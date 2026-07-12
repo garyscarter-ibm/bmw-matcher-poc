@@ -1,0 +1,242 @@
+/*
+ * BMW Matcher block styles. Scoped under .bmwm so the block drops into
+ * an existing EDS site without leaking styles. Mobile-first.
+ */
+
+.bmwm {
+  --bmwm-bg: #16181d;
+  --bmwm-surface: #1f232b;
+  --bmwm-surface-2: #262b35;
+  --bmwm-line: #343b48;
+  --bmwm-text: #eef0f4;
+  --bmwm-muted: #9aa3b2;
+  --bmwm-accent: #4da3ff;
+  --bmwm-accent-ink: #0b1420;
+  --bmwm-radius: 14px;
+
+  background: var(--bmwm-bg);
+  color: var(--bmwm-text);
+  font-family: 'Helvetica Neue', helvetica, arial, sans-serif;
+  border-radius: var(--bmwm-radius);
+  padding: 24px 20px 32px;
+  max-width: 880px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+.bmwm * { box-sizing: border-box; }
+
+.bmwm-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  color: var(--bmwm-accent);
+  margin: 0 0 10px;
+}
+
+.bmwm-title {
+  font-size: clamp(1.6rem, 4.5vw, 2.4rem);
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 14px;
+}
+
+.bmwm-lede { color: var(--bmwm-muted); max-width: 46ch; margin: 0 0 26px; }
+
+.bmwm-intro { padding: 28px 4px; }
+
+/* --- buttons --- */
+
+.bmwm-btn {
+  font: inherit;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 12px 26px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.12s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+.bmwm-btn:active { transform: scale(0.98); }
+.bmwm-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.bmwm-btn-primary { background: var(--bmwm-accent); color: var(--bmwm-accent-ink); }
+.bmwm-btn-primary:not(:disabled):hover { filter: brightness(1.1); }
+
+.bmwm-btn-ghost {
+  background: transparent;
+  color: var(--bmwm-muted);
+  border-color: var(--bmwm-line);
+}
+.bmwm-btn-ghost:not(:disabled):hover { color: var(--bmwm-text); border-color: var(--bmwm-muted); }
+
+.bmwm button:focus-visible {
+  outline: 2px solid var(--bmwm-accent);
+  outline-offset: 2px;
+}
+
+/* --- quiz --- */
+
+.bmwm-screen { animation: bmwm-in 0.25s ease; }
+
+@keyframes bmwm-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.bmwm-progress {
+  height: 4px;
+  background: var(--bmwm-line);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.bmwm-progress-bar {
+  height: 100%;
+  background: var(--bmwm-accent);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.bmwm-step {
+  font-size: 0.75rem;
+  color: var(--bmwm-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 18px;
+}
+
+.bmwm-question { font-size: clamp(1.3rem, 3.5vw, 1.7rem); margin: 0 0 6px; outline: none; }
+.bmwm-help { color: var(--bmwm-muted); font-size: 0.92rem; margin: 0 0 20px; }
+
+.bmwm-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 18px 0 24px;
+}
+
+@media (min-width: 560px) {
+  .bmwm-options { grid-template-columns: 1fr 1fr; }
+}
+
+.bmwm-option {
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bmwm-surface);
+  color: var(--bmwm-text);
+  border: 1px solid var(--bmwm-line);
+  border-radius: var(--bmwm-radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.bmwm-option:hover { border-color: var(--bmwm-muted); }
+
+.bmwm-option.is-selected {
+  border-color: var(--bmwm-accent);
+  background: var(--bmwm-surface-2);
+  box-shadow: inset 0 0 0 1px var(--bmwm-accent);
+}
+
+.bmwm-option-label { font-weight: 600; }
+.bmwm-option-sub { font-size: 0.82rem; color: var(--bmwm-muted); }
+
+.bmwm-nav { display: flex; justify-content: space-between; gap: 12px; }
+
+/* --- results --- */
+
+.bmwm-grid { display: grid; gap: 16px; margin: 22px 0 8px; }
+
+.bmwm-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--bmwm-surface);
+  border: 1px solid var(--bmwm-line);
+  border-radius: var(--bmwm-radius);
+  overflow: hidden;
+}
+
+.bmwm-card-media {
+  background:
+    radial-gradient(120% 140% at 85% 10%, rgb(77 163 255 / 18%), transparent 55%),
+    linear-gradient(160deg, #232936, #191d24);
+  min-height: 84px;
+  display: flex;
+  align-items: flex-end;
+  padding: 14px 18px;
+}
+
+.bmwm-card-line {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bmwm-muted);
+}
+
+.bmwm-card-body { padding: 16px 18px 20px; }
+
+.bmwm-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bmwm-card-name { font-size: 1.15rem; margin: 0; }
+
+.bmwm-score {
+  flex: none;
+  font-weight: 700;
+  color: var(--bmwm-accent);
+  border: 1px solid var(--bmwm-accent);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  padding: 3px 10px;
+}
+
+.bmwm-specs { color: var(--bmwm-muted); font-size: 0.82rem; margin: 8px 0 10px; }
+.bmwm-blurb { margin: 0 0 4px; font-size: 0.95rem; }
+
+.bmwm-why-label {
+  margin: 14px 0 6px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--bmwm-accent);
+}
+
+.bmwm-reasons { margin: 0; padding: 0 0 0 18px; font-size: 0.92rem; }
+.bmwm-reasons li { margin-bottom: 4px; }
+
+.bmwm-subhead { margin: 26px 0 12px; font-size: 1rem; color: var(--bmwm-muted); }
+
+.bmwm-contenders { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.bmwm-contender {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: var(--bmwm-surface);
+  border: 1px solid var(--bmwm-line);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+
+.bmwm-contender-score { color: var(--bmwm-accent); font-weight: 700; }
+
+.bmwm-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 8px; }
+
+.bmwm-disclaimer { color: var(--bmwm-muted); font-size: 0.75rem; margin-top: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bmwm-screen { animation: none; }
+  .bmwm-btn, .bmwm-option, .bmwm-progress-bar { transition: none; }
+}
