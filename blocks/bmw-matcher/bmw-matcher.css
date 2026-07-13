@@ -46,6 +46,9 @@
 
 .bmwm-intro { padding: 28px 4px; }
 
+/* Loading / error status screens (quiz load, match fetch). */
+.bmwm-status { padding: 44px 4px; min-height: 180px; }
+
 /* --- buttons --- */
 
 .bmwm-btn {

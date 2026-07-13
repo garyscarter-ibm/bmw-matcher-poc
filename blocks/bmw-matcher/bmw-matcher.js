@@ -1,19 +1,23 @@
 /*
  * BMW Matcher — Adobe Edge Delivery Services (EDS) block.
  *
- * EDS calls `decorate(block)` with the block's DOM element; everything
- * else (quiz state, scoring, results, share links) is handled here with
- * zero dependencies. The block also runs standalone — see index.html.
+ * EDS calls `decorate(block)` with the block's DOM element; the quiz UI,
+ * results rendering and share links are handled here. The scoring engine and
+ * car dataset live behind an API (see server/) so they never reach the
+ * browser — the block fetches the quiz definition and match results over HTTP.
  *
- * Share links encode the quiz answers in the URL hash (#m=<base64url>),
- * so results re-render anywhere the block is mounted, no backend needed.
+ * The API base is read from the block's `data-api` attribute (set per-site in
+ * EDS) and falls back to http://localhost:8787 for local preview.
+ *
+ * Share links encode the quiz answers in the URL hash (#m=<base64url>); the
+ * link is decoded/validated client-side (quiz-meta.js), then the results are
+ * re-fetched from the API.
  */
 
-import { QUESTIONS, BUDGET_BANDS } from './questions.js';
-import { CARS } from './data.js';
-import { matchCars } from './engine.js';
+import { SHOW_IF, BUDGET_BANDS } from './quiz-meta.js';
 
 const HASH_KEY = 'm';
+const DEFAULT_API = 'http://localhost:8787';
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -24,31 +28,60 @@ function el(tag, className, text) {
   return node;
 }
 
+/** API base for this block: `data-api` attribute, else the localhost default. */
+function apiBase(block) {
+  return (block.dataset.api || DEFAULT_API).replace(/\/+$/, '');
+}
+
+async function apiGetQuestions(base) {
+  const res = await fetch(`${base}/api/questions`);
+  if (!res.ok) throw new Error(`Questions request failed (${res.status})`);
+  const data = await res.json();
+  return data.questions;
+}
+
+async function apiMatch(base, answers) {
+  const res = await fetch(`${base}/api/match`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers }),
+  });
+  if (!res.ok) throw new Error(`Match request failed (${res.status})`);
+  return res.json();
+}
+
+/** Is question `q` shown given the current answers? Uses SHOW_IF by id. */
+function isVisible(q, answers) {
+  if (!q.conditional) return true;
+  const predicate = SHOW_IF[q.id];
+  return predicate ? predicate(answers) : true;
+}
+
 function encodeAnswers(answers) {
   const json = JSON.stringify(answers);
   return btoa(unescape(encodeURIComponent(json)))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function decodeAnswers(encoded) {
+function decodeAnswers(encoded, questions) {
   try {
     const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
     const answers = JSON.parse(decodeURIComponent(escape(atob(b64))));
-    // Minimal validation: every non-conditional question must be answered.
-    const valid = QUESTIONS.every((q) => (q.showIf && !q.showIf(answers)) || answers[q.id] != null);
+    // Minimal validation: every question that should be shown must be answered.
+    const valid = questions.every((q) => !isVisible(q, answers) || answers[q.id] != null);
     return valid && BUDGET_BANDS[answers.budget] ? answers : null;
   } catch {
     return null;
   }
 }
 
-function answersFromHash() {
+function answersFromHash(questions) {
   const match = window.location.hash.match(new RegExp(`${HASH_KEY}=([A-Za-z0-9_-]+)`));
-  return match ? decodeAnswers(match[1]) : null;
+  return match ? decodeAnswers(match[1], questions) : null;
 }
 
-function visibleQuestions(answers) {
-  return QUESTIONS.filter((q) => !q.showIf || q.showIf(answers));
+function visibleQuestions(questions, answers) {
+  return questions.filter((q) => isVisible(q, answers));
 }
 
 const gbp = (n) => `£${n.toLocaleString('en-GB')}`;
@@ -64,11 +97,14 @@ const FUEL_SPEC = { petrol: 'Petrol', diesel: 'Diesel', phev: 'Plug-in hybrid', 
 function renderIntro(root, ctx) {
   root.replaceChildren();
   const intro = el('div', 'bmwm-intro');
+  // Count the questions a typical run sees ("Help me decide" shows the
+  // conditional charging question, matching the longest common path).
+  const count = visibleQuestions(ctx.questions, { fuel: 'open' }).length;
   intro.append(
     el('p', 'bmwm-kicker', 'The unofficial UK matchmaker'),
     el('h1', 'bmwm-title', 'Find your perfect BMW'),
     el('p', 'bmwm-lede',
-      `Answer ${visibleQuestions({ fuel: 'open' }).length} quick questions about your life, your miles and your budget — we’ll match you with your top three from the current UK range, and tell you exactly why.`),
+      `Answer ${count} quick questions about your life, your miles and your budget — we’ll match you with your top three from the current UK range, and tell you exactly why.`),
   );
   const start = el('button', 'bmwm-btn bmwm-btn-primary', 'Start the quiz');
   start.addEventListener('click', () => ctx.showQuestion(0));
@@ -77,7 +113,7 @@ function renderIntro(root, ctx) {
 }
 
 function renderQuestion(root, ctx, index) {
-  const questions = visibleQuestions(ctx.answers);
+  const questions = visibleQuestions(ctx.questions, ctx.answers);
   const q = questions[index];
   const selected = new Set(
     q.multi ? (ctx.answers[q.id] || []) : (ctx.answers[q.id] != null ? [ctx.answers[q.id]] : []),
@@ -100,7 +136,7 @@ function renderQuestion(root, ctx, index) {
   const optionButtons = [];
 
   const advance = () => {
-    if (index + 1 < visibleQuestions(ctx.answers).length) ctx.showQuestion(index + 1);
+    if (index + 1 < visibleQuestions(ctx.questions, ctx.answers).length) ctx.showQuestion(index + 1);
     else ctx.showResults(ctx.answers, { updateHash: true });
   };
 
@@ -196,8 +232,40 @@ function matchCard(match, big) {
   return card;
 }
 
-function renderResults(root, ctx, answers) {
-  const { matches, contenders } = matchCars(answers, CARS);
+/** Full-screen status message (loading / error), optionally with a retry button. */
+function renderStatus(root, { kicker, title, message, retryLabel, onRetry }) {
+  root.replaceChildren();
+  const screen = el('div', 'bmwm-screen bmwm-status');
+  if (kicker) screen.append(el('p', 'bmwm-kicker', kicker));
+  screen.append(el('h2', 'bmwm-title', title));
+  if (message) screen.append(el('p', 'bmwm-lede', message));
+  if (onRetry) {
+    const retry = el('button', 'bmwm-btn bmwm-btn-primary', retryLabel || 'Try again');
+    retry.type = 'button';
+    retry.addEventListener('click', onRetry);
+    screen.append(retry);
+  }
+  root.append(screen);
+}
+
+async function renderResults(root, ctx, answers) {
+  renderStatus(root, { kicker: 'Almost there', title: 'Finding your matches…' });
+
+  let matches;
+  let contenders;
+  try {
+    ({ matches, contenders } = await apiMatch(ctx.api, answers));
+  } catch {
+    renderStatus(root, {
+      kicker: 'Hmm',
+      title: 'We couldn’t reach the matcher',
+      message: 'The matching service didn’t respond. Check your connection and try again.',
+      retryLabel: 'Try again',
+      onRetry: () => renderResults(root, ctx, answers),
+    });
+    return;
+  }
+
   root.replaceChildren();
   const screen = el('div', 'bmwm-screen bmwm-results');
 
@@ -244,7 +312,7 @@ function renderResults(root, ctx, answers) {
   });
   const tweak = el('button', 'bmwm-btn bmwm-btn-ghost', 'Tweak my answers');
   tweak.type = 'button';
-  tweak.addEventListener('click', () => ctx.showQuestion(visibleQuestions(ctx.answers).length - 1));
+  tweak.addEventListener('click', () => ctx.showQuestion(visibleQuestions(ctx.questions, ctx.answers).length - 1));
   const retake = el('button', 'bmwm-btn bmwm-btn-ghost', 'Start over');
   retake.type = 'button';
   retake.addEventListener('click', () => {
@@ -263,11 +331,11 @@ function renderResults(root, ctx, answers) {
 
 /* ------------------------------ decorate ------------------------------ */
 
-export default function decorate(block) {
+export default async function decorate(block) {
   block.replaceChildren();
   block.classList.add('bmwm');
 
-  const ctx = { answers: {} };
+  const ctx = { answers: {}, api: apiBase(block), questions: [] };
   ctx.showIntro = () => renderIntro(block, ctx);
   ctx.showQuestion = (i) => renderQuestion(block, ctx, i);
   ctx.showResults = (answers, { updateHash = false } = {}) => {
@@ -277,11 +345,30 @@ export default function decorate(block) {
     renderResults(block, ctx, answers);
   };
 
-  const shared = answersFromHash();
-  if (shared) {
-    ctx.answers = shared;
-    ctx.showResults(shared);
-  } else {
-    ctx.showIntro();
-  }
+  // The quiz definition lives behind the API, so load it before rendering.
+  const boot = async () => {
+    renderStatus(block, { kicker: 'The unofficial UK matchmaker', title: 'Warming up…' });
+    try {
+      ctx.questions = await apiGetQuestions(ctx.api);
+    } catch {
+      renderStatus(block, {
+        kicker: 'Hmm',
+        title: 'We couldn’t load the quiz',
+        message: 'The matching service didn’t respond. Check your connection and try again.',
+        retryLabel: 'Try again',
+        onRetry: boot,
+      });
+      return;
+    }
+
+    const shared = answersFromHash(ctx.questions);
+    if (shared) {
+      ctx.answers = shared;
+      ctx.showResults(shared);
+    } else {
+      ctx.showIntro();
+    }
+  };
+
+  await boot();
 }

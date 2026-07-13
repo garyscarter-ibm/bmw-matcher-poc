@@ -24,8 +24,10 @@
 </head>
 <body>
   <main>
-    <!-- Standalone harness: mounts the block exactly as EDS would. -->
-    <div class="bmw-matcher block" data-block-name="bmw-matcher"></div>
+    <!-- Standalone harness: mounts the block exactly as EDS would.
+         data-api points the block at the matching backend; in a live EDS site
+         you'd set this per-environment. Defaults to http://localhost:8787. -->
+    <div class="bmw-matcher block" data-block-name="bmw-matcher" data-api="http://localhost:8787"></div>
   </main>
   <script type="module">
     import decorate from './blocks/bmw-matcher/bmw-matcher.js';

@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { matchCars, STRETCH_FACTOR } from '../blocks/bmw-matcher/engine.js';
-import { CARS } from '../blocks/bmw-matcher/data.js';
-import { BUDGET_BANDS, QUESTIONS } from '../blocks/bmw-matcher/questions.js';
+import { matchCars, STRETCH_FACTOR } from '../engine.js';
+import { CARS } from '../data.js';
+import { BUDGET_BANDS, QUESTIONS } from '../questions.js';
 
 function run(answers) {
   return matchCars(answers, CARS);
