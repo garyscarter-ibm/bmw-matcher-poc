@@ -119,21 +119,16 @@ New/changed files under `server/`:
 
 ## Design tokens (separate, lighter-weight follow-up)
 
-From inspecting `grassicksbmw.co.uk` (BMW's official brand system):
-- Font: BMWTypeNextLatin (Thin/Light/Regular/Bold) — proprietary, can't
-  ship; use a close system-font fallback and document that the real face
-  is available site-side once ported into EDS/the retailer site. Headings
-  are Light weight, UPPERCASE.
-- Palette: text `#262626` (primary) / `#000`, backgrounds `#FFFFFF`
-  (dominant) / `#F5F5F5` / `#F9F9F9` (section bands) / `#262626` or `#000`
-  (dark bands), **accent `#1C69D4`** (BMW blue), secondary `#0085AC`
-  (BMW i teal).
-- Geometry: sharp corners — mostly `0px` radius, occasional `4px`. Flat,
-  editorial, generous spacing, full-bleed photographic hero treatment.
-- Contrast with the current block CSS (dark graphite + rounded pills +
-  a different blue) — needs a reskin to fit a retailer site. Plan: land the
-  live-data work first, then a CSS-variable token layer, then apply it to
-  `bmw-matcher.css` without touching the JS.
+Full spec now written up in [design-tokens.md](design-tokens.md) — complete
+type scale, 4px-based spacing scale, button variants, colour tokens
+(`--bmwm-accent: #1C69D4` etc.), and geometry (sharp, 0px radius), all
+extracted directly from `grassicksbmw.co.uk`'s computed styles. That
+document is a ready-to-implement CSS custom-property spec, not just notes.
+
+Plan: land the live-data work first, then apply the token layer to
+`bmw-matcher.css` (swap custom-property values, no JS changes needed) —
+see the "Mapping onto the existing block" section of design-tokens.md for
+the step order.
 
 ## Open risks / notes for whoever resumes this
 
