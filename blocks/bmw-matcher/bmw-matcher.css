@@ -1,24 +1,75 @@
 /*
  * BMW Matcher block styles. Scoped under .bmwm so the block drops into
  * an existing EDS site without leaking styles. Mobile-first.
+ *
+ * Reskinned to the BMW / Grassick's design system — see docs/design-tokens.md.
+ * Light, sharp, editorial: BMW Blue accent, flat no-radius cards, the
+ * BMWTypeNext family (referenced by name; the retailer site loads it site-wide,
+ * and we fall through to a neutral geometric system stack in the preview
+ * harness where the proprietary font isn't available).
  */
 
 .bmwm {
-  --bmwm-bg: #16181d;
-  --bmwm-surface: #1f232b;
-  --bmwm-surface-2: #262b35;
-  --bmwm-line: #343b48;
-  --bmwm-text: #eef0f4;
-  --bmwm-muted: #9aa3b2;
-  --bmwm-accent: #4da3ff;
-  --bmwm-accent-ink: #0b1420;
-  --bmwm-radius: 14px;
+  /* --- font --- */
+  --bmwm-font-heading: 'BMWTypeNextLatin-Light', 'Helvetica Neue', arial, sans-serif;
+  --bmwm-font-body: 'BMWTypeNextLatin-Regular', 'Helvetica Neue', arial, sans-serif;
+  --bmwm-font-bold: 'BMWTypeNextLatin-Bold', 'Helvetica Neue', arial, sans-serif;
 
-  background: var(--bmwm-bg);
-  color: var(--bmwm-text);
-  font-family: 'Helvetica Neue', helvetica, arial, sans-serif;
+  /* --- colour (light theme) --- */
+  --bmwm-ink: #262626;          /* primary text */
+  --bmwm-ink-strong: #000000;   /* pure-black text/CTAs */
+  --bmwm-ink-muted: #666666;    /* secondary/caption text */
+  --bmwm-surface: #ffffff;      /* page background */
+  --bmwm-surface-alt: #f5f5f5;  /* section band background */
+  --bmwm-surface-alt-2: #f9f9f9;/* secondary section band */
+  --bmwm-surface-dark: #262626; /* dark section band */
+  --bmwm-accent: #1c69d4;       /* BMW Blue — primary CTA, links, highlights */
+  --bmwm-accent-ink: #ffffff;   /* text/icon colour on the accent */
+  --bmwm-accent-secondary: #0085ac; /* BMW i teal */
+  --bmwm-line: #d6d6d6;         /* hairline dividers/borders on the light theme */
+
+  /* Semantic aliases so the shared selectors below read cleanly. */
+  --bmwm-bg: var(--bmwm-surface);
+  --bmwm-surface-2: var(--bmwm-surface-alt);
+  --bmwm-text: var(--bmwm-ink);
+  --bmwm-muted: var(--bmwm-ink-muted);
+
+  /* --- spacing scale (4px based) --- */
+  --bmwm-space-1: 4px;
+  --bmwm-space-2: 8px;
+  --bmwm-space-3: 12px;
+  --bmwm-space-4: 16px;
+  --bmwm-space-5: 20px;
+  --bmwm-space-6: 24px;
+  --bmwm-space-8: 32px;
+  --bmwm-space-10: 40px;
+  --bmwm-space-12: 48px;
+  --bmwm-space-16: 64px;
+
+  /* --- geometry --- */
+  --bmwm-radius: 0px;
+  --bmwm-radius-soft: 4px;      /* rare exception, e.g. inline links */
+  --bmwm-btn-height: 46px;
+  --bmwm-btn-padding: 12px 20px 15px;
+  --bmwm-btn-min-width: 232px;
+  --bmwm-border-width: 1px;
+
+  /* --- type scale (line-height 1.2× unless noted) --- */
+  --bmwm-text-h1: 40px;
+  --bmwm-text-h2-lg: 36px;
+  --bmwm-text-h2: 26px;
+  --bmwm-text-h3: 24px;
+  --bmwm-text-body-lg: 18px;
+  --bmwm-text-body: 16px;
+  --bmwm-text-label: 13px;
+  --bmwm-text-eyebrow: 10px;
+
+  background: var(--bmwm-surface);
+  color: var(--bmwm-ink);
+  font-family: var(--bmwm-font-body);
+  font-size: var(--bmwm-text-body);
   border-radius: var(--bmwm-radius);
-  padding: 24px 20px 32px;
+  padding: var(--bmwm-space-6) var(--bmwm-space-5) var(--bmwm-space-8);
   max-width: 880px;
   margin: 0 auto;
   line-height: 1.5;
@@ -27,52 +78,76 @@
 .bmwm * { box-sizing: border-box; }
 
 .bmwm-kicker {
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.72rem;
-  color: var(--bmwm-accent);
-  margin: 0 0 10px;
+  letter-spacing: 0.8px;
+  font-size: var(--bmwm-text-eyebrow);
+  line-height: 1.2;
+  color: var(--bmwm-ink-muted);
+  margin: 0 0 var(--bmwm-space-3);
 }
 
 .bmwm-title {
-  font-size: clamp(1.6rem, 4.5vw, 2.4rem);
-  line-height: 1.15;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  margin: 0 0 14px;
+  font-family: var(--bmwm-font-heading);
+  font-size: var(--bmwm-text-h1);
+  line-height: 1.2;
+  font-weight: 300;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  margin: 0 0 var(--bmwm-space-4);
 }
 
-.bmwm-lede { color: var(--bmwm-muted); max-width: 46ch; margin: 0 0 26px; }
+.bmwm-lede {
+  font-family: var(--bmwm-font-heading);
+  font-weight: 300;
+  font-size: var(--bmwm-text-body-lg);
+  line-height: 1.2;
+  color: var(--bmwm-ink-muted);
+  max-width: 52ch;
+  margin: 0 0 var(--bmwm-space-6);
+}
 
-.bmwm-intro { padding: 28px 4px; }
+.bmwm-intro { padding: var(--bmwm-space-8) var(--bmwm-space-1); }
 
 /* Loading / error status screens (quiz load, match fetch). */
-.bmwm-status { padding: 44px 4px; min-height: 180px; }
+.bmwm-status { padding: var(--bmwm-space-12) var(--bmwm-space-1); min-height: 180px; }
 
 /* --- buttons --- */
 
 .bmwm-btn {
-  font: inherit;
-  font-weight: 600;
-  border-radius: 999px;
-  padding: 12px 26px;
+  font-family: var(--bmwm-font-body);
+  font-size: var(--bmwm-text-label);
+  font-weight: 400;
+  line-height: 1;
+  min-height: var(--bmwm-btn-height);
+  padding: var(--bmwm-btn-padding);
+  border-radius: var(--bmwm-radius);
   cursor: pointer;
-  border: 1px solid transparent;
-  transition: transform 0.12s ease, background 0.15s ease, opacity 0.15s ease;
+  border: var(--bmwm-border-width) solid transparent;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
-.bmwm-btn:active { transform: scale(0.98); }
 .bmwm-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-.bmwm-btn-primary { background: var(--bmwm-accent); color: var(--bmwm-accent-ink); }
-.bmwm-btn-primary:not(:disabled):hover { filter: brightness(1.1); }
+.bmwm-btn-primary {
+  background: var(--bmwm-accent);
+  color: var(--bmwm-accent-ink);
+  border-color: var(--bmwm-accent);
+}
+.bmwm-btn-primary:not(:disabled):hover { filter: brightness(1.08); }
 
 .bmwm-btn-ghost {
-  background: transparent;
-  color: var(--bmwm-muted);
-  border-color: var(--bmwm-line);
+  background: var(--bmwm-surface);
+  color: var(--bmwm-ink);
+  border-color: var(--bmwm-ink);
 }
-.bmwm-btn-ghost:not(:disabled):hover { color: var(--bmwm-text); border-color: var(--bmwm-muted); }
+.bmwm-btn-ghost:not(:disabled):hover { background: var(--bmwm-surface-alt); }
+
+/* Primary CTAs that stand alone (intro/results/status) get the wide min-width;
+   in-flow nav/action buttons stay their natural size. */
+.bmwm-intro .bmwm-btn-primary,
+.bmwm-status .bmwm-btn-primary { min-width: var(--bmwm-btn-min-width); }
 
 .bmwm button:focus-visible {
   outline: 2px solid var(--bmwm-accent);
@@ -90,35 +165,49 @@
 
 .bmwm-progress {
   height: 4px;
-  background: var(--bmwm-line);
-  border-radius: 999px;
+  background: var(--bmwm-surface-alt);
+  border-radius: var(--bmwm-radius);
   overflow: hidden;
-  margin-bottom: 10px;
+  margin-bottom: var(--bmwm-space-3);
 }
 
 .bmwm-progress-bar {
   height: 100%;
   background: var(--bmwm-accent);
-  border-radius: 999px;
+  border-radius: var(--bmwm-radius);
   transition: width 0.3s ease;
 }
 
 .bmwm-step {
-  font-size: 0.75rem;
-  color: var(--bmwm-muted);
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  font-size: var(--bmwm-text-eyebrow);
+  color: var(--bmwm-ink-muted);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  margin: 0 0 18px;
+  letter-spacing: 0.8px;
+  margin: 0 0 var(--bmwm-space-5);
 }
 
-.bmwm-question { font-size: clamp(1.3rem, 3.5vw, 1.7rem); margin: 0 0 6px; outline: none; }
-.bmwm-help { color: var(--bmwm-muted); font-size: 0.92rem; margin: 0 0 20px; }
+.bmwm-question {
+  font-family: var(--bmwm-font-heading);
+  font-weight: 300;
+  font-size: var(--bmwm-text-h2);
+  line-height: 1.2;
+  margin: 0 0 var(--bmwm-space-2);
+  outline: none;
+}
+
+.bmwm-help {
+  color: var(--bmwm-ink-muted);
+  font-size: var(--bmwm-text-body);
+  margin: 0 0 var(--bmwm-space-5);
+}
 
 .bmwm-options {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
-  margin: 18px 0 24px;
+  gap: var(--bmwm-space-2);
+  margin: var(--bmwm-space-5) 0 var(--bmwm-space-6);
 }
 
 @media (min-width: 560px) {
@@ -126,118 +215,185 @@
 }
 
 .bmwm-option {
-  font: inherit;
+  font-family: var(--bmwm-font-body);
+  font-size: var(--bmwm-text-body);
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--bmwm-space-1);
   background: var(--bmwm-surface);
-  color: var(--bmwm-text);
-  border: 1px solid var(--bmwm-line);
+  color: var(--bmwm-ink);
+  border: var(--bmwm-border-width) solid var(--bmwm-line);
   border-radius: var(--bmwm-radius);
-  padding: 14px 16px;
+  padding: var(--bmwm-space-4);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.bmwm-option:hover { border-color: var(--bmwm-muted); }
+.bmwm-option:hover { border-color: var(--bmwm-ink); }
 
 .bmwm-option.is-selected {
   border-color: var(--bmwm-accent);
-  background: var(--bmwm-surface-2);
+  background: var(--bmwm-surface);
   box-shadow: inset 0 0 0 1px var(--bmwm-accent);
 }
 
-.bmwm-option-label { font-weight: 600; }
-.bmwm-option-sub { font-size: 0.82rem; color: var(--bmwm-muted); }
+.bmwm-option-label { font-family: var(--bmwm-font-bold); font-weight: 700; }
+.bmwm-option-sub { font-size: var(--bmwm-text-label); color: var(--bmwm-ink-muted); }
 
-.bmwm-nav { display: flex; justify-content: space-between; gap: 12px; }
+.bmwm-nav { display: flex; justify-content: space-between; gap: var(--bmwm-space-3); }
 
 /* --- results --- */
 
-.bmwm-grid { display: grid; gap: 16px; margin: 22px 0 8px; }
+.bmwm-grid { display: grid; gap: var(--bmwm-space-4); margin: var(--bmwm-space-6) 0 var(--bmwm-space-2); }
 
 .bmwm-card {
   display: flex;
   flex-direction: column;
   background: var(--bmwm-surface);
-  border: 1px solid var(--bmwm-line);
+  border: var(--bmwm-border-width) solid var(--bmwm-line);
   border-radius: var(--bmwm-radius);
   overflow: hidden;
 }
 
+/* Full-width 16:9 photo band at the top of the card (matching the live-stock
+   API's sixteennine aspect ratio). Flat dark field standing in for the photo
+   until real imagery is wired in. */
 .bmwm-card-media {
-  background:
-    radial-gradient(120% 140% at 85% 10%, rgb(77 163 255 / 18%), transparent 55%),
-    linear-gradient(160deg, #232936, #191d24);
-  min-height: 84px;
+  position: relative;
+  background: var(--bmwm-surface-dark);
+  aspect-ratio: 16 / 9;
   display: flex;
   align-items: flex-end;
-  padding: 14px 18px;
+  padding: var(--bmwm-space-4) var(--bmwm-space-5);
+  overflow: hidden;
+}
+
+/* Real retailer photo fills the media slot; the line label sits over it. */
+.bmwm-card-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .bmwm-card-line {
-  font-size: 0.72rem;
-  letter-spacing: 0.16em;
+  position: relative; /* keep the label above the photo */
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  font-size: var(--bmwm-text-eyebrow);
+  letter-spacing: 0.8px;
   text-transform: uppercase;
-  color: var(--bmwm-muted);
+  color: var(--bmwm-accent-ink);
 }
 
-.bmwm-card-body { padding: 16px 18px 20px; }
+/* On photo cards, give the label a scrim so it stays legible over imagery. */
+.bmwm-card-media.has-photo .bmwm-card-line {
+  color: #fff;
+  padding: var(--bmwm-space-1) var(--bmwm-space-2);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.bmwm-card-body { padding: var(--bmwm-space-6); }
 
 .bmwm-card-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--bmwm-space-3);
 }
 
-.bmwm-card-name { font-size: 1.15rem; margin: 0; }
+.bmwm-card-name {
+  font-family: var(--bmwm-font-heading);
+  font-weight: 300;
+  font-size: var(--bmwm-text-h3);
+  line-height: 1.33;
+  margin: 0;
+}
 
 .bmwm-score {
   flex: none;
+  font-family: var(--bmwm-font-bold);
   font-weight: 700;
-  color: var(--bmwm-accent);
-  border: 1px solid var(--bmwm-accent);
-  border-radius: 999px;
-  font-size: 0.85rem;
-  padding: 3px 10px;
+  color: var(--bmwm-accent-ink);
+  background: var(--bmwm-accent);
+  border: var(--bmwm-border-width) solid var(--bmwm-accent);
+  border-radius: var(--bmwm-radius);
+  font-size: var(--bmwm-text-label);
+  padding: var(--bmwm-space-1) var(--bmwm-space-3);
 }
 
-.bmwm-specs { color: var(--bmwm-muted); font-size: 0.82rem; margin: 8px 0 10px; }
-.bmwm-blurb { margin: 0 0 4px; font-size: 0.95rem; }
+.bmwm-specs { color: var(--bmwm-ink-muted); font-size: var(--bmwm-text-label); margin: var(--bmwm-space-2) 0 var(--bmwm-space-2); }
+.bmwm-usedmeta {
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  color: var(--bmwm-ink);
+  font-size: var(--bmwm-text-label);
+  margin: 0 0 var(--bmwm-space-3);
+}
+.bmwm-blurb { margin: 0 0 var(--bmwm-space-1); font-size: var(--bmwm-text-body); }
+
+.bmwm-card-link {
+  display: inline-block;
+  margin-top: var(--bmwm-space-4);
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-accent);
+  text-decoration: none;
+}
+.bmwm-card-link:hover { text-decoration: underline; }
 
 .bmwm-why-label {
-  margin: 14px 0 6px;
-  font-size: 0.72rem;
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  margin: var(--bmwm-space-4) 0 var(--bmwm-space-2);
+  font-size: var(--bmwm-text-eyebrow);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.8px;
   color: var(--bmwm-accent);
 }
 
-.bmwm-reasons { margin: 0; padding: 0 0 0 18px; font-size: 0.92rem; }
-.bmwm-reasons li { margin-bottom: 4px; }
+.bmwm-reasons { margin: 0; padding: 0 0 0 var(--bmwm-space-5); font-size: var(--bmwm-text-body); }
+.bmwm-reasons li { margin-bottom: var(--bmwm-space-1); }
 
-.bmwm-subhead { margin: 26px 0 12px; font-size: 1rem; color: var(--bmwm-muted); }
+.bmwm-subhead {
+  font-family: var(--bmwm-font-heading);
+  font-weight: 300;
+  margin: var(--bmwm-space-8) 0 var(--bmwm-space-3);
+  font-size: var(--bmwm-text-h3);
+  color: var(--bmwm-ink);
+}
 
-.bmwm-contenders { display: flex; flex-wrap: wrap; gap: 8px; }
+.bmwm-contenders { display: flex; flex-wrap: wrap; gap: var(--bmwm-space-2); }
 
 .bmwm-contender {
   display: flex;
-  gap: 10px;
+  gap: var(--bmwm-space-3);
   align-items: center;
-  background: var(--bmwm-surface);
-  border: 1px solid var(--bmwm-line);
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-size: 0.85rem;
+  background: var(--bmwm-surface-alt);
+  border: var(--bmwm-border-width) solid var(--bmwm-line);
+  border-radius: var(--bmwm-radius);
+  padding: var(--bmwm-space-3) var(--bmwm-space-4);
+  font-size: var(--bmwm-text-label);
 }
 
-.bmwm-contender-score { color: var(--bmwm-accent); font-weight: 700; }
+.bmwm-contender-score { font-family: var(--bmwm-font-bold); color: var(--bmwm-accent); font-weight: 700; }
 
-.bmwm-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 8px; }
+.bmwm-actions { display: flex; flex-wrap: wrap; gap: var(--bmwm-space-3); margin: var(--bmwm-space-8) 0 var(--bmwm-space-2); }
 
-.bmwm-disclaimer { color: var(--bmwm-muted); font-size: 0.75rem; margin-top: 18px; }
+.bmwm-disclaimer { color: var(--bmwm-ink-muted); font-size: var(--bmwm-text-label); margin-top: var(--bmwm-space-5); }
+
+/* Mobile: hero steps 40px → 32px (the one confirmed breakpoint data point);
+   other headings scale down ~proportionally. Desktop values are the defaults
+   above, so only the stepped-down overrides live here. */
+@media (max-width: 767px) {
+  .bmwm-title { font-size: 32px; }
+  .bmwm-question { font-size: 22px; }
+  .bmwm-card-name, .bmwm-subhead { font-size: 20px; }
+  .bmwm-lede { font-size: var(--bmwm-text-body); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .bmwm-screen { animation: none; }

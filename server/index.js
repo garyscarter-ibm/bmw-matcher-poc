@@ -1,8 +1,10 @@
 /*
  * BMW Matcher API — zero-dependency Node HTTP server.
  *
- * Runs the matching engine server-side so the curated dataset (data.js) and
- * scoring weights (engine.js) never reach the browser. The EDS block calls:
+ * Runs the matching engine server-side so the scoring weights (engine.js)
+ * never reach the browser, and fetches live used-car stock from a real BMW
+ * retailer (stock.js) so matches are cars you can actually buy today. The
+ * EDS block calls:
  *
  *   GET  /api/questions  → quiz definition (showIf functions stripped)
  *   POST /api/match      → { answers } → { matches, contenders } with
@@ -16,7 +18,7 @@
 import { createServer } from 'node:http';
 
 import { matchCars } from './engine.js';
-import { CARS } from './data.js';
+import { fetchGrassickStock, StockUnavailableError } from './stock.js';
 import { QUESTIONS, BUDGET_BANDS } from './questions.js';
 
 const PORT = Number(process.env.PORT) || 8787;
@@ -53,8 +55,9 @@ function publicQuestions() {
 /**
  * Project a car down to only the fields the result cards render (see
  * matchCard() in bmw-matcher.js). Internal scoring fields — tags, sizeClass,
- * seats, boot, monthlyFrom, id — are omitted so responses can't be used to
- * reconstruct the dataset.
+ * seats, boot, id — are omitted so responses can't be used to reconstruct the
+ * dataset. The real display fields (mileage, plate, photo, retailerName, link)
+ * come from the live feed and are passed through where present.
  */
 function publicCar(car) {
   return {
@@ -68,6 +71,12 @@ function publicCar(car) {
     mpg: car.mpg,
     evRange: car.evRange,
     blurb: car.blurb,
+    // Live retailer detail (present when sourced from the live feed).
+    mileage: car.mileage,
+    plate: car.plate,
+    photo: car.photo,
+    retailerName: car.retailerName,
+    link: car.link,
   };
 }
 
@@ -116,7 +125,20 @@ async function handleMatch(req, res) {
     return sendJson(res, 400, { error: 'Invalid or missing budget' });
   }
 
-  const { matches, contenders } = matchCars(answers, CARS);
+  // Live proxy: score against the retailer's real stock, not a static file.
+  // If the live feed can't be reached, return a friendly 5xx — the block's
+  // retry UI handles it. No static fallback (this tool is honestly live-only).
+  let cars;
+  try {
+    cars = await fetchGrassickStock();
+  } catch (err) {
+    if (err instanceof StockUnavailableError) {
+      return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
+    }
+    return sendJson(res, 500, { error: 'Something went wrong finding matches' });
+  }
+
+  const { matches, contenders } = matchCars(answers, cars);
   return sendJson(res, 200, {
     matches: matches.map(publicMatch),
     contenders: contenders.map(publicMatch),

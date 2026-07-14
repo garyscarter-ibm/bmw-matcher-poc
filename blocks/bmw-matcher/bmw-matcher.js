@@ -198,6 +198,21 @@ function matchCard(match, big) {
   const card = el('article', `bmwm-card${big ? ' bmwm-card-big' : ''}`);
 
   const media = el('div', 'bmwm-card-media');
+  // Real retailer photo when the live feed supplied one; the line label sits
+  // over it. Falls back to the flat placeholder field (CSS) when absent.
+  if (car.photo) {
+    media.classList.add('has-photo');
+    const img = el('img', 'bmwm-card-photo');
+    img.src = car.photo;
+    img.alt = car.name;
+    img.loading = 'lazy';
+    // A broken image URL shouldn't leave a half-rendered card.
+    img.addEventListener('error', () => {
+      media.classList.remove('has-photo');
+      img.remove();
+    });
+    media.append(img);
+  }
   media.append(el('span', 'bmwm-card-line', car.line));
   card.append(media);
 
@@ -209,16 +224,28 @@ function matchCard(match, big) {
   head.append(badge);
   body.append(head);
 
+  // Single used price when min === max (live stock), else the range.
+  const price = car.priceMin === car.priceMax
+    ? gbp(car.priceMin)
+    : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`;
   const specs = el('p', 'bmwm-specs');
   const specBits = [
     SPEC_LABELS[car.body],
     FUEL_SPEC[car.fuel],
-    `${gbp(car.priceMin)}–${gbp(car.priceMax)}`,
+    price,
     `0–62 ${car.zeroTo62}s`,
     car.fuel === 'ev' ? `${car.evRange} mi range` : `${car.mpg} mpg`,
   ];
-  specs.textContent = specBits.join('  ·  ');
+  specs.textContent = specBits.filter(Boolean).join('  ·  ');
   body.append(specs);
+
+  // Real used-car detail from the live feed, when present.
+  const detailBits = [];
+  if (car.plate) detailBits.push(`’${car.plate} reg`);
+  if (car.mileage != null) detailBits.push(`${car.mileage.toLocaleString('en-GB')} miles`);
+  if (detailBits.length) {
+    body.append(el('p', 'bmwm-usedmeta', detailBits.join('  ·  ')));
+  }
 
   body.append(el('p', 'bmwm-blurb', car.blurb));
 
@@ -226,6 +253,15 @@ function matchCard(match, big) {
     const why = el('ul', 'bmwm-reasons');
     reasons.forEach((r) => why.append(el('li', null, r)));
     body.append(el('p', 'bmwm-why-label', 'Why it suits you'), why);
+  }
+
+  // Link out to the retailer's live stock, when the feed gave us one.
+  if (car.link) {
+    const cta = el('a', 'bmwm-card-link', `View at ${car.retailerName || 'the retailer'} ›`);
+    cta.href = car.link;
+    cta.target = '_blank';
+    cta.rel = 'noopener noreferrer';
+    body.append(cta);
   }
 
   card.append(body);
