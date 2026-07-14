@@ -246,8 +246,10 @@ export function mapVehicle(v) {
     plate: v?.identification?.plate || undefined,
     photo,
     retailerName: v?.retailer_site?.name || undefined,
-    // The feed exposes no per-vehicle detail URL and the public detail path
-    // isn't cleanly derivable, so link to the retailer's stock page instead.
-    link: `${ORIGIN}/?retailer_site=${encodeURIComponent(v?.retailer_site?.id ?? '96')}`,
+    // Public PDP is /vehicle/{advert_id} (confirmed against the live site);
+    // fall back to the retailer's stock page if the feed ever omits it.
+    link: v?.advert_id
+      ? `${ORIGIN}/vehicle/${encodeURIComponent(v.advert_id)}`
+      : `${ORIGIN}/?retailer_site=${encodeURIComponent(v?.retailer_site?.id ?? '96')}`,
   };
 }
