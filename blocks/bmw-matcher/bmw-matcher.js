@@ -387,7 +387,7 @@ async function renderResults(root, ctx, answers) {
   screen.append(actions);
 
   screen.append(el('p', 'bmwm-disclaimer',
-    'An unofficial tool, not affiliated with or endorsed by BMW. Prices and specs are indicative — always check with a retailer.'));
+    'An unofficial tool, not affiliated with or endorsed by BMW. Prices and specs are indicative, always check with a retailer.'));
 
   root.append(screen);
 }

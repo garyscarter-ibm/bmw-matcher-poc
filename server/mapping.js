@@ -182,7 +182,7 @@ function blurbFor(line, body, fuel, retailerName) {
     petrol: 'petrol', diesel: 'diesel', phev: 'plug-in hybrid', ev: 'electric',
   }[fuel];
   const from = retailerName ? ` from ${retailerName}` : '';
-  return `Approved-used ${line} ${bodyWord} — ${fuelWord}, ready to drive away${from}.`;
+  return `Approved-used ${line} ${bodyWord}, ${fuelWord}, ready to drive away${from}.`;
 }
 
 /* ------------------------------ projection ----------------------------- */

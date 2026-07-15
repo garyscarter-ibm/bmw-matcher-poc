@@ -105,7 +105,7 @@ function scoreFuel(car, answers) {
   if (score >= 0.85) {
     if (car.fuel === 'ev') {
       reason = canCharge
-        ? `Fully electric with a ${car.evRange}-mile range — ideal with your charging setup`
+        ? `Fully electric with a ${car.evRange}-mile range, ideal with your charging setup`
         : `Fully electric with a ${car.evRange}-mile range`;
     } else if (pref !== 'open') {
       reason = `The ${FUEL_LABELS[car.fuel]} power you wanted`;
@@ -138,7 +138,7 @@ function scorePerformance(car, answers) {
   const wantsIt = Number(answers.style) >= 4 || (answers.priorities || []).includes('performance');
   let reason;
   if (score >= 0.85 && wantsIt) {
-    reason = `0–62 in ${car.zeroTo62}s — as quick as you hoped`;
+    reason = `0–62 in ${car.zeroTo62}s, as quick as you hoped`;
   }
   return { score, reason };
 }
@@ -155,7 +155,7 @@ function scoreEconomy(car, answers) {
     if (canCharge && car.evRange) reason = `Around ${car.evRange} electric miles covers most daily driving`;
   } else {
     score = clamp((car.mpg - 25) / 35);
-    if (score >= 0.8) reason = `Frugal for what it is — around ${car.mpg}mpg`;
+    if (score >= 0.8) reason = `Frugal for what it is, around ${car.mpg}mpg`;
   }
   return { score, reason };
 }
@@ -275,7 +275,7 @@ export function matchCars(answers, cars) {
         .sort((a, b) => b.rank - a.rank)
         .slice(0, 4)
         .map((c) => c.reason);
-      if (stretch) reasons.push(`A stretch at ${gbp(car.priceMin)}+ — but maybe worth it`);
+      if (stretch) reasons.push(`A stretch at ${gbp(car.priceMin)}+, but maybe worth it`);
       return { car, score: Math.round((weighted / totalWeight) * 100), stretch, reasons };
     })
     // Deterministic tie-breaking: score, then cheaper car, then name.

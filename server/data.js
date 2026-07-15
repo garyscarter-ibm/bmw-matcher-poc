@@ -21,7 +21,7 @@ export const CARS = [
     id: '118', name: 'BMW 118 M Sport', line: '1 Series', body: 'hatchback', fuel: 'petrol',
     priceMin: 32000, priceMax: 38000, monthlyFrom: 380, sizeClass: 1, seats: 5, boot: 380,
     zeroTo62: 8.5, mpg: 48, tags: ['urban', 'efficient'],
-    blurb: 'The most affordable way into a BMW — a tidy-handling premium hatchback.',
+    blurb: 'The most affordable way into a BMW, a tidy-handling premium hatchback.',
   },
   {
     id: 'm135', name: 'BMW M135 xDrive', line: '1 Series', body: 'hatchback', fuel: 'petrol',
@@ -39,7 +39,7 @@ export const CARS = [
     id: '230eat', name: 'BMW 230e xDrive Active Tourer', line: '2 Series Active Tourer', body: 'mpv', fuel: 'phev',
     priceMin: 42000, priceMax: 47000, monthlyFrom: 480, sizeClass: 2, seats: 5, boot: 406,
     zeroTo62: 5.5, mpg: 250, evRange: 55, tags: ['family', 'practical', 'efficient'],
-    blurb: 'Plug-in family MPV — school runs on electric, holidays on petrol.',
+    blurb: 'Plug-in family MPV: school runs on electric, holidays on petrol.',
   },
   {
     id: '218gc', name: 'BMW 218 Gran Coupé', line: '2 Series Gran Coupé', body: 'saloon', fuel: 'petrol',
@@ -51,7 +51,7 @@ export const CARS = [
     id: 'm240', name: 'BMW M240i xDrive Coupé', line: '2 Series Coupé', body: 'coupe', fuel: 'petrol',
     priceMin: 48000, priceMax: 54000, monthlyFrom: 560, sizeClass: 1, seats: 4, boot: 390,
     zeroTo62: 4.3, mpg: 34, tags: ['drivers-car', 'image'],
-    blurb: 'Straight-six, rear-biased, compact — the enthusiast bargain of the range.',
+    blurb: 'Straight-six, rear-biased, compact: the enthusiast bargain of the range.',
   },
   {
     id: 'm2', name: 'BMW M2', line: 'M', body: 'coupe', fuel: 'petrol',
@@ -63,7 +63,7 @@ export const CARS = [
     id: '320', name: 'BMW 320i Saloon', line: '3 Series', body: 'saloon', fuel: 'petrol',
     priceMin: 45000, priceMax: 52000, monthlyFrom: 490, sizeClass: 2, seats: 5, boot: 480,
     zeroTo62: 7.4, mpg: 44, tags: ['drivers-car', 'cruiser', 'efficient'],
-    blurb: 'The default sports saloon — still the benchmark all-rounder.',
+    blurb: 'The default sports saloon, still the benchmark all-rounder.',
   },
   {
     id: '330e-t', name: 'BMW 330e Touring', line: '3 Series', body: 'estate', fuel: 'phev',
@@ -75,7 +75,7 @@ export const CARS = [
     id: 'm340-t', name: 'BMW M340i xDrive Touring', line: '3 Series', body: 'estate', fuel: 'petrol',
     priceMin: 60000, priceMax: 67000, monthlyFrom: 690, sizeClass: 2, seats: 5, boot: 500,
     zeroTo62: 4.6, mpg: 36, tags: ['drivers-car', 'family', 'practical'],
-    blurb: 'A straight-six fast estate — one car that genuinely does everything.',
+    blurb: 'A straight-six fast estate, one car that genuinely does everything.',
   },
   {
     id: 'm3-t', name: 'BMW M3 Competition Touring', line: 'M', body: 'estate', fuel: 'petrol',
@@ -99,7 +99,7 @@ export const CARS = [
     id: 'm4', name: 'BMW M4 Competition xDrive', line: 'M', body: 'coupe', fuel: 'petrol',
     priceMin: 86000, priceMax: 94000, monthlyFrom: 1000, sizeClass: 2, seats: 4, boot: 440,
     zeroTo62: 3.5, mpg: 28, tags: ['drivers-car', 'image'],
-    blurb: 'The definitive fast BMW coupé — savage pace, everyday usability.',
+    blurb: 'The definitive fast BMW coupé: savage pace, everyday usability.',
   },
   {
     id: 'i4-40', name: 'BMW i4 eDrive40', line: 'i4', body: 'saloon', fuel: 'ev',
@@ -123,7 +123,7 @@ export const CARS = [
     id: '530e-t', name: 'BMW 530e Touring', line: '5 Series', body: 'estate', fuel: 'phev',
     priceMin: 60000, priceMax: 69000, monthlyFrom: 660, sizeClass: 3, seats: 5, boot: 500,
     zeroTo62: 6.2, mpg: 220, evRange: 60, tags: ['cruiser', 'family', 'efficient', 'practical'],
-    blurb: 'Big plug-in estate — electric around town, continental-crusher on holiday.',
+    blurb: 'Big plug-in estate: electric around town, continental-crusher on holiday.',
   },
   {
     id: 'i5-40t', name: 'BMW i5 eDrive40 Touring', line: 'i5', body: 'estate', fuel: 'ev',
@@ -147,7 +147,7 @@ export const CARS = [
     id: '740', name: 'BMW 740d xDrive', line: '7 Series', body: 'saloon', fuel: 'diesel',
     priceMin: 104000, priceMax: 118000, monthlyFrom: 1250, sizeClass: 5, seats: 5, boot: 540,
     zeroTo62: 5.8, mpg: 44, tags: ['cruiser', 'tech', 'image'],
-    blurb: 'The luxury flagship — a first-class lounge that does 600 miles a tank.',
+    blurb: 'The luxury flagship, a first-class lounge that does 600 miles a tank.',
   },
   {
     id: 'i7', name: 'BMW i7 xDrive60', line: 'i7', body: 'saloon', fuel: 'ev',
@@ -159,7 +159,7 @@ export const CARS = [
     id: '840gc', name: 'BMW 840i Gran Coupé', line: '8 Series', body: 'coupe', fuel: 'petrol',
     priceMin: 87000, priceMax: 97000, monthlyFrom: 1000, sizeClass: 4, seats: 4, boot: 440,
     zeroTo62: 5.0, mpg: 35, tags: ['image', 'cruiser', 'drivers-car'],
-    blurb: 'The glamorous grand tourer — four doors, coupé drama.',
+    blurb: 'The glamorous grand tourer: four doors, coupé drama.',
   },
   {
     id: 'x1', name: 'BMW X1 sDrive20i', line: 'X1', body: 'suv', fuel: 'petrol',
@@ -171,7 +171,7 @@ export const CARS = [
     id: 'ix1', name: 'BMW iX1 eDrive20', line: 'iX1', body: 'suv', fuel: 'ev',
     priceMin: 45000, priceMax: 53000, monthlyFrom: 500, sizeClass: 2, seats: 5, boot: 490,
     zeroTo62: 8.6, evRange: 270, tags: ['family', 'urban', 'efficient', 'tech'],
-    blurb: 'The electric X1 — the easiest first EV in the range.',
+    blurb: 'The electric X1, the easiest first EV in the range.',
   },
   {
     id: 'ix2', name: 'BMW iX2 xDrive30', line: 'iX2', body: 'suv', fuel: 'ev',
@@ -183,7 +183,7 @@ export const CARS = [
     id: 'x3', name: 'BMW X3 20 xDrive', line: 'X3', body: 'suv', fuel: 'petrol',
     priceMin: 50000, priceMax: 59000, monthlyFrom: 560, sizeClass: 3, seats: 5, boot: 570,
     zeroTo62: 7.8, mpg: 40, tags: ['family', 'practical', 'cruiser'],
-    blurb: 'The goldilocks family SUV — big enough for everything, easy to live with.',
+    blurb: 'The goldilocks family SUV, big enough for everything, easy to live with.',
   },
   {
     id: 'x3-m50', name: 'BMW X3 M50 xDrive', line: 'X3', body: 'suv', fuel: 'petrol',
@@ -201,19 +201,19 @@ export const CARS = [
     id: 'x5', name: 'BMW X5 xDrive50e', line: 'X5', body: 'suv', fuel: 'phev',
     priceMin: 84000, priceMax: 96000, monthlyFrom: 980, sizeClass: 4, seats: 5, boot: 500,
     zeroTo62: 4.8, mpg: 235, evRange: 60, tags: ['family', 'cruiser', 'image', 'practical'],
-    blurb: 'The big plug-in luxury SUV — tows, cruises, and does the school run on electric.',
+    blurb: 'The big plug-in luxury SUV: tows, cruises, and does the school run on electric.',
   },
   {
     id: 'x7', name: 'BMW X7 xDrive40d', line: 'X7', body: 'suv', fuel: 'diesel',
     priceMin: 112000, priceMax: 128000, monthlyFrom: 1300, sizeClass: 5, seats: 7, boot: 750,
     zeroTo62: 5.9, mpg: 36, tags: ['family', 'cruiser', 'image', 'practical'],
-    blurb: 'Seven proper seats and limousine luxury — the biggest BMW you can buy.',
+    blurb: 'Seven proper seats and limousine luxury, the biggest BMW you can buy.',
   },
   {
     id: 'xm', name: 'BMW XM', line: 'M', body: 'suv', fuel: 'phev',
     priceMin: 150000, priceMax: 168000, monthlyFrom: 1800, sizeClass: 5, seats: 5, boot: 527,
     zeroTo62: 4.1, mpg: 33, evRange: 50, tags: ['image', 'drivers-car', 'tech'],
-    blurb: 'The unapologetic M flagship — a 650-horsepower hybrid statement piece.',
+    blurb: 'The unapologetic M flagship, a 650-horsepower hybrid statement piece.',
   },
   {
     id: 'z4', name: 'BMW Z4 sDrive20i', line: 'Z4', body: 'convertible', fuel: 'petrol',
@@ -225,6 +225,6 @@ export const CARS = [
     id: 'ix', name: 'BMW iX xDrive45', line: 'iX', body: 'suv', fuel: 'ev',
     priceMin: 77000, priceMax: 95000, monthlyFrom: 880, sizeClass: 4, seats: 5, boot: 500,
     zeroTo62: 5.1, evRange: 375, tags: ['tech', 'cruiser', 'family', 'image'],
-    blurb: 'The electric tech flagship SUV — serene, spacious, and long-legged.',
+    blurb: 'The electric tech flagship SUV, serene, spacious, and long-legged.',
   },
 ];

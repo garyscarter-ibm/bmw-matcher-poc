@@ -57,8 +57,8 @@ export const QUESTIONS = [
     help: 'A driveway socket or workplace charger changes the electric maths.',
     showIf: (a) => a.fuel === 'ev' || a.fuel === 'phev' || a.fuel === 'open',
     options: [
-      { value: 'home', label: 'Yes — at home' },
-      { value: 'work', label: 'Yes — at work' },
+      { value: 'home', label: 'Yes, at home' },
+      { value: 'work', label: 'Yes, at work' },
       { value: 'none', label: 'No, I’d rely on public chargers' },
     ],
   },
@@ -115,7 +115,7 @@ export const QUESTIONS = [
   },
   {
     id: 'priorities',
-    title: 'Finally — pick your top two priorities.',
+    title: 'Finally, pick your top two priorities.',
     multi: true,
     max: 2,
     options: [
