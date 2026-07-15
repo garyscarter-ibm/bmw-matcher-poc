@@ -147,7 +147,7 @@ function renderIntro(root, ctx) {
     el('p', 'bmwm-kicker', 'The unofficial UK matchmaker'),
     el('h1', 'bmwm-title', 'Find your perfect BMW'),
     el('p', 'bmwm-lede',
-      `Answer ${count} quick questions about your life, your miles and your budget, and we’ll match you with your top three approved-used BMWs at ${ctx.retailerLabel}, with the reasons why. We hope it helps.`),
+      `Answer ${count} quick questions about your life, your miles and your budget, and we’ll match you with your top three approved-used cars at ${ctx.retailerLabel}, with the reasons why. We hope it helps.`),
   );
   const start = el('button', 'bmwm-btn bmwm-btn-primary', 'Start the quiz');
   start.addEventListener('click', () => ctx.showQuestion(0));
