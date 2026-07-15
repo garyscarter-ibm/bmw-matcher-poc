@@ -20,12 +20,14 @@ Two deployables:
   holds no dataset or weights; it calls the API for the quiz definition and for
   match results. Ports into a live EDS site by copy-paste; point it at your
   backend with a `data-api` attribute.
-- **`server/`** — a zero-dependency Node HTTP API that runs the matching engine.
-  The full dataset (`data.js`) and scoring weights (`engine.js`) live here and
-  stay server-side. Deploy it to any Node host.
+- **`server/`** — a zero-dependency Node HTTP API that runs the matching engine
+  against the retailer's **live stock feed** (`stock.js` + `mapping.js`), scored
+  with the weights in `engine.js`. All of it stays server-side. Deploy it to
+  any Node host.
 
-Why the split: the curated dataset and tuned weights are the interesting IP, and
-a purely client-side block would ship all of it in plain sight. Moving the engine
+Why the split: the tuned weights (and the live-stock request flow) are the
+interesting IP, and a purely client-side block would ship all of it in plain
+sight. Moving the engine
 behind an API keeps `matchCars()` (and everything it reads) off the client — the
 browser only ever sees the display fields of your top matches.
 
@@ -66,7 +68,9 @@ server/
   index.js          # zero-dep Node API: /api/questions, /api/match, /health
   engine.js         # pure scoring engine + WEIGHTS config  (server-side only)
   questions.js      # quiz definition + budget bands        (source of truth)
-  data.js           # curated UK BMW dataset (~35 cars)     (server-side only)
+  stock.js          # live retailer-stock client (usedcars.bmw.co.uk)
+  mapping.js        # maps live vehicles -> engine schema; MODEL_SPECS lookup
+  data.js           # test fixture cars (~35)                (server/test only)
   test/engine.test.js # engine tests (node --test)
   package.json      # server: start / test scripts
 index.html          # standalone preview harness (sets data-api)
@@ -163,11 +167,12 @@ Deterministic weighted scoring — transparent and unit-tested, no black box.
 | How much each dimension matters | `WEIGHTS` in `server/engine.js` |
 | How priorities reweight scoring | `PRIORITY_BOOSTS` in `server/engine.js` |
 | Budget stretch tolerance | `STRETCH_FACTOR` in `server/engine.js` |
-| Cars, prices, specs, character tags | `server/data.js` (see field docs at top) |
+| New/updated model specs (0–62, boot, seats) | `MODEL_SPECS` in `server/mapping.js` — see [Updating the dataset](#updating-the-dataset) |
+| Test fixture cars | `server/data.js` (see field docs at top; used by `server/test/` only) |
 | Questions, options, budget bands | `server/questions.js` (mirror any conditional-question predicate in `blocks/bmw-matcher/quiz-meta.js`) |
 
-Tuning lives entirely server-side, so you can retune weights or refresh the
-dataset and redeploy the backend **without touching the EDS block**.
+Tuning lives entirely server-side, so you can retune weights or add new model
+specs and redeploy the backend **without touching the EDS block**.
 
 Run `npm test` after tuning — the tests assert persona-level outcomes
 (city driver gets something compact, enthusiast gets a drivers' car, family
@@ -176,11 +181,43 @@ product, not just the code.
 
 ### Updating the dataset
 
-`data.js` is the single source of truth, marked with a "last reviewed" date.
-Figures are indicative UK OTR prices and approximate WLTP-ish specs; the
-*relative* positioning between cars matters more than exact numbers. Add or
-retire cars by editing the array — the engine and tests pick them up
-automatically (`npm test` validates every entry has the required fields).
+Since [e6c8635] the matcher no longer scores a curated, static list — every
+`/api/match` call fetches the retailer's **live used-stock feed**
+(`server/stock.js`) and maps each vehicle through `server/mapping.js` into the
+engine's schema. New models, discontinued lines and day-to-day price changes
+all show up automatically as stock turns over; there's no dataset file to
+hand-edit or keep "current".
+
+`server/data.js` still exists, but only as **fixture data for the test
+suite** (`server/test/engine.test.js` imports `CARS` from it to test
+`matchCars()` in isolation from the live feed). It is not read by `index.js`
+or `stock.js` and does not need to be kept in sync with the real BMW range —
+treat it as a small, stable set of test cases, not a product dataset.
+
+What the live feed *can't* tell us is three specs it doesn't carry: 0–62 time,
+boot litres and seat count. Those come from `MODEL_SPECS` in
+`server/mapping.js`, a lookup table keyed by model line (e.g. `X3`, `3
+Series`, `iX1`) with derivative-based overrides for quicker trims (M badges,
+`xDrive50e`, etc.). **This table is what needs updating when BMW releases a
+new model line**:
+
+1. Add an entry to `MODEL_SPECS` keyed by the line name the feed will use in
+   its `title` (see `lineFromTitle()` for how the title is normalized — pure-M
+   models collapse to the `"M"` key; everything else is the title with the
+   leading "BMW" stripped).
+2. Fill in `boot`, `seats`, `zeroTo62` (base/slowest trim for the line) and
+   `sizeClass` (1 smallest – 5 largest), following the pattern of neighbouring
+   entries.
+3. If the new line has a distinctly quicker performance trim, extend
+   `trimZeroTo62()` so that trim gets a faster figure than the base line.
+4. If you skip a line, `mapVehicle()` falls back to `DEFAULT_SPEC` and logs a
+   one-time `[mapping] no MODEL_SPECS for line "…"` warning — watch the server
+   logs after a new model launches to catch anything missing.
+
+Retiring a model needs no action — once the retailer stops stocking it, it
+simply stops appearing in the live feed.
+
+[e6c8635]: https://github.com/garyscarter-ibm/bmw-matcher-poc/commit/e6c8635
 
 ## Extending
 
