@@ -58,6 +58,22 @@ function retailerSite(block) {
   return config['retailer-id'] || config['retailer-site'] || undefined;
 }
 
+const DEFAULT_RETAILER_NAME = 'our retailer network';
+
+/** Retailer display name for this block instance: authored "Retailer Name"
+ * config row. Required alongside Retailer ID so the copy can name the
+ * retailer the stock is actually sourced from; falls back to a generic
+ * phrase (and warns) if the page author forgot to set it. */
+function retailerName(block) {
+  const config = readBlockConfig(block);
+  const name = config['retailer-name'];
+  if (!name) {
+    console.warn('[bmw-matcher] No "Retailer Name" config row set — add one alongside "Retailer ID". Falling back to generic copy.');
+    return DEFAULT_RETAILER_NAME;
+  }
+  return name;
+}
+
 async function apiGetQuestions(base, retailer) {
   const url = new URL(`${base}/api/questions`);
   if (retailer) url.searchParams.set('retailer', retailer);
@@ -131,7 +147,7 @@ function renderIntro(root, ctx) {
     el('p', 'bmwm-kicker', 'The unofficial UK matchmaker'),
     el('h1', 'bmwm-title', 'Find your perfect BMW'),
     el('p', 'bmwm-lede',
-      `Answer ${count} quick questions about your life, your miles and your budget, and we’ll match you with your top three from the current UK range with the reasons why. We hope it helps.`),
+      `Answer ${count} quick questions about your life, your miles and your budget, and we’ll match you with your top three approved-used BMWs at ${ctx.retailerLabel}, with the reasons why. We hope it helps.`),
   );
   const start = el('button', 'bmwm-btn bmwm-btn-primary', 'Start the quiz');
   start.addEventListener('click', () => ctx.showQuestion(0));
@@ -337,7 +353,7 @@ async function renderResults(root, ctx, answers) {
   if (matches.length === 0) {
     screen.append(
       el('h2', 'bmwm-title', 'No matches found'),
-      el('p', 'bmwm-lede', 'Nothing in the current range fits those answers. Try loosening the budget or seating needs.'),
+      el('p', 'bmwm-lede', `Nothing in ${ctx.retailerLabel}'s current stock fits those answers. Try loosening the budget or seating needs.`),
     );
   } else {
     screen.append(el('h2', 'bmwm-title', `Your perfect BMW is the ${matches[0].car.name.replace(/^BMW /, '')}`));
@@ -398,12 +414,13 @@ export default async function decorate(block) {
   // Read authored config (e.g. the "Retailer ID" row) before clearing the
   // block's children — the config rows live in the block's original markup.
   const retailer = retailerSite(block);
+  const retailerLabel = retailerName(block);
   const api = apiBase(block);
 
   block.replaceChildren();
   block.classList.add('bmwm');
 
-  const ctx = { answers: {}, api, retailer, questions: [] };
+  const ctx = { answers: {}, api, retailer, retailerLabel, questions: [] };
   ctx.showIntro = () => renderIntro(block, ctx);
   ctx.showQuestion = (i) => renderQuestion(block, ctx, i);
   ctx.showResults = (answers, { updateHash = false } = {}) => {
