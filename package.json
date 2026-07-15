@@ -8,6 +8,6 @@
     "serve": "node scripts/serve.js",
     "preview": "python3 -m http.server 3000",
     "server": "node server/index.js",
-    "test": "node --test server/"
+    "test": "node --test server/test/**/*.test.js"
   }
 }
