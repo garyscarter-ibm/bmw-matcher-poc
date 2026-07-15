@@ -173,7 +173,7 @@ function displayName(title, derivative) {
 }
 
 /** A short derived blurb — the feed has no marketing copy. */
-function blurbFor(line, body, fuel) {
+function blurbFor(line, body, fuel, retailerName) {
   const bodyWord = {
     hatchback: 'hatchback', saloon: 'saloon', estate: 'Touring estate', suv: 'SUV',
     coupe: 'coupé', convertible: 'convertible', mpv: 'family carrier',
@@ -181,7 +181,8 @@ function blurbFor(line, body, fuel) {
   const fuelWord = {
     petrol: 'petrol', diesel: 'diesel', phev: 'plug-in hybrid', ev: 'electric',
   }[fuel];
-  return `Approved-used ${line} ${bodyWord} — ${fuelWord}, ready to drive away from Grassick's.`;
+  const from = retailerName ? ` from ${retailerName}` : '';
+  return `Approved-used ${line} ${bodyWord} — ${fuelWord}, ready to drive away${from}.`;
 }
 
 /* ------------------------------ projection ----------------------------- */
@@ -222,6 +223,7 @@ export function mapVehicle(v) {
 
   const media = Array.isArray(v.media?.items) ? v.media.items : [];
   const photo = firstPhoto(media);
+  const retailerName = v?.retailer_site?.name || undefined;
 
   return {
     // ---- engine-scored fields (same shape as data.js) ----
@@ -239,13 +241,13 @@ export function mapVehicle(v) {
     mpg: num(v?.consumption?.fuel?.values?.combined),
     evRange: num(v?.consumption?.range?.values?.total),
     tags: tagsFor(line, body, fuel, derivative),
-    blurb: blurbFor(line, body, fuel),
+    blurb: blurbFor(line, body, fuel, retailerName),
 
     // ---- display-only (surfaced by index.js publicCar) ----
     mileage: num(v.mileage),
     plate: v?.identification?.plate || undefined,
     photo,
-    retailerName: v?.retailer_site?.name || undefined,
+    retailerName,
     // Public PDP is /vehicle/{advert_id} (confirmed against the live site);
     // fall back to the retailer's stock page if the feed ever omits it.
     link: v?.advert_id

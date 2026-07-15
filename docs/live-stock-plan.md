@@ -76,11 +76,16 @@ platform used by all BMW UK retailers.
 
 New/changed files under `server/`:
 
-- **`server/stock.js`** (new) — the live-fetch client. CSRF bootstrap +
-  cookie/token cache, `fetchGrassickStock()` pages through `list/` and
-  returns raw vehicles, short in-memory TTL cache (~5–10 min) so
-  `/api/match` doesn't refetch on every request. `RETAILER_SITE` env var
-  (default `96`) so the retailer is configurable, not hardcoded.
+- **`server/stock.js`** — the live-fetch client. CSRF bootstrap +
+  cookie/token cache, `fetchGrassickStock(retailerSite)` pages through
+  `list/` and returns raw vehicles, short in-memory TTL cache (~5–10 min,
+  keyed per retailer) so `/api/match` doesn't refetch on every request.
+  **Done:** the retailer is now request-scoped, not just a server-wide env
+  var — `/api/match` accepts an optional `retailer` field in its body
+  (falling back to the `RETAILER_SITE` env var, default `96`, if omitted),
+  so one deployed backend can serve multiple retailer sites. The EDS block
+  reads its retailer from an authored "Retailer ID" config row (standard
+  `readBlockConfig()` convention) and passes it through per request.
 - **`server/mapping.js`** (new) — `vehicle → car` projection to the engine's
   existing schema, plus the per-model lookup table:
   - `name`/`line` ← derived from `title` + `derivative`

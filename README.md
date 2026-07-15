@@ -83,11 +83,22 @@ after the block, self-contained folder), so porting is a copy-paste:
 1. Copy `blocks/bmw-matcher/` into your EDS project's `blocks/` directory.
 2. In the document that drives the page, add a block table named
    **BMW Matcher** (a one-cell table containing `bmw-matcher` works too).
-3. Point the block at your deployed backend by setting a `data-api` attribute on
+3. To match against a specific retailer's live stock, add a config row below
+   the block name with **Retailer ID** in the first cell and that retailer's
+   `retailer_site` ID (e.g. `96`) in the second. This is the standard EDS
+   block-config convention — the block reads it with a `readBlockConfig()`
+   helper, the same pattern used across `aem-boilerplate`. Omit the row to
+   fall back to the backend's own default retailer.
+4. Point the block at your deployed backend by setting a `data-api` attribute on
    the block element to your API's base URL. It defaults to
    `http://localhost:8787` for local dev.
-4. Publish. EDS auto-loads `bmw-matcher.css` and calls the block's
+5. Publish. EDS auto-loads `bmw-matcher.css` and calls the block's
    `decorate()` — no other wiring needed.
+
+The standalone `index.html` harness simulates the Retailer ID config row
+locally (no DA needed) — see the comment above the block markup there. Pass
+`?retailer=<id>` on the harness URL to try a different retailer without
+editing the file.
 
 Notes:
 - The block itself ships no dataset or weights — those stay behind the API.
@@ -104,7 +115,9 @@ The backend exposes two endpoints (plus `GET /health` → `{ ok: true }`):
   with the conditional-visibility functions stripped (they can't cross JSON);
   conditional questions are marked `conditional: true` and the block applies the
   matching predicate from `quiz-meta.js`.
-- **`POST /api/match`** with body `{ answers }` → `{ matches, contenders }`.
+- **`POST /api/match`** with body `{ answers, retailer? }` → `{ matches, contenders }`.
+  `retailer` is the retailer_site ID to match against; omit it to use the
+  backend's default (`RETAILER_SITE` env var, or `96` if unset).
   Each entry is `{ car, score, stretch, reasons }`, where `car` carries **only
   display fields** (name, line, body, fuel, price range, 0–62, mpg/range, blurb).
   Internal scoring fields (tags, size class, seats, boot…) are omitted, so the

@@ -128,9 +128,10 @@ async function handleMatch(req, res) {
   // Live proxy: score against the retailer's real stock, not a static file.
   // If the live feed can't be reached, return a friendly 5xx — the block's
   // retry UI handles it. No static fallback (this tool is honestly live-only).
+  const retailer = typeof body.retailer === 'string' && body.retailer ? body.retailer : undefined;
   let cars;
   try {
-    cars = await fetchGrassickStock();
+    cars = await fetchGrassickStock(retailer);
   } catch (err) {
     if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });

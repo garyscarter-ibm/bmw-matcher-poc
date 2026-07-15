@@ -24,7 +24,10 @@ import { request } from 'node:https';
 import { mapVehicle } from './mapping.js';
 
 const ORIGIN = 'https://usedcars.bmw.co.uk';
-const RETAILER_SITE = process.env.RETAILER_SITE || '96'; // 96 = Grassicks Garage
+// Server-wide fallback when a request doesn't specify a retailer (e.g. the
+// block wasn't configured with a "Retailer ID" row). Per-request retailer
+// selection is the normal path — see fetchGrassickStock().
+const DEFAULT_RETAILER_SITE = process.env.RETAILER_SITE || '96'; // 96 = Grassicks Garage
 const STOCK_TTL_MS = Number(process.env.STOCK_TTL_MS) || 5 * 60 * 1000; // 5 min
 const PAGE_LIMIT = 10; // safety cap on pagination (stock is ~3 pages)
 
@@ -94,9 +97,9 @@ async function bootstrap() {
   return csrf;
 }
 
-/** One page of the retailer's list endpoint, with the CSRF handshake applied. */
-async function fetchPage(page) {
-  const url = `${ORIGIN}/vehicle/api/list/?retailer_site=${encodeURIComponent(RETAILER_SITE)}&page=${page}`;
+/** One page of a retailer's list endpoint, with the CSRF handshake applied. */
+async function fetchPage(retailerSite, page) {
+  const url = `${ORIGIN}/vehicle/api/list/?retailer_site=${encodeURIComponent(retailerSite)}&page=${page}`;
   return httpsGet(url, {
     Accept: 'application/json',
     Cookie: `csrftoken=${csrf.token}`,
@@ -107,14 +110,16 @@ async function fetchPage(page) {
 
 /**
  * Fetch a page, transparently re-bootstrapping once if the token was rejected.
- * Any 403 (even mid-pagination) rotates the token and retries that page.
+ * Any 403 (even mid-pagination) rotates the token and retries that page. The
+ * CSRF token is scoped to the origin, not the retailer, so it's shared across
+ * every retailer this server proxies.
  */
-async function fetchPageWithRetry(page) {
+async function fetchPageWithRetry(retailerSite, page) {
   if (!csrf) await bootstrap();
-  let res = await fetchPage(page);
+  let res = await fetchPage(retailerSite, page);
   if (res.status === 403) {
     await bootstrap(); // token likely rotated/expired
-    res = await fetchPage(page);
+    res = await fetchPage(retailerSite, page);
   }
   if (res.status !== 200) {
     throw new StockUnavailableError(`list/ returned HTTP ${res.status} on page ${page}`);
@@ -128,7 +133,10 @@ async function fetchPageWithRetry(page) {
 
 /* ------------------------------ TTL cache ----------------------------- */
 
-let cache = null; // { at: epochMs, cars: Car[] }
+// Keyed by retailer site ID — each retailer this server proxies for gets its
+// own cache entry so concurrent requests for different retailers don't
+// clobber each other's stock.
+const cacheByRetailer = new Map(); // retailerSite -> { at: epochMs, cars: Car[] }
 
 /** node:https has no argless Date.now ban — this is server runtime, fine to use. */
 function fresh(entry) {
@@ -138,22 +146,25 @@ function fresh(entry) {
 /* ------------------------------ public API ---------------------------- */
 
 /**
- * Fetch the retailer's full live stock, mapped to the engine's car schema.
- * Cached for STOCK_TTL_MS. Throws StockUnavailableError if the live feed
- * can't be reached (no static fallback — this tool is honestly live-only).
+ * Fetch a retailer's full live stock, mapped to the engine's car schema.
+ * Cached per-retailer for STOCK_TTL_MS. Throws StockUnavailableError if the
+ * live feed can't be reached (no static fallback — this tool is honestly
+ * live-only).
  *
+ * @param {string} [retailerSite] retailer_site ID; defaults to DEFAULT_RETAILER_SITE
  * @returns {Promise<Array>} mapped car objects (mapping.js shape)
  */
-export async function fetchGrassickStock() {
-  if (fresh(cache)) return cache.cars;
+export async function fetchGrassickStock(retailerSite = DEFAULT_RETAILER_SITE) {
+  const cached = cacheByRetailer.get(retailerSite);
+  if (fresh(cached)) return cached.cars;
 
   let vehicles;
   try {
-    const first = await fetchPageWithRetry(1);
+    const first = await fetchPageWithRetry(retailerSite, 1);
     vehicles = [...(first.results || [])];
     const totalPages = Math.min(first.pagination?.total || 1, PAGE_LIMIT);
     for (let page = 2; page <= totalPages; page += 1) {
-      const next = await fetchPageWithRetry(page);
+      const next = await fetchPageWithRetry(retailerSite, page);
       vehicles.push(...(next.results || []));
     }
   } catch (err) {
@@ -165,6 +176,6 @@ export async function fetchGrassickStock() {
   if (cars.length === 0) {
     throw new StockUnavailableError('Live feed returned no usable vehicles');
   }
-  cache = { at: Date.now(), cars };
+  cacheByRetailer.set(retailerSite, { at: Date.now(), cars });
   return cars;
 }

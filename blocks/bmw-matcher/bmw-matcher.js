@@ -33,18 +33,45 @@ function apiBase(block) {
   return (block.dataset.api || DEFAULT_API).replace(/\/+$/, '');
 }
 
-async function apiGetQuestions(base) {
-  const res = await fetch(`${base}/api/questions`);
+/**
+ * Read authored block config the standard EDS way: each row below the block
+ * name becomes a child `<div>` with two nested `<div>` cells (key, value).
+ * See aem-boilerplate's `readBlockConfig()` — same shape, same convention,
+ * so a page author sets config in their DA table, not in code.
+ */
+function readBlockConfig(block) {
+  const config = {};
+  [...block.children].forEach((row) => {
+    const cols = [...row.children];
+    if (cols.length < 2) return;
+    const key = cols[0].textContent.trim().toLowerCase().replace(/\s+/g, '-');
+    if (!key) return;
+    config[key] = cols[1].textContent.trim();
+  });
+  return config;
+}
+
+/** Retailer site ID for this block instance: authored "Retailer ID" config
+ * row, else undefined (the server falls back to its own default). */
+function retailerSite(block) {
+  const config = readBlockConfig(block);
+  return config['retailer-id'] || config['retailer-site'] || undefined;
+}
+
+async function apiGetQuestions(base, retailer) {
+  const url = new URL(`${base}/api/questions`);
+  if (retailer) url.searchParams.set('retailer', retailer);
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Questions request failed (${res.status})`);
   const data = await res.json();
   return data.questions;
 }
 
-async function apiMatch(base, answers) {
+async function apiMatch(base, answers, retailer) {
   const res = await fetch(`${base}/api/match`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ answers }),
+    body: JSON.stringify({ answers, retailer }),
   });
   if (!res.ok) throw new Error(`Match request failed (${res.status})`);
   return res.json();
@@ -104,7 +131,7 @@ function renderIntro(root, ctx) {
     el('p', 'bmwm-kicker', 'The unofficial UK matchmaker'),
     el('h1', 'bmwm-title', 'Find your perfect BMW'),
     el('p', 'bmwm-lede',
-      `Answer ${count} quick questions about your life, your miles and your budget — we’ll match you with your top three from the current UK range, and tell you exactly why.`),
+      `Answer ${count} quick questions about your life, your miles and your budget, and we’ll match you with your top three from the current UK range with the reasons why. We hope it helps.`),
   );
   const start = el('button', 'bmwm-btn bmwm-btn-primary', 'Start the quiz');
   start.addEventListener('click', () => ctx.showQuestion(0));
@@ -285,15 +312,15 @@ function renderStatus(root, { kicker, title, message, retryLabel, onRetry }) {
 }
 
 async function renderResults(root, ctx, answers) {
-  renderStatus(root, { kicker: 'Almost there', title: 'Finding your matches…' });
+  renderStatus(root, { kicker: 'Almost there', title: 'Finding your matches' });
 
   let matches;
   let contenders;
   try {
-    ({ matches, contenders } = await apiMatch(ctx.api, answers));
+    ({ matches, contenders } = await apiMatch(ctx.api, answers, ctx.retailer));
   } catch {
     renderStatus(root, {
-      kicker: 'Hmm',
+      kicker: 'Sorry',
       title: 'We couldn’t reach the matcher',
       message: 'The matching service didn’t respond. Check your connection and try again.',
       retryLabel: 'Try again',
@@ -309,8 +336,8 @@ async function renderResults(root, ctx, answers) {
 
   if (matches.length === 0) {
     screen.append(
-      el('h2', 'bmwm-title', 'That’s a tough brief…'),
-      el('p', 'bmwm-lede', 'Nothing in the current range fits those answers — try loosening the budget or seating needs.'),
+      el('h2', 'bmwm-title', 'No matches found'),
+      el('p', 'bmwm-lede', 'Nothing in the current range fits those answers. Try loosening the budget or seating needs.'),
     );
   } else {
     screen.append(el('h2', 'bmwm-title', `Your perfect BMW is the ${matches[0].car.name.replace(/^BMW /, '')}`));
@@ -340,7 +367,7 @@ async function renderResults(root, ctx, answers) {
     const url = `${window.location.origin}${window.location.pathname}#${HASH_KEY}=${encodeAnswers(answers)}`;
     try {
       await navigator.clipboard.writeText(url);
-      share.textContent = 'Link copied!';
+      share.textContent = 'Link copied';
     } catch {
       window.prompt('Copy your results link:', url);
     }
@@ -368,10 +395,15 @@ async function renderResults(root, ctx, answers) {
 /* ------------------------------ decorate ------------------------------ */
 
 export default async function decorate(block) {
+  // Read authored config (e.g. the "Retailer ID" row) before clearing the
+  // block's children — the config rows live in the block's original markup.
+  const retailer = retailerSite(block);
+  const api = apiBase(block);
+
   block.replaceChildren();
   block.classList.add('bmwm');
 
-  const ctx = { answers: {}, api: apiBase(block), questions: [] };
+  const ctx = { answers: {}, api, retailer, questions: [] };
   ctx.showIntro = () => renderIntro(block, ctx);
   ctx.showQuestion = (i) => renderQuestion(block, ctx, i);
   ctx.showResults = (answers, { updateHash = false } = {}) => {
@@ -383,12 +415,12 @@ export default async function decorate(block) {
 
   // The quiz definition lives behind the API, so load it before rendering.
   const boot = async () => {
-    renderStatus(block, { kicker: 'The unofficial UK matchmaker', title: 'Warming up…' });
+    renderStatus(block, { kicker: 'The unofficial UK matchmaker', title: 'Loading the quiz' });
     try {
-      ctx.questions = await apiGetQuestions(ctx.api);
+      ctx.questions = await apiGetQuestions(ctx.api, ctx.retailer);
     } catch {
       renderStatus(block, {
-        kicker: 'Hmm',
+        kicker: 'Sorry',
         title: 'We couldn’t load the quiz',
         message: 'The matching service didn’t respond. Check your connection and try again.',
         retryLabel: 'Try again',

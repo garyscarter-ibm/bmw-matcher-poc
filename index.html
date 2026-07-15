@@ -26,12 +26,33 @@
   <main>
     <!-- Standalone harness: mounts the block exactly as EDS would.
          data-api points the block at the matching backend; in a live EDS site
-         you'd set this per-environment. Defaults to http://localhost:8787. -->
-    <div class="bmw-matcher block" data-block-name="bmw-matcher" data-api="http://localhost:8787"></div>
+         you'd set this per-environment. Defaults to http://localhost:8787.
+
+         The "Retailer ID" row below simulates what Adobe DA (Document
+         Authoring) renders from an authored block-config table row: each row
+         under the block name becomes a child <div> with two nested <div>
+         cells (key, value) — the same shape aem-boilerplate's
+         readBlockConfig() reads. A real retailer page would set this row's
+         value in their DA document; here it's hardcoded for local dev, and
+         can be overridden with ?retailer=<id> on this harness's URL for a
+         quick multi-retailer demo without editing HTML. -->
+    <div class="bmw-matcher block" data-block-name="bmw-matcher" data-api="http://localhost:8787">
+      <div>
+        <div>Retailer ID</div>
+        <div>96</div>
+      </div>
+    </div>
   </main>
   <script type="module">
     import decorate from './blocks/bmw-matcher/bmw-matcher.js';
-    decorate(document.querySelector('.bmw-matcher'));
+
+    const block = document.querySelector('.bmw-matcher');
+    const override = new URLSearchParams(window.location.search).get('retailer');
+    if (override) {
+      block.querySelector(':scope > div > div:last-child').textContent = override;
+    }
+
+    decorate(block);
   </script>
 </body>
 </html>
