@@ -57,6 +57,35 @@ server — ES modules don't load from `file://`.
 > `npm run preview` (Python `http.server`) is kept as an alternative static
 > server, but `npm run serve` (Node) works in more environments.
 
+## Deploy it free
+
+The two pieces host free on separate services: the backend on **Render**, the
+static block on **GitHub Pages**. The block learns the backend URL at runtime via
+a `?api=` query param, so nothing is hardcoded or rebuilt.
+
+**1. Backend → Render.** [`render.yaml`](render.yaml) is a Blueprint Render reads
+automatically. In the Render dashboard: **New → Blueprint**, connect this repo,
+**Apply**. It builds `server/` and starts `node index.js`; Render injects `PORT`
+and the server binds to it. Copy the service URL (e.g.
+`https://bmw-matcher-api.onrender.com`).
+
+> Free-plan services spin down after ~15 min idle, so the first request after a
+> lull cold-starts (~30–50s). And `POST /api/match` proxies the **live** retailer
+> stock feed — matches depend on that upstream being reachable.
+
+**2. Frontend → GitHub Pages.** The [Pages workflow](.github/workflows/pages.yml)
+publishes the repo root on every push to `main`. One-time setup: repo
+**Settings → Pages → Source: "GitHub Actions"**.
+
+**3. Wire them together.** Open the Pages URL with the backend passed in `?api=`:
+
+```
+https://<user>.github.io/<repo>/?api=https://bmw-matcher-api.onrender.com
+```
+
+Without `?api=`, the page falls back to `http://localhost:8787` (local-dev
+default), so bookmark/share the URL *with* the param.
+
 ## Project layout
 
 ```

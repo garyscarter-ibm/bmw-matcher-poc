@@ -1,0 +1,21 @@
+# Render Blueprint — deploys the matching API (server/) as a free web service.
+#
+# Render auto-detects this file at the repo root. In the dashboard:
+#   New → Blueprint → connect this repo → Apply.
+# Render reads process.env.PORT itself (do NOT set PORT here); the server binds
+# to it in server/index.js. /health returns { ok: true } for the health check.
+#
+# The free plan spins down after ~15 min idle, so the first request after a lull
+# cold-starts (~30–50s). Fine for a demo; the block shows a friendly wait/error.
+services:
+  - type: web
+    name: bmw-matcher-api
+    runtime: node
+    plan: free
+    rootDir: server         # package.json + index.js live here
+    buildCommand: npm install # no dependencies, but Render expects a build step
+    startCommand: npm start   # → node index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"

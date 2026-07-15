@@ -27,6 +27,8 @@
     <!-- Standalone harness: mounts the block exactly as EDS would.
          data-api points the block at the matching backend; in a live EDS site
          you'd set this per-environment. Defaults to http://localhost:8787.
+         Override at runtime with ?api=<url> — used by the GitHub Pages build to
+         point the static page at the deployed Render backend without a rebuild.
 
          The "Retailer ID" row below simulates what Adobe DA (Document
          Authoring) renders from an authored block-config table row: each row
@@ -47,7 +49,16 @@
     import decorate from './blocks/bmw-matcher/bmw-matcher.js';
 
     const block = document.querySelector('.bmw-matcher');
-    const override = new URLSearchParams(window.location.search).get('retailer');
+    const params = new URLSearchParams(window.location.search);
+
+    // ?api=<url> points the block at a deployed backend (e.g. Render) — else it
+    // falls back to the data-api attribute's localhost default for local dev.
+    const apiOverride = params.get('api');
+    if (apiOverride) {
+      block.dataset.api = apiOverride;
+    }
+
+    const override = params.get('retailer');
     if (override) {
       block.querySelector(':scope > div > div:last-child').textContent = override;
     }
