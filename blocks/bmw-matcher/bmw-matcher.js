@@ -353,8 +353,60 @@ function renderStatus(root, { kicker, title, message, retryLabel, onRetry }) {
   root.append(screen);
 }
 
+/**
+ * Skeleton placeholder for the results page, shown while /api/match is in
+ * flight. Mirrors the real layout — kicker, title, one big hero card, a 2-up
+ * row of compact tiles — so the load reads as "this page, arriving" rather
+ * than a centred spinner that then jumps to a dense grid. The shimmer is CSS
+ * (see .bmwm-skel); reduced-motion users get a static tint instead.
+ */
+function renderResultsSkeleton(root) {
+  root.replaceChildren();
+  const screen = el('div', 'bmwm-screen bmwm-results bmwm-results-skeleton');
+  // Announce the wait for assistive tech, since there's no visible status text.
+  screen.setAttribute('aria-busy', 'true');
+  screen.setAttribute('aria-label', 'Finding your matches');
+
+  // A skeleton block: className extends .bmwm-skel with a shape modifier.
+  const skel = (mod) => el('div', `bmwm-skel ${mod}`);
+
+  screen.append(skel('bmwm-skel-kicker'), skel('bmwm-skel-title'));
+
+  // Hero card: media band + a few body lines, matching matchCard(big).
+  const hero = el('div', 'bmwm-grid');
+  const heroCard = el('article', 'bmwm-card bmwm-card-big bmwm-skel-card');
+  heroCard.append(el('div', 'bmwm-skel bmwm-skel-media'));
+  const heroBody = el('div', 'bmwm-card-body');
+  heroBody.append(
+    skel('bmwm-skel-line bmwm-skel-name'),
+    skel('bmwm-skel-line bmwm-skel-specs'),
+    skel('bmwm-skel-line bmwm-skel-blurb'),
+    skel('bmwm-skel-line bmwm-skel-blurb'),
+  );
+  heroCard.append(heroBody);
+  hero.append(heroCard);
+  screen.append(hero);
+
+  // Two compact-tile skeletons, matching the "More at <retailer>" 2-up row.
+  const more = el('div', 'bmwm-more');
+  for (let i = 0; i < 2; i += 1) {
+    const tile = el('article', 'bmwm-card bmwm-card-compact bmwm-skel-card');
+    tile.append(el('div', 'bmwm-skel bmwm-skel-media'));
+    const body = el('div', 'bmwm-card-body');
+    body.append(
+      skel('bmwm-skel-line bmwm-skel-name'),
+      skel('bmwm-skel-line bmwm-skel-specs'),
+    );
+    tile.append(body);
+    more.append(tile);
+  }
+  screen.append(more);
+
+  root.append(screen);
+}
+
 async function renderResults(root, ctx, answers) {
-  renderStatus(root, { kicker: 'Almost there', title: 'Finding your matches' });
+  renderResultsSkeleton(root);
 
   let matches;
   let nearby;

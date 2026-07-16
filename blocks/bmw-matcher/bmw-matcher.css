@@ -163,6 +163,12 @@
   to { opacity: 1; transform: none; }
 }
 
+/* Skeleton shimmer: sweep the light band from left to right across the block. */
+@keyframes bmwm-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
 .bmwm-progress {
   height: 4px;
   background: var(--bmwm-surface-alt);
@@ -246,6 +252,41 @@
 /* --- results --- */
 
 .bmwm-grid { display: grid; gap: var(--bmwm-space-4); margin: var(--bmwm-space-6) 0 var(--bmwm-space-2); }
+
+/* --- results skeleton (shown while /api/match is in flight) ---
+   Reuses the real .bmwm-card / .bmwm-grid / .bmwm-more structure so the
+   placeholder occupies the same footprint the results will, avoiding a layout
+   jump. Each grey block shimmers via a sweeping gradient. */
+.bmwm-skel {
+  background: var(--bmwm-surface-alt);
+  border-radius: var(--bmwm-radius);
+  /* The sweep: a lighter band travelling across the grey base. */
+  background-image: linear-gradient(
+    90deg,
+    var(--bmwm-surface-alt) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    var(--bmwm-surface-alt) 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: bmwm-shimmer 1.3s ease-in-out infinite;
+}
+
+/* Skeleton cards keep the card frame but drop the shadow/hover affordance. */
+.bmwm-skel-card { pointer-events: none; }
+
+/* Media band matches the real card's 16:9 photo slot. */
+.bmwm-skel-media { aspect-ratio: 16 / 9; }
+
+/* Text-line placeholders. Height ≈ a line of body text; widths vary per role
+   so the block reads as text rather than solid bars. */
+.bmwm-skel-line { height: 0.85em; margin-bottom: var(--bmwm-space-3); }
+.bmwm-skel-kicker { height: 0.7em; width: 30%; margin-bottom: var(--bmwm-space-3); }
+.bmwm-skel-title { height: 1.6em; width: 70%; margin: 0 0 var(--bmwm-space-6); }
+.bmwm-skel-name { width: 60%; height: 1.1em; }
+.bmwm-skel-specs { width: 85%; }
+.bmwm-skel-blurb { width: 95%; }
+.bmwm-skel-blurb:last-child { width: 55%; margin-bottom: 0; }
 
 .bmwm-card {
   display: flex;
@@ -516,4 +557,6 @@
 @media (prefers-reduced-motion: reduce) {
   .bmwm-screen { animation: none; }
   .bmwm-btn, .bmwm-option, .bmwm-progress-bar { transition: none; }
+  /* Drop the sweep; keep a static grey tint so the skeleton still reads. */
+  .bmwm-skel { animation: none; background-image: none; }
 }
