@@ -198,14 +198,14 @@ function renderIntro(root, ctx) {
   root.append(intro);
 }
 
-/* --------------------------- live preview drawer --------------------------- */
+/* -------------------------- live "best guess" preview ---------------------- */
 
 // How long after an answer changes before the preview refetches. Multi-select
 // rapid taps collapse into one call; a fresh answer resets the timer.
 const PREVIEW_DEBOUNCE_MS = 250;
-// Placeholder tiles shown while the first preview for a given answer set loads
-// and we have nothing cached to show yet.
-const PREVIEW_SKELETON_TILES = 3;
+// Cross-fade duration when the tile row re-ranks (kept in sync with the CSS
+// transition on .bmwm-preview-track). Disabled under prefers-reduced-motion.
+const PREVIEW_FADE_MS = 150;
 
 /** Can the engine score these answers yet? It hard-requires a valid budget. */
 function canPreview(ctx) {
@@ -213,113 +213,85 @@ function canPreview(ctx) {
 }
 
 /**
- * (Re)fill the drawer's bar label + panel from ctx.preview, in place. One path
- * shared by the debounced refresh and a freshly-built drawer (on question
- * advance), so both render identically.
+ * Build the "best guess" preview section: a heading + a horizontal strip of
+ * compact result tiles (the same card the results carousel uses). This has no
+ * toggle and no empty/loading state — the caller only mounts it once there are
+ * matches to show (see mountPreview). Returns the <section>.
  */
-function paintPreview(section, ctx) {
-  const { matches, open, loading } = ctx.preview;
-  const bar = section.querySelector('.bmwm-preview-bar');
-  const label = section.querySelector('.bmwm-preview-label');
-  const panel = section.querySelector('.bmwm-preview-panel');
-
-  // Bar label reflects state: pre-budget (nothing to score) vs a live count.
-  const scored = canPreview(ctx);
-  label.textContent = scored && matches.length
-    ? `Best guess so far (${matches.length})`
-    : 'Best guess so far';
-  // Nothing to open before a budget is picked — keep the bar inert then.
-  bar.disabled = !scored;
-
-  bar.setAttribute('aria-expanded', String(open));
-  panel.hidden = !open;
-
-  const track = panel.querySelector('.bmwm-preview-track');
-  track.replaceChildren();
-  if (!scored) {
-    panel.querySelector('.bmwm-preview-note').textContent = 'Pick a budget to see your matches.';
-    return;
-  }
-  if (loading && matches.length === 0) {
-    panel.querySelector('.bmwm-preview-note').textContent = '';
-    for (let i = 0; i < PREVIEW_SKELETON_TILES; i += 1) {
-      const tile = el('article', 'bmwm-card bmwm-card-compact bmwm-skel-card');
-      tile.append(el('div', 'bmwm-skel bmwm-skel-media'));
-      const body = el('div', 'bmwm-card-body');
-      body.append(
-        el('div', 'bmwm-skel bmwm-skel-line bmwm-skel-name'),
-        el('div', 'bmwm-skel bmwm-skel-line bmwm-skel-specs'),
-      );
-      tile.append(body);
-      track.append(tile);
-    }
-    return;
-  }
-  if (matches.length === 0) {
-    panel.querySelector('.bmwm-preview-note').textContent = 'Nothing fits those answers yet — try loosening them.';
-    return;
-  }
-  panel.querySelector('.bmwm-preview-note').textContent = '';
-  matches.forEach((m) => track.append(matchCard(m, { compact: true })));
-}
-
-/**
- * Build the collapsible "best guess" drawer for the quiz screen: a bar that
- * toggles a horizontal track of compact result tiles (the same card the results
- * carousel uses). State (open/closed, last matches) lives on ctx.preview so it
- * survives the per-question re-render. Returns the <section>.
- */
-function renderPreviewDrawer(ctx) {
+function renderPreviewSection(ctx) {
   const section = el('section', 'bmwm-preview');
-
-  const bar = el('button', 'bmwm-preview-bar');
-  bar.type = 'button';
-  bar.setAttribute('aria-controls', 'bmwm-preview-panel');
-  bar.append(
-    el('span', 'bmwm-preview-label', 'Best guess so far'),
-    el('span', 'bmwm-preview-caret', ''),
-  );
-
-  const panel = el('div', 'bmwm-preview-panel');
-  panel.id = 'bmwm-preview-panel';
-  panel.append(el('p', 'bmwm-preview-note', ''), el('div', 'bmwm-nearby bmwm-preview-track'));
-
-  bar.addEventListener('click', () => {
-    if (!canPreview(ctx)) return;
-    ctx.preview.open = !ctx.preview.open;
-    paintPreview(section, ctx);
-  });
-
-  section.append(bar, panel);
+  section.append(el('h3', 'bmwm-subhead bmwm-nearby-heading bmwm-preview-heading', 'BEST GUESS SO FAR'));
+  const track = el('div', 'bmwm-nearby bmwm-preview-track');
+  track.tabIndex = 0;
+  track.setAttribute('role', 'region');
+  track.setAttribute('aria-label', `Your best matches so far at ${ctx.retailerLabel}`);
+  section.append(track);
   paintPreview(section, ctx);
   return section;
 }
 
 /**
- * Debounced, latest-wins preview refresh. Schedules a refetch of the retailer's
- * top matches for the current answers and repaints the on-screen drawer when it
- * lands — unless a newer schedule has superseded it (seq guard) or the drawer
- * has been torn down (navigated away). A no-op until a budget is chosen.
+ * Replace the strip's tiles from ctx.preview.matches, with a soft cross-fade so
+ * a re-rank reads as "this just updated" rather than a hard jump. Reduced-motion
+ * users get an instant swap (the CSS transition is disabled).
+ */
+function paintPreview(section, ctx) {
+  const track = section.querySelector('.bmwm-preview-track');
+  const swap = () => {
+    track.replaceChildren();
+    ctx.preview.matches.forEach((m) => track.append(matchCard(m, { compact: true })));
+    // Next frame: fade back in from the dimmed state set below.
+    requestAnimationFrame(() => track.classList.remove('is-fading'));
+  };
+  // First paint (no tiles yet) swaps immediately; a re-rank fades out then in.
+  if (!track.children.length) {
+    swap();
+  } else {
+    track.classList.add('is-fading');
+    setTimeout(swap, PREVIEW_FADE_MS);
+  }
+}
+
+/**
+ * Mount or update the preview for the current answers. Once matches exist the
+ * section lives at the end of ctx.preview's host (`.bmwm-screen`); this inserts
+ * it on first content, repaints it on later updates, and removes it if a re-rank
+ * ever comes back empty — so the section is only ever on screen with content.
+ */
+function showPreview(ctx) {
+  const screen = document.querySelector('.bmwm-screen');
+  if (!screen) return;
+  let section = screen.querySelector('.bmwm-preview');
+  if (!ctx.preview.matches.length) {
+    section?.remove();
+    return;
+  }
+  if (!section) {
+    section = renderPreviewSection(ctx);
+    ctx.mountPreview(screen, section);
+  } else {
+    paintPreview(section, ctx);
+  }
+}
+
+/**
+ * Debounced, latest-wins preview refresh. Refetches the retailer's top matches
+ * for the current answers and mounts/updates the on-screen strip when it lands —
+ * unless a newer schedule has superseded it (seq guard). A no-op until a budget
+ * is chosen. Never surfaces an empty/loading state: the strip only appears once
+ * there are real matches.
  */
 function schedulePreviewRefresh(ctx) {
   if (!canPreview(ctx)) return;
   clearTimeout(ctx.previewTimer);
   ctx.previewTimer = setTimeout(() => {
     const seq = (ctx.preview.seq += 1);
-    ctx.preview.loading = true;
-    // Repaint so the drawer shows its skeleton while this first load is in
-    // flight (no-op visually if we already have matches to keep showing).
-    const live = document.querySelector('.bmwm-preview');
-    if (live) paintPreview(live, ctx);
-
     const answers = { ...ctx.answers };
     apiPreview(ctx.api, answers, ctx.retailer).then((matches) => {
       // A newer answer already superseded this request — drop the stale result.
       if (seq !== ctx.preview.seq) return;
       ctx.preview.matches = matches;
-      ctx.preview.loading = false;
-      const section = document.querySelector('.bmwm-preview');
-      if (section && section.isConnected) paintPreview(section, ctx);
+      showPreview(ctx);
     });
   }, PREVIEW_DEBOUNCE_MS);
 }
@@ -406,13 +378,16 @@ function renderQuestion(root, ctx, index) {
   }
   screen.append(nav);
 
-  // Live "best guess" drawer, pinned below the nav. Built from ctx.preview so
-  // it paints the last known guess instantly on advance, then refreshes.
-  screen.append(renderPreviewDrawer(ctx));
-
   root.append(screen);
   screen.querySelector('.bmwm-question').setAttribute('tabindex', '-1');
   screen.querySelector('.bmwm-question').focus({ preventScroll: true });
+
+  // Live "best guess" strip. If we already have matches cached (navigating
+  // Back/Next), mount it straight away so it doesn't flash out and back in;
+  // otherwise it appears once the refresh below lands. showPreview no-ops
+  // (and removes the strip) when there are no matches, so it's only ever on
+  // screen with content.
+  showPreview(ctx);
 
   // Refresh on entering the question too, so navigating Back/Next (budget
   // already set) updates the guess even without changing an answer. Cheap: the
@@ -736,10 +711,11 @@ async function renderResults(root, ctx, answers) {
   retake.type = 'button';
   retake.addEventListener('click', () => {
     ctx.answers = {};
-    // Clear the drawer's carried-over guess so a fresh run starts empty, and
-    // drop any in-flight/debounced refresh from the finished run.
+    // Clear the strip's carried-over guess so a fresh run starts empty, and
+    // drop any in-flight/debounced refresh from the finished run (bump seq so a
+    // late-landing response from the old run is ignored).
     clearTimeout(ctx.previewTimer);
-    ctx.preview = { matches: [], open: false, loading: false, seq: ctx.preview.seq + 1 };
+    ctx.preview = { matches: [], seq: ctx.preview.seq + 1 };
     window.history.replaceState(null, '', window.location.pathname);
     ctx.showIntro();
   });
@@ -782,10 +758,15 @@ export default async function decorate(block) {
     retailer,
     retailerLabel,
     questions: [],
-    // Live "best guess" drawer state, kept on ctx so it survives the
-    // per-question re-render (see renderPreviewDrawer / schedulePreviewRefresh).
-    preview: { matches: [], open: false, loading: false, seq: 0 },
+    // Live "best guess" strip state, kept on ctx so it survives the
+    // per-question re-render (see renderPreviewSection / schedulePreviewRefresh).
+    // `seq` is the latest-wins guard for the debounced refetch.
+    preview: { matches: [], seq: 0 },
     previewTimer: null,
+    // Where the preview strip mounts within the quiz screen. This is the one
+    // spot that differs by layout: here it sits at the END of the screen, i.e.
+    // below the Back/Next nav.
+    mountPreview: (screen, section) => screen.append(section),
   };
   ctx.showIntro = () => renderIntro(block, ctx);
   ctx.showQuestion = (i) => renderQuestion(block, ctx, i);
