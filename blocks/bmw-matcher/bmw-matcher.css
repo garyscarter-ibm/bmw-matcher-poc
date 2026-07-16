@@ -197,8 +197,46 @@
   color: var(--bmwm-ink-muted);
   text-transform: uppercase;
   letter-spacing: 0.8px;
+  margin: 0 0 var(--bmwm-space-4);
+}
+
+/* --- answered-question pills (running summary above the question) ---
+   One tap-to-edit chip per already-answered question; wraps onto multiple
+   lines as they accumulate. Sits between the step line and the question. */
+.bmwm-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bmwm-space-2);
   margin: 0 0 var(--bmwm-space-5);
 }
+
+/* A flat chip in the section-fill grey with a hairline; whole chip is the tap
+   target (jumps back to edit that answer). Sharp corners per the design system. */
+.bmwm-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--bmwm-space-2);
+  padding: var(--bmwm-space-1) var(--bmwm-space-3);
+  font-family: var(--bmwm-font-body);
+  font-size: var(--bmwm-text-label);
+  line-height: 1.4;
+  color: var(--bmwm-ink);
+  background: var(--bmwm-surface-alt);
+  border: var(--bmwm-border-width) solid var(--bmwm-line);
+  border-radius: var(--bmwm-radius);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.bmwm-pill:hover { border-color: var(--bmwm-accent); background: var(--bmwm-surface); }
+.bmwm-pill:focus-visible { outline: 2px solid var(--bmwm-accent); outline-offset: 2px; }
+
+/* The edit glyph is a quiet affordance — muted, and picks up the accent on
+   hover so the whole chip reads as editable. */
+.bmwm-pill-edit {
+  font-size: var(--bmwm-text-eyebrow);
+  color: var(--bmwm-ink-muted);
+}
+.bmwm-pill:hover .bmwm-pill-edit { color: var(--bmwm-accent); }
 
 .bmwm-question {
   font-family: var(--bmwm-font-heading);

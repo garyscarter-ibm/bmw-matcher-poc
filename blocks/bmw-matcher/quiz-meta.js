@@ -28,3 +28,85 @@ export const BUDGET_BANDS = {
   b4: [70000, 100000],
   b5: [100000, 250000],
 };
+
+/*
+ * Short pill summaries of a chosen answer, keyed by question id then value.
+ * These are deliberately terse noun-phrases ("Home charging", "Balanced") — a
+ * *record* of the choice, not the option's own prompt text ("Yes, at home",
+ * "A bit of both"), which reads oddly as a summary. Kept client-side (like
+ * SHOW_IF) since the option labels themselves live server-side in the fetched
+ * quiz. Keep the values in sync with server/questions.js option values.
+ *
+ * `budget` is derived from BUDGET_BANDS below rather than listed here, and the
+ * multi-select questions (bodyStyles, priorities) collapse to "First +N" in
+ * pillFor — so this map only needs the single-select questions.
+ */
+export const PILL_LABEL = {
+  fuel: {
+    petrol: 'Petrol', diesel: 'Diesel', phev: 'Plug-in hybrid', ev: 'Electric', open: 'Any fuel',
+  },
+  charging: { home: 'Home charging', work: 'Work charging', none: 'Public charging' },
+  primaryUse: {
+    city: 'City driving', commute: 'Commuting', family: 'Family duties',
+    roadtrips: 'Road trips', fun: 'Weekend fun',
+  },
+  people: { solo: 'Just me', family: 'Small family', crew: '5+ seats' },
+  boot: { small: 'Small boot', medium: 'Medium boot', big: 'Big boot' },
+  mileage: {
+    low: 'Under 6k mi/yr', mid: '6–12k mi/yr', high: '12–20k mi/yr', vhigh: '20k+ mi/yr',
+  },
+  style: {
+    1: 'Comfort', 2: 'Comfort-leaning', 3: 'Balanced', 4: 'Sporty-leaning', 5: 'Sporty',
+  },
+  // Per-value labels for the multi-select body styles; priorities reuse the
+  // option label as-is (they're already short), so it has no entry here.
+  bodyStyles: {
+    hatchback: 'Hatchback', saloon: 'Saloon', estate: 'Estate', suv: 'SUV',
+    coupe: 'Coupé', convertible: 'Convertible', mpv: 'Family carrier', any: 'Any body',
+  },
+};
+
+/** Short priorities labels (multi-select) — terser than the option prompts. */
+const PRIORITY_LABEL = {
+  economy: 'Running costs', performance: 'Performance', comfort: 'Comfort',
+  tech: 'Tech', image: 'Style',
+};
+
+/** Money as a compact "£50–70k" band label (min 0 renders as "Under £Xk"). */
+function bandLabel([min, max]) {
+  const k = (n) => `£${Math.round(n / 1000)}k`;
+  if (!min) return `Under ${k(max)}`;
+  if (max >= 250000) return `${k(min)}+`;
+  return `${k(min)}–${Math.round(max / 1000)}k`;
+}
+
+/**
+ * A short pill summary of the current answer to `question`, or null if it isn't
+ * answered yet. `question` is the fetched quiz object (has id, multi, options);
+ * `answers` is the running ctx.answers.
+ *   single-select → PILL_LABEL[id][value] (or the raw value as a fallback)
+ *   budget        → derived band, e.g. "£50–70k"
+ *   multi-select  → "First +N" (e.g. "SUV +1"), or "Any body" when 'any' picked
+ */
+export function pillFor(question, answers) {
+  const { id, multi } = question;
+  const value = answers[id];
+  if (value == null || (multi && value.length === 0)) return null;
+
+  if (id === 'budget') {
+    const band = BUDGET_BANDS[value];
+    return band ? bandLabel(band) : null;
+  }
+
+  if (multi) {
+    const values = Array.isArray(value) ? value : [value];
+    const label = (v) => (id === 'priorities'
+      ? (PRIORITY_LABEL[v] || v)
+      : (PILL_LABEL[id]?.[v] || v));
+    if (values.includes('any')) return PILL_LABEL[id]?.any || 'Any';
+    const [first, ...rest] = values;
+    return rest.length ? `${label(first)} +${rest.length}` : label(first);
+  }
+
+  return PILL_LABEL[id]?.[value] || String(value);
+}
