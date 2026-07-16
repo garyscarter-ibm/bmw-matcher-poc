@@ -382,10 +382,30 @@ async function renderResults(root, ctx, answers) {
       el('p', 'bmwm-lede', `Nothing in ${ctx.retailerLabel}'s current stock fits those answers. Try loosening the budget or seating needs.`),
     );
   } else {
+    // #1 is the recommendation — a single full-width hero, matching the
+    // "Your perfect BMW is the …" headline (three co-equal heroes contradicted
+    // that claim). #2/#3 drop to a quieter "More at <retailer>" tier below.
     screen.append(el('h2', 'bmwm-title', `Your perfect BMW is the ${matches[0].car.name.replace(/^BMW /, '')}`));
     const grid = el('div', 'bmwm-grid');
-    matches.forEach((m) => grid.append(matchCard(m, { big: true })));
+    grid.append(matchCard(matches[0], { big: true }));
     screen.append(grid);
+
+    // Runners-up: the other local matches, as smaller compact tiles in a
+    // static 2-up row (distinct from the horizontal "Worth the drive" carousel
+    // of OTHER retailers below). Same retailer as the hero, so "More at".
+    const runnersUp = matches.slice(1);
+    if (runnersUp.length) {
+      const more = el('section', 'bmwm-more-band');
+      more.append(
+        el('h3', 'bmwm-subhead bmwm-nearby-heading', `MORE AT ${ctx.retailerLabel.toUpperCase()}`),
+        el('p', 'bmwm-lede bmwm-nearby-lede',
+          `Other cars in ${ctx.retailerLabel}'s stock that also fit your answers.`),
+      );
+      const moreGrid = el('div', 'bmwm-more');
+      runnersUp.forEach((m) => moreGrid.append(matchCard(m, { compact: true })));
+      more.append(moreGrid);
+      screen.append(more);
+    }
   }
 
   // Cars at other nearby retailers — worth a drive if the local three didn't

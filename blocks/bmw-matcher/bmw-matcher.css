@@ -371,6 +371,33 @@
    servicing"-style module: grey field, uppercase heading, even 3-up
    spacing) rather than sitting directly on the white results page. */
 
+/* --- "more at <retailer>": runner-up matches (#2/#3) ---
+   The other local matches, a tier quieter than the hero but louder than the
+   grey "worth the drive" band below. Sits on the white page (no grey fill,
+   no full-bleed) so the weight order reads hero → more → worth-the-drive. */
+.bmwm-more-band { margin-top: var(--bmwm-space-8); }
+
+/* Static 2-up row of compact tiles (not the scrolling .bmwm-nearby track).
+   Collapses to a single column on mobile. The compact card's flex-basis is a
+   no-op here — grid items size to the tracks, so the tiles fill the columns. */
+.bmwm-more {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--bmwm-space-4);
+  align-items: start;
+}
+
+@media (max-width: 767px) {
+  .bmwm-more { grid-template-columns: 1fr; }
+}
+
+/* Compact tiles are borderless-on-grey by default (tuned for the nearby band).
+   On the white "more" section restore the hairline so they read as cards. */
+.bmwm-more .bmwm-card-compact {
+  border-color: var(--bmwm-line);
+  box-shadow: none;
+}
+
 /* Bleeds out to the block's own edges by cancelling .bmwm's side padding,
    so the band reads as a distinct section rather than an inset panel. */
 .bmwm-nearby-band {
