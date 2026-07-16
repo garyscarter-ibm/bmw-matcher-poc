@@ -35,6 +35,7 @@ const MODEL_SPECS = {
   '4 Series': { boot: 440, seats: 4, zeroTo62: 7.5, sizeClass: 2 },
   '4 Series Gran Coupe': { boot: 470, seats: 5, zeroTo62: 7.5, sizeClass: 2 },
   '5 Series': { boot: 520, seats: 5, zeroTo62: 7.5, sizeClass: 3 },
+  '6 Series': { boot: 610, seats: 5, zeroTo62: 6.3, sizeClass: 3 }, // GT/Gran Coupé; older convertibles seat 4
   '7 Series': { boot: 540, seats: 5, zeroTo62: 6.0, sizeClass: 5 },
   '8 Series': { boot: 440, seats: 4, zeroTo62: 5.0, sizeClass: 4 },
   X1: { boot: 540, seats: 5, zeroTo62: 8.3, sizeClass: 2 },
@@ -44,7 +45,17 @@ const MODEL_SPECS = {
   X5: { boot: 500, seats: 5, zeroTo62: 6.5, sizeClass: 4 },
   X6: { boot: 580, seats: 5, zeroTo62: 6.5, sizeClass: 4 },
   X7: { boot: 750, seats: 7, zeroTo62: 5.9, sizeClass: 5 },
+  // Pure-M SUVs. The feed titles them one-off ("X4M", "X5 M") so they don't
+  // fold into the base X-line key; give each the base line's boot/seats/size
+  // but the M car's (already-fast) 0-62. trimZeroTo62 leaves these untouched
+  // (their derivatives carry no m<digits> trim token to speed up further).
+  X3M: { boot: 570, seats: 5, zeroTo62: 4.0, sizeClass: 3 },
+  X4M: { boot: 525, seats: 5, zeroTo62: 4.0, sizeClass: 3 },
+  'X5 M': { boot: 500, seats: 5, zeroTo62: 3.9, sizeClass: 4 },
+  'X6 M': { boot: 580, seats: 5, zeroTo62: 3.9, sizeClass: 4 },
+  XM: { boot: 527, seats: 5, zeroTo62: 4.6, sizeClass: 4 }, // M PHEV SUV; 50e ~5.1, V8 ~4.1
   Z4: { boot: 281, seats: 2, zeroTo62: 6.6, sizeClass: 1 },
+  i3: { boot: 260, seats: 4, zeroTo62: 7.3, sizeClass: 1 }, // electric city car; i3s 7.3s
   i4: { boot: 470, seats: 5, zeroTo62: 5.7, sizeClass: 2 },
   i5: { boot: 490, seats: 5, zeroTo62: 6.1, sizeClass: 3 },
   i7: { boot: 500, seats: 5, zeroTo62: 4.7, sizeClass: 5 },
@@ -70,6 +81,9 @@ function lineFromTitle(title = '') {
   const t = title.replace(/^BMW\s+/i, '').trim();
   // Pure M models: "M2", "M3 Competition", "M4", "M5", "M8" (standalone M<digit>).
   if (/^M[2-8]\b/.test(t)) return 'M';
+  // The feed titles the electric i3 city car "i3 Series"; fold it to the "i3"
+  // spec key (the "i3s"/"i3" derivatives are trims of the same line).
+  if (/^i3\b/.test(t)) return 'i3';
   return t;
 }
 
@@ -79,8 +93,11 @@ function lineFromTitle(title = '') {
  */
 function bodyFor(line, derivative = '') {
   const d = derivative.toLowerCase();
-  // X1-X7, iX1-iX3 and the bare iX flagship are all SUVs.
-  if (/^X[1-7]$/i.test(line) || /^iX[1-3]?$/i.test(line)) return 'suv';
+  // X1-X7, the M-SUVs (X3M/X4M/X5 M/X6 M), the XM, iX1-iX3 and the bare iX
+  // flagship are all SUVs.
+  if (/^X[1-7]$/i.test(line) || /^X\d ?M$/i.test(line) || line === 'XM'
+    || /^iX[1-3]?$/i.test(line)) return 'suv';
+  if (line === 'i3') return 'hatchback';
   if (d.includes('active tourer')) return 'mpv';
   if (d.includes('gran coupe') || d.includes('gran coupé')) return 'saloon';
   if (d.includes('touring')) return 'estate';
@@ -115,7 +132,10 @@ function num(v) {
  * detected in the derivative (M badges, xDrive50e PHEV, ti hot-hatch, etc.).
  */
 function trimZeroTo62(base, line, derivative = '') {
-  if (line === 'M') return base; // already the fast M figure
+  // Pure-M lines already carry the fast figure. XM and the M-SUVs (X3M/X4M/
+  // X5 M/X6 M) do too, and their derivatives ("XM 50e", "X5 M") would
+  // otherwise trip the 50e / trim rules below and mis-speed them.
+  if (line === 'M' || line === 'XM' || /^X\d ?M$/.test(line)) return base;
   const d = derivative.toLowerCase();
   // Top performance trims of a normal line.
   if (/\bm\d{2,3}[di]?\b/.test(d) || /\bm135|m235|m240|m340|m440|m40|m50|m60\b/.test(d)) {
@@ -131,10 +151,13 @@ function trimZeroTo62(base, line, derivative = '') {
 function tagsFor(line, body, fuel, derivative = '') {
   const tags = new Set();
   const d = derivative.toLowerCase();
-  const perf = line === 'M' || /\bm1|m2|m3|m4|m34|m44|m40|m50|m60|ti\b/.test(d);
+  // Pure-M line, the M-SUVs (X3M/X4M/X5 M/X6 M) and the XM are all M cars;
+  // the rest key off M-trim tokens in the derivative.
+  const mLine = line === 'M' || line === 'XM' || /^X\d ?M$/.test(line);
+  const perf = mLine || /\bm1|m2|m3|m4|m34|m44|m40|m50|m60|ti\b/.test(d);
 
   if (perf) tags.add('drivers-car');
-  if (line === 'M') tags.add('image');
+  if (mLine) tags.add('image');
   if (/^i/i.test(line) || fuel === 'ev') tags.add('tech'); // i5, iX, iX2…
   if (body === 'suv' || body === 'mpv' || body === 'estate') {
     tags.add('family');
