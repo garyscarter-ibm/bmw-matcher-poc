@@ -213,37 +213,34 @@ function canPreview(ctx) {
 }
 
 /**
- * Build the "best guess" preview section: a heading + a horizontal strip of
- * compact result tiles (the same card the results carousel uses). This has no
- * toggle and no empty/loading state — the caller only mounts it once there are
- * matches to show (see mountPreview). Returns the <section>.
+ * Build the live preview section: a heading + a horizontal strip of small
+ * "mini" result tiles (see previewTile). No toggle and no empty/loading state —
+ * the caller only mounts it once there are matches (see mountPreview).
  */
 function renderPreviewSection(ctx) {
   const section = el('section', 'bmwm-preview');
-  section.append(el('h3', 'bmwm-subhead bmwm-nearby-heading bmwm-preview-heading', 'BEST GUESS SO FAR'));
+  section.append(el('h3', 'bmwm-subhead bmwm-nearby-heading bmwm-preview-heading', 'SHORTLISTING FOR YOU'));
   const track = el('div', 'bmwm-nearby bmwm-preview-track');
   track.tabIndex = 0;
   track.setAttribute('role', 'region');
-  track.setAttribute('aria-label', `Your best matches so far at ${ctx.retailerLabel}`);
+  track.setAttribute('aria-label', `Your closest matches so far at ${ctx.retailerLabel}`);
   section.append(track);
   paintPreview(section, ctx);
   return section;
 }
 
 /**
- * Replace the strip's tiles from ctx.preview.matches, with a soft cross-fade so
- * a re-rank reads as "this just updated" rather than a hard jump. Reduced-motion
- * users get an instant swap (the CSS transition is disabled).
+ * Refill the strip from ctx.preview.matches, with a soft cross-fade so a re-rank
+ * reads as "this just updated" rather than a hard jump. Reduced-motion users get
+ * an instant swap (the CSS transition is disabled).
  */
 function paintPreview(section, ctx) {
   const track = section.querySelector('.bmwm-preview-track');
   const swap = () => {
     track.replaceChildren();
-    ctx.preview.matches.forEach((m) => track.append(matchCard(m, { compact: true })));
-    // Next frame: fade back in from the dimmed state set below.
+    ctx.preview.matches.forEach((m) => track.append(previewTile(m, 'mini')));
     requestAnimationFrame(() => track.classList.remove('is-fading'));
   };
-  // First paint (no tiles yet) swaps immediately; a re-rank fades out then in.
   if (!track.children.length) {
     swap();
   } else {
@@ -503,6 +500,56 @@ function matchCard(match, { big = false, compact = false } = {}) {
 
   card.append(body);
   return card;
+}
+
+/**
+ * A small "mini" tile for the live preview strip — deliberately lighter than the
+ * results-page compact card (matchCard): a small photo (or the "Images coming
+ * soon" placeholder), the model name + match score, and one spec line. The whole
+ * tile is a link to the live listing when the feed gave us one.
+ */
+function previewTile(match) {
+  const { car, score } = match;
+  const price = car.priceMin === car.priceMax
+    ? gbp(car.priceMin)
+    : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`;
+
+  // Whole tile is the tap target — an <a> when we have a link, else a plain
+  // article (still a valid tile, just not clickable).
+  const tag = car.link ? 'a' : 'article';
+  const tile = el(tag, 'bmwm-ptile bmwm-ptile-mini');
+  if (car.link) {
+    tile.href = car.link;
+    tile.target = '_blank';
+    tile.rel = 'noopener noreferrer';
+    tile.setAttribute('aria-label', `${car.name} — ${price}, ${score}% match. View at ${car.retailerName || 'the retailer'}`);
+  }
+
+  // Photo band (or the shared "Images coming soon" placeholder), with the line
+  // label pinned in its corner — same treatment as matchCard's media.
+  const media = el('div', 'bmwm-card-media bmwm-ptile-media');
+  const soon = el('span', 'bmwm-card-soon', 'Images coming soon');
+  if (car.photo) {
+    media.classList.add('has-photo');
+    const img = el('img', 'bmwm-card-photo');
+    img.src = car.photo;
+    img.alt = car.name;
+    img.loading = 'lazy';
+    img.addEventListener('error', () => { media.classList.remove('has-photo'); img.remove(); });
+    media.append(img);
+  }
+  media.append(soon, el('span', 'bmwm-card-line', car.line));
+
+  const body = el('div', 'bmwm-ptile-body');
+  const head = el('div', 'bmwm-ptile-head');
+  const badge = el('span', 'bmwm-score bmwm-ptile-score', `${score}%`);
+  badge.title = 'Match score';
+  head.append(el('span', 'bmwm-ptile-name', car.name.replace(/^BMW /, '')), badge);
+  const specs = el('span', 'bmwm-ptile-specs',
+    [SPEC_LABELS[car.body], FUEL_SPEC[car.fuel], price].filter(Boolean).join(' · '));
+  body.append(head, specs);
+  tile.append(media, body);
+  return tile;
 }
 
 /** Full-screen status message (loading / error), optionally with a retry button. */

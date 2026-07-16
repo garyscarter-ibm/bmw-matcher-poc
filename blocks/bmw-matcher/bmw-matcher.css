@@ -588,12 +588,57 @@
    transition drives the soft cross-fade on re-rank (see paintPreview). */
 .bmwm-preview-track {
   transition: opacity 0.15s ease;
+  align-items: stretch;
 }
 .bmwm-preview-track.is-fading { opacity: 0; }
 
-/* Mobile: hero steps 40px → 32px (the one confirmed breakpoint data point);
-   other headings scale down ~proportionally. Desktop values are the defaults
-   above, so only the stepped-down overrides live here. */
+/* --- small "mini" preview tiles ---
+   A flat white card, lighter than the results-page compact card: small photo,
+   model name + match score, one spec line. The whole tile is the tap target
+   (an <a> to the live listing). Sharp corners + hairline to match the system. */
+.bmwm-ptile {
+  flex: 0 0 clamp(150px, 46vw, 176px);
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  background: var(--bmwm-surface);
+  border: var(--bmwm-border-width) solid var(--bmwm-line);
+  color: var(--bmwm-ink);
+  text-decoration: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+a.bmwm-ptile:hover { border-color: var(--bmwm-ink); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); }
+a.bmwm-ptile:focus-visible { outline: 2px solid var(--bmwm-accent); outline-offset: 2px; }
+
+/* Media band: shorter than the results card; the line label sits in its
+   bottom corner over the photo (or the "Images coming soon" placeholder). */
+.bmwm-ptile-media {
+  aspect-ratio: 16 / 10;
+  padding: var(--bmwm-space-2);
+}
+.bmwm-ptile-media .bmwm-card-line { align-self: flex-end; }
+.bmwm-ptile-media .bmwm-card-soon { font-size: var(--bmwm-text-eyebrow); }
+
+.bmwm-ptile-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bmwm-space-1);
+  padding: var(--bmwm-space-3);
+}
+.bmwm-ptile-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--bmwm-space-2); }
+.bmwm-ptile-name {
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  font-size: var(--bmwm-text-label);
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Score badge: a touch smaller than the results card's. */
+.bmwm-ptile-score { flex: none; font-size: var(--bmwm-text-label); }
+.bmwm-ptile-specs { font-size: var(--bmwm-text-eyebrow); color: var(--bmwm-ink-muted); }
 
 /* Mobile: hero steps 40px → 32px (the one confirmed breakpoint data point);
    other headings scale down ~proportionally. Desktop values are the defaults
