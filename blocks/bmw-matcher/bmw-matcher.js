@@ -366,7 +366,7 @@ function renderQuestion(root, ctx, index) {
   back.addEventListener('click', () => ctx.showQuestion(index - 1));
   nav.append(back);
 
-  const next = el('button', 'bmwm-btn bmwm-btn-primary', index + 1 === questions.length ? 'See my matches' : 'Next');
+  const next = el('button', 'bmwm-btn bmwm-btn-primary', index + 1 === questions.length ? 'Explore my matches' : 'Next');
   next.type = 'button';
   if (q.multi) {
     next.disabled = selected.size === 0;
