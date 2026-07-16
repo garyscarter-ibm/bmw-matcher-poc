@@ -14,7 +14,7 @@
  * re-fetched from the API.
  */
 
-import { SHOW_IF, BUDGET_BANDS } from './quiz-meta.js';
+import { SHOW_IF, BUDGET_BANDS, pillFor } from './quiz-meta.js';
 
 const HASH_KEY = 'm';
 const DEFAULT_API = 'http://localhost:8787';
@@ -293,6 +293,36 @@ function schedulePreviewRefresh(ctx) {
   }, PREVIEW_DEBOUNCE_MS);
 }
 
+/**
+ * A wrapping row of tap-to-edit summary pills — one per question answered
+ * *before* the current one (the current question is what you're answering now,
+ * so it's excluded). Tapping a pill jumps back to edit that answer and sets a
+ * return point so advancing lands back on the question you left. Returns the
+ * row element, or null when nothing's been answered yet.
+ *
+ * @param {number} index current question's position in the visible list
+ */
+function renderAnswerPills(ctx, questions, index) {
+  const row = el('div', 'bmwm-pills');
+  for (let i = 0; i < index; i += 1) {
+    const question = questions[i];
+    const label = pillFor(question, ctx.answers);
+    if (!label) continue; // unanswered (shouldn't happen before `index`, but safe)
+    const pill = el('button', 'bmwm-pill');
+    pill.type = 'button';
+    pill.append(el('span', 'bmwm-pill-text', label));
+    pill.append(el('span', 'bmwm-pill-edit', '✎'));
+    pill.setAttribute('aria-label', `${question.title.replace(/[?？]$/, '')}: ${label}. Edit`);
+    pill.addEventListener('click', () => {
+      // Remember where we were so advance() returns here after the edit.
+      ctx.editReturnIndex = index;
+      ctx.showQuestion(i);
+    });
+    row.append(pill);
+  }
+  return row.children.length ? row : null;
+}
+
 function renderQuestion(root, ctx, index) {
   const questions = visibleQuestions(ctx.questions, ctx.answers);
   const q = questions[index];
@@ -309,6 +339,12 @@ function renderQuestion(root, ctx, index) {
   progress.append(bar);
   screen.append(progress, el('p', 'bmwm-step', `Question ${index + 1} of ${questions.length}`));
 
+  // Summary pills for every question already answered before this one. Each is
+  // a tap-to-edit button: it jumps back to that question, remembering the
+  // current index so advancing returns straight here (see advance / jumpToEdit).
+  const answeredPills = renderAnswerPills(ctx, questions, index);
+  if (answeredPills) screen.append(answeredPills);
+
   screen.append(el('h2', 'bmwm-question', q.title));
   if (q.help) screen.append(el('p', 'bmwm-help', q.help));
 
@@ -317,7 +353,18 @@ function renderQuestion(root, ctx, index) {
   const optionButtons = [];
 
   const advance = () => {
-    if (index + 1 < visibleQuestions(ctx.questions, ctx.answers).length) ctx.showQuestion(index + 1);
+    const total = visibleQuestions(ctx.questions, ctx.answers).length;
+    // Editing a pill sets a return point: once this (earlier) question is
+    // re-answered, jump straight back rather than walking forward again. Only
+    // honour it when returning would actually move forward, and clamp to the
+    // live visible range (editing fuel can add/remove the charging question).
+    const returnTo = ctx.editReturnIndex;
+    if (returnTo != null) {
+      ctx.editReturnIndex = null;
+      const target = Math.min(returnTo, total - 1);
+      if (target > index) return ctx.showQuestion(target);
+    }
+    if (index + 1 < total) ctx.showQuestion(index + 1);
     else ctx.showResults(ctx.answers, { updateHash: true });
   };
 
@@ -763,6 +810,7 @@ async function renderResults(root, ctx, answers) {
     // late-landing response from the old run is ignored).
     clearTimeout(ctx.previewTimer);
     ctx.preview = { matches: [], seq: ctx.preview.seq + 1 };
+    ctx.editReturnIndex = null;
     window.history.replaceState(null, '', window.location.pathname);
     ctx.showIntro();
   });
@@ -810,6 +858,10 @@ export default async function decorate(block) {
     // `seq` is the latest-wins guard for the debounced refetch.
     preview: { matches: [], seq: 0 },
     previewTimer: null,
+    // Set when a summary pill is tapped to edit an earlier answer: the index to
+    // return to once that answer is re-submitted (see renderAnswerPills /
+    // advance). Null the rest of the time.
+    editReturnIndex: null,
     // Where the preview strip mounts within the quiz screen. This is the one
     // spot that differs by layout: here it sits at the END of the screen, i.e.
     // below the Back/Next nav.
