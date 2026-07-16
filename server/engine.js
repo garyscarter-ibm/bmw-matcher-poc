@@ -74,7 +74,11 @@ function scoreBody(car, answers) {
 const FUEL_LABELS = { petrol: 'petrol', diesel: 'diesel', phev: 'plug-in hybrid', ev: 'fully electric' };
 
 function scoreFuel(car, answers) {
-  const pref = answers.fuel;
+  // An unanswered fuel question scores like "Help me decide" — the honest
+  // reading of "no preference stated yet", and what lets the live-preview
+  // drawer rank a partial (budget-only) answer set instead of throwing on
+  // table[undefined].
+  const pref = answers.fuel || 'open';
   const charging = answers.charging || 'none';
   const canCharge = charging === 'home' || charging === 'work';
 
@@ -117,7 +121,10 @@ function scoreFuel(car, answers) {
 }
 
 function scorePracticality(car, answers) {
-  const need = { small: 0, medium: 400, big: 500 }[answers.boot];
+  // Unanswered boot question ⇒ no space requirement yet (treat as "small"),
+  // so a partial answer set scores a real number rather than NaN from
+  // dividing by an undefined `need`.
+  const need = { small: 0, medium: 400, big: 500 }[answers.boot] ?? 0;
   const seatsOk = answers.people === 'solo' || car.seats >= 5;
   let score = need === 0 ? 1 : clamp(car.boot / need);
   if (!seatsOk) score *= 0.3;

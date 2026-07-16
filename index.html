@@ -14,12 +14,14 @@
       margin: 0;
       min-height: 100vh;
       background: #0d0f12;
-      display: grid;
-      place-items: start center;
       padding: 4vh 16px;
+      box-sizing: border-box;
       font-family: 'Helvetica Neue', helvetica, arial, sans-serif;
     }
-    main { width: 100%; max-width: 880px; }
+    /* Normal flow + auto side margins centre the column without a grid track
+       that would size to the block's 880px max-content and overflow narrow
+       viewports (the grid centring did exactly that on mobile). */
+    main { width: 100%; max-width: 880px; margin: 0 auto; box-sizing: border-box; }
   </style>
 </head>
 <body>

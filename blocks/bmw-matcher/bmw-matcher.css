@@ -70,6 +70,12 @@
   font-size: var(--bmwm-text-body);
   border-radius: var(--bmwm-radius);
   padding: var(--bmwm-space-6) var(--bmwm-space-5) var(--bmwm-space-8);
+  /* Cap the width on large screens, but fill (never exceed) a narrow viewport:
+     box-sizing keeps the side padding inside the 100%, so the block can't push
+     past the screen edge on mobile. Without width:100% a centred flex/grid
+     parent sizes the block to its 880px max-content and it overflows. */
+  box-sizing: border-box;
+  width: 100%;
   max-width: 880px;
   margin: 0 auto;
   line-height: 1.5;
@@ -540,6 +546,78 @@
 
 .bmwm-disclaimer { color: var(--bmwm-ink-muted); font-size: var(--bmwm-text-label); margin-top: var(--bmwm-space-5); }
 
+/* --- live "best guess" drawer (quiz screen) ---
+   A collapsible bar pinned below the quiz nav that expands into a horizontal
+   track of compact result tiles — the same card the results carousel uses.
+   Full-bleed to the block's edges (like .bmwm-nearby-band) so it reads as a
+   distinct dock rather than an inset panel. The bar is sticky to the bottom of
+   the viewport so it stays reachable while the options scroll; the quiz is
+   short, so this is a nicety and degrades fine where sticky isn't honoured. */
+.bmwm-preview {
+  margin: var(--bmwm-space-8) calc(var(--bmwm-space-5) * -1) calc(var(--bmwm-space-8) * -1);
+  border-top: var(--bmwm-border-width) solid var(--bmwm-line);
+  background: var(--bmwm-surface);
+}
+
+/* The toggle bar: a full-width flat button in the grey section fill, uppercase
+   label in the Light heading face to match the results subheads. */
+.bmwm-preview-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bmwm-space-3);
+  padding: var(--bmwm-space-4) var(--bmwm-space-5);
+  border: 0;
+  background: var(--bmwm-surface-alt);
+  color: var(--bmwm-ink);
+  font-family: inherit;
+  font-size: var(--bmwm-text-body);
+  text-align: left;
+  cursor: pointer;
+  position: sticky;
+  bottom: 0;
+}
+
+.bmwm-preview-bar:not(:disabled):hover { background: var(--bmwm-line); }
+.bmwm-preview-bar:disabled { cursor: default; color: var(--bmwm-ink-muted); }
+
+.bmwm-preview-label {
+  font-family: var(--bmwm-font-heading);
+  font-weight: 300;
+  font-size: var(--bmwm-text-h3);
+}
+
+/* Chevron: a CSS caret that points up when collapsed, flips down when open. */
+.bmwm-preview-caret {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid currentcolor;
+  border-bottom: 2px solid currentcolor;
+  transform: rotate(-135deg); /* points up: "tap to open" */
+  transition: transform 0.2s ease;
+}
+
+.bmwm-preview-bar[aria-expanded="true"] .bmwm-preview-caret {
+  transform: rotate(45deg); /* points down: "tap to close" */
+}
+
+.bmwm-preview-panel { padding: var(--bmwm-space-5); }
+.bmwm-preview-panel[hidden] { display: none; }
+
+/* Sits above the tile track when shown (pre-budget hint / empty-state note). */
+.bmwm-preview-note {
+  margin: 0 0 var(--bmwm-space-4);
+  color: var(--bmwm-ink-muted);
+  font-size: var(--bmwm-text-label);
+}
+.bmwm-preview-note:empty { display: none; }
+
+/* The track reuses .bmwm-nearby's horizontal scroll-snap layout, so the 9
+   tiles scroll with the next one peeking — same affordance as the results
+   carousel — and the .bmwm-card-compact tile styling comes for free. */
+
 /* Mobile: hero steps 40px → 32px (the one confirmed breakpoint data point);
    other headings scale down ~proportionally. Desktop values are the defaults
    above, so only the stepped-down overrides live here. */
@@ -551,6 +629,7 @@
      breakpoint; the .bmwm-subhead override above doesn't reach the more
      specific nearby-heading rule, so step it down explicitly to match. */
   .bmwm-nearby-heading { font-size: 18px; }
+  .bmwm-preview-label { font-size: 18px; }
   .bmwm-lede { font-size: var(--bmwm-text-body); }
 }
 
@@ -559,4 +638,6 @@
   .bmwm-btn, .bmwm-option, .bmwm-progress-bar { transition: none; }
   /* Drop the sweep; keep a static grey tint so the skeleton still reads. */
   .bmwm-skel { animation: none; background-image: none; }
+  /* Caret still flips (it conveys open/closed state) but without the tween. */
+  .bmwm-preview-caret { transition: none; }
 }
