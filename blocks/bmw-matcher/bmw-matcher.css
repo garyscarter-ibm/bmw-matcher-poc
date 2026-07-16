@@ -336,6 +336,26 @@
   background: rgba(0, 0, 0, 0.6);
 }
 
+/* "Images coming soon" — the placeholder for a photo-less listing, matching
+   usedcars.bmw.co.uk's own PDP: white bold caption centred on the dark media
+   field. Absolutely positioned so it centres independently of the bottom-left
+   line label. Hidden once a real photo loads (has-photo). */
+.bmwm-card-soon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--bmwm-space-4);
+  text-align: center;
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-accent-ink);
+}
+
+.bmwm-card-media.has-photo .bmwm-card-soon { display: none; }
+
 .bmwm-card-body { padding: var(--bmwm-space-6); }
 
 .bmwm-card-head {

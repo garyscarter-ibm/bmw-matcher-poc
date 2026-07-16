@@ -273,22 +273,31 @@ function matchCard(match, { big = false, compact = false } = {}) {
   const card = el('article', `bmwm-card${big ? ' bmwm-card-big' : ''}${compact ? ' bmwm-card-compact' : ''}`);
 
   const media = el('div', 'bmwm-card-media');
+  // "Images coming soon" placeholder, mirroring usedcars.bmw.co.uk's own PDP
+  // for a photo-less listing: a white bold caption centred on the dark media
+  // field. Every card surface (hero, "More at" tiles, "Worth the drive"
+  // carousel) goes through matchCard, so this covers all image viewers. The
+  // placeholder is hidden (CSS) once a real photo loads, and re-shown if one
+  // fails to.
+  const soon = el('span', 'bmwm-card-soon', 'Images coming soon');
   // Real retailer photo when the live feed supplied one; the line label sits
-  // over it. Falls back to the flat placeholder field (CSS) when absent.
+  // over it. Falls back to the "Images coming soon" placeholder above when
+  // absent — same as the live site.
   if (car.photo) {
     media.classList.add('has-photo');
     const img = el('img', 'bmwm-card-photo');
     img.src = car.photo;
     img.alt = car.name;
     img.loading = 'lazy';
-    // A broken image URL shouldn't leave a half-rendered card.
+    // A broken image URL shouldn't leave a half-rendered card — drop back to
+    // the "Images coming soon" placeholder, exactly as a photo-less car shows.
     img.addEventListener('error', () => {
       media.classList.remove('has-photo');
       img.remove();
     });
     media.append(img);
   }
-  media.append(el('span', 'bmwm-card-line', car.line));
+  media.append(soon, el('span', 'bmwm-card-line', car.line));
   card.append(media);
 
   const body = el('div', 'bmwm-card-body');
