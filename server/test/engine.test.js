@@ -1,12 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { matchCars, STRETCH_FACTOR } from '../engine.js';
+import { matchCars, rankCars, STRETCH_FACTOR } from '../engine.js';
 import { CARS } from '../data.js';
 import { BUDGET_BANDS, QUESTIONS } from '../questions.js';
 
 function run(answers) {
   return matchCars(answers, CARS);
+}
+
+/** Full ranking, not just the top 3 — lets a test assert over every survivor. */
+function runAll(answers) {
+  return rankCars(answers, CARS);
 }
 
 const base = {
@@ -39,7 +44,7 @@ test('budget-constrained city driver gets a small, affordable car', () => {
 });
 
 test('large family with big boot needs gets practical 5+ seaters only', () => {
-  const { matches, contenders } = run({
+  const answers = {
     ...base,
     budget: 'b4',
     bodyStyles: ['suv', 'estate'],
@@ -47,9 +52,10 @@ test('large family with big boot needs gets practical 5+ seaters only', () => {
     boot: 'big',
     primaryUse: 'family',
     priorities: ['comfort', 'economy'],
-  });
+  };
+  const { matches } = run(answers);
   assert.ok(matches.length > 0);
-  for (const m of [...matches, ...contenders]) {
+  for (const m of runAll(answers)) {
     assert.ok(m.car.seats >= 5, `${m.car.name} has too few seats`);
     assert.ok(m.car.boot >= 430, `${m.car.name} boot too small for a crew`);
   }
@@ -90,7 +96,7 @@ test('EV preference without charging access is heavily penalised', () => {
   const without = run({ ...base, budget: 'b3', fuel: 'ev', charging: 'none' });
   const evTop = withCharging.matches[0];
   assert.equal(evTop.car.fuel, 'ev');
-  const sameCar = without.matches.concat(without.contenders)
+  const sameCar = rankCars({ ...base, budget: 'b3', fuel: 'ev', charging: 'none' }, CARS)
     .find((m) => m.car.id === evTop.car.id);
   if (sameCar) {
     assert.ok(sameCar.score < evTop.score, 'no-charging score should drop');
@@ -99,7 +105,8 @@ test('EV preference without charging access is heavily penalised', () => {
 
 test('contradictory answers still produce ranked, in-filter results', () => {
   // Tiny budget, maximum-attack sports intent, seven people, huge boot.
-  const { matches, contenders } = run({
+  // Engine must not crash and must respect hard filters even if empty.
+  for (const m of runAll({
     ...base,
     budget: 'b1',
     bodyStyles: ['convertible'],
@@ -107,9 +114,7 @@ test('contradictory answers still produce ranked, in-filter results', () => {
     boot: 'big',
     style: '5',
     priorities: ['performance', 'image'],
-  });
-  // Engine must not crash and must respect hard filters even if empty.
-  for (const m of [...matches, ...contenders]) {
+  })) {
     assert.ok(m.car.seats >= 5);
     assert.ok(m.car.priceMin <= BUDGET_BANDS.b1[1] * STRETCH_FACTOR);
   }
@@ -119,7 +124,7 @@ test('scores are 0–100, sorted, deterministic, with reasons on the top match',
   const a = run(base);
   const b = run(base);
   assert.deepEqual(a, b, 'same answers → same output');
-  const all = [...a.matches, ...a.contenders];
+  const all = runAll(base);
   for (let i = 0; i < all.length; i += 1) {
     assert.ok(all[i].score >= 0 && all[i].score <= 100);
     if (i > 0) assert.ok(all[i - 1].score >= all[i].score, 'sorted descending');
@@ -130,12 +135,31 @@ test('scores are 0–100, sorted, deterministic, with reasons on the top match',
 test('stretch cars are flagged and carry a stretch reason', () => {
   // b1 budget: M135 (43k+) is within 15% of... no; use b2 (max 50k) → M240i (48k) fits;
   // find any returned stretch match across a few personas and assert the flag text.
-  const { matches, contenders } = run({ ...base, budget: 'b2', style: '5', priorities: ['performance', 'image'], fuel: 'petrol', primaryUse: 'fun' });
-  const stretchy = [...matches, ...contenders].filter((m) => m.stretch);
+  const stretchy = runAll({ ...base, budget: 'b2', style: '5', priorities: ['performance', 'image'], fuel: 'petrol', primaryUse: 'fun' }).filter((m) => m.stretch);
   for (const m of stretchy) {
     assert.ok(m.car.priceMin > BUDGET_BANDS.b2[1]);
     assert.ok(m.reasons.some((r) => r.toLowerCase().includes('stretch')));
   }
+});
+
+test('rankCars ranks a mixed-retailer pool on merit alone', () => {
+  // The "worth the drive" carousel ranks cars from several retailers through
+  // the same scoring as the hero grid. Retailer/distance must not leak into
+  // the score: two identical cars differing only in where they sit must tie.
+  const [near, far] = [2.2, 31.1].map((distance) => ({
+    ...CARS[0], id: `${CARS[0].id}-${distance}`, distance, retailerId: distance < 10 ? 96 : 101,
+  }));
+  const ranked = rankCars(base, [near, far]);
+  assert.equal(ranked.length, 2);
+  assert.equal(ranked[0].score, ranked[1].score, 'distance must not affect score');
+});
+
+test('rankCars returns every survivor, not just the top 3', () => {
+  const all = rankCars(base, CARS);
+  const { matches } = run(base);
+  assert.ok(all.length > matches.length, 'ranking is wider than the headline matches');
+  assert.equal(matches.length, 3);
+  assert.deepEqual(matches, all.slice(0, 3), 'matches are the head of the full ranking');
 });
 
 test('every dataset entry has the fields the engine needs', () => {

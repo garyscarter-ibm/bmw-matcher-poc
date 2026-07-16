@@ -248,6 +248,13 @@ export function mapVehicle(v) {
     plate: v?.identification?.plate || undefined,
     photo,
     retailerName,
+    // Miles from the searched location. Only present on `sort=distance`
+    // queries (see fetchNearbyStock) — undefined on plain retailer_site
+    // fetches, which is why the hero cards show no distance.
+    distance: num(v?.retailer_site?.distance),
+    // Internal: lets the nearby fetch drop the anchor retailer's own cars.
+    // Deliberately NOT exposed by index.js publicCar().
+    retailerId: v?.retailer_site?.id,
     // Public PDP is /vehicle/{advert_id} (confirmed against the live site);
     // fall back to the retailer's stock page if the feed ever omits it.
     link: v?.advert_id

@@ -366,20 +366,65 @@
   color: var(--bmwm-ink);
 }
 
-.bmwm-contenders { display: flex; flex-wrap: wrap; gap: var(--bmwm-space-2); }
+/* --- "worth the drive": nearby-retailer carousel --- */
 
-.bmwm-contender {
+/* The lede sits under the subhead, so drop the subhead's bottom margin. */
+.bmwm-nearby-lede { margin: 0 0 var(--bmwm-space-4); }
+
+/* Horizontal scroll-snap track. Three tiles fit on desktop; on mobile the
+   clamp below leaves the next tile peeking, which is what signals "swipe". */
+.bmwm-nearby {
   display: flex;
-  gap: var(--bmwm-space-3);
-  align-items: center;
-  background: var(--bmwm-surface-alt);
-  border: var(--bmwm-border-width) solid var(--bmwm-line);
-  border-radius: var(--bmwm-radius);
-  padding: var(--bmwm-space-3) var(--bmwm-space-4);
-  font-size: var(--bmwm-text-label);
+  gap: var(--bmwm-space-4);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  /* Room for the focus ring, which would otherwise be clipped by overflow. */
+  padding: var(--bmwm-space-1);
+  margin: 0 calc(var(--bmwm-space-1) * -1);
+  scrollbar-width: none; /* the peeking tile is the affordance */
 }
 
-.bmwm-contender-score { font-family: var(--bmwm-font-bold); color: var(--bmwm-accent); font-weight: 700; }
+.bmwm-nearby::-webkit-scrollbar { display: none; }
+
+.bmwm-card-compact {
+  flex: 0 0 clamp(240px, 72vw, 300px);
+  scroll-snap-align: start;
+}
+
+/* Tighter than a hero card: this is a glance, not a pitch. */
+.bmwm-card-compact .bmwm-card-body { padding: var(--bmwm-space-4); }
+
+/* Most feed names are short (~24 chars), but a minority are raw Auto Trader
+   dumps up to 80 ("BMW 1.5 118i Sport Hatchback 5dr Petrol Auto Euro 6 (s/s)").
+   At the hero card's 24px those take four lines in a 300px tile, so step the
+   size down and cap at two. No title tooltip: the feed itself already sends
+   ~6% of these names pre-truncated with an ellipsis, so it would promise a
+   full name we don't have. The card links out for the full detail. */
+.bmwm-card-compact .bmwm-card-name {
+  font-size: var(--bmwm-text-body);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The score is a small badge, not a column-squeezing peer of the name. */
+.bmwm-card-compact .bmwm-card-head { gap: var(--bmwm-space-2); }
+.bmwm-card-compact .bmwm-score { flex: none; }
+
+.bmwm-distance {
+  margin: var(--bmwm-space-3) 0 0;
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+}
+
+/* The distance is the reason this section exists — give it the accent. */
+.bmwm-distance-miles {
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  color: var(--bmwm-accent);
+}
 
 .bmwm-actions { display: flex; flex-wrap: wrap; gap: var(--bmwm-space-3); margin: var(--bmwm-space-8) 0 var(--bmwm-space-2); }
 

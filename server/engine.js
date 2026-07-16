@@ -249,15 +249,19 @@ const SCORERS = {
 };
 
 /**
- * Rank all cars against the user's answers.
- * @returns {{ matches: Match[], contenders: Match[] }}
- *   Match: { car, score (0–100), stretch, reasons: string[] }
+ * Rank every car that survives the hard filters, best first.
+ *
+ * Callers slice this to taste: the block's hero grid takes the top 3 of the
+ * configured retailer's stock, while the "worth the drive" carousel ranks a
+ * separate pool (nearby retailers) through the same scoring.
+ *
+ * @returns {Match[]} Match: { car, score (0–100), stretch, reasons: string[] }
  */
-export function matchCars(answers, cars) {
+export function rankCars(answers, cars) {
   const weights = effectiveWeights(answers);
   const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
 
-  const ranked = cars
+  return cars
     .filter((car) => passesHardFilters(car, answers))
     .map((car) => {
       let weighted = 0;
@@ -285,6 +289,15 @@ export function matchCars(answers, cars) {
         a.car.priceMin - b.car.priceMin ||
         a.car.name.localeCompare(b.car.name),
     );
+}
 
-  return { matches: ranked.slice(0, 3), contenders: ranked.slice(3, 6) };
+/** How many cars the results screen shows as headline matches. */
+export const TOP_MATCHES = 3;
+
+/**
+ * The user's top matches from a pool of cars.
+ * @returns {{ matches: Match[] }}
+ */
+export function matchCars(answers, cars) {
+  return { matches: rankCars(answers, cars).slice(0, TOP_MATCHES) };
 }

@@ -7,9 +7,12 @@
  * EDS block calls:
  *
  *   GET  /api/questions  → quiz definition (showIf functions stripped)
- *   POST /api/match      → { answers } → { matches, contenders } with
+ *   POST /api/match      → { answers } → { matches, nearby } with
  *                          display-only car fields (no tags/specs the engine
- *                          uses internally, so the dataset can't be rebuilt)
+ *                          uses internally, so the dataset can't be rebuilt).
+ *                          `matches` are the configured retailer's own stock;
+ *                          `nearby` are the best matches at *other* retailers
+ *                          close by, each carrying a real distance in miles.
  *   GET  /health         → { ok: true }
  *
  * Portable: no framework, no build step. Deploy behind any host; set PORT.
@@ -17,8 +20,8 @@
 
 import { createServer } from 'node:http';
 
-import { matchCars } from './engine.js';
-import { fetchGrassickStock, StockUnavailableError } from './stock.js';
+import { matchCars, rankCars, TOP_MATCHES } from './engine.js';
+import { fetchGrassickStock, fetchNearbyStock, StockUnavailableError } from './stock.js';
 import { QUESTIONS, BUDGET_BANDS } from './questions.js';
 
 const PORT = Number(process.env.PORT) || 8787;
@@ -58,6 +61,9 @@ function publicQuestions() {
  * seats, boot, id — are omitted so responses can't be used to reconstruct the
  * dataset. The real display fields (mileage, plate, photo, retailerName, link)
  * come from the live feed and are passed through where present.
+ *
+ * `retailerId` is deliberately absent: it exists only so fetchNearbyStock can
+ * drop the anchor retailer's own cars, and the block has no use for it.
  */
 function publicCar(car) {
   return {
@@ -77,6 +83,9 @@ function publicCar(car) {
     photo: car.photo,
     retailerName: car.retailerName,
     link: car.link,
+    // Miles from the configured retailer. Only set on `nearby` cars — the
+    // hero matches are the configured retailer's own stock.
+    distance: car.distance,
   };
 }
 
@@ -128,21 +137,37 @@ async function handleMatch(req, res) {
   // Live proxy: score against the retailer's real stock, not a static file.
   // If the live feed can't be reached, return a friendly 5xx — the block's
   // retry UI handles it. No static fallback (this tool is honestly live-only).
+  //
+  // Both pools are fetched concurrently: the nearby search is several extra
+  // pages, and serialising it behind the retailer's own stock would double
+  // cold-cache latency for no reason. allSettled, not all — the nearby pool
+  // is a bonus section, so its failure must not sink the whole response.
   const retailer = typeof body.retailer === 'string' && body.retailer ? body.retailer : undefined;
-  let cars;
-  try {
-    cars = await fetchGrassickStock(retailer);
-  } catch (err) {
-    if (err instanceof StockUnavailableError) {
+  const [own, near] = await Promise.allSettled([
+    fetchGrassickStock(retailer),
+    fetchNearbyStock(retailer),
+  ]);
+
+  if (own.status === 'rejected') {
+    if (own.reason instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
     }
     return sendJson(res, 500, { error: 'Something went wrong finding matches' });
   }
 
-  const { matches, contenders } = matchCars(answers, cars);
+  if (near.status === 'rejected') {
+    // Degrade to just the hero matches — the block omits the section.
+    console.warn('[match] nearby stock unavailable:', near.reason?.message);
+  }
+
+  const { matches } = matchCars(answers, own.value);
+  const nearby = near.status === 'fulfilled'
+    ? rankCars(answers, near.value).slice(0, TOP_MATCHES)
+    : [];
+
   return sendJson(res, 200, {
     matches: matches.map(publicMatch),
-    contenders: contenders.map(publicMatch),
+    nearby: nearby.map(publicMatch),
   });
 }
 

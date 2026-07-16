@@ -236,9 +236,20 @@ function renderQuestion(root, ctx, index) {
   screen.querySelector('.bmwm-question').focus({ preventScroll: true });
 }
 
-function matchCard(match, big) {
+/** Miles from the configured retailer, e.g. "18.1 miles away". */
+function distanceLabel(distance) {
+  const miles = Math.round(distance * 10) / 10;
+  return `${miles} ${miles === 1 ? 'mile' : 'miles'} away`;
+}
+
+/**
+ * One result card.
+ * `big` adds the "why it suits you" reasons; `compact` is the carousel tile —
+ * same anatomy, but trades the blurb and reasons for a distance line.
+ */
+function matchCard(match, { big = false, compact = false } = {}) {
   const { car, score, reasons } = match;
-  const card = el('article', `bmwm-card${big ? ' bmwm-card-big' : ''}`);
+  const card = el('article', `bmwm-card${big ? ' bmwm-card-big' : ''}${compact ? ' bmwm-card-compact' : ''}`);
 
   const media = el('div', 'bmwm-card-media');
   // Real retailer photo when the live feed supplied one; the line label sits
@@ -272,7 +283,12 @@ function matchCard(match, big) {
     ? gbp(car.priceMin)
     : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`;
   const specs = el('p', 'bmwm-specs');
-  const specBits = [
+  // Compact tiles are narrow — the headline specs only, no 0–62/economy.
+  const specBits = compact ? [
+    SPEC_LABELS[car.body],
+    FUEL_SPEC[car.fuel],
+    price,
+  ] : [
     SPEC_LABELS[car.body],
     FUEL_SPEC[car.fuel],
     price,
@@ -282,6 +298,16 @@ function matchCard(match, big) {
   specs.textContent = specBits.filter(Boolean).join('  ·  ');
   body.append(specs);
 
+  // The whole point of the carousel: how far away is it, and whose is it?
+  // Distance comes from the live feed, so omit the line rather than invent
+  // one if the feed didn't supply it.
+  if (compact && car.distance != null) {
+    const where = el('p', 'bmwm-distance');
+    where.append(el('span', 'bmwm-distance-miles', distanceLabel(car.distance)));
+    if (car.retailerName) where.append(el('span', null, ` · ${car.retailerName}`));
+    body.append(where);
+  }
+
   // Real used-car detail from the live feed, when present.
   const detailBits = [];
   if (car.plate) detailBits.push(`’${car.plate} reg`);
@@ -290,7 +316,7 @@ function matchCard(match, big) {
     body.append(el('p', 'bmwm-usedmeta', detailBits.join('  ·  ')));
   }
 
-  body.append(el('p', 'bmwm-blurb', car.blurb));
+  if (!compact) body.append(el('p', 'bmwm-blurb', car.blurb));
 
   if (big && reasons.length) {
     const why = el('ul', 'bmwm-reasons');
@@ -331,9 +357,9 @@ async function renderResults(root, ctx, answers) {
   renderStatus(root, { kicker: 'Almost there', title: 'Finding your matches' });
 
   let matches;
-  let contenders;
+  let nearby;
   try {
-    ({ matches, contenders } = await apiMatch(ctx.api, answers, ctx.retailer));
+    ({ matches, nearby } = await apiMatch(ctx.api, answers, ctx.retailer));
   } catch {
     renderStatus(root, {
       kicker: 'Sorry',
@@ -358,22 +384,26 @@ async function renderResults(root, ctx, answers) {
   } else {
     screen.append(el('h2', 'bmwm-title', `Your perfect BMW is the ${matches[0].car.name.replace(/^BMW /, '')}`));
     const grid = el('div', 'bmwm-grid');
-    matches.forEach((m, i) => grid.append(matchCard(m, i === 0 || true)));
+    matches.forEach((m) => grid.append(matchCard(m, { big: true })));
     screen.append(grid);
   }
 
-  if (contenders.length) {
-    screen.append(el('h3', 'bmwm-subhead', 'Close contenders'));
-    const strip = el('div', 'bmwm-contenders');
-    contenders.forEach((m) => {
-      const chip = el('div', 'bmwm-contender');
-      chip.append(
-        el('span', 'bmwm-contender-name', m.car.name),
-        el('span', 'bmwm-contender-score', `${m.score}%`),
-      );
-      strip.append(chip);
-    });
-    screen.append(strip);
+  // Cars at other nearby retailers — worth a drive if the local three didn't
+  // land. Absent when the nearby lookup failed (the API degrades to []), so
+  // the section simply doesn't render rather than showing an error.
+  if (nearby.length) {
+    screen.append(
+      el('h3', 'bmwm-subhead', 'Worth the drive'),
+      el('p', 'bmwm-lede bmwm-nearby-lede',
+        `Not quite it? These are the closest matches at other retailers near ${ctx.retailerLabel}.`),
+    );
+    const track = el('div', 'bmwm-nearby');
+    // Focusable so the carousel is scrollable by keyboard, not just by swipe.
+    track.tabIndex = 0;
+    track.setAttribute('role', 'region');
+    track.setAttribute('aria-label', `Matches at other retailers near ${ctx.retailerLabel}`);
+    nearby.forEach((m) => track.append(matchCard(m, { compact: true })));
+    screen.append(track);
   }
 
   const actions = el('div', 'bmwm-actions');
