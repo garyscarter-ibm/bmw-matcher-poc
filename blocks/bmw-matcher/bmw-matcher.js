@@ -392,8 +392,9 @@ async function renderResults(root, ctx, answers) {
   // land. Absent when the nearby lookup failed (the API degrades to []), so
   // the section simply doesn't render rather than showing an error.
   if (nearby.length) {
-    screen.append(
-      el('h3', 'bmwm-subhead', 'Worth the drive'),
+    const band = el('section', 'bmwm-nearby-band');
+    band.append(
+      el('h3', 'bmwm-subhead bmwm-nearby-heading', 'WORTH THE DRIVE'),
       el('p', 'bmwm-lede bmwm-nearby-lede',
         `Not quite it? These are the closest matches at other retailers near ${ctx.retailerLabel}.`),
     );
@@ -403,7 +404,8 @@ async function renderResults(root, ctx, answers) {
     track.setAttribute('role', 'region');
     track.setAttribute('aria-label', `Matches at other retailers near ${ctx.retailerLabel}`);
     nearby.forEach((m) => track.append(matchCard(m, { compact: true })));
-    screen.append(track);
+    band.append(track);
+    screen.append(band);
   }
 
   const actions = el('div', 'bmwm-actions');

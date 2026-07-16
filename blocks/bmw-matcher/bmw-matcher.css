@@ -366,16 +366,37 @@
   color: var(--bmwm-ink);
 }
 
-/* --- "worth the drive": nearby-retailer carousel --- */
+/* --- "worth the drive": nearby-retailer carousel ---
+   Styled as a full-width grey content band (BMW's own "why choose BMW
+   servicing"-style module: grey field, uppercase heading, even 3-up
+   spacing) rather than sitting directly on the white results page. */
+
+/* Bleeds out to the block's own edges by cancelling .bmwm's side padding,
+   so the band reads as a distinct section rather than an inset panel. */
+.bmwm-nearby-band {
+  background: var(--bmwm-surface-alt);
+  margin: var(--bmwm-space-8) calc(var(--bmwm-space-5) * -1) calc(var(--bmwm-space-2) * -1);
+  padding: var(--bmwm-space-8) var(--bmwm-space-5);
+}
+
+/* Matches BMW's own "WHY CHOOSE BMW SERVICING?" module heading: the Light
+   face (inherited from .bmwm-subhead) at 28px, left-aligned, normal tracking.
+   BMW bakes the caps into the copy rather than using text-transform, so the
+   heading text is authored in caps and no transform is applied here. */
+.bmwm-nearby-heading {
+  margin-top: 0;
+  font-size: 28px;
+  line-height: 1.2;
+}
 
 /* The lede sits under the subhead, so drop the subhead's bottom margin. */
-.bmwm-nearby-lede { margin: 0 0 var(--bmwm-space-4); }
+.bmwm-nearby-lede { margin: 0 0 var(--bmwm-space-6); }
 
 /* Horizontal scroll-snap track. Three tiles fit on desktop; on mobile the
    clamp below leaves the next tile peeking, which is what signals "swipe". */
 .bmwm-nearby {
   display: flex;
-  gap: var(--bmwm-space-4);
+  gap: var(--bmwm-space-6);
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   /* Room for the focus ring, which would otherwise be clipped by overflow. */
@@ -389,10 +410,31 @@
 .bmwm-card-compact {
   flex: 0 0 clamp(240px, 72vw, 300px);
   scroll-snap-align: start;
+  /* On a grey band a bordered white card reads as a tile, matching the
+     photo-over-text module style rather than the hairline-bordered hero card. */
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
-/* Tighter than a hero card: this is a glance, not a pitch. */
-.bmwm-card-compact .bmwm-card-body { padding: var(--bmwm-space-4); }
+/* Tighter than a hero card: this is a glance, not a pitch. The body fills the
+   tile's height (tiles stretch to the tallest via the track's default
+   align-items: stretch) so the "View at…" anchor can be pinned to the bottom
+   edge — the card names run 1–2 lines and the distance/used-meta lines are
+   conditional, which would otherwise leave the CTAs at ragged heights. */
+.bmwm-card-compact .bmwm-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--bmwm-space-4);
+}
+
+/* Pin the anchor to the bottom of the tile, taking up the slack above it.
+   margin-top: auto eats the fixed gap, so restore the breathing room as
+   padding for the tallest tile (where there's no slack to absorb). */
+.bmwm-card-compact .bmwm-card-link {
+  margin-top: auto;
+  padding-top: var(--bmwm-space-4);
+}
 
 /* Most feed names are short (~24 chars), but a minority are raw Auto Trader
    dumps up to 80 ("BMW 1.5 118i Sport Hatchback 5dr Petrol Auto Euro 6 (s/s)").
@@ -437,6 +479,10 @@
   .bmwm-title { font-size: 32px; }
   .bmwm-question { font-size: 22px; }
   .bmwm-card-name, .bmwm-subhead { font-size: 20px; }
+  /* BMW's own module steps its heading 28px → 18px at this same 768px
+     breakpoint; the .bmwm-subhead override above doesn't reach the more
+     specific nearby-heading rule, so step it down explicitly to match. */
+  .bmwm-nearby-heading { font-size: 18px; }
   .bmwm-lede { font-size: var(--bmwm-text-body); }
 }
 
