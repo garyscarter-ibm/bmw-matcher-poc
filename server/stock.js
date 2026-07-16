@@ -158,13 +158,52 @@ const byDistanceQuery = (postcode) => `location=${encodeURIComponent(postcode)}`
 
 // Keyed by retailer site ID — each retailer this server proxies for gets its
 // own cache entry so concurrent requests for different retailers don't
-// clobber each other's stock.
-const cacheByRetailer = new Map(); // retailerSite -> { at: epochMs, cars: Car[] }
-const cacheNearby = new Map(); // retailerSite -> { at: epochMs, cars: Car[] }
+// clobber each other's stock. `inflight` holds the in-progress fetch promise
+// so concurrent callers (and the background warmer) share one request instead
+// of each triggering their own cold fetch.
+const cacheByRetailer = new Map(); // retailerSite -> { at, cars, inflight }
+const cacheNearby = new Map(); // retailerSite -> { at, cars, inflight }
+
+// Every retailer we've been asked about, so the warmer knows what to keep hot.
+const seenRetailers = new Set();
 
 /** node:https has no argless Date.now ban — this is server runtime, fine to use. */
 function fresh(entry) {
-  return entry && Date.now() - entry.at < STOCK_TTL_MS;
+  return entry && entry.cars && Date.now() - entry.at < STOCK_TTL_MS;
+}
+
+/**
+ * Read-through cache with single-flight: returns fresh cached cars, joins an
+ * in-flight fetch if one is running, else starts one. `load()` does the actual
+ * network work and returns the mapped cars. On success the entry is refreshed;
+ * on failure a stale-but-usable entry is kept (the warmer will retry) and the
+ * error propagates to any caller that was waiting on this fetch.
+ *
+ * @param {Map} cache the per-retailer cache map
+ * @param {string} key retailer site ID
+ * @param {() => Promise<Array>} load the network fetch
+ */
+function cachedFetch(cache, key, load) {
+  const entry = cache.get(key);
+  if (fresh(entry)) return Promise.resolve(entry.cars);
+  if (entry?.inflight) return entry.inflight;
+
+  const inflight = load().then(
+    (cars) => {
+      cache.set(key, { at: Date.now(), cars });
+      return cars;
+    },
+    (err) => {
+      // Drop only the in-flight marker; keep any stale cars so a transient
+      // failure degrades to serving slightly old stock rather than nothing.
+      const prev = cache.get(key);
+      if (prev) delete prev.inflight;
+      throw err;
+    },
+  );
+  // Preserve stale cars (if any) alongside the in-flight promise.
+  cache.set(key, { ...(entry || {}), inflight });
+  return inflight;
 }
 
 /* ------------------------------ public API ---------------------------- */
@@ -179,30 +218,29 @@ function fresh(entry) {
  * @returns {Promise<Array>} mapped car objects (mapping.js shape)
  */
 export async function fetchGrassickStock(retailerSite = DEFAULT_RETAILER_SITE) {
-  const cached = cacheByRetailer.get(retailerSite);
-  if (fresh(cached)) return cached.cars;
-
-  const query = byRetailerQuery(retailerSite);
-  let vehicles;
-  try {
-    const first = await fetchPageWithRetry(query, 1);
-    vehicles = [...(first.results || [])];
-    const totalPages = Math.min(first.pagination?.total || 1, PAGE_LIMIT);
-    for (let page = 2; page <= totalPages; page += 1) {
-      const next = await fetchPageWithRetry(query, page);
-      vehicles.push(...(next.results || []));
+  seenRetailers.add(retailerSite);
+  return cachedFetch(cacheByRetailer, retailerSite, async () => {
+    const query = byRetailerQuery(retailerSite);
+    let vehicles;
+    try {
+      const first = await fetchPageWithRetry(query, 1);
+      vehicles = [...(first.results || [])];
+      const totalPages = Math.min(first.pagination?.total || 1, PAGE_LIMIT);
+      for (let page = 2; page <= totalPages; page += 1) {
+        const next = await fetchPageWithRetry(query, page);
+        vehicles.push(...(next.results || []));
+      }
+    } catch (err) {
+      if (err instanceof StockUnavailableError) throw err;
+      throw new StockUnavailableError('Live stock fetch failed', { cause: err });
     }
-  } catch (err) {
-    if (err instanceof StockUnavailableError) throw err;
-    throw new StockUnavailableError('Live stock fetch failed', { cause: err });
-  }
 
-  const cars = vehicles.map(mapVehicle).filter(Boolean);
-  if (cars.length === 0) {
-    throw new StockUnavailableError('Live feed returned no usable vehicles');
-  }
-  cacheByRetailer.set(retailerSite, { at: Date.now(), cars });
-  return cars;
+    const cars = vehicles.map(mapVehicle).filter(Boolean);
+    if (cars.length === 0) {
+      throw new StockUnavailableError('Live feed returned no usable vehicles');
+    }
+    return cars;
+  });
 }
 
 /* ------------------------- nearby-retailer stock ---------------------- */
@@ -258,40 +296,105 @@ async function resolveRetailerPostcode(retailerSite) {
  * @returns {Promise<Array>} mapped car objects, nearest first
  */
 export async function fetchNearbyStock(retailerSite = DEFAULT_RETAILER_SITE) {
-  const cached = cacheNearby.get(retailerSite);
-  if (fresh(cached)) return cached.cars;
-
-  let vehicles;
-  try {
-    const postcode = await resolveRetailerPostcode(retailerSite);
-    const query = byDistanceQuery(postcode);
-    const first = await fetchPageWithRetry(query, 1);
-    vehicles = [...(first.results || [])];
-    const totalPages = Math.min(first.pagination?.total || 1, NEARBY_PAGES);
-    for (let page = 2; page <= totalPages; page += 1) {
-      const next = await fetchPageWithRetry(query, page);
-      vehicles.push(...(next.results || []));
+  seenRetailers.add(retailerSite);
+  return cachedFetch(cacheNearby, retailerSite, async () => {
+    let vehicles;
+    try {
+      const postcode = await resolveRetailerPostcode(retailerSite);
+      const query = byDistanceQuery(postcode);
+      const first = await fetchPageWithRetry(query, 1);
+      vehicles = [...(first.results || [])];
+      const totalPages = Math.min(first.pagination?.total || 1, NEARBY_PAGES);
+      for (let page = 2; page <= totalPages; page += 1) {
+        const next = await fetchPageWithRetry(query, page);
+        vehicles.push(...(next.results || []));
+      }
+    } catch (err) {
+      if (err instanceof StockUnavailableError) throw err;
+      throw new StockUnavailableError('Nearby stock fetch failed', { cause: err });
     }
-  } catch (err) {
-    if (err instanceof StockUnavailableError) throw err;
-    throw new StockUnavailableError('Nearby stock fetch failed', { cause: err });
+
+    // String vs number: the feed's retailer_site.id is a number, the authored
+    // config row is a string. Compare as strings so the anchor is really dropped.
+    const anchor = String(retailerSite);
+    const cars = vehicles
+      .map(mapVehicle)
+      .filter(Boolean)
+      .filter((car) => String(car.retailerId) !== anchor);
+
+    // An empty pool means the search came back with nothing but the anchor's
+    // own cars — implausible for 400 nearest vehicles, so treat it as a broken
+    // feed rather than caching "no neighbours" for the whole TTL.
+    if (cars.length === 0) {
+      throw new StockUnavailableError('Nearby search returned no cars from other retailers');
+    }
+
+    return cars;
+  });
+}
+
+/* --------------------------- background warmer ------------------------ */
+
+// How often the warmer wakes. Default is 80% of the TTL, so an entry is
+// refreshed before it expires and a user request never lands on a cold cache.
+// (A ~15s cold nearby fetch inside a 5-min TTL leaves ample headroom.)
+const WARM_INTERVAL_MS = Number(process.env.STOCK_WARM_INTERVAL_MS)
+  || Math.round(STOCK_TTL_MS * 0.8);
+
+/**
+ * Refresh one pool for one retailer if its cached entry is missing or within a
+ * warm-interval of expiring — proactively, off the request path. Reuses the
+ * public fetchers, so single-flight de-dup means a warm that overlaps a user
+ * request shares the same fetch. Errors are swallowed: the existing (stale)
+ * entry keeps serving and the next tick retries.
+ */
+function warmOne(cache, retailerSite, fetcher) {
+  const entry = cache.get(retailerSite);
+  // Skip if a fetch is already running, or the entry is comfortably fresh
+  // (more than one warm-interval of life left) — nothing to do yet.
+  if (entry?.inflight) return Promise.resolve();
+  const ageOk = entry?.cars
+    && Date.now() - entry.at < STOCK_TTL_MS - WARM_INTERVAL_MS;
+  if (ageOk) return Promise.resolve();
+  // Expire the entry so the fetcher's freshness check falls through and
+  // actually re-fetches (rather than returning the about-to-expire cars).
+  if (entry) entry.at = 0;
+  return fetcher(retailerSite).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.warn(`[warmer] ${retailerSite} refresh failed:`, err?.message);
+  });
+}
+
+let warmTimer = null;
+
+/**
+ * Start the background cache warmer. For every retailer we've served, it keeps
+ * both stock pools hot so the slow cold fetch (chiefly the nearby distance
+ * search) is paid off the request path instead of by a user. Idempotent; the
+ * timer is unref'd so it never keeps the process alive on its own. Call once
+ * from server boot — NOT on import, so tests and tooling don't fire network.
+ *
+ * @returns {() => void} a stop function (clears the interval)
+ */
+export function startStockWarmer() {
+  if (warmTimer) return () => stopStockWarmer();
+
+  const tick = () => {
+    for (const retailerSite of seenRetailers) {
+      warmOne(cacheByRetailer, retailerSite, fetchGrassickStock);
+      warmOne(cacheNearby, retailerSite, fetchNearbyStock);
+    }
+  };
+
+  warmTimer = setInterval(tick, WARM_INTERVAL_MS);
+  warmTimer.unref?.();
+  return () => stopStockWarmer();
+}
+
+/** Stop the warmer (used by the stop function; handy for tests). */
+export function stopStockWarmer() {
+  if (warmTimer) {
+    clearInterval(warmTimer);
+    warmTimer = null;
   }
-
-  // String vs number: the feed's retailer_site.id is a number, the authored
-  // config row is a string. Compare as strings so the anchor is really dropped.
-  const anchor = String(retailerSite);
-  const cars = vehicles
-    .map(mapVehicle)
-    .filter(Boolean)
-    .filter((car) => String(car.retailerId) !== anchor);
-
-  // An empty pool means the search came back with nothing but the anchor's own
-  // cars — implausible for 400 nearest vehicles, so treat it as a broken feed
-  // rather than caching "no neighbours" for the whole TTL.
-  if (cars.length === 0) {
-    throw new StockUnavailableError('Nearby search returned no cars from other retailers');
-  }
-
-  cacheNearby.set(retailerSite, { at: Date.now(), cars });
-  return cars;
 }

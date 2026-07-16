@@ -7,12 +7,15 @@
  * EDS block calls:
  *
  *   GET  /api/questions  → quiz definition (showIf functions stripped)
- *   POST /api/match      → { answers } → { matches, nearby } with
- *                          display-only car fields (no tags/specs the engine
- *                          uses internally, so the dataset can't be rebuilt).
- *                          `matches` are the configured retailer's own stock;
- *                          `nearby` are the best matches at *other* retailers
- *                          close by, each carrying a real distance in miles.
+ *   POST /api/match      → { answers } → { matches } from the configured
+ *                          retailer's own stock (fast path). Display-only car
+ *                          fields (no tags/specs the engine uses internally,
+ *                          so the dataset can't be rebuilt).
+ *   POST /api/nearby     → { answers } → { nearby }: the best matches at
+ *                          *other* retailers close by, each carrying a real
+ *                          distance in miles. Split from /api/match so its
+ *                          slow national search never blocks the hero matches;
+ *                          degrades to [] on any failure (HTTP 200).
  *   GET  /health         → { ok: true }
  *
  * Portable: no framework, no build step. Deploy behind any host; set PORT.
@@ -21,7 +24,9 @@
 import { createServer } from 'node:http';
 
 import { matchCars, rankCars, TOP_MATCHES } from './engine.js';
-import { fetchGrassickStock, fetchNearbyStock, StockUnavailableError } from './stock.js';
+import {
+  fetchGrassickStock, fetchNearbyStock, startStockWarmer, StockUnavailableError,
+} from './stock.js';
 import { QUESTIONS, BUDGET_BANDS } from './questions.js';
 
 const PORT = Number(process.env.PORT) || 8787;
@@ -118,57 +123,77 @@ function readJsonBody(req) {
   });
 }
 
-async function handleMatch(req, res) {
+/**
+ * Parse + validate the { answers, retailer } POST body shared by /api/match
+ * and /api/nearby. Returns { answers, retailer } on success, or { error,
+ * status } for the caller to send. Kept in one place so both endpoints
+ * validate identically.
+ */
+async function readMatchRequest(req) {
   let body;
   try {
     body = await readJsonBody(req);
   } catch (err) {
-    return sendJson(res, err.statusCode || 400, { error: err.message });
+    return { error: err.message, status: err.statusCode || 400 };
   }
-
   const answers = body && body.answers;
   if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
-    return sendJson(res, 400, { error: 'Missing "answers" object' });
+    return { error: 'Missing "answers" object', status: 400 };
   }
   if (!BUDGET_BANDS[answers.budget]) {
-    return sendJson(res, 400, { error: 'Invalid or missing budget' });
+    return { error: 'Invalid or missing budget', status: 400 };
   }
+  const retailer = typeof body.retailer === 'string' && body.retailer ? body.retailer : undefined;
+  return { answers, retailer };
+}
+
+/**
+ * The retailer's own matches — the fast path. Scores against just the
+ * retailer's live stock (one feed, ~3 pages), so the results page can render
+ * the hero + "More at" tier without waiting on the slower national nearby
+ * search, which the block now fetches separately via /api/nearby.
+ */
+async function handleMatch(req, res) {
+  const { answers, retailer, error, status } = await readMatchRequest(req);
+  if (error) return sendJson(res, status, { error });
 
   // Live proxy: score against the retailer's real stock, not a static file.
   // If the live feed can't be reached, return a friendly 5xx — the block's
   // retry UI handles it. No static fallback (this tool is honestly live-only).
-  //
-  // Both pools are fetched concurrently: the nearby search is several extra
-  // pages, and serialising it behind the retailer's own stock would double
-  // cold-cache latency for no reason. allSettled, not all — the nearby pool
-  // is a bonus section, so its failure must not sink the whole response.
-  const retailer = typeof body.retailer === 'string' && body.retailer ? body.retailer : undefined;
-  const [own, near] = await Promise.allSettled([
-    fetchGrassickStock(retailer),
-    fetchNearbyStock(retailer),
-  ]);
-
-  if (own.status === 'rejected') {
-    if (own.reason instanceof StockUnavailableError) {
+  let cars;
+  try {
+    cars = await fetchGrassickStock(retailer);
+  } catch (err) {
+    if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
     }
     return sendJson(res, 500, { error: 'Something went wrong finding matches' });
   }
 
-  if (near.status === 'rejected') {
-    // Degrade to just the hero matches — the block omits the section.
-    console.warn('[match] nearby stock unavailable:', near.reason?.message);
+  const { matches } = matchCars(answers, cars);
+  return sendJson(res, 200, { matches: matches.map(publicMatch) });
+}
+
+/**
+ * Cars at OTHER nearby retailers — the slow path (a national, distance-sorted
+ * search over several extra pages). Split out from /api/match so its latency
+ * never blocks the hero matches. This section is a bonus, so any failure
+ * degrades to an empty list (HTTP 200) rather than an error the block must
+ * surface — the block simply omits the "Worth the drive" section.
+ */
+async function handleNearby(req, res) {
+  const { answers, retailer, error, status } = await readMatchRequest(req);
+  if (error) return sendJson(res, status, { error });
+
+  let nearby = [];
+  try {
+    const cars = await fetchNearbyStock(retailer);
+    nearby = rankCars(answers, cars).slice(0, TOP_MATCHES);
+  } catch (err) {
+    console.warn('[nearby] stock unavailable:', err?.message);
   }
 
-  const { matches } = matchCars(answers, own.value);
-  const nearby = near.status === 'fulfilled'
-    ? rankCars(answers, near.value).slice(0, TOP_MATCHES)
-    : [];
-
-  return sendJson(res, 200, {
-    matches: matches.map(publicMatch),
-    nearby: nearby.map(publicMatch),
-  });
+  return sendJson(res, 200, { nearby: nearby.map(publicMatch) });
 }
 
 const server = createServer(async (req, res) => {
@@ -191,9 +216,28 @@ const server = createServer(async (req, res) => {
     return handleMatch(req, res);
   }
 
+  if (req.method === 'POST' && pathname === '/api/nearby') {
+    return handleNearby(req, res);
+  }
+
   return sendJson(res, 404, { error: 'Not found' });
 });
 
 server.listen(PORT, () => {
   console.log(`BMW Matcher API listening on http://localhost:${PORT}`);
+
+  // Keep live stock hot off the request path so the slow cold fetch (chiefly
+  // the nearby distance search) isn't paid by a user. Prime the default
+  // retailer now so even the first visitor hits a warm cache; the warmer then
+  // keeps it (and any other served retailer) fresh. Failures are non-fatal —
+  // the request path still fetches on demand.
+  startStockWarmer();
+  Promise.allSettled([fetchGrassickStock(), fetchNearbyStock()]).then((r) => {
+    const failed = r.filter((x) => x.status === 'rejected');
+    if (failed.length) {
+      console.warn(`[warmer] initial prime: ${failed.length}/2 pools cold (will retry on demand)`);
+    } else {
+      console.log('[warmer] initial stock primed');
+    }
+  });
 });

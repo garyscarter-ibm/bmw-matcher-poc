@@ -93,6 +93,27 @@ async function apiMatch(base, answers, retailer) {
   return res.json();
 }
 
+/**
+ * Cars at other nearby retailers — a separate, slower request than /api/match
+ * (a national distance-sorted search) so the hero matches can render first.
+ * The section is a bonus, so any failure resolves to an empty list rather than
+ * throwing: the caller just omits the "Worth the drive" section.
+ */
+async function apiNearby(base, answers, retailer) {
+  try {
+    const res = await fetch(`${base}/api/nearby`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers, retailer }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.nearby) ? data.nearby : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Is question `q` shown given the current answers? Uses SHOW_IF by id. */
 function isVisible(q, answers) {
   if (!q.conditional) return true;
@@ -405,13 +426,64 @@ function renderResultsSkeleton(root) {
   root.append(screen);
 }
 
+/**
+ * The "Worth the drive" band with its heading + lede but a skeleton carousel in
+ * place of real tiles, shown while /api/nearby is in flight. Returns the
+ * <section> so the caller can fill it (fillNearbyBand) or remove it. Built to
+ * match the real band exactly so filling it in causes no layout shift.
+ */
+function renderNearbySkeleton(ctx) {
+  const band = el('section', 'bmwm-nearby-band');
+  band.setAttribute('aria-busy', 'true');
+  band.append(
+    el('h3', 'bmwm-subhead bmwm-nearby-heading', 'WORTH THE DRIVE'),
+    el('p', 'bmwm-lede bmwm-nearby-lede',
+      `Not quite it? These are the closest matches at other retailers near ${ctx.retailerLabel}.`),
+  );
+  const track = el('div', 'bmwm-nearby');
+  // A few placeholder tiles mirroring the compact card (media band + 2 lines).
+  for (let i = 0; i < 3; i += 1) {
+    const tile = el('article', 'bmwm-card bmwm-card-compact bmwm-skel-card');
+    tile.append(el('div', 'bmwm-skel bmwm-skel-media'));
+    const body = el('div', 'bmwm-card-body');
+    body.append(
+      el('div', 'bmwm-skel bmwm-skel-line bmwm-skel-name'),
+      el('div', 'bmwm-skel bmwm-skel-line bmwm-skel-specs'),
+    );
+    tile.append(body);
+    track.append(tile);
+  }
+  band.append(track);
+  return band;
+}
+
+/**
+ * Swap a nearby skeleton band (from renderNearbySkeleton) for the real
+ * carousel of nearby-retailer matches, in place. Replaces only the track so
+ * the heading/lede stay put.
+ */
+function fillNearbyBand(band, ctx, nearby) {
+  band.removeAttribute('aria-busy');
+  band.querySelector('.bmwm-nearby')?.remove();
+  const track = el('div', 'bmwm-nearby');
+  // Focusable so the carousel is scrollable by keyboard, not just by swipe.
+  track.tabIndex = 0;
+  track.setAttribute('role', 'region');
+  track.setAttribute('aria-label', `Matches at other retailers near ${ctx.retailerLabel}`);
+  nearby.forEach((m) => track.append(matchCard(m, { compact: true })));
+  band.append(track);
+}
+
 async function renderResults(root, ctx, answers) {
   renderResultsSkeleton(root);
 
+  // Two-phase load. The retailer's own matches (fast: one feed) render first;
+  // the nearby-retailer carousel (slow: a national distance search) is fetched
+  // separately below so it never holds up the hero. See apiNearby / the
+  // .bmwm-nearby placeholder wired up further down.
   let matches;
-  let nearby;
   try {
-    ({ matches, nearby } = await apiMatch(ctx.api, answers, ctx.retailer));
+    ({ matches } = await apiMatch(ctx.api, answers, ctx.retailer));
   } catch {
     renderStatus(root, {
       kicker: 'Sorry',
@@ -460,24 +532,16 @@ async function renderResults(root, ctx, answers) {
     }
   }
 
-  // Cars at other nearby retailers — worth a drive if the local three didn't
-  // land. Absent when the nearby lookup failed (the API degrades to []), so
-  // the section simply doesn't render rather than showing an error.
-  if (nearby.length) {
-    const band = el('section', 'bmwm-nearby-band');
-    band.append(
-      el('h3', 'bmwm-subhead bmwm-nearby-heading', 'WORTH THE DRIVE'),
-      el('p', 'bmwm-lede bmwm-nearby-lede',
-        `Not quite it? These are the closest matches at other retailers near ${ctx.retailerLabel}.`),
-    );
-    const track = el('div', 'bmwm-nearby');
-    // Focusable so the carousel is scrollable by keyboard, not just by swipe.
-    track.tabIndex = 0;
-    track.setAttribute('role', 'region');
-    track.setAttribute('aria-label', `Matches at other retailers near ${ctx.retailerLabel}`);
-    nearby.forEach((m) => track.append(matchCard(m, { compact: true })));
-    band.append(track);
-    screen.append(band);
+  // Cars at other nearby retailers — worth a drive if the local matches didn't
+  // land. Fetched separately (the slow national search) so the hero above is
+  // already on screen; a slim skeleton band holds the space until it resolves.
+  // When it does: fill the carousel, or drop the band entirely if nothing came
+  // back (empty result or a failed lookup — the section is a bonus, never an
+  // error). Only shown when there are matches to be "not quite" about.
+  let nearbyBand = null;
+  if (matches.length) {
+    nearbyBand = renderNearbySkeleton(ctx);
+    screen.append(nearbyBand);
   }
 
   const actions = el('div', 'bmwm-actions');
@@ -510,6 +574,18 @@ async function renderResults(root, ctx, answers) {
     'An unofficial tool, not affiliated with or endorsed by BMW. Prices and specs are indicative, always check with a retailer.'));
 
   root.append(screen);
+
+  // Phase two: now the page is painted, load the nearby carousel in the
+  // background and swap it into the placeholder band (or drop the band).
+  if (nearbyBand) {
+    apiNearby(ctx.api, answers, ctx.retailer).then((nearby) => {
+      // The user may have navigated away (retake/tweak) before this resolves;
+      // only touch the band if it's still in the document.
+      if (!nearbyBand.isConnected) return;
+      if (nearby.length) fillNearbyBand(nearbyBand, ctx, nearby);
+      else nearbyBand.remove();
+    });
+  }
 }
 
 /* ------------------------------ decorate ------------------------------ */
