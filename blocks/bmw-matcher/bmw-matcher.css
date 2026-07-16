@@ -332,6 +332,16 @@
 .bmwm-skel-blurb { width: 95%; }
 .bmwm-skel-blurb:last-child { width: 55%; margin-bottom: 0; }
 
+/* Intro-skeleton shapes: wider lede lines (the intro's lede runs ~3 lines) and
+   a button-shaped block matching the wide primary CTA. */
+.bmwm-skel-lede { height: 1.1em; width: 90%; }
+.bmwm-skel-lede-last { width: 65%; margin-bottom: var(--bmwm-space-8); }
+.bmwm-skel-btn {
+  height: var(--bmwm-btn-height);
+  width: var(--bmwm-btn-min-width);
+  max-width: 100%;
+}
+
 .bmwm-card {
   display: flex;
   flex-direction: column;

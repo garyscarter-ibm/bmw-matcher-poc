@@ -616,6 +616,30 @@ function renderStatus(root, { kicker, title, message, retryLabel, onRetry }) {
 }
 
 /**
+ * Skeleton placeholder for the intro screen, shown while the quiz definition
+ * loads (GET /api/questions). Mirrors renderIntro — kicker, title, two lede
+ * lines, a "Start" button block — so the boot reads as "the intro, arriving"
+ * rather than a "Loading the quiz" status message that then swaps out. Reuses
+ * the .bmwm-skel shimmer; reduced-motion users get a static tint.
+ */
+function renderIntroSkeleton(root) {
+  root.replaceChildren();
+  const intro = el('div', 'bmwm-intro bmwm-intro-skeleton');
+  intro.setAttribute('aria-busy', 'true');
+  intro.setAttribute('aria-label', 'Loading the quiz');
+  const skel = (mod) => el('div', `bmwm-skel ${mod}`);
+  intro.append(
+    skel('bmwm-skel-kicker'),
+    skel('bmwm-skel-title'),
+    skel('bmwm-skel-line bmwm-skel-lede'),
+    skel('bmwm-skel-line bmwm-skel-lede'),
+    skel('bmwm-skel-line bmwm-skel-lede bmwm-skel-lede-last'),
+    skel('bmwm-skel-btn'),
+  );
+  root.append(intro);
+}
+
+/**
  * Skeleton placeholder for the results page, shown while /api/match is in
  * flight. Mirrors the real layout — kicker, title, one big hero card, a 2-up
  * row of compact tiles — so the load reads as "this page, arriving" rather
@@ -878,7 +902,10 @@ export default async function decorate(block) {
 
   // The quiz definition lives behind the API, so load it before rendering.
   const boot = async () => {
-    renderStatus(block, { kicker: 'The unofficial UK matchmaker', title: 'Loading the quiz' });
+    // Skeleton the intro while the quiz definition loads — reads as the page
+    // arriving rather than a "Loading…" status. (A deep-link run swaps to the
+    // results skeleton a moment later inside renderResults.)
+    renderIntroSkeleton(block);
     try {
       ctx.questions = await apiGetQuestions(ctx.api, ctx.retailer);
     } catch {
