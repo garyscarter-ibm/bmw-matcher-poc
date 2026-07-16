@@ -11,6 +11,11 @@
  *                          retailer's own stock (fast path). Display-only car
  *                          fields (no tags/specs the engine uses internally,
  *                          so the dataset can't be rebuilt).
+ *   POST /api/preview    → { answers } → { matches }: the top few from the
+ *                          configured retailer's stock for the quiz's live
+ *                          "best guess" drawer. Same scoring + cache as
+ *                          /api/match, just a wider slice — served hot from the
+ *                          warmed cache so mid-quiz refreshes are cheap.
  *   POST /api/nearby     → { answers } → { nearby }: the best matches at
  *                          *other* retailers close by, each carrying a real
  *                          distance in miles. Split from /api/match so its
@@ -31,6 +36,12 @@ import { QUESTIONS, BUDGET_BANDS } from './questions.js';
 
 const PORT = Number(process.env.PORT) || 8787;
 const MAX_BODY_BYTES = 16 * 1024; // quiz answers are tiny; reject anything bigger
+
+// How many matches the quiz's live "best guess" drawer shows. Wider than the
+// results page's TOP_MATCHES (3) — it's a browse-the-shortlist glance, not the
+// final recommendation. The retailer may hold fewer that survive the filters;
+// the block renders however many come back.
+const PREVIEW_COUNT = 9;
 
 const CORS_HEADERS = {
   // Public, read-only tool — responses carry no secrets. Tighten to the EDS
@@ -175,6 +186,41 @@ async function handleMatch(req, res) {
 }
 
 /**
+ * The quiz's live "best guess" — the same scoring as /api/match against the
+ * same (cached) retailer stock, just a wider PREVIEW_COUNT slice for the
+ * drawer that re-ranks as each question is answered. Shares fetchGrassickStock's
+ * cache key with /api/match, so a quiz's stream of refreshes hits the warmed
+ * cache and adds no upstream traffic. Requires a budget (readMatchRequest
+ * enforces it) — the block only calls this once budget is set.
+ */
+async function handlePreview(req, res) {
+  const { answers, retailer, error, status } = await readMatchRequest(req);
+  if (error) return sendJson(res, status, { error });
+
+  let cars;
+  try {
+    cars = await fetchGrassickStock(retailer);
+  } catch (err) {
+    if (err instanceof StockUnavailableError) {
+      return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
+    }
+    return sendJson(res, 500, { error: 'Something went wrong finding matches' });
+  }
+
+  // The preview scores partial answer sets (only budget is guaranteed), so
+  // guard the ranking too: a scorer that trips on an unanswered question must
+  // degrade to "no guess yet" (empty list, HTTP 200 — the drawer is a bonus),
+  // never take the process down with an uncaught throw.
+  let matches = [];
+  try {
+    matches = rankCars(answers, cars).slice(0, PREVIEW_COUNT);
+  } catch (err) {
+    console.warn('[preview] ranking failed:', err?.message);
+  }
+  return sendJson(res, 200, { matches: matches.map(publicMatch) });
+}
+
+/**
  * Cars at OTHER nearby retailers — the slow path (a national, distance-sorted
  * search over several extra pages). Split out from /api/match so its latency
  * never blocks the hero matches. This section is a bonus, so any failure
@@ -214,6 +260,10 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'POST' && pathname === '/api/match') {
     return handleMatch(req, res);
+  }
+
+  if (req.method === 'POST' && pathname === '/api/preview') {
+    return handlePreview(req, res);
   }
 
   if (req.method === 'POST' && pathname === '/api/nearby') {
