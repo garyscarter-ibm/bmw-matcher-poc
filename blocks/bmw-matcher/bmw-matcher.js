@@ -114,6 +114,28 @@ async function apiNearby(base, answers, retailer) {
   }
 }
 
+/**
+ * The configured retailer's current top matches for the quiz's live "best
+ * guess" drawer — a wider slice than /api/match, refetched as answers change.
+ * Like apiNearby it NEVER throws: a failed preview must never break the quiz,
+ * so any error/non-ok resolves to an empty list and the drawer just keeps its
+ * last state.
+ */
+async function apiPreview(base, answers, retailer) {
+  try {
+    const res = await fetch(`${base}/api/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers, retailer }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.matches) ? data.matches : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Is question `q` shown given the current answers? Uses SHOW_IF by id. */
 function isVisible(q, answers) {
   if (!q.conditional) return true;
@@ -176,6 +198,132 @@ function renderIntro(root, ctx) {
   root.append(intro);
 }
 
+/* --------------------------- live preview drawer --------------------------- */
+
+// How long after an answer changes before the preview refetches. Multi-select
+// rapid taps collapse into one call; a fresh answer resets the timer.
+const PREVIEW_DEBOUNCE_MS = 250;
+// Placeholder tiles shown while the first preview for a given answer set loads
+// and we have nothing cached to show yet.
+const PREVIEW_SKELETON_TILES = 3;
+
+/** Can the engine score these answers yet? It hard-requires a valid budget. */
+function canPreview(ctx) {
+  return !!BUDGET_BANDS[ctx.answers.budget];
+}
+
+/**
+ * (Re)fill the drawer's bar label + panel from ctx.preview, in place. One path
+ * shared by the debounced refresh and a freshly-built drawer (on question
+ * advance), so both render identically.
+ */
+function paintPreview(section, ctx) {
+  const { matches, open, loading } = ctx.preview;
+  const bar = section.querySelector('.bmwm-preview-bar');
+  const label = section.querySelector('.bmwm-preview-label');
+  const panel = section.querySelector('.bmwm-preview-panel');
+
+  // Bar label reflects state: pre-budget (nothing to score) vs a live count.
+  const scored = canPreview(ctx);
+  label.textContent = scored && matches.length
+    ? `Best guess so far (${matches.length})`
+    : 'Best guess so far';
+  // Nothing to open before a budget is picked — keep the bar inert then.
+  bar.disabled = !scored;
+
+  bar.setAttribute('aria-expanded', String(open));
+  panel.hidden = !open;
+
+  const track = panel.querySelector('.bmwm-preview-track');
+  track.replaceChildren();
+  if (!scored) {
+    panel.querySelector('.bmwm-preview-note').textContent = 'Pick a budget to see your matches.';
+    return;
+  }
+  if (loading && matches.length === 0) {
+    panel.querySelector('.bmwm-preview-note').textContent = '';
+    for (let i = 0; i < PREVIEW_SKELETON_TILES; i += 1) {
+      const tile = el('article', 'bmwm-card bmwm-card-compact bmwm-skel-card');
+      tile.append(el('div', 'bmwm-skel bmwm-skel-media'));
+      const body = el('div', 'bmwm-card-body');
+      body.append(
+        el('div', 'bmwm-skel bmwm-skel-line bmwm-skel-name'),
+        el('div', 'bmwm-skel bmwm-skel-line bmwm-skel-specs'),
+      );
+      tile.append(body);
+      track.append(tile);
+    }
+    return;
+  }
+  if (matches.length === 0) {
+    panel.querySelector('.bmwm-preview-note').textContent = 'Nothing fits those answers yet — try loosening them.';
+    return;
+  }
+  panel.querySelector('.bmwm-preview-note').textContent = '';
+  matches.forEach((m) => track.append(matchCard(m, { compact: true })));
+}
+
+/**
+ * Build the collapsible "best guess" drawer for the quiz screen: a bar that
+ * toggles a horizontal track of compact result tiles (the same card the results
+ * carousel uses). State (open/closed, last matches) lives on ctx.preview so it
+ * survives the per-question re-render. Returns the <section>.
+ */
+function renderPreviewDrawer(ctx) {
+  const section = el('section', 'bmwm-preview');
+
+  const bar = el('button', 'bmwm-preview-bar');
+  bar.type = 'button';
+  bar.setAttribute('aria-controls', 'bmwm-preview-panel');
+  bar.append(
+    el('span', 'bmwm-preview-label', 'Best guess so far'),
+    el('span', 'bmwm-preview-caret', ''),
+  );
+
+  const panel = el('div', 'bmwm-preview-panel');
+  panel.id = 'bmwm-preview-panel';
+  panel.append(el('p', 'bmwm-preview-note', ''), el('div', 'bmwm-nearby bmwm-preview-track'));
+
+  bar.addEventListener('click', () => {
+    if (!canPreview(ctx)) return;
+    ctx.preview.open = !ctx.preview.open;
+    paintPreview(section, ctx);
+  });
+
+  section.append(bar, panel);
+  paintPreview(section, ctx);
+  return section;
+}
+
+/**
+ * Debounced, latest-wins preview refresh. Schedules a refetch of the retailer's
+ * top matches for the current answers and repaints the on-screen drawer when it
+ * lands — unless a newer schedule has superseded it (seq guard) or the drawer
+ * has been torn down (navigated away). A no-op until a budget is chosen.
+ */
+function schedulePreviewRefresh(ctx) {
+  if (!canPreview(ctx)) return;
+  clearTimeout(ctx.previewTimer);
+  ctx.previewTimer = setTimeout(() => {
+    const seq = (ctx.preview.seq += 1);
+    ctx.preview.loading = true;
+    // Repaint so the drawer shows its skeleton while this first load is in
+    // flight (no-op visually if we already have matches to keep showing).
+    const live = document.querySelector('.bmwm-preview');
+    if (live) paintPreview(live, ctx);
+
+    const answers = { ...ctx.answers };
+    apiPreview(ctx.api, answers, ctx.retailer).then((matches) => {
+      // A newer answer already superseded this request — drop the stale result.
+      if (seq !== ctx.preview.seq) return;
+      ctx.preview.matches = matches;
+      ctx.preview.loading = false;
+      const section = document.querySelector('.bmwm-preview');
+      if (section && section.isConnected) paintPreview(section, ctx);
+    });
+  }, PREVIEW_DEBOUNCE_MS);
+}
+
 function renderQuestion(root, ctx, index) {
   const questions = visibleQuestions(ctx.questions, ctx.answers);
   const q = questions[index];
@@ -227,8 +375,13 @@ function renderQuestion(root, ctx, index) {
           button.setAttribute('aria-checked', String(selected.has(value)));
         });
         next.disabled = selected.size === 0;
+        schedulePreviewRefresh(ctx);
       } else {
         ctx.answers[q.id] = opt.value;
+        // Refresh before advancing: the debounced fetch is scheduled on ctx, so
+        // the next question's freshly-built drawer picks up the result (via the
+        // seq guard) even though this screen is about to be replaced.
+        schedulePreviewRefresh(ctx);
         advance();
       }
     });
@@ -252,9 +405,19 @@ function renderQuestion(root, ctx, index) {
     nav.append(next);
   }
   screen.append(nav);
+
+  // Live "best guess" drawer, pinned below the nav. Built from ctx.preview so
+  // it paints the last known guess instantly on advance, then refreshes.
+  screen.append(renderPreviewDrawer(ctx));
+
   root.append(screen);
   screen.querySelector('.bmwm-question').setAttribute('tabindex', '-1');
   screen.querySelector('.bmwm-question').focus({ preventScroll: true });
+
+  // Refresh on entering the question too, so navigating Back/Next (budget
+  // already set) updates the guess even without changing an answer. Cheap: the
+  // stock is served from the warmed cache and the call is debounced.
+  schedulePreviewRefresh(ctx);
 }
 
 /** Miles from the configured retailer, e.g. "18.1 miles away". */
@@ -573,6 +736,10 @@ async function renderResults(root, ctx, answers) {
   retake.type = 'button';
   retake.addEventListener('click', () => {
     ctx.answers = {};
+    // Clear the drawer's carried-over guess so a fresh run starts empty, and
+    // drop any in-flight/debounced refresh from the finished run.
+    clearTimeout(ctx.previewTimer);
+    ctx.preview = { matches: [], open: false, loading: false, seq: ctx.preview.seq + 1 };
     window.history.replaceState(null, '', window.location.pathname);
     ctx.showIntro();
   });
@@ -609,7 +776,17 @@ export default async function decorate(block) {
   block.replaceChildren();
   block.classList.add('bmwm');
 
-  const ctx = { answers: {}, api, retailer, retailerLabel, questions: [] };
+  const ctx = {
+    answers: {},
+    api,
+    retailer,
+    retailerLabel,
+    questions: [],
+    // Live "best guess" drawer state, kept on ctx so it survives the
+    // per-question re-render (see renderPreviewDrawer / schedulePreviewRefresh).
+    preview: { matches: [], open: false, loading: false, seq: 0 },
+    previewTimer: null,
+  };
   ctx.showIntro = () => renderIntro(block, ctx);
   ctx.showQuestion = (i) => renderQuestion(block, ctx, i);
   ctx.showResults = (answers, { updateHash = false } = {}) => {
