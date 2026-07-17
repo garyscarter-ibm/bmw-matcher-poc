@@ -375,6 +375,48 @@
   color: var(--bmwm-ink-muted);
 }
 
+/* Dual-thumb range (budget): two range inputs overlaid on one track. The track
+   is drawn once here; each input's own track is made transparent so only this
+   shared one shows, with an accent fill spanning the selected bracket. */
+.bmwm-range {
+  position: relative;
+  height: 24px;
+}
+.bmwm-range::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  background: var(--bmwm-line);
+}
+.bmwm-range-fill {
+  position: absolute;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  background: var(--bmwm-accent);
+}
+/* Both inputs fill the container and stack; the container's ::before is the
+   visible track, so hide each input's native track. Only the thumbs take
+   pointer events, so whichever thumb you grab wins even where they overlap. */
+.bmwm-range .bmwm-slider-input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 24px;
+  pointer-events: none;
+  background: transparent;
+}
+.bmwm-range .bmwm-slider-input::-webkit-slider-runnable-track { background: transparent; }
+.bmwm-range .bmwm-slider-input::-moz-range-track { background: transparent; }
+.bmwm-range .bmwm-slider-input::-moz-range-progress { background: transparent; }
+.bmwm-range .bmwm-slider-input::-webkit-slider-thumb { pointer-events: auto; }
+.bmwm-range .bmwm-slider-input::-moz-range-thumb { pointer-events: auto; }
+
 .bmwm-nav { display: flex; justify-content: space-between; gap: var(--bmwm-space-3); }
 
 /* --- results --- */

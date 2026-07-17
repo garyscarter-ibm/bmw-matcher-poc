@@ -177,11 +177,30 @@ test('every dataset entry has the fields the engine needs', () => {
 
 /* ---- Stakeholder amendments: slider budget/mileage, multi-select fuel ---- */
 
-test('budgetRange resolves both a legacy band key and a raw number', () => {
+test('budgetRange resolves a band key, a raw number, and a [min,max] range', () => {
   assert.deepEqual(budgetRange({ budget: 'b2' }), BUDGET_BANDS.b2);
   assert.deepEqual(budgetRange({ budget: 60000 }), [0, 60000]);
+  assert.deepEqual(budgetRange({ budget: [40000, 75000] }), [40000, 75000]);
+  // Unordered thumbs normalise; garbage/empty ranges are unusable.
+  assert.deepEqual(budgetRange({ budget: [75000, 40000] }), [40000, 75000]);
+  assert.equal(budgetRange({ budget: [0, 0] }), null);
   assert.equal(budgetRange({ budget: 0 }), null, '0 is not a usable budget');
   assert.equal(budgetRange({ budget: 'nope' }), null);
+});
+
+test('a [min,max] budget scores in-bracket cars full and cheaper cars lower', () => {
+  // 40k–75k: a car around the middle should out-score one well under the min.
+  const ranked = rankCars({ ...base, budget: [40000, 75000], fuel: ['open'] }, CARS);
+  const inBracket = ranked.find((m) => m.car.priceMin >= 40000 && m.car.priceMax <= 75000);
+  const cheap = ranked.find((m) => m.car.priceMax < 40000);
+  if (inBracket && cheap) {
+    // Compare the budget dimension's effect: an in-bracket car isn't penalised
+    // for price, a sub-min car is (the min thumb now bites).
+    const both = rankCars({ ...base, budget: [40000, 75000], fuel: ['open'] }, [inBracket.car, cheap.car]);
+    const inScore = both.find((m) => m.car.id === inBracket.car.id).score;
+    const cheapScore = both.find((m) => m.car.id === cheap.car.id).score;
+    assert.ok(inScore >= cheapScore, 'in-bracket car should not score below a sub-min car on budget');
+  }
 });
 
 test('a numeric budget ranks the same cars as the equivalent band', () => {

@@ -39,13 +39,21 @@ const clamp = (v, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 const gbp = (n) => `£${Math.round(n / 1000)}k`;
 
 /**
- * Resolve a budget answer to a [min, max] £ range. Budget is now a continuous
- * number from the quiz's slider, but we still accept the legacy b1–b5 band keys
- * so old shared #m= links (and existing callers/tests) keep working. A bare
- * number means "up to this much" — min 0, max the number.
+ * Resolve a budget answer to a [min, max] £ range. Budget is a dual-thumb range
+ * from the quiz slider — a [min, max] pair — but we also accept a bare number
+ * (→ [0, n], the earlier single-slider shape) and the legacy b1–b5 band keys, so
+ * old shared #m= links (and existing callers/tests) keep working. Returns null
+ * for anything unusable, which the caller turns into a 400.
  */
 export function budgetRange(answers) {
   const b = answers.budget;
+  if (Array.isArray(b) && b.length === 2) {
+    const [lo, hi] = b.map(Number);
+    if (Number.isFinite(lo) && Number.isFinite(hi) && hi > 0) {
+      return [Math.max(0, Math.min(lo, hi)), Math.max(lo, hi)];
+    }
+    return null;
+  }
   if (typeof b === 'number' && Number.isFinite(b) && b > 0) return [0, b];
   return BUDGET_BANDS[b] || null;
 }

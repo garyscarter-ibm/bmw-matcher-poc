@@ -97,6 +97,13 @@ function budgetValueLabel(value, question) {
   return question?.plusAtMax && value >= question.max ? `${k}+` : k;
 }
 
+/** A dual-thumb budget range as "£40–75k" ("£40k+" when max hits the ceiling). */
+function budgetRangeLabel([lo, hi], question) {
+  const k = (n) => `£${Math.round(n / 1000)}k`;
+  if (question?.plusAtMax && hi >= question.max) return `${k(lo)}+`;
+  return `${k(lo)}–${Math.round(hi / 1000)}k`;
+}
+
 /** Annual mileage number as "12,000 mi/yr" (or "25,000+ mi/yr" at the ceiling). */
 function mileageValueLabel(value, question) {
   const n = value.toLocaleString('en-GB');
@@ -117,7 +124,9 @@ export function pillFor(question, answers) {
   if (value == null || (multi && value.length === 0)) return null;
 
   if (id === 'budget') {
-    // Slider budget is a number; legacy shared links may still carry a b1–b5 key.
+    // Dual-thumb range → "£40–75k"; a bare number (earlier shape) → "£62k";
+    // legacy shared links may still carry a b1–b5 band key.
+    if (Array.isArray(value)) return budgetRangeLabel(value, question);
     if (typeof value === 'number') return budgetValueLabel(value, question);
     const band = BUDGET_BANDS[value];
     return band ? bandLabel(band) : null;

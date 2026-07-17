@@ -30,10 +30,14 @@ function el(tag, className, text) {
 
 /**
  * Is the budget answer usable? Budget drives the engine's one hard requirement.
- * It's now a slider number, but legacy shared links may still carry a b1–b5 band
- * key — accept either. Mirror of budgetRange's guard in server/engine.js.
+ * It's a dual-thumb range ([min, max]) from the slider, but we also accept a bare
+ * number (the earlier single-slider shape) and a legacy b1–b5 band key from an
+ * old shared link. Mirror of budgetRange's guard in server/engine.js.
  */
 function validBudget(value) {
+  if (Array.isArray(value)) {
+    return value.length === 2 && value.every(Number.isFinite) && Math.max(...value) > 0;
+  }
   if (typeof value === 'number') return Number.isFinite(value) && value > 0;
   return !!BUDGET_BANDS[value];
 }
@@ -192,6 +196,11 @@ function formatSliderValue(value, q) {
   return q.plusAtMax && value >= q.max ? `${base}+` : base;
 }
 
+/** Readout for a dual-thumb range slider, e.g. "£40,000 – £75,000". */
+function formatRange([lo, hi], q) {
+  return `${formatSliderValue(lo, q)} – ${formatSliderValue(hi, q)}`;
+}
+
 const SPEC_LABELS = {
   hatchback: 'Hatchback', saloon: 'Saloon', estate: 'Estate', suv: 'SUV',
   coupe: 'Coupé', convertible: 'Convertible', mpv: 'Family carrier',
@@ -344,6 +353,76 @@ function renderAnswerPills(ctx, questions, index) {
   return row.children.length ? row : null;
 }
 
+/**
+ * A dual-thumb range slider (budget): two native range inputs overlaid on one
+ * track, writing a [min, max] pair to ctx.answers[q.id]. The thumbs can't cross
+ * (kept at least one step apart). Appends readout + track + bounds to `list`.
+ */
+function renderRangeSlider(list, q, ctx) {
+  const stored = ctx.answers[q.id];
+  const start = Array.isArray(stored) && stored.length === 2
+    ? [Number(stored[0]), Number(stored[1])]
+    : (Array.isArray(q.default) ? [...q.default] : [q.min, q.max]);
+  let [lo, hi] = [Math.min(...start), Math.max(...start)];
+  // Persist immediately so Next is enabled even without a drag.
+  ctx.answers[q.id] = [lo, hi];
+
+  const readout = el('output', 'bmwm-slider-value', formatRange([lo, hi], q));
+
+  const track = el('div', 'bmwm-range');
+  const fill = el('div', 'bmwm-range-fill');
+  const mkInput = (cls, label, value) => {
+    const input = el('input', `bmwm-slider-input ${cls}`);
+    input.type = 'range';
+    input.min = String(q.min);
+    input.max = String(q.max);
+    input.step = String(q.step);
+    input.value = String(value);
+    input.setAttribute('aria-label', label);
+    input.setAttribute('aria-valuetext', formatSliderValue(value, q));
+    return input;
+  };
+  const minInput = mkInput('bmwm-range-min', 'Minimum budget', lo);
+  const maxInput = mkInput('bmwm-range-max', 'Maximum budget', hi);
+
+  const span = q.max - q.min || 1;
+  const paintFill = () => {
+    const a = ((lo - q.min) / span) * 100;
+    const b = ((hi - q.min) / span) * 100;
+    fill.style.left = `${a}%`;
+    fill.style.right = `${100 - b}%`;
+  };
+  const sync = () => {
+    // Clamp so the thumbs never cross (keep a one-step gap).
+    lo = Math.min(Number(minInput.value), hi - q.step);
+    hi = Math.max(Number(maxInput.value), lo + q.step);
+    lo = Math.max(q.min, lo);
+    hi = Math.min(q.max, hi);
+    minInput.value = String(lo);
+    maxInput.value = String(hi);
+    ctx.answers[q.id] = [lo, hi];
+    const text = formatRange([lo, hi], q);
+    readout.textContent = text;
+    minInput.setAttribute('aria-valuetext', formatSliderValue(lo, q));
+    maxInput.setAttribute('aria-valuetext', formatSliderValue(hi, q));
+    paintFill();
+    schedulePreviewRefresh(ctx);
+  };
+  minInput.addEventListener('input', sync);
+  maxInput.addEventListener('input', sync);
+
+  paintFill();
+  track.append(fill, minInput, maxInput);
+
+  const bounds = el('div', 'bmwm-slider-bounds');
+  bounds.append(
+    el('span', 'bmwm-slider-min', formatSliderValue(q.min, q)),
+    el('span', 'bmwm-slider-max', formatSliderValue(q.max, q)),
+  );
+
+  list.append(readout, track, bounds);
+}
+
 function renderQuestion(root, ctx, index) {
   const questions = visibleQuestions(ctx.questions, ctx.answers);
   const q = questions[index];
@@ -392,7 +471,11 @@ function renderQuestion(root, ctx, index) {
   };
 
   const isSlider = q.type === 'slider';
-  if (isSlider) {
+  if (isSlider && q.range) {
+    // Dual-thumb range (budget): two overlaid inputs writing a [min, max] pair.
+    list.classList.add('bmwm-slider');
+    renderRangeSlider(list, q, ctx);
+  } else if (isSlider) {
     // A range input plus a live value readout. The whole thing writes a number
     // to ctx.answers[q.id] and, unlike a single-select, never auto-advances —
     // the Next button (below) is the commit point, since any drag would fire.

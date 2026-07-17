@@ -19,16 +19,18 @@ export const QUESTIONS = [
     id: 'budget',
     title: 'What’s your budget?',
     help: 'Rough on the road price. We’ll flag anything that’s a slight stretch.',
-    // A continuous £ value. The engine still understands the legacy b1–b5 band
-    // keys (see budgetRange in engine.js) so old shared links keep working, but
-    // the quiz now sends a number.
+    // A dual-thumb range: the user brackets a min and a max, so the answer is a
+    // [min, max] pair. The engine still understands a bare number (→ [0, n]) and
+    // the legacy b1–b5 band keys (see budgetRange in engine.js), so old shared
+    // links keep working.
     type: 'slider',
+    range: true,
     min: 0,
     max: 150000,
     step: 1000,
     format: 'gbp',
     plusAtMax: true,
-    default: 50000,
+    default: [40000, 75000],
   },
   {
     id: 'bodyStyles',
