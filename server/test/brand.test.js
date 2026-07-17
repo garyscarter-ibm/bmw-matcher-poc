@@ -101,6 +101,21 @@ test('questionsForBrand(mini) drops options MINI does not sell', () => {
   for (const opt of byId.bodyStyles.options) assert.equal(opt.brands, undefined);
 });
 
+test('the budget slider is capped lower for MINI than for BMW', () => {
+  const bmwBudget = questionsForBrand('bmw').find((q) => q.id === 'budget');
+  const miniBudget = questionsForBrand('mini').find((q) => q.id === 'budget');
+  assert.equal(bmwBudget.max, 150000, 'BMW keeps the full range');
+  assert.ok(miniBudget.max <= 50000, 'MINI budget is capped near its price ceiling');
+  assert.ok(miniBudget.max < bmwBudget.max, 'MINI cap is below BMW');
+  // Shared base fields are untouched, so the client renders it identically.
+  assert.equal(miniBudget.type, 'slider');
+  assert.equal(miniBudget.range, true);
+  assert.equal(miniBudget.step, 1000);
+  // The MINI default bracket sits within its own range.
+  const [lo, hi] = miniBudget.default;
+  assert.ok(lo >= miniBudget.min && hi <= miniBudget.max, 'MINI default is inside its range');
+});
+
 test('questionsForBrand(bmw) keeps the full option set', () => {
   const q = questionsForBrand('bmw');
   const byId = Object.fromEntries(q.map((x) => [x.id, x]));

@@ -14,6 +14,8 @@
  * so adding a question here means teaching engine.js about its id.
  */
 
+import { brandConfig } from './brands.js';
+
 export const QUESTIONS = [
   {
     id: 'budget',
@@ -163,15 +165,25 @@ export const BUDGET_BANDS = {
 };
 
 /**
- * The quiz for a given brand: the shared question set with each option's
- * `brands` restriction applied. An option with no `brands` shows for every
- * brand; one with `brands: ['bmw']` is dropped for MINI. The scoring engine is
- * unchanged — a brand simply never receives an answer value it can't sell (no
- * Saloon/Diesel for MINI). The `brands` marker itself is stripped from the
- * returned options so it never reaches the client.
+ * The quiz for a given brand: the shared question set with per-brand tweaks
+ * applied —
+ *   - each option's `brands` restriction (an option with no `brands` shows for
+ *     every brand; `brands: ['bmw']` is dropped for MINI). The `brands` marker
+ *     is stripped so it never reaches the client.
+ *   - the budget slider's `max`/`default` from the brand registry, since MINI
+ *     stock tops out ~£40k where BMW reaches £100k+.
+ * The scoring engine is unchanged — a brand simply never receives an answer
+ * value it can't sell (no Saloon/Diesel for MINI), and a narrower budget slider
+ * still emits the same [min, max] shape the engine already reads.
  */
 export function questionsForBrand(brand = 'bmw') {
+  const { budget } = brandConfig(brand);
   return QUESTIONS.map((q) => {
+    if (q.id === 'budget' && budget) {
+      // Only override the fields the brand actually specifies; min/step/format
+      // stay as the shared base.
+      return { ...q, ...budget };
+    }
     if (!q.options) return q;
     const options = q.options
       .filter((o) => !o.brands || o.brands.includes(brand))
