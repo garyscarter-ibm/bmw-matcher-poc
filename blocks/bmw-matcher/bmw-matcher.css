@@ -878,6 +878,15 @@ a.bmwm-ptile:focus-visible { outline: 2px solid var(--bmwm-accent); outline-offs
 .bmwm-ptile-score { flex: none; font-size: var(--bmwm-text-label); }
 .bmwm-ptile-specs { font-size: var(--bmwm-text-eyebrow); color: var(--bmwm-ink-muted); }
 
+/* Skeleton preview tile: same footprint as a real mini tile so the strip holds
+   its size, then real tiles swap in without a layout jump. The media band is a
+   plain shimmer block (no padding/line label), and the two text lines shimmer
+   in the body. Not interactive. */
+.bmwm-skel-ptile { pointer-events: none; }
+.bmwm-skel-ptile .bmwm-ptile-media { padding: 0; }
+.bmwm-skel-ptile .bmwm-skel-name { width: 70%; margin-bottom: var(--bmwm-space-2); }
+.bmwm-skel-ptile .bmwm-skel-specs { width: 45%; margin-bottom: 0; }
+
 /* Mobile: hero steps 40px → 32px (the one confirmed breakpoint data point);
    other headings scale down ~proportionally. Desktop values are the defaults
    above, so only the stepped-down overrides live here. */

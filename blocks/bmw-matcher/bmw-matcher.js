@@ -260,10 +260,15 @@ function canPreview(ctx) {
   return validBudget(ctx.answers.budget);
 }
 
+// How many skeleton tiles to show while the first guess loads. A handful is
+// enough to fill the strip's width so it reads as "results loading here".
+const PREVIEW_SKELETON_COUNT = 5;
+
 /**
  * Build the live preview section: a heading + a horizontal strip of small
- * "mini" result tiles (see previewTile). No toggle and no empty/loading state —
- * the caller only mounts it once there are matches (see mountPreview).
+ * "mini" result tiles (see previewTile). Since budget is set from the first
+ * render, the section mounts straight away — showing skeleton tiles until the
+ * first guess lands (see paintPreview), so it never snaps open.
  */
 function renderPreviewSection(ctx) {
   const section = el('section', 'bmwm-preview');
@@ -277,37 +282,65 @@ function renderPreviewSection(ctx) {
   return section;
 }
 
+/** A shimmer placeholder shaped like a mini preview tile (media + two lines). */
+function previewSkeletonTile() {
+  const tile = el('div', 'bmwm-ptile bmwm-ptile-mini bmwm-skel-ptile');
+  tile.append(el('div', 'bmwm-skel bmwm-ptile-media'));
+  const body = el('div', 'bmwm-ptile-body');
+  body.append(
+    el('div', 'bmwm-skel bmwm-skel-line bmwm-skel-name'),
+    el('div', 'bmwm-skel bmwm-skel-line bmwm-skel-specs'),
+  );
+  tile.append(body);
+  return tile;
+}
+
 /**
  * Refill the strip from ctx.preview.matches, with a soft cross-fade so a re-rank
  * reads as "this just updated" rather than a hard jump. Reduced-motion users get
- * an instant swap (the CSS transition is disabled).
+ * an instant swap (the CSS transition is disabled). With no matches yet (budget
+ * is set from the off, so this is the initial load), paint skeleton tiles so the
+ * bar holds its footprint instead of popping in when the first guess arrives.
  */
 function paintPreview(section, ctx) {
   const track = section.querySelector('.bmwm-preview-track');
+  const hasMatches = ctx.preview.matches.length > 0;
   const swap = () => {
     track.replaceChildren();
-    ctx.preview.matches.forEach((m) => track.append(previewTile(m, 'mini')));
+    if (hasMatches) {
+      ctx.preview.matches.forEach((m) => track.append(previewTile(m, 'mini')));
+    } else {
+      for (let i = 0; i < PREVIEW_SKELETON_COUNT; i += 1) track.append(previewSkeletonTile());
+    }
     requestAnimationFrame(() => track.classList.remove('is-fading'));
   };
-  if (!track.children.length) {
-    swap();
-  } else {
+  // Cross-fade only when swapping real tiles for real tiles (a re-rank). The
+  // first skeleton→results fill is a plain swap so results appear promptly.
+  const showingReal = track.querySelector('.bmwm-ptile:not(.bmwm-skel-ptile)');
+  if (showingReal && hasMatches) {
     track.classList.add('is-fading');
     setTimeout(swap, PREVIEW_FADE_MS);
+  } else {
+    swap();
   }
 }
 
 /**
- * Mount or update the preview for the current answers. Once matches exist the
- * section lives at the end of ctx.preview's host (`.bmwm-screen`); this inserts
- * it on first content, repaints it on later updates, and removes it if a re-rank
- * ever comes back empty — so the section is only ever on screen with content.
+ * Mount or update the preview for the current answers. The section lives at the
+ * end of ctx.preview's host (`.bmwm-screen`): it mounts as soon as a budget is
+ * set (skeleton tiles until the first guess lands), repaints on later updates,
+ * and is only removed if we genuinely can't preview yet (no valid budget).
  */
 function showPreview(ctx) {
   const screen = document.querySelector('.bmwm-screen');
   if (!screen) return;
   let section = screen.querySelector('.bmwm-preview');
-  if (!ctx.preview.matches.length) {
+  const { matches, loaded } = ctx.preview;
+  // Hide the strip only when there's genuinely nothing to show: no budget to
+  // score yet, or a guess has landed and returned zero matches. While a budget
+  // is set but the first guess hasn't arrived (!loaded), we keep the strip up
+  // with skeleton tiles (paintPreview) rather than removing it.
+  if ((!canPreview(ctx) && !matches.length) || (loaded && !matches.length)) {
     section?.remove();
     return;
   }
@@ -336,6 +369,7 @@ function schedulePreviewRefresh(ctx) {
       // A newer answer already superseded this request — drop the stale result.
       if (seq !== ctx.preview.seq) return;
       ctx.preview.matches = matches;
+      ctx.preview.loaded = true; // first (and every) response has now landed
       showPreview(ctx);
     });
   }, PREVIEW_DEBOUNCE_MS);
@@ -1001,7 +1035,7 @@ async function renderResults(root, ctx, answers) {
     // drop any in-flight/debounced refresh from the finished run (bump seq so a
     // late-landing response from the old run is ignored).
     clearTimeout(ctx.previewTimer);
-    ctx.preview = { matches: [], seq: ctx.preview.seq + 1 };
+    ctx.preview = { matches: [], seq: ctx.preview.seq + 1, loaded: false };
     ctx.editReturnIndex = null;
     window.history.replaceState(null, '', window.location.pathname);
     ctx.showIntro();
@@ -1052,7 +1086,10 @@ export default async function decorate(block) {
     // Live "best guess" strip state, kept on ctx so it survives the
     // per-question re-render (see renderPreviewSection / schedulePreviewRefresh).
     // `seq` is the latest-wins guard for the debounced refetch.
-    preview: { matches: [], seq: 0 },
+    // `loaded` flips true once the first /api/preview response lands, so the
+    // strip can tell "still loading" (show skeleton) from "loaded, no matches"
+    // (hide the strip). `seq` is the latest-wins guard for the debounced fetch.
+    preview: { matches: [], seq: 0, loaded: false },
     previewTimer: null,
     // Set when a summary pill is tapped to edit an earlier answer: the index to
     // return to once that answer is re-submitted (see renderAnswerPills /
