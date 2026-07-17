@@ -47,7 +47,8 @@
   --bmwm-space-16: 64px;
 
   /* --- geometry --- */
-  --bmwm-radius: 0px;
+  --bmwm-radius: 0px;           /* cards, media, options — BMW is sharp */
+  --bmwm-radius-control: 0px;   /* buttons/pills — MINI overrides to a pill */
   --bmwm-radius-soft: 4px;      /* rare exception, e.g. inline links */
   --bmwm-btn-height: 46px;
   --bmwm-btn-padding: 12px 20px 15px;
@@ -82,6 +83,66 @@
 }
 
 .bmwm * { box-sizing: border-box; }
+
+/* ------------------------------ MINI theme ---------------------------- *
+ * Applied when the block is configured Brand: MINI (the .bmwm-mini class,
+ * added in decorate). MINI's identity vs BMW: black/white base with a British
+ * Racing Green accent, pill-shaped buttons + softly-rounded cards, and a serif
+ * UPPERCASE headline face. Everything is a token override — no structural CSS
+ * changes — because the base selectors all read the --bmwm-* custom properties.
+ *
+ * Fonts are MINI's real web faces, self-hosted from ./fonts for this private
+ * demo (never publicly hosted). Fallbacks stay in each stack so a missing file
+ * degrades gracefully rather than breaking the layout.
+ * -------------------------------------------------------------------- */
+@font-face {
+  font-family: 'MINISerif-Bold';
+  src: url('./fonts/mini_serif-bold-web.woff') format('woff');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'MINISansSerif-Regular';
+  src: url('./fonts/mini_sans_serif-regular-web.woff') format('woff');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'MINISansSerif-Bold';
+  src: url('./fonts/mini_sans_serif-bold-web.woff') format('woff');
+  font-weight: 700;
+  font-display: swap;
+}
+
+.bmwm.bmwm-mini {
+  /* fonts: serif headings, sans body — MINI's real faces + fallbacks */
+  --bmwm-font-heading: 'MINISerif-Bold', Georgia, 'Times New Roman', serif;
+  --bmwm-font-bold: 'MINISansSerif-Bold', 'Helvetica Neue', arial, sans-serif;
+  --bmwm-font-body: 'MINISansSerif-Regular', 'Helvetica Neue', arial, sans-serif;
+
+  /* colour: black/white base, British Racing Green accent */
+  --bmwm-ink: #000000;
+  --bmwm-ink-strong: #000000;
+  --bmwm-ink-muted: #555555;
+  --bmwm-accent: #01693e;          /* MINI British Racing Green */
+  --bmwm-accent-ink: #ffffff;
+  --bmwm-accent-secondary: #56c5e5;
+  --bmwm-line: #d0d0d0;
+
+  /* geometry: pill buttons, softly-rounded cards */
+  --bmwm-radius: 4px;
+  --bmwm-radius-control: 999px;
+}
+
+/* MINI headlines are set UPPERCASE in the serif face. */
+.bmwm.bmwm-mini .bmwm-title,
+.bmwm.bmwm-mini .bmwm-question,
+.bmwm.bmwm-mini .bmwm-subhead,
+.bmwm.bmwm-mini .bmwm-preview-heading,
+.bmwm.bmwm-mini .bmwm-nearby-heading {
+  text-transform: uppercase;
+  font-family: var(--bmwm-font-heading);
+}
 
 .bmwm-kicker {
   font-family: var(--bmwm-font-bold);
@@ -128,7 +189,7 @@
   line-height: 1;
   min-height: var(--bmwm-btn-height);
   padding: var(--bmwm-btn-padding);
-  border-radius: var(--bmwm-radius);
+  border-radius: var(--bmwm-radius-control);
   cursor: pointer;
   border: var(--bmwm-border-width) solid transparent;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;

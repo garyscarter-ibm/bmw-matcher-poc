@@ -37,14 +37,16 @@ export const QUESTIONS = [
     title: 'Any body styles you’re drawn to?',
     help: 'Pick as many as you like or keep an open mind.',
     multi: true,
+    // `brands` limits an option to specific brands; absent means all brands.
+    // MINI sells no saloons, coupés or 7-seat MPVs, so those are BMW-only.
     options: [
       { value: 'hatchback', label: 'Hatchback' },
-      { value: 'saloon', label: 'Saloon' },
+      { value: 'saloon', label: 'Saloon', brands: ['bmw'] },
       { value: 'estate', label: 'Estate or Touring' },
       { value: 'suv', label: 'SUV' },
-      { value: 'coupe', label: 'Coupé' },
+      { value: 'coupe', label: 'Coupé', brands: ['bmw'] },
       { value: 'convertible', label: 'Convertible' },
-      { value: 'mpv', label: 'Family carrier' },
+      { value: 'mpv', label: 'Family carrier', brands: ['bmw'] },
       { value: 'any', label: 'No preference', sub: 'Open to any body style' },
     ],
   },
@@ -55,7 +57,7 @@ export const QUESTIONS = [
     multi: true,
     options: [
       { value: 'petrol', label: 'Petrol' },
-      { value: 'diesel', label: 'Diesel', sub: 'Higher miles, more torque' },
+      { value: 'diesel', label: 'Diesel', sub: 'Higher miles, more torque', brands: ['bmw'] },
       { value: 'phev', label: 'Plug-in hybrid', sub: 'Electric and petrol combined' },
       { value: 'ev', label: 'Fully electric' },
       { value: 'open', label: 'Help me decide', sub: 'Open to any fuel type' },
@@ -159,3 +161,21 @@ export const BUDGET_BANDS = {
   b4: [70000, 100000],
   b5: [100000, 250000],
 };
+
+/**
+ * The quiz for a given brand: the shared question set with each option's
+ * `brands` restriction applied. An option with no `brands` shows for every
+ * brand; one with `brands: ['bmw']` is dropped for MINI. The scoring engine is
+ * unchanged — a brand simply never receives an answer value it can't sell (no
+ * Saloon/Diesel for MINI). The `brands` marker itself is stripped from the
+ * returned options so it never reaches the client.
+ */
+export function questionsForBrand(brand = 'bmw') {
+  return QUESTIONS.map((q) => {
+    if (!q.options) return q;
+    const options = q.options
+      .filter((o) => !o.brands || o.brands.includes(brand))
+      .map(({ brands, ...rest }) => rest);
+    return { ...q, options };
+  });
+}
