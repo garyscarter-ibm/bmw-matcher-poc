@@ -164,6 +164,105 @@ export const BUDGET_BANDS = {
   b5: [100000, 250000],
 };
 
+/*
+ * Per-brand copy overrides. The base QUESTIONS text above is BMW/Grassick's
+ * measured voice; MINI speaks in a playful, "go-kart", UPPERCASE-with-a-full-
+ * stop register (see docs/tone-style-guide.md). Only the *words* change —
+ * question ids and option `value`s are untouched, so the scoring engine is
+ * unaffected. Keyed by brand → question id → { title?, help?, options?:{ value
+ * → { label?, sub? } } }. A brand with no entry (BMW) keeps the base copy.
+ */
+const BRAND_COPY = {
+  mini: {
+    budget: {
+      title: 'WHAT’S THE DAMAGE?',
+      help: 'A rough on-the-road figure — we’ll flag anything that’s a cheeky stretch.',
+    },
+    bodyStyles: {
+      title: 'WHICH SHAPE SPEAKS TO YOU?',
+      help: 'Pick as many as you fancy, or keep an open mind.',
+      options: {
+        hatchback: { label: 'The classic hatch' },
+        estate: { label: 'Clubman estate' },
+        suv: { label: 'Countryman crossover' },
+        convertible: { label: 'Roof-down convertible' },
+        any: { label: 'Surprise me', sub: 'Open to any shape' },
+      },
+    },
+    fuel: {
+      title: 'HOW DO YOU WANT TO BE POWERED?',
+      help: 'Pick as many as you like, or let us point you the right way.',
+      options: {
+        petrol: { label: 'Classic petrol' },
+        phev: { label: 'Plug-in hybrid', sub: 'Electric zip plus petrol range' },
+        ev: { label: 'Fully electric', sub: 'Silent, instant go-kart torque' },
+        open: { label: 'Help me decide', sub: 'Open to anything' },
+      },
+    },
+    charging: {
+      title: 'COULD YOU PLUG IN AT HOME OR WORK?',
+      help: 'A driveway socket or a charger at work changes the electric maths.',
+      options: {
+        either: { label: 'Yep — home or work' },
+        home: { label: 'Yep — at home' },
+        work: { label: 'Yep — at work' },
+        none: { label: 'Nope, public chargers only' },
+      },
+    },
+    primaryUse: {
+      title: 'WHERE WILL IT LIVE?',
+      options: {
+        city: { label: 'Nipping round town', sub: 'Short hops, tight parking' },
+        commute: { label: 'The daily dash' },
+        family: { label: 'Family runs', sub: 'School runs and clubs' },
+        roadtrips: { label: 'Longer adventures', sub: 'Motorways and mountain peaks' },
+        fun: { label: 'Weekend fun', sub: 'Go-kart grins on your favourite B-road' },
+      },
+    },
+    people: {
+      title: 'WHO’S ALONG FOR THE RIDE?',
+      options: {
+        solo: { label: 'Just me (and the odd passenger)' },
+        family: { label: 'A small crew', sub: 'Child seats included' },
+        crew: { label: 'A full house', sub: 'Five seats, regularly' },
+      },
+    },
+    boot: {
+      title: 'HOW MUCH DO YOU NEED TO CART ABOUT?',
+      options: {
+        small: { label: 'Barely anything', sub: 'A weekend bag will do' },
+        medium: { label: 'A fair bit', sub: 'Weekly shop, buggy, luggage' },
+        big: { label: 'Cram it full', sub: 'Dogs, kit, the lot' },
+      },
+    },
+    mileage: {
+      title: 'HOW FAR DO YOU ROAM?',
+      help: 'Roughly, per year — it helps us weigh up fuel and running costs.',
+    },
+    style: {
+      title: 'HOW DO YOU LIKE TO DRIVE?',
+      help: 'Somewhere between comfy cruiser and full go-kart?',
+      options: {
+        1: { label: 'Comfy and calm' },
+        2: { label: 'Leaning comfy' },
+        3: { label: 'A bit of both' },
+        4: { label: 'Leaning sporty' },
+        5: { label: 'Full go-kart' },
+      },
+    },
+    priorities: {
+      title: 'LAST ONE — PICK YOUR TOP TWO.',
+      options: {
+        economy: { label: 'Cheap to run' },
+        performance: { label: 'Go-kart thrills' },
+        comfort: { label: 'Comfort & calm' },
+        tech: { label: 'Tech & toys' },
+        image: { label: 'Looks & character' },
+      },
+    },
+  },
+};
+
 /**
  * The quiz for a given brand: the shared question set with per-brand tweaks
  * applied —
@@ -172,22 +271,33 @@ export const BUDGET_BANDS = {
  *     is stripped so it never reaches the client.
  *   - the budget slider's `max`/`default` from the brand registry, since MINI
  *     stock tops out ~£40k where BMW reaches £100k+.
- * The scoring engine is unchanged — a brand simply never receives an answer
- * value it can't sell (no Saloon/Diesel for MINI), and a narrower budget slider
- * still emits the same [min, max] shape the engine already reads.
+ *   - per-brand copy (BRAND_COPY): title/help/option labels+subs in the brand's
+ *     voice. Only display text changes — ids and option `value`s are untouched.
+ * The scoring engine is unaffected: a brand never receives an answer value it
+ * can't sell (no Saloon/Diesel for MINI), a narrower budget slider still emits
+ * the same [min, max] shape, and reworded labels map to the same values.
  */
 export function questionsForBrand(brand = 'bmw') {
   const { budget } = brandConfig(brand);
+  const copy = BRAND_COPY[brand] || {};
   return QUESTIONS.map((q) => {
-    if (q.id === 'budget' && budget) {
-      // Only override the fields the brand actually specifies; min/step/format
-      // stay as the shared base.
-      return { ...q, ...budget };
+    const c = copy[q.id] || {};
+    // Base fields, then brand copy for title/help.
+    const out = { ...q };
+    if (c.title) out.title = c.title;
+    if (c.help) out.help = c.help;
+    // Budget slider bounds from the registry (only the fields it specifies).
+    if (q.id === 'budget' && budget) Object.assign(out, budget);
+    // Options: drop brand-excluded ones, strip the `brands` marker, and apply
+    // any per-option label/sub overrides.
+    if (q.options) {
+      out.options = q.options
+        .filter((o) => !o.brands || o.brands.includes(brand))
+        .map(({ brands, ...rest }) => {
+          const oc = c.options?.[rest.value];
+          return oc ? { ...rest, ...oc } : rest;
+        });
     }
-    if (!q.options) return q;
-    const options = q.options
-      .filter((o) => !o.brands || o.brands.includes(brand))
-      .map(({ brands, ...rest }) => rest);
-    return { ...q, options };
+    return out;
   });
 }

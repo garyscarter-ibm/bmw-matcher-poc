@@ -116,6 +116,31 @@ test('the budget slider is capped lower for MINI than for BMW', () => {
   assert.ok(lo >= miniBudget.min && hi <= miniBudget.max, 'MINI default is inside its range');
 });
 
+test('MINI copy differs from BMW in words but keeps identical option values', () => {
+  const bmw = questionsForBrand('bmw');
+  const mini = questionsForBrand('mini');
+  const bmwById = Object.fromEntries(bmw.map((q) => [q.id, q]));
+  const miniById = Object.fromEntries(mini.map((q) => [q.id, q]));
+
+  // Titles are reworded for MINI (e.g. budget, style, priorities).
+  assert.notEqual(miniById.budget.title, bmwById.budget.title);
+  assert.notEqual(miniById.priorities.title, bmwById.priorities.title);
+  assert.match(miniById.style.title, /DRIVE/i);
+
+  // But every option VALUE is unchanged for questions common to both brands,
+  // so the scoring engine sees the same answer space.
+  for (const id of ['primaryUse', 'people', 'boot', 'style', 'priorities', 'charging']) {
+    const bmwVals = (bmwById[id].options || []).map((o) => o.value).sort();
+    const miniVals = (miniById[id].options || []).map((o) => o.value).sort();
+    assert.deepEqual(miniVals, bmwVals, `${id} option values must match across brands`);
+  }
+  // A reworded label actually changed (style value '5').
+  const miniS5 = miniById.style.options.find((o) => o.value === '5');
+  const bmwS5 = bmwById.style.options.find((o) => o.value === '5');
+  assert.notEqual(miniS5.label, bmwS5.label);
+  assert.match(miniS5.label, /go-kart/i);
+});
+
 test('questionsForBrand(bmw) keeps the full option set', () => {
   const q = questionsForBrand('bmw');
   const byId = Object.fromEntries(q.map((x) => [x.id, x]));
