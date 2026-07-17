@@ -28,7 +28,9 @@
 
 import { createServer } from 'node:http';
 
-import { matchCars, rankCars, TOP_MATCHES } from './engine.js';
+import {
+  matchCars, rankCars, budgetRange, TOP_MATCHES,
+} from './engine.js';
 import {
   fetchGrassickStock, fetchNearbyStock, startStockWarmer, StockUnavailableError,
 } from './stock.js';
@@ -151,7 +153,10 @@ async function readMatchRequest(req) {
   if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
     return { error: 'Missing "answers" object', status: 400 };
   }
-  if (!BUDGET_BANDS[answers.budget]) {
+  // Budget is now a continuous number from the slider, but legacy b1–b5 band
+  // keys are still honoured (old shared links). budgetRange resolves both to a
+  // [min, max]; a null means neither a valid number nor a known band.
+  if (!budgetRange(answers)) {
     return { error: 'Invalid or missing budget', status: 400 };
   }
   const retailer = typeof body.retailer === 'string' && body.retailer ? body.retailer : undefined;

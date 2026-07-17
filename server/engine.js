@@ -38,18 +38,52 @@ export const STRETCH_FACTOR = 1.15;
 const clamp = (v, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 const gbp = (n) => `£${Math.round(n / 1000)}k`;
 
+/**
+ * Resolve a budget answer to a [min, max] £ range. Budget is now a continuous
+ * number from the quiz's slider, but we still accept the legacy b1–b5 band keys
+ * so old shared #m= links (and existing callers/tests) keep working. A bare
+ * number means "up to this much" — min 0, max the number.
+ */
+export function budgetRange(answers) {
+  const b = answers.budget;
+  if (typeof b === 'number' && Number.isFinite(b) && b > 0) return [0, b];
+  return BUDGET_BANDS[b] || null;
+}
+
+/** High annual mileage (the old 'vhigh' band): the diesel/economy boost line. */
+function isHighMileage(answers) {
+  const m = answers.mileage;
+  if (typeof m === 'number') return m >= 20000;
+  return m === 'vhigh';
+}
+
+/** Normalise a fuel answer to an array of preference values (multi-select). */
+function fuelPrefs(answers) {
+  const f = answers.fuel;
+  const picks = Array.isArray(f) ? f : (f != null ? [f] : []);
+  return picks.length ? picks : ['open'];
+}
+
+/** Charging access good enough for an EV/PHEV to make sense. */
+function canChargeAt(charging) {
+  return charging === 'home' || charging === 'work' || charging === 'either';
+}
+
 /* ---------------------------------------------------------------- *
  *  Per-dimension scorers. Each returns { score: 0..1, reason? }.    *
  * ---------------------------------------------------------------- */
 
 function scoreBudget(car, answers) {
-  const [min, max] = BUDGET_BANDS[answers.budget];
+  const [min, max] = budgetRange(answers);
+  // A slider budget has min 0, so phrase the "in budget" reason as an upper
+  // limit ("up to £62k") rather than a "£0k–£62k" band.
+  const budgetReason = min > 0 ? `Sits right in your ${gbp(min)}–${gbp(max)} budget` : `Comfortably within your ${gbp(max)} budget`;
   if (car.priceMin > max) {
     // Survivor of the hard filter → it's a stretch buy.
     return { score: 0.35, stretch: true };
   }
   if (car.priceMax <= max && car.priceMax >= min) {
-    return { score: 1, reason: `Sits right in your ${gbp(min)}–${gbp(max)} budget` };
+    return { score: 1, reason: budgetReason };
   }
   if (car.priceMax < min) {
     // Cheaper than the stated band — fine, mildly off-target.
@@ -73,34 +107,30 @@ function scoreBody(car, answers) {
 
 const FUEL_LABELS = { petrol: 'petrol', diesel: 'diesel', phev: 'plug-in hybrid', ev: 'fully electric' };
 
-function scoreFuel(car, answers) {
-  // An unanswered fuel question scores like "Help me decide" — the honest
-  // reading of "no preference stated yet", and what lets the live-preview
-  // drawer rank a partial (budget-only) answer set instead of throwing on
-  // table[undefined].
-  const pref = answers.fuel || 'open';
+const FUEL_TABLE = {
+  petrol: { petrol: 1, diesel: 0.7, phev: 0.6, ev: 0.15 },
+  diesel: { diesel: 1, petrol: 0.6, phev: 0.5, ev: 0.15 },
+  phev: { phev: 1, ev: 0.55, petrol: 0.5, diesel: 0.4 },
+  ev: { ev: 1, phev: 0.5, petrol: 0.1, diesel: 0.1 },
+};
+
+/** Score one car against a single fuel preference. Returns { score, reason? }. */
+function scoreOneFuel(pref, car, answers) {
   const charging = answers.charging || 'none';
-  const canCharge = charging === 'home' || charging === 'work';
-
-  // EVs and PHEVs make much less sense with no charging access.
-  const evAccess = charging === 'home' ? 1 : charging === 'work' ? 0.85 : 0.3;
-
-  const table = {
-    petrol: { petrol: 1, diesel: 0.7, phev: 0.6, ev: 0.15 },
-    diesel: { diesel: 1, petrol: 0.6, phev: 0.5, ev: 0.15 },
-    phev: { phev: 1, ev: 0.55, petrol: 0.5, diesel: 0.4 },
-    ev: { ev: 1, phev: 0.5, petrol: 0.1, diesel: 0.1 },
-  };
+  const canCharge = canChargeAt(charging);
+  // EVs and PHEVs make much less sense with no charging access. "either" and
+  // "home" both imply home access — the best case.
+  const evAccess = (charging === 'home' || charging === 'either') ? 1 : charging === 'work' ? 0.85 : 0.3;
 
   let score;
   if (pref === 'open') {
     // "Help me decide": recommend by circumstance.
     if (car.fuel === 'ev') score = canCharge ? 0.95 : 0.25;
     else if (car.fuel === 'phev') score = canCharge ? 0.85 : 0.6;
-    else if (car.fuel === 'diesel') score = answers.mileage === 'vhigh' ? 0.9 : 0.55;
+    else if (car.fuel === 'diesel') score = isHighMileage(answers) ? 0.9 : 0.55;
     else score = 0.7;
   } else {
-    score = table[pref][car.fuel];
+    score = FUEL_TABLE[pref][car.fuel];
     if (car.fuel === 'ev') score *= evAccess;
     if (car.fuel === 'phev' && !canCharge) score *= 0.7;
   }
@@ -113,11 +143,26 @@ function scoreFuel(car, answers) {
         : `Fully electric with a ${car.evRange}-mile range`;
     } else if (pref !== 'open') {
       reason = `The ${FUEL_LABELS[car.fuel]} power you wanted`;
-    } else if (car.fuel === 'diesel' && answers.mileage === 'vhigh') {
+    } else if (car.fuel === 'diesel' && isHighMileage(answers)) {
       reason = 'Diesel torque and economy suit your big annual mileage';
     }
   }
   return { score, reason };
+}
+
+function scoreFuel(car, answers) {
+  // Fuel is multi-select: the user can pick several fuels (or none, which reads
+  // as "help me decide"). Score the car against each chosen fuel and take the
+  // best — a petrol car matching "Petrol + EV" scores on its petrol merit. An
+  // unanswered set falls back to ['open'] (fuelPrefs), so a partial answer set
+  // still ranks instead of throwing on FUEL_TABLE[undefined].
+  const prefs = fuelPrefs(answers);
+  let best = { score: -1 };
+  for (const pref of prefs) {
+    const r = scoreOneFuel(pref, car, answers);
+    if (r.score > best.score) best = r;
+  }
+  return best;
 }
 
 function scorePracticality(car, answers) {
@@ -151,7 +196,7 @@ function scorePerformance(car, answers) {
 }
 
 function scoreEconomy(car, answers) {
-  const canCharge = answers.charging === 'home' || answers.charging === 'work';
+  const canCharge = canChargeAt(answers.charging);
   let score;
   let reason;
   if (car.fuel === 'ev') {
@@ -230,14 +275,14 @@ function effectiveWeights(answers) {
     const boosts = PRIORITY_BOOSTS[p] || {};
     for (const [dim, add] of Object.entries(boosts)) w[dim] += add;
   }
-  if (answers.mileage === 'vhigh') w.economy += 1;
+  if (isHighMileage(answers)) w.economy += 1;
   if (Number(answers.style) >= 4) w.performance += 1;
   if (Number(answers.style) <= 2) w.performance = Math.max(0.5, w.performance - 0.5);
   return w;
 }
 
 function passesHardFilters(car, answers) {
-  const [, max] = BUDGET_BANDS[answers.budget];
+  const [, max] = budgetRange(answers);
   if (car.priceMin > max * STRETCH_FACTOR) return false;
   if (answers.people === 'crew' && (car.seats < 5 || car.boot < 430)) return false;
   if (answers.people === 'family' && car.seats < 4) return false;

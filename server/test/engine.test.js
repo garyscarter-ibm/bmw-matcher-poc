@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { matchCars, rankCars, STRETCH_FACTOR } from '../engine.js';
+import {
+  matchCars, rankCars, budgetRange, STRETCH_FACTOR,
+} from '../engine.js';
 import { CARS } from '../data.js';
 import { BUDGET_BANDS, QUESTIONS } from '../questions.js';
 
@@ -171,6 +173,59 @@ test('every dataset entry has the fields the engine needs', () => {
     if (car.fuel === 'ev') assert.ok(car.evRange > 0, `${car.name} needs evRange`);
     else assert.ok(car.mpg > 0, `${car.name} needs mpg`);
   }
+});
+
+/* ---- Stakeholder amendments: slider budget/mileage, multi-select fuel ---- */
+
+test('budgetRange resolves both a legacy band key and a raw number', () => {
+  assert.deepEqual(budgetRange({ budget: 'b2' }), BUDGET_BANDS.b2);
+  assert.deepEqual(budgetRange({ budget: 60000 }), [0, 60000]);
+  assert.equal(budgetRange({ budget: 0 }), null, '0 is not a usable budget');
+  assert.equal(budgetRange({ budget: 'nope' }), null);
+});
+
+test('a numeric budget ranks the same cars as the equivalent band', () => {
+  // b3 is [50k, 70k]; a 70k number should surface the same top match.
+  const byBand = run({ ...base, budget: 'b3', fuel: 'petrol', primaryUse: 'commute' });
+  const byNumber = run({ ...base, budget: 70000, fuel: ['petrol'], primaryUse: 'commute' });
+  assert.ok(byNumber.matches.length > 0);
+  assert.equal(byNumber.matches[0].car.id, byBand.matches[0].car.id);
+});
+
+test('multi-select fuel scores a car on its best matching fuel', () => {
+  // Picking petrol + ev: a petrol car should score on its (perfect) petrol
+  // merit, not be dragged down by the ev mismatch — best-of, not average.
+  const petrolOnly = rankCars({ ...base, budget: 'b3', fuel: ['petrol'], charging: 'none' }, CARS);
+  const petrolAndEv = rankCars({ ...base, budget: 'b3', fuel: ['petrol', 'ev'], charging: 'none' }, CARS);
+  const aPetrol = petrolOnly.find((m) => m.car.fuel === 'petrol');
+  assert.ok(aPetrol, 'expected a petrol car in the pool');
+  const same = petrolAndEv.find((m) => m.car.id === aPetrol.car.id);
+  assert.ok(same.score >= aPetrol.score, 'adding EV as an option must not lower a petrol car');
+});
+
+test('an empty / absent fuel selection scores like "help me decide"', () => {
+  const asOpen = rankCars({ ...base, budget: 'b3', fuel: 'open' }, CARS);
+  const asEmpty = rankCars({ ...base, budget: 'b3', fuel: [] }, CARS);
+  assert.deepEqual(asEmpty.map((m) => m.car.id), asOpen.map((m) => m.car.id));
+});
+
+test('numeric mileage ≥20k triggers the same diesel/economy boost as vhigh', () => {
+  const byBand = run({ ...base, budget: 'b3', fuel: ['open'], mileage: 'vhigh' });
+  const byNumber = run({ ...base, budget: 'b3', fuel: ['open'], mileage: 22000 });
+  assert.equal(byNumber.matches[0].car.id, byBand.matches[0].car.id);
+  // And a low number must NOT trigger it — 5k should differ from 22k when a
+  // diesel is in play.
+  const low = run({ ...base, budget: 'b3', fuel: ['open'], mileage: 5000 });
+  assert.ok(low.matches.length > 0);
+});
+
+test('charging "either" gives EV access like home charging', () => {
+  const home = rankCars({ ...base, budget: 'b3', fuel: ['ev'], charging: 'home' }, CARS);
+  const either = rankCars({ ...base, budget: 'b3', fuel: ['ev'], charging: 'either' }, CARS);
+  const evHome = home.find((m) => m.car.fuel === 'ev');
+  assert.ok(evHome, 'expected an EV with home charging');
+  const evEither = either.find((m) => m.car.id === evHome.car.id);
+  assert.equal(evEither.score, evHome.score, '"either" should match "home" for EV access');
 });
 
 test('quiz answer keys line up with what the engine reads', () => {

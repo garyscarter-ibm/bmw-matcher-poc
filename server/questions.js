@@ -4,6 +4,9 @@
  *  title:    question shown to the user
  *  help:     optional sub-text
  *  multi:    true → multi-select (answer is an array of values)
+ *  type:     'slider' → a range input (answer is a number); otherwise an option
+ *            list. Slider questions carry min/max/step/format/plusAtMax and no
+ *            `options`.
  *  showIf:   optional (answers) => boolean, for conditional questions
  *  options:  { value, label, sub? }
  *
@@ -16,13 +19,16 @@ export const QUESTIONS = [
     id: 'budget',
     title: 'What’s your budget?',
     help: 'Rough on the road price. We’ll flag anything that’s a slight stretch.',
-    options: [
-      { value: 'b1', label: 'Under £35k' },
-      { value: 'b2', label: '£35k to £50k' },
-      { value: 'b3', label: '£50k to £70k' },
-      { value: 'b4', label: '£70k to £100k' },
-      { value: 'b5', label: '£100k+' },
-    ],
+    // A continuous £ value. The engine still understands the legacy b1–b5 band
+    // keys (see budgetRange in engine.js) so old shared links keep working, but
+    // the quiz now sends a number.
+    type: 'slider',
+    min: 0,
+    max: 150000,
+    step: 1000,
+    format: 'gbp',
+    plusAtMax: true,
+    default: 50000,
   },
   {
     id: 'bodyStyles',
@@ -42,7 +48,9 @@ export const QUESTIONS = [
   },
   {
     id: 'fuel',
-    title: 'What fuel type suits you?',
+    title: 'What fuel types suit you?',
+    help: 'Pick as many as you like, or let us help you decide.',
+    multi: true,
     options: [
       { value: 'petrol', label: 'Petrol' },
       { value: 'diesel', label: 'Diesel', sub: 'Higher miles, more torque' },
@@ -55,8 +63,16 @@ export const QUESTIONS = [
     id: 'charging',
     title: 'Could you charge a car at home or work?',
     help: 'A driveway socket or workplace charger changes the electric maths.',
-    showIf: (a) => a.fuel === 'ev' || a.fuel === 'phev' || a.fuel === 'open',
+    // fuel is now multi-select (an array), so test membership. Show the charging
+    // question if the picks include electric-adjacent fuels or "help me decide",
+    // or if fuel is still unanswered. Mirror of SHOW_IF.charging in quiz-meta.js.
+    showIf: (a) => {
+      const f = a.fuel;
+      const picks = Array.isArray(f) ? f : (f != null ? [f] : []);
+      return picks.length === 0 || picks.some((v) => v === 'ev' || v === 'phev' || v === 'open');
+    },
     options: [
+      { value: 'either', label: 'Yes, at home or at work' },
       { value: 'home', label: 'Yes, at home' },
       { value: 'work', label: 'Yes, at work' },
       { value: 'none', label: 'No, I’d rely on public chargers' },
@@ -94,12 +110,17 @@ export const QUESTIONS = [
   {
     id: 'mileage',
     title: 'How many miles a year?',
-    options: [
-      { value: 'low', label: 'Under 6,000' },
-      { value: 'mid', label: '6,000 – 12,000' },
-      { value: 'high', label: '12,000 – 20,000' },
-      { value: 'vhigh', label: '20,000+' },
-    ],
+    help: 'Roughly — it helps us weigh fuel type and running costs.',
+    // A number. High-mileage scoring (the diesel/economy boost) kicks in at
+    // ≥20,000, matching the old 'vhigh' band — see isHighMileage in engine.js.
+    type: 'slider',
+    min: 0,
+    max: 25000,
+    step: 1000,
+    format: 'int',
+    unit: ' miles',
+    plusAtMax: true,
+    default: 10000,
   },
   {
     id: 'style',
