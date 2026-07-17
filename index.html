@@ -42,6 +42,10 @@
          quick multi-retailer demo without editing HTML. -->
     <div class="bmw-matcher block" data-block-name="bmw-matcher" data-api="http://localhost:8787">
       <div>
+        <div>Brand</div>
+        <div>BMW</div>
+      </div>
+      <div>
         <div>Retailer ID</div>
         <div>96</div>
       </div>
@@ -64,9 +68,14 @@
       block.dataset.api = apiOverride;
     }
 
+    // ?retailer=<id> overrides the authored Retailer ID row (find it by its
+    // label so it isn't confused with the Brand / Retailer Name rows).
     const override = params.get('retailer');
     if (override) {
-      block.querySelector(':scope > div > div:last-child').textContent = override;
+      const row = [...block.children].find(
+        (r) => r.firstElementChild?.textContent.trim().toLowerCase() === 'retailer id',
+      );
+      if (row) row.lastElementChild.textContent = override;
     }
 
     decorate(block);

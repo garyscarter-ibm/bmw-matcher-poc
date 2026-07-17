@@ -32,9 +32,10 @@ import {
   matchCars, rankCars, budgetRange, TOP_MATCHES,
 } from './engine.js';
 import {
-  fetchGrassickStock, fetchNearbyStock, startStockWarmer, StockUnavailableError,
+  fetchRetailerStock, fetchNearbyStock, startStockWarmer, StockUnavailableError,
 } from './stock.js';
-import { QUESTIONS, BUDGET_BANDS } from './questions.js';
+import { QUESTIONS, BUDGET_BANDS, questionsForBrand } from './questions.js';
+import { normalizeBrand } from './brands.js';
 
 const PORT = Number(process.env.PORT) || 8787;
 const MAX_BODY_BYTES = 16 * 1024; // quiz answers are tiny; reject anything bigger
@@ -65,12 +66,14 @@ function sendJson(res, status, payload) {
 }
 
 /**
- * Quiz definition for the client. `showIf` predicates can't cross JSON, so we
- * drop them and mark conditional questions — the block applies the matching
- * predicate from quiz-meta.js by question id.
+ * Quiz definition for the client, for a given brand. Options the brand doesn't
+ * sell are filtered out (questionsForBrand); `showIf` predicates can't cross
+ * JSON, so we drop them and mark conditional questions — the block applies the
+ * matching predicate from quiz-meta.js by question id.
  */
-function publicQuestions() {
-  return QUESTIONS.map(({ showIf, ...q }) => (showIf ? { ...q, conditional: true } : q));
+function publicQuestions(brand) {
+  return questionsForBrand(brand)
+    .map(({ showIf, ...q }) => (showIf ? { ...q, conditional: true } : q));
 }
 
 /**
@@ -160,7 +163,10 @@ async function readMatchRequest(req) {
     return { error: 'Invalid or missing budget', status: 400 };
   }
   const retailer = typeof body.retailer === 'string' && body.retailer ? body.retailer : undefined;
-  return { answers, retailer };
+  // Brand selects the feed (BMW vs MINI). normalizeBrand defaults unknown/absent
+  // to BMW, so old clients that don't send a brand keep working.
+  const brand = normalizeBrand(body.brand);
+  return { answers, retailer, brand };
 }
 
 /**
@@ -170,7 +176,9 @@ async function readMatchRequest(req) {
  * search, which the block now fetches separately via /api/nearby.
  */
 async function handleMatch(req, res) {
-  const { answers, retailer, error, status } = await readMatchRequest(req);
+  const {
+    answers, retailer, brand, error, status,
+  } = await readMatchRequest(req);
   if (error) return sendJson(res, status, { error });
 
   // Live proxy: score against the retailer's real stock, not a static file.
@@ -178,7 +186,7 @@ async function handleMatch(req, res) {
   // retry UI handles it. No static fallback (this tool is honestly live-only).
   let cars;
   try {
-    cars = await fetchGrassickStock(retailer);
+    cars = await fetchRetailerStock(brand, retailer);
   } catch (err) {
     if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
@@ -193,18 +201,20 @@ async function handleMatch(req, res) {
 /**
  * The quiz's live "best guess" — the same scoring as /api/match against the
  * same (cached) retailer stock, just a wider PREVIEW_COUNT slice for the
- * drawer that re-ranks as each question is answered. Shares fetchGrassickStock's
+ * drawer that re-ranks as each question is answered. Shares fetchRetailerStock's
  * cache key with /api/match, so a quiz's stream of refreshes hits the warmed
  * cache and adds no upstream traffic. Requires a budget (readMatchRequest
  * enforces it) — the block only calls this once budget is set.
  */
 async function handlePreview(req, res) {
-  const { answers, retailer, error, status } = await readMatchRequest(req);
+  const {
+    answers, retailer, brand, error, status,
+  } = await readMatchRequest(req);
   if (error) return sendJson(res, status, { error });
 
   let cars;
   try {
-    cars = await fetchGrassickStock(retailer);
+    cars = await fetchRetailerStock(brand, retailer);
   } catch (err) {
     if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
@@ -233,12 +243,14 @@ async function handlePreview(req, res) {
  * surface — the block simply omits the "Worth the drive" section.
  */
 async function handleNearby(req, res) {
-  const { answers, retailer, error, status } = await readMatchRequest(req);
+  const {
+    answers, retailer, brand, error, status,
+  } = await readMatchRequest(req);
   if (error) return sendJson(res, status, { error });
 
   let nearby = [];
   try {
-    const cars = await fetchNearbyStock(retailer);
+    const cars = await fetchNearbyStock(brand, retailer);
     nearby = rankCars(answers, cars).slice(0, TOP_MATCHES);
   } catch (err) {
     console.warn('[nearby] stock unavailable:', err?.message);
@@ -248,7 +260,7 @@ async function handleNearby(req, res) {
 }
 
 const server = createServer(async (req, res) => {
-  const { pathname } = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const { pathname, searchParams } = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204, CORS_HEADERS);
@@ -260,7 +272,10 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && pathname === '/api/questions') {
-    return sendJson(res, 200, { questions: publicQuestions(), budgetBands: BUDGET_BANDS });
+    // Brand comes on the query string (?brand=mini) for this GET; the quiz's
+    // option set is filtered to what that brand sells. Defaults to BMW.
+    const brand = normalizeBrand(searchParams.get('brand'));
+    return sendJson(res, 200, { questions: publicQuestions(brand), budgetBands: BUDGET_BANDS });
   }
 
   if (req.method === 'POST' && pathname === '/api/match') {
@@ -279,20 +294,23 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`BMW Matcher API listening on http://localhost:${PORT}`);
+  console.log(`Matcher API listening on http://localhost:${PORT}`);
 
   // Keep live stock hot off the request path so the slow cold fetch (chiefly
-  // the nearby distance search) isn't paid by a user. Prime the default
-  // retailer now so even the first visitor hits a warm cache; the warmer then
-  // keeps it (and any other served retailer) fresh. Failures are non-fatal —
-  // the request path still fetches on demand.
+  // the nearby distance search) isn't paid by a user. Prime each brand's
+  // default retailer now so even the first visitor hits a warm cache; the
+  // warmer then keeps every served brand+retailer fresh. Failures are
+  // non-fatal — the request path still fetches on demand.
   startStockWarmer();
-  Promise.allSettled([fetchGrassickStock(), fetchNearbyStock()]).then((r) => {
+  Promise.allSettled([
+    fetchRetailerStock('bmw'), fetchNearbyStock('bmw'),
+    fetchRetailerStock('mini'), fetchNearbyStock('mini'),
+  ]).then((r) => {
     const failed = r.filter((x) => x.status === 'rejected');
     if (failed.length) {
-      console.warn(`[warmer] initial prime: ${failed.length}/2 pools cold (will retry on demand)`);
+      console.warn(`[warmer] initial prime: ${failed.length}/${r.length} pools cold (will retry on demand)`);
     } else {
-      console.log('[warmer] initial stock primed');
+      console.log('[warmer] initial stock primed (BMW + MINI)');
     }
   });
 });

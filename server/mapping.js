@@ -18,7 +18,7 @@
  * field is computed defensively against both forms.
  */
 
-const ORIGIN = 'https://usedcars.bmw.co.uk';
+import { brandConfig } from './brands.js';
 
 /* --------------------------- model spec table -------------------------- *
  * Keyed by the normalized `line` (see lineFromTitle). Values are the specs
@@ -26,7 +26,7 @@ const ORIGIN = 'https://usedcars.bmw.co.uk';
  * trim for the line; trimZeroTo62() speeds it up for M / performance trims.
  * boot = litres (seats up); sizeClass = 1 (smallest) .. 5 (largest).
  * ---------------------------------------------------------------------- */
-const MODEL_SPECS = {
+const MODEL_SPECS_BMW = {
   '1 Series': { boot: 380, seats: 5, zeroTo62: 8.4, sizeClass: 1 },
   '2 Series': { boot: 390, seats: 4, zeroTo62: 6.5, sizeClass: 1 }, // Coupé
   '2 Series Active Tourer': { boot: 470, seats: 5, zeroTo62: 8.9, sizeClass: 2 },
@@ -66,8 +66,23 @@ const MODEL_SPECS = {
   M: { boot: 440, seats: 4, zeroTo62: 4.1, sizeClass: 2 }, // pure-M line (M2/M3/M4…)
 };
 
+/* MINI range. Keyed by the `line` MINI's feed titles use ("MINI Hatch",
+ * "MINI Countryman", …) normalised to the model word (see miniLine). boot =
+ * litres (seats up), sizeClass 1..5 on the same scale as BMW so the engine's
+ * size scoring is comparable. zeroTo62 is the base trim; miniTrimZeroTo62
+ * speeds up JCW / S / SE trims. Every current MINI is a 4/5-seat small car. */
+const MODEL_SPECS_MINI = {
+  Hatch: { boot: 210, seats: 4, zeroTo62: 7.7, sizeClass: 1 }, // 3/5-door Cooper
+  Convertible: { boot: 160, seats: 4, zeroTo62: 7.7, sizeClass: 1 },
+  Clubman: { boot: 360, seats: 5, zeroTo62: 7.2, sizeClass: 2 }, // estate-ish
+  Countryman: { boot: 460, seats: 5, zeroTo62: 8.3, sizeClass: 2 }, // crossover/SUV
+  Aceman: { boot: 300, seats: 5, zeroTo62: 7.9, sizeClass: 1 }, // small electric crossover
+  Electric: { boot: 210, seats: 4, zeroTo62: 7.3, sizeClass: 1 }, // electric Hatch
+};
+
 /** Fallback when the feed carries a line we have no specs for. */
 const DEFAULT_SPEC = { boot: 460, seats: 5, zeroTo62: 8.0, sizeClass: 2 };
+const DEFAULT_SPEC_MINI = { boot: 210, seats: 4, zeroTo62: 7.7, sizeClass: 1 };
 const warnedLines = new Set(); // log each unknown line once, not per-car
 
 /* ------------------------------ derivations ---------------------------- */
@@ -208,6 +223,116 @@ function blurbFor(line, body, fuel, retailerName) {
   return `Approved-used ${line} ${bodyWord}, ${fuelWord}, ready to drive away${from}.`;
 }
 
+/* ------------------------- MINI derivations ---------------------------- *
+ * MINI's range is small and its feed is tidy — the model word sits in the
+ * title ("MINI Hatch", "MINI Countryman") and the derivative carries the
+ * door count / trim ("Cooper S 3 Door", "Countryman SE ALL4"). No M-line
+ * collapse, no i-prefix — so these are much simpler than the BMW versions.
+ * ---------------------------------------------------------------------- */
+
+/** Normalise a MINI title to a MODEL_SPECS_MINI key ("MINI Hatch" → "Hatch"). */
+function miniLine(title = '') {
+  const t = title.replace(/^MINI\s+/i, '').trim();
+  if (/hatch/i.test(t)) return 'Hatch';
+  if (/countryman/i.test(t)) return 'Countryman';
+  if (/clubman/i.test(t)) return 'Clubman';
+  if (/aceman/i.test(t)) return 'Aceman';
+  if (/convertible|cabrio/i.test(t)) return 'Convertible';
+  if (/electric/i.test(t)) return 'Electric';
+  return t.split(' ')[0] || 'Hatch';
+}
+
+/** Body style for a MINI. Countryman/Aceman are crossovers (suv), the rest
+ *  hatchbacks except the obvious convertible/clubman. */
+function miniBody(line, derivative = '') {
+  const d = derivative.toLowerCase();
+  if (line === 'Countryman' || line === 'Aceman') return 'suv';
+  if (line === 'Clubman' || d.includes('clubman')) return 'estate';
+  if (line === 'Convertible' || d.includes('convertible') || d.includes('cabrio')) return 'convertible';
+  return 'hatchback';
+}
+
+/** 0-62 for a MINI trim: JCW is quick, S/SE quicker than the Cooper base. */
+function miniTrimZeroTo62(base, derivative = '') {
+  const d = derivative.toLowerCase();
+  if (/john cooper works|\bjcw\b/.test(d)) return Math.max(5.2, base - 2.2);
+  if (/\bcooper s\b|\bcooper se\b|\bs all4\b|\bse all4\b|\bcooper s\b/.test(d)) return Math.max(6.0, base - 1.2);
+  return base;
+}
+
+/** Tags for a MINI — the MINI range skews playful/urban/tech. */
+function miniTags(line, body, fuel, derivative = '') {
+  const tags = new Set();
+  const d = derivative.toLowerCase();
+  const jcw = /john cooper works|\bjcw\b/.test(d);
+  const sporty = jcw || /\bcooper s\b|\bcooper se\b|all4/.test(d);
+  tags.add('urban'); // every MINI is a city-friendly small car
+  if (jcw) tags.add('image');
+  if (sporty) tags.add('drivers-car');
+  if (fuel === 'ev') { tags.add('tech'); tags.add('efficient'); }
+  if (line === 'Countryman' || line === 'Aceman' || line === 'Clubman') {
+    tags.add('family');
+    tags.add('practical');
+  }
+  if (body === 'convertible') tags.add('image');
+  if (tags.size === 0) tags.add('urban');
+  return [...tags];
+}
+
+/** MINI display name: the derivative already leads with the model word for
+ *  most trims ("Countryman S ALL4"), and "Cooper …" trims want the title. */
+function miniDisplayName(title, derivative) {
+  const t = title.replace(/^MINI\s+/i, '').trim();
+  const d = (derivative || '').trim();
+  if (!d) return title;
+  const firstToken = t.split(' ')[0].toLowerCase();
+  if (d.toLowerCase().startsWith(firstToken)) {
+    return `MINI ${d}`.replace(/\s+/g, ' ').trim();
+  }
+  return `${title} ${d}`.replace(/\s+/g, ' ').trim();
+}
+
+/** A short derived blurb for a MINI (the feed has no marketing copy). */
+function miniBlurb(line, body, fuel, retailerName) {
+  const bodyWord = {
+    hatchback: 'hatch', estate: 'Clubman estate', suv: 'crossover',
+    convertible: 'convertible',
+  }[body] || 'car';
+  const fuelWord = { petrol: 'petrol', ev: 'electric', phev: 'plug-in hybrid', diesel: 'diesel' }[fuel];
+  const from = retailerName ? ` from ${retailerName}` : '';
+  return `Approved-used MINI ${line} ${bodyWord}, ${fuelWord}, ready to drive away${from}.`;
+}
+
+/* ---------------------- per-brand derivation config -------------------- *
+ * mapVehicle dispatches on brand through this table. BMW keeps its existing
+ * model-aware derivations; MINI uses the simpler ones above. The engine
+ * consumes the identical output shape either way.
+ * ---------------------------------------------------------------------- */
+const BRAND_MAPPERS = {
+  bmw: {
+    defaultTitle: 'BMW',
+    specs: MODEL_SPECS_BMW,
+    fallbackSpec: DEFAULT_SPEC,
+    line: lineFromTitle,
+    body: bodyFor,
+    zeroTo62: trimZeroTo62,
+    tags: tagsFor,
+    displayName,
+    blurb: blurbFor,
+  },
+  mini: {
+    defaultTitle: 'MINI',
+    specs: MODEL_SPECS_MINI,
+    fallbackSpec: DEFAULT_SPEC_MINI,
+    line: miniLine,
+    body: miniBody,
+    zeroTo62: miniTrimZeroTo62,
+    tags: miniTags,
+    displayName: miniDisplayName,
+    blurb: miniBlurb,
+  },
+};
+
 /* ------------------------------ projection ----------------------------- */
 
 /**
@@ -225,24 +350,30 @@ function firstPhoto(media) {
  * Returns null (and the caller filters it out) if the price is missing —
  * a car with no price can't be scored on budget.
  */
-export function mapVehicle(v) {
+export function mapVehicle(v, brand = 'bmw') {
   const price = num(v?.cash_price?.value);
   if (!price) return null;
 
-  const title = v.title || 'BMW';
-  const derivative = v.derivative || '';
-  const line = lineFromTitle(title);
+  const m = BRAND_MAPPERS[brand] || BRAND_MAPPERS.bmw;
+  const { origin, defaultRetailer } = brandConfig(brand);
 
-  const spec = MODEL_SPECS[line] || DEFAULT_SPEC;
-  if (!MODEL_SPECS[line] && !warnedLines.has(line)) {
-    warnedLines.add(line);
-    // eslint-disable-next-line no-console
-    console.warn(`[mapping] no MODEL_SPECS for line "${line}" — using defaults`);
+  const title = v.title || m.defaultTitle;
+  const derivative = v.derivative || '';
+  const line = m.line(title);
+
+  const spec = m.specs[line] || m.fallbackSpec;
+  if (!m.specs[line]) {
+    const warnKey = `${brand}:${line}`;
+    if (!warnedLines.has(warnKey)) {
+      warnedLines.add(warnKey);
+      // eslint-disable-next-line no-console
+      console.warn(`[mapping] no ${brand} MODEL_SPECS for line "${line}" — using defaults`);
+    }
   }
 
-  const body = bodyFor(line, derivative);
+  const body = m.body(line, derivative);
   const fuel = fuelFor(v.fuel);
-  const zeroTo62 = trimZeroTo62(spec.zeroTo62, line, derivative);
+  const zeroTo62 = m.zeroTo62(spec.zeroTo62, line, derivative);
 
   const media = Array.isArray(v.media?.items) ? v.media.items : [];
   const photo = firstPhoto(media);
@@ -251,7 +382,7 @@ export function mapVehicle(v) {
   return {
     // ---- engine-scored fields (same shape as data.js) ----
     id: String(v.advert_id ?? v.vin ?? `${title}-${price}`),
-    name: displayName(title, derivative),
+    name: m.displayName(title, derivative),
     line,
     body,
     fuel,
@@ -263,8 +394,8 @@ export function mapVehicle(v) {
     zeroTo62,
     mpg: num(v?.consumption?.fuel?.values?.combined),
     evRange: num(v?.consumption?.range?.values?.total),
-    tags: tagsFor(line, body, fuel, derivative),
-    blurb: blurbFor(line, body, fuel, retailerName),
+    tags: m.tags(line, body, fuel, derivative),
+    blurb: m.blurb(line, body, fuel, retailerName),
 
     // ---- display-only (surfaced by index.js publicCar) ----
     mileage: num(v.mileage),
@@ -281,7 +412,7 @@ export function mapVehicle(v) {
     // Public PDP is /vehicle/{advert_id} (confirmed against the live site);
     // fall back to the retailer's stock page if the feed ever omits it.
     link: v?.advert_id
-      ? `${ORIGIN}/vehicle/${encodeURIComponent(v.advert_id)}`
-      : `${ORIGIN}/?retailer_site=${encodeURIComponent(v?.retailer_site?.id ?? '96')}`,
+      ? `${origin}/vehicle/${encodeURIComponent(v.advert_id)}`
+      : `${origin}/?retailer_site=${encodeURIComponent(v?.retailer_site?.id ?? defaultRetailer)}`,
   };
 }

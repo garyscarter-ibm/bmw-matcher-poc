@@ -88,20 +88,37 @@ function retailerName(block) {
   return name;
 }
 
-async function apiGetQuestions(base, retailer) {
+/** Brand for this block instance: authored "Brand" config row ("BMW" | "MINI"),
+ * lower-cased. Defaults to 'bmw'. Drives both the visual theme (a body class)
+ * and which live feed the server queries. */
+function brand(block) {
+  const config = readBlockConfig(block);
+  const b = (config.brand || '').toLowerCase();
+  return b === 'mini' ? 'mini' : 'bmw';
+}
+
+/** Brand-specific display copy, keyed by brand. `name` is the marque, `title`
+ * the intro headline, `noun` how we refer to the vehicles in body copy. */
+const BRAND_COPY = {
+  bmw: { name: 'BMW', title: 'Find your perfect BMW', noun: 'cars' },
+  mini: { name: 'MINI', title: 'Find your perfect MINI', noun: 'MINIs' },
+};
+
+async function apiGetQuestions(base, retailer, brandKey) {
   const url = new URL(`${base}/api/questions`);
   if (retailer) url.searchParams.set('retailer', retailer);
+  if (brandKey) url.searchParams.set('brand', brandKey);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Questions request failed (${res.status})`);
   const data = await res.json();
   return data.questions;
 }
 
-async function apiMatch(base, answers, retailer) {
+async function apiMatch(base, answers, retailer, brandKey) {
   const res = await fetch(`${base}/api/match`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ answers, retailer }),
+    body: JSON.stringify({ answers, retailer, brand: brandKey }),
   });
   if (!res.ok) throw new Error(`Match request failed (${res.status})`);
   return res.json();
@@ -113,12 +130,12 @@ async function apiMatch(base, answers, retailer) {
  * The section is a bonus, so any failure resolves to an empty list rather than
  * throwing: the caller just omits the "Worth the drive" section.
  */
-async function apiNearby(base, answers, retailer) {
+async function apiNearby(base, answers, retailer, brandKey) {
   try {
     const res = await fetch(`${base}/api/nearby`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers, retailer }),
+      body: JSON.stringify({ answers, retailer, brand: brandKey }),
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -135,12 +152,12 @@ async function apiNearby(base, answers, retailer) {
  * so any error/non-ok resolves to an empty list and the drawer just keeps its
  * last state.
  */
-async function apiPreview(base, answers, retailer) {
+async function apiPreview(base, answers, retailer, brandKey) {
   try {
     const res = await fetch(`${base}/api/preview`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers, retailer }),
+      body: JSON.stringify({ answers, retailer, brand: brandKey }),
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -216,11 +233,12 @@ function renderIntro(root, ctx) {
   // conditional charging question, matching the longest common path). fuel is
   // multi-select now, so pass it as an array.
   const count = visibleQuestions(ctx.questions, { fuel: ['open'] }).length;
+  const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
   intro.append(
     el('p', 'bmwm-kicker', 'The unofficial UK matchmaker'),
-    el('h1', 'bmwm-title', 'Find your perfect BMW'),
+    el('h1', 'bmwm-title', copy.title),
     el('p', 'bmwm-lede',
-      `Answer ${count} quick questions about your life, your miles and your budget, and we’ll match you with your top three approved-used cars at ${ctx.retailerLabel}, with the reasons why. We hope it helps.`),
+      `Answer ${count} quick questions about your life, your miles and your budget, and we’ll match you with your top three approved-used ${copy.noun} at ${ctx.retailerLabel}, with the reasons why. We hope it helps.`),
   );
   const start = el('button', 'bmwm-btn bmwm-btn-primary', 'Start the quiz');
   start.addEventListener('click', () => ctx.showQuestion(0));
@@ -314,7 +332,7 @@ function schedulePreviewRefresh(ctx) {
   ctx.previewTimer = setTimeout(() => {
     const seq = (ctx.preview.seq += 1);
     const answers = { ...ctx.answers };
-    apiPreview(ctx.api, answers, ctx.retailer).then((matches) => {
+    apiPreview(ctx.api, answers, ctx.retailer, ctx.brand).then((matches) => {
       // A newer answer already superseded this request — drop the stale result.
       if (seq !== ctx.preview.seq) return;
       ctx.preview.matches = matches;
@@ -719,7 +737,7 @@ function previewTile(match) {
     tile.href = car.link;
     tile.target = '_blank';
     tile.rel = 'noopener noreferrer';
-    tile.setAttribute('aria-label', `${car.name} — ${price}, ${score}% match. View at ${car.retailerName || 'the retailer'}`);
+    tile.setAttribute('aria-label', `${car.name}, ${price}, ${score}% match. View at ${car.retailerName || 'the retailer'}`);
   }
 
   // Photo band (or the shared "Images coming soon" placeholder), with the line
@@ -898,7 +916,7 @@ async function renderResults(root, ctx, answers) {
   // .bmwm-nearby placeholder wired up further down.
   let matches;
   try {
-    ({ matches } = await apiMatch(ctx.api, answers, ctx.retailer));
+    ({ matches } = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand));
   } catch {
     renderStatus(root, {
       kicker: 'Sorry',
@@ -992,14 +1010,14 @@ async function renderResults(root, ctx, answers) {
   screen.append(actions);
 
   screen.append(el('p', 'bmwm-disclaimer',
-    'An unofficial tool, not affiliated with or endorsed by BMW. Prices and specs are indicative, always check with a retailer.'));
+    `An unofficial tool, not affiliated with or endorsed by ${(BRAND_COPY[ctx.brand] || BRAND_COPY.bmw).name}. Prices and specs are indicative, always check with a retailer.`));
 
   root.append(screen);
 
   // Phase two: now the page is painted, load the nearby carousel in the
   // background and swap it into the placeholder band (or drop the band).
   if (nearbyBand) {
-    apiNearby(ctx.api, answers, ctx.retailer).then((nearby) => {
+    apiNearby(ctx.api, answers, ctx.retailer, ctx.brand).then((nearby) => {
       // The user may have navigated away (retake/tweak) before this resolves;
       // only touch the band if it's still in the document.
       if (!nearbyBand.isConnected) return;
@@ -1017,15 +1035,19 @@ export default async function decorate(block) {
   const retailer = retailerSite(block);
   const retailerLabel = retailerName(block);
   const api = apiBase(block);
+  const brandKey = brand(block);
 
   block.replaceChildren();
-  block.classList.add('bmwm');
+  // Base class + brand theme class ('bmwm-bmw' | 'bmwm-mini'). The MINI theme
+  // (bmw-matcher.css) overrides the design tokens under .bmwm-mini.
+  block.classList.add('bmwm', `bmwm-${brandKey}`);
 
   const ctx = {
     answers: {},
     api,
     retailer,
     retailerLabel,
+    brand: brandKey,
     questions: [],
     // Live "best guess" strip state, kept on ctx so it survives the
     // per-question re-render (see renderPreviewSection / schedulePreviewRefresh).
@@ -1057,7 +1079,7 @@ export default async function decorate(block) {
     // results skeleton a moment later inside renderResults.)
     renderIntroSkeleton(block);
     try {
-      ctx.questions = await apiGetQuestions(ctx.api, ctx.retailer);
+      ctx.questions = await apiGetQuestions(ctx.api, ctx.retailer, ctx.brand);
     } catch {
       renderStatus(block, {
         kicker: 'Sorry',

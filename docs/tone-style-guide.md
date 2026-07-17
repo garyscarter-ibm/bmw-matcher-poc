@@ -1,10 +1,19 @@
-# Grassick's tone & style guide
+# Tone & style guides (BMW + MINI)
+
+The matcher is multi-brand. Each brand has its own voice, applied to the quiz
+copy per brand (see the per-brand copy overrides in `server/questions.js`,
+selected by `questionsForBrand(brand)`). The **BMW/Grassick** guide is below;
+the **MINI/Sytner Luton** guide follows it. Companion to
+[design-tokens.md](design-tokens.md), which covers the visual system —
+this covers the words.
+
+---
+
+# Grassick's (BMW) tone & style guide
 
 Extracted from `grassicksbmw.co.uk` (homepage copy, offer blurbs, section
 intros) to bring the matcher's wording in line with how a real BMW retailer
-site talks to customers. Companion to
-[design-tokens.md](design-tokens.md), which covers the visual system —
-this covers the words.
+site talks to customers.
 
 ## Voice in three words
 
@@ -69,3 +78,50 @@ it in line:
    and what to do next.
 6. **Keep disclaimers/legal copy fenced off at the bottom**, factual and
    plain, exactly as the matcher already does with `.bmwm-disclaimer`.
+
+---
+
+# MINI (Sytner Luton) tone & style guide
+
+Observed from `sytnerlutonmini.co.uk` (homepage, about, finance). MINI's voice
+is the near-opposite of BMW's understatement — where BMW lets the cars do the
+talking, MINI *performs*. This is the register the MINI quiz copy adopts.
+
+## Voice in three words
+
+**Playful. Spirited. Iconic.** Cheeky and warm, leaning on MINI's "go-kart"
+character and heritage. It has fun with the words — but stays clear, never
+cryptic.
+
+## What MINI's copy actually does
+
+- **Headings are UPPERCASE with a full stop**: "FIND YOUR MINI.", "SYTNER
+  LUTON.", "WHY MINI?", "ALL IN. SIMPLY SMART." The full stop is a MINI
+  signature — a confident little beat, not a shout.
+- **Short, punchy declaratives** with personality: "Look who's gone electric.",
+  "The original reborn.", "Meet the ace in the pack.", "Powered up icon." One
+  idea per line, landed with a full stop.
+- **"go-kart" is the core brand metaphor** — agility, fun, cornering. "Turning
+  a new corner go-kart style.", "From speed bumps to mountain peaks." Driving a
+  MINI is framed as a *feeling*, not a spec.
+- **Heritage + character words**: "icon", "original", "free spirit", "reborn",
+  "ace". MINI sells identity and joy, not refinement or status.
+- **Warm and human**, like Grassick's, but wittier — it allows itself a wink
+  where BMW stays earnest.
+- **Numbers still stated plainly** for prices/finance ("From £26,905 OTR*") —
+  the play is in the framing, not the facts.
+
+## What this means for MINI matcher copy
+
+1. **Titles become UPPERCASE-with-a-full-stop and gain a bit of cheek** where it
+   fits: "What's your budget?" → "WHAT'S THE DAMAGE?"; "Comfort or sportiness?"
+   → "HOW DO YOU LIKE TO DRIVE?" Still a clear question, just in MINI's voice.
+2. **Option labels lead with character, keep the meaning obvious.** "Weekend
+   driving" → "Weekend fun"; "Maximum sportiness" → "Full go-kart"; "City
+   driving" → "Nipping round town." The value it maps to is unchanged.
+3. **`sub` lines can be playful** ("go-kart grins on your favourite B-road")
+   rather than purely factual, but never at the cost of clarity.
+4. **Keep it kind and inclusive**, not laddish — MINI is joyful, not aggressive.
+5. **BMW copy is untouched** — these two voices live side by side, chosen by the
+   configured brand. Meaning and answer values are identical across both so the
+   shared scoring engine is unaffected; only the words change.
