@@ -737,7 +737,7 @@ function previewTile(match) {
     tile.href = car.link;
     tile.target = '_blank';
     tile.rel = 'noopener noreferrer';
-    tile.setAttribute('aria-label', `${car.name} — ${price}, ${score}% match. View at ${car.retailerName || 'the retailer'}`);
+    tile.setAttribute('aria-label', `${car.name}, ${price}, ${score}% match. View at ${car.retailerName || 'the retailer'}`);
   }
 
   // Photo band (or the shared "Images coming soon" placeholder), with the line

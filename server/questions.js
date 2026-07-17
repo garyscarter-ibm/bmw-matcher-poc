@@ -116,7 +116,7 @@ export const QUESTIONS = [
   {
     id: 'mileage',
     title: 'How many miles a year?',
-    help: 'Roughly — it helps us weigh fuel type and running costs.',
+    help: 'Roughly, it helps us weigh fuel type and running costs.',
     // A number. High-mileage scoring (the diesel/economy boost) kicks in at
     // ≥20,000, matching the old 'vhigh' band — see isHighMileage in engine.js.
     type: 'slider',
@@ -176,7 +176,7 @@ const BRAND_COPY = {
   mini: {
     budget: {
       title: 'WHAT’S THE DAMAGE?',
-      help: 'A rough on-the-road figure — we’ll flag anything that’s a cheeky stretch.',
+      help: 'A rough on-the-road figure. We’ll flag anything that’s a cheeky stretch.',
     },
     bodyStyles: {
       title: 'WHICH SHAPE SPEAKS TO YOU?',
@@ -203,9 +203,9 @@ const BRAND_COPY = {
       title: 'COULD YOU PLUG IN AT HOME OR WORK?',
       help: 'A driveway socket or a charger at work changes the electric maths.',
       options: {
-        either: { label: 'Yep — home or work' },
-        home: { label: 'Yep — at home' },
-        work: { label: 'Yep — at work' },
+        either: { label: 'Yep, home or work' },
+        home: { label: 'Yep, at home' },
+        work: { label: 'Yep, at work' },
         none: { label: 'Nope, public chargers only' },
       },
     },
@@ -237,7 +237,7 @@ const BRAND_COPY = {
     },
     mileage: {
       title: 'HOW FAR DO YOU ROAM?',
-      help: 'Roughly, per year — it helps us weigh up fuel and running costs.',
+      help: 'Roughly, per year. It helps us weigh up fuel and running costs.',
     },
     style: {
       title: 'HOW DO YOU LIKE TO DRIVE?',
@@ -251,7 +251,7 @@ const BRAND_COPY = {
       },
     },
     priorities: {
-      title: 'LAST ONE — PICK YOUR TOP TWO.',
+      title: 'LAST ONE. PICK YOUR TOP TWO.',
       options: {
         economy: { label: 'Cheap to run' },
         performance: { label: 'Go-kart thrills' },
