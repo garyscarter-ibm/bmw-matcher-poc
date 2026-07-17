@@ -94,8 +94,17 @@ function scoreBudget(car, answers) {
     return { score: 1, reason: budgetReason };
   }
   if (car.priceMax < min) {
-    // Cheaper than the stated band — fine, mildly off-target.
-    return { score: 0.7, reason: 'Comes in under budget' };
+    // Below the user's minimum. When there's no real floor (min 0, the old
+    // "up to £X" slider) this is fine — just mildly off-target. But when the
+    // user has deliberately set a min (a range), a car well under it is NOT
+    // what they asked for, so penalise in proportion to how far below the floor
+    // it sits: right at the floor ≈ 0.7, half the floor ≈ 0.35, far below → ~0.1.
+    // Without this, a car £50k under a £92k floor still scored 0.7 and, since
+    // budget is only ~1/5 of the blend, out-ranked in-budget cars on merit.
+    if (!min) return { score: 0.7, reason: 'Comes in under budget' };
+    const shortfall = (min - car.priceMax) / min; // 0 at the floor → 1 at £0
+    const score = clamp(0.7 - shortfall, 0.1, 0.7);
+    return { score };
   }
   return { score: 0.75 }; // straddles the band edge
 }

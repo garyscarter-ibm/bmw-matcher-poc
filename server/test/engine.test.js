@@ -203,6 +203,21 @@ test('a [min,max] budget scores in-bracket cars full and cheaper cars lower', ()
   }
 });
 
+test('a car far below a high budget floor is heavily penalised, not gently', () => {
+  // Regression: with a £92k–128k range, a £39k car used to score 0.7 on budget
+  // and — since budget is only ~1/5 of the blend — out-ranked pricier cars that
+  // actually fit the bracket. A car well under the floor must now score low.
+  const near = { ...CARS[0], id: 'near', priceMin: 90000, priceMax: 95000 };
+  const wayUnder = { ...CARS[0], id: 'under', priceMin: 38000, priceMax: 42000 };
+  const answers = { ...base, budget: [92000, 128000], fuel: ['open'] };
+  const ranked = rankCars(answers, [near, wayUnder]);
+  const nearScore = ranked.find((m) => m.car.id === 'near').score;
+  const underScore = ranked.find((m) => m.car.id === 'under').score;
+  // Same car spec, so any gap is the budget dimension: the near-floor car must
+  // clearly beat one ~£50k under it (old behaviour had them near-tied).
+  assert.ok(nearScore - underScore >= 5, `expected a clear gap, got ${nearScore} vs ${underScore}`);
+});
+
 test('a numeric budget ranks the same cars as the equivalent band', () => {
   // b3 is [50k, 70k]; a 70k number should surface the same top match.
   const byBand = run({ ...base, budget: 'b3', fuel: 'petrol', primaryUse: 'commute' });
