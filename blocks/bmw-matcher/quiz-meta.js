@@ -15,9 +15,18 @@
  * server/questions.js (there's only one conditional question today).
  */
 
-/** Conditional-visibility predicates, keyed by question id. */
+/**
+ * Conditional-visibility predicates, keyed by question id. Mirror of the
+ * `showIf` functions in server/questions.js. `fuel` is multi-select (an array),
+ * so test membership: show charging when any electric-adjacent fuel (or "help me
+ * decide") is picked, or while fuel is still unanswered.
+ */
 export const SHOW_IF = {
-  charging: (a) => a.fuel === 'ev' || a.fuel === 'phev' || a.fuel === 'open',
+  charging: (a) => {
+    const f = a.fuel;
+    const picks = Array.isArray(f) ? f : (f != null ? [f] : []);
+    return picks.length === 0 || picks.some((v) => v === 'ev' || v === 'phev' || v === 'open');
+  },
 };
 
 /** Budget bands → [min, max] GBP. Mirror of server/questions.js BUDGET_BANDS. */
@@ -45,7 +54,9 @@ export const PILL_LABEL = {
   fuel: {
     petrol: 'Petrol', diesel: 'Diesel', phev: 'Plug-in hybrid', ev: 'Electric', open: 'Any fuel',
   },
-  charging: { home: 'Home charging', work: 'Work charging', none: 'Public charging' },
+  charging: {
+    either: 'Home or work charging', home: 'Home charging', work: 'Work charging', none: 'Public charging',
+  },
   primaryUse: {
     city: 'City driving', commute: 'Commuting', family: 'Family duties',
     roadtrips: 'Road trips', fun: 'Weekend fun',
@@ -80,6 +91,25 @@ function bandLabel([min, max]) {
   return `${k(min)}–${Math.round(max / 1000)}k`;
 }
 
+/** A single slider budget as "£62k" (or "£150k+" at the slider ceiling). */
+function budgetValueLabel(value, question) {
+  const k = `£${Math.round(value / 1000)}k`;
+  return question?.plusAtMax && value >= question.max ? `${k}+` : k;
+}
+
+/** A dual-thumb budget range as "£40–75k" ("£40k+" when max hits the ceiling). */
+function budgetRangeLabel([lo, hi], question) {
+  const k = (n) => `£${Math.round(n / 1000)}k`;
+  if (question?.plusAtMax && hi >= question.max) return `${k(lo)}+`;
+  return `${k(lo)}–${Math.round(hi / 1000)}k`;
+}
+
+/** Annual mileage number as "12,000 mi/yr" (or "25,000+ mi/yr" at the ceiling). */
+function mileageValueLabel(value, question) {
+  const n = value.toLocaleString('en-GB');
+  return question?.plusAtMax && value >= question.max ? `${n}+ mi/yr` : `${n} mi/yr`;
+}
+
 /**
  * A short pill summary of the current answer to `question`, or null if it isn't
  * answered yet. `question` is the fetched quiz object (has id, multi, options);
@@ -94,8 +124,16 @@ export function pillFor(question, answers) {
   if (value == null || (multi && value.length === 0)) return null;
 
   if (id === 'budget') {
+    // Dual-thumb range → "£40–75k"; a bare number (earlier shape) → "£62k";
+    // legacy shared links may still carry a b1–b5 band key.
+    if (Array.isArray(value)) return budgetRangeLabel(value, question);
+    if (typeof value === 'number') return budgetValueLabel(value, question);
     const band = BUDGET_BANDS[value];
     return band ? bandLabel(band) : null;
+  }
+
+  if (id === 'mileage' && typeof value === 'number') {
+    return mileageValueLabel(value, question);
   }
 
   if (multi) {

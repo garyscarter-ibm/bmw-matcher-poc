@@ -28,6 +28,20 @@ function el(tag, className, text) {
   return node;
 }
 
+/**
+ * Is the budget answer usable? Budget drives the engine's one hard requirement.
+ * It's a dual-thumb range ([min, max]) from the slider, but we also accept a bare
+ * number (the earlier single-slider shape) and a legacy b1–b5 band key from an
+ * old shared link. Mirror of budgetRange's guard in server/engine.js.
+ */
+function validBudget(value) {
+  if (Array.isArray(value)) {
+    return value.length === 2 && value.every(Number.isFinite) && Math.max(...value) > 0;
+  }
+  if (typeof value === 'number') return Number.isFinite(value) && value > 0;
+  return !!BUDGET_BANDS[value];
+}
+
 /** API base for this block: `data-api` attribute, else the localhost default. */
 function apiBase(block) {
   return (block.dataset.api || DEFAULT_API).replace(/\/+$/, '');
@@ -155,7 +169,7 @@ function decodeAnswers(encoded, questions) {
     const answers = JSON.parse(decodeURIComponent(escape(atob(b64))));
     // Minimal validation: every question that should be shown must be answered.
     const valid = questions.every((q) => !isVisible(q, answers) || answers[q.id] != null);
-    return valid && BUDGET_BANDS[answers.budget] ? answers : null;
+    return valid && validBudget(answers.budget) ? answers : null;
   } catch {
     return null;
   }
@@ -172,6 +186,21 @@ function visibleQuestions(questions, answers) {
 
 const gbp = (n) => `£${n.toLocaleString('en-GB')}`;
 
+/**
+ * Format a slider value for its readout, per the question's `format` hint:
+ *   'gbp' → "£62,000", 'int' → "12,000" (with an optional `unit` suffix).
+ * At the ceiling of a `plusAtMax` slider, append "+" ("£150,000+", "25,000+").
+ */
+function formatSliderValue(value, q) {
+  const base = q.format === 'gbp' ? gbp(value) : `${value.toLocaleString('en-GB')}${q.unit || ''}`;
+  return q.plusAtMax && value >= q.max ? `${base}+` : base;
+}
+
+/** Readout for a dual-thumb range slider, e.g. "£40,000 – £75,000". */
+function formatRange([lo, hi], q) {
+  return `${formatSliderValue(lo, q)} – ${formatSliderValue(hi, q)}`;
+}
+
 const SPEC_LABELS = {
   hatchback: 'Hatchback', saloon: 'Saloon', estate: 'Estate', suv: 'SUV',
   coupe: 'Coupé', convertible: 'Convertible', mpv: 'Family carrier',
@@ -184,8 +213,9 @@ function renderIntro(root, ctx) {
   root.replaceChildren();
   const intro = el('div', 'bmwm-intro');
   // Count the questions a typical run sees ("Help me decide" shows the
-  // conditional charging question, matching the longest common path).
-  const count = visibleQuestions(ctx.questions, { fuel: 'open' }).length;
+  // conditional charging question, matching the longest common path). fuel is
+  // multi-select now, so pass it as an array.
+  const count = visibleQuestions(ctx.questions, { fuel: ['open'] }).length;
   intro.append(
     el('p', 'bmwm-kicker', 'The unofficial UK matchmaker'),
     el('h1', 'bmwm-title', 'Find your perfect BMW'),
@@ -209,7 +239,7 @@ const PREVIEW_FADE_MS = 150;
 
 /** Can the engine score these answers yet? It hard-requires a valid budget. */
 function canPreview(ctx) {
-  return !!BUDGET_BANDS[ctx.answers.budget];
+  return validBudget(ctx.answers.budget);
 }
 
 /**
@@ -323,6 +353,76 @@ function renderAnswerPills(ctx, questions, index) {
   return row.children.length ? row : null;
 }
 
+/**
+ * A dual-thumb range slider (budget): two native range inputs overlaid on one
+ * track, writing a [min, max] pair to ctx.answers[q.id]. The thumbs can't cross
+ * (kept at least one step apart). Appends readout + track + bounds to `list`.
+ */
+function renderRangeSlider(list, q, ctx) {
+  const stored = ctx.answers[q.id];
+  const start = Array.isArray(stored) && stored.length === 2
+    ? [Number(stored[0]), Number(stored[1])]
+    : (Array.isArray(q.default) ? [...q.default] : [q.min, q.max]);
+  let [lo, hi] = [Math.min(...start), Math.max(...start)];
+  // Persist immediately so Next is enabled even without a drag.
+  ctx.answers[q.id] = [lo, hi];
+
+  const readout = el('output', 'bmwm-slider-value', formatRange([lo, hi], q));
+
+  const track = el('div', 'bmwm-range');
+  const fill = el('div', 'bmwm-range-fill');
+  const mkInput = (cls, label, value) => {
+    const input = el('input', `bmwm-slider-input ${cls}`);
+    input.type = 'range';
+    input.min = String(q.min);
+    input.max = String(q.max);
+    input.step = String(q.step);
+    input.value = String(value);
+    input.setAttribute('aria-label', label);
+    input.setAttribute('aria-valuetext', formatSliderValue(value, q));
+    return input;
+  };
+  const minInput = mkInput('bmwm-range-min', 'Minimum budget', lo);
+  const maxInput = mkInput('bmwm-range-max', 'Maximum budget', hi);
+
+  const span = q.max - q.min || 1;
+  const paintFill = () => {
+    const a = ((lo - q.min) / span) * 100;
+    const b = ((hi - q.min) / span) * 100;
+    fill.style.left = `${a}%`;
+    fill.style.right = `${100 - b}%`;
+  };
+  const sync = () => {
+    // Clamp so the thumbs never cross (keep a one-step gap).
+    lo = Math.min(Number(minInput.value), hi - q.step);
+    hi = Math.max(Number(maxInput.value), lo + q.step);
+    lo = Math.max(q.min, lo);
+    hi = Math.min(q.max, hi);
+    minInput.value = String(lo);
+    maxInput.value = String(hi);
+    ctx.answers[q.id] = [lo, hi];
+    const text = formatRange([lo, hi], q);
+    readout.textContent = text;
+    minInput.setAttribute('aria-valuetext', formatSliderValue(lo, q));
+    maxInput.setAttribute('aria-valuetext', formatSliderValue(hi, q));
+    paintFill();
+    schedulePreviewRefresh(ctx);
+  };
+  minInput.addEventListener('input', sync);
+  maxInput.addEventListener('input', sync);
+
+  paintFill();
+  track.append(fill, minInput, maxInput);
+
+  const bounds = el('div', 'bmwm-slider-bounds');
+  bounds.append(
+    el('span', 'bmwm-slider-min', formatSliderValue(q.min, q)),
+    el('span', 'bmwm-slider-max', formatSliderValue(q.max, q)),
+  );
+
+  list.append(readout, track, bounds);
+}
+
 function renderQuestion(root, ctx, index) {
   const questions = visibleQuestions(ctx.questions, ctx.answers);
   const q = questions[index];
@@ -349,7 +449,9 @@ function renderQuestion(root, ctx, index) {
   if (q.help) screen.append(el('p', 'bmwm-help', q.help));
 
   const list = el('div', 'bmwm-options');
-  list.setAttribute('role', q.multi ? 'group' : 'radiogroup');
+  // A slider is a single labelled input (its own role), not a radio/checkbox
+  // group — only set the group role for option lists.
+  if (q.type !== 'slider') list.setAttribute('role', q.multi ? 'group' : 'radiogroup');
   const optionButtons = [];
 
   const advance = () => {
@@ -368,42 +470,88 @@ function renderQuestion(root, ctx, index) {
     else ctx.showResults(ctx.answers, { updateHash: true });
   };
 
-  q.options.forEach((opt) => {
-    const btn = el('button', 'bmwm-option');
-    btn.type = 'button';
-    btn.setAttribute('role', q.multi ? 'checkbox' : 'radio');
-    btn.setAttribute('aria-checked', String(selected.has(opt.value)));
-    if (selected.has(opt.value)) btn.classList.add('is-selected');
-    btn.append(el('span', 'bmwm-option-label', opt.label));
-    if (opt.sub) btn.append(el('span', 'bmwm-option-sub', opt.sub));
-    btn.addEventListener('click', () => {
-      if (q.multi) {
-        if (selected.has(opt.value)) selected.delete(opt.value);
-        else {
-          if (opt.value === 'any') selected.clear();
-          else selected.delete('any');
-          if (q.max && selected.size >= q.max) return;
-          selected.add(opt.value);
-        }
-        ctx.answers[q.id] = [...selected];
-        optionButtons.forEach(({ button, value }) => {
-          button.classList.toggle('is-selected', selected.has(value));
-          button.setAttribute('aria-checked', String(selected.has(value)));
-        });
-        next.disabled = selected.size === 0;
-        schedulePreviewRefresh(ctx);
-      } else {
-        ctx.answers[q.id] = opt.value;
-        // Refresh before advancing: the debounced fetch is scheduled on ctx, so
-        // the next question's freshly-built drawer picks up the result (via the
-        // seq guard) even though this screen is about to be replaced.
-        schedulePreviewRefresh(ctx);
-        advance();
-      }
+  const isSlider = q.type === 'slider';
+  if (isSlider && q.range) {
+    // Dual-thumb range (budget): two overlaid inputs writing a [min, max] pair.
+    list.classList.add('bmwm-slider');
+    renderRangeSlider(list, q, ctx);
+  } else if (isSlider) {
+    // A range input plus a live value readout. The whole thing writes a number
+    // to ctx.answers[q.id] and, unlike a single-select, never auto-advances —
+    // the Next button (below) is the commit point, since any drag would fire.
+    list.classList.add('bmwm-slider');
+    const stored = ctx.answers[q.id];
+    const startValue = typeof stored === 'number'
+      ? stored
+      : (typeof q.default === 'number' ? q.default : q.min);
+
+    const readout = el('output', 'bmwm-slider-value', formatSliderValue(startValue, q));
+    const input = el('input', 'bmwm-slider-input');
+    input.type = 'range';
+    input.min = String(q.min);
+    input.max = String(q.max);
+    input.step = String(q.step);
+    input.value = String(startValue);
+    input.setAttribute('aria-label', q.title);
+    input.setAttribute('aria-valuetext', formatSliderValue(startValue, q));
+    // Persist the starting value immediately so the answer exists even if the
+    // user accepts the default without dragging (Next is enabled from the off).
+    ctx.answers[q.id] = startValue;
+
+    const bounds = el('div', 'bmwm-slider-bounds');
+    bounds.append(
+      el('span', 'bmwm-slider-min', formatSliderValue(q.min, q)),
+      el('span', 'bmwm-slider-max', formatSliderValue(q.max, q)),
+    );
+
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      ctx.answers[q.id] = value;
+      const text = formatSliderValue(value, q);
+      readout.textContent = text;
+      input.setAttribute('aria-valuetext', text);
+      schedulePreviewRefresh(ctx);
     });
-    optionButtons.push({ button: btn, value: opt.value });
-    list.append(btn);
-  });
+
+    list.append(readout, input, bounds);
+  } else {
+    q.options.forEach((opt) => {
+      const btn = el('button', 'bmwm-option');
+      btn.type = 'button';
+      btn.setAttribute('role', q.multi ? 'checkbox' : 'radio');
+      btn.setAttribute('aria-checked', String(selected.has(opt.value)));
+      if (selected.has(opt.value)) btn.classList.add('is-selected');
+      btn.append(el('span', 'bmwm-option-label', opt.label));
+      if (opt.sub) btn.append(el('span', 'bmwm-option-sub', opt.sub));
+      btn.addEventListener('click', () => {
+        if (q.multi) {
+          if (selected.has(opt.value)) selected.delete(opt.value);
+          else {
+            if (opt.value === 'any') selected.clear();
+            else selected.delete('any');
+            if (q.max && selected.size >= q.max) return;
+            selected.add(opt.value);
+          }
+          ctx.answers[q.id] = [...selected];
+          optionButtons.forEach(({ button, value }) => {
+            button.classList.toggle('is-selected', selected.has(value));
+            button.setAttribute('aria-checked', String(selected.has(value)));
+          });
+          next.disabled = selected.size === 0;
+          schedulePreviewRefresh(ctx);
+        } else {
+          ctx.answers[q.id] = opt.value;
+          // Refresh before advancing: the debounced fetch is scheduled on ctx, so
+          // the next question's freshly-built drawer picks up the result (via the
+          // seq guard) even though this screen is about to be replaced.
+          schedulePreviewRefresh(ctx);
+          advance();
+        }
+      });
+      optionButtons.push({ button: btn, value: opt.value });
+      list.append(btn);
+    });
+  }
   screen.append(list);
 
   const nav = el('div', 'bmwm-nav');
@@ -415,8 +563,10 @@ function renderQuestion(root, ctx, index) {
 
   const next = el('button', 'bmwm-btn bmwm-btn-primary', index + 1 === questions.length ? 'Explore my matches' : 'Next');
   next.type = 'button';
-  if (q.multi) {
-    next.disabled = selected.size === 0;
+  // Multi-select and sliders both commit via Next (a slider always has a value,
+  // so it's enabled from the off); single-select auto-advances on tap.
+  if (q.multi || isSlider) {
+    next.disabled = q.multi ? selected.size === 0 : false;
     next.addEventListener('click', advance);
     nav.append(next);
   }

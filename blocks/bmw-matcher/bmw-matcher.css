@@ -291,6 +291,132 @@
 .bmwm-option-label { font-family: var(--bmwm-font-bold); font-weight: 700; }
 .bmwm-option-sub { font-size: var(--bmwm-text-label); color: var(--bmwm-ink-muted); }
 
+/* Slider question: one column, never the 2-up option grid. */
+.bmwm-options.bmwm-slider {
+  display: block;
+  padding: var(--bmwm-space-2) var(--bmwm-space-1) 0;
+}
+
+/* Big live value readout above the track. */
+.bmwm-slider-value {
+  display: block;
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  font-size: var(--bmwm-text-h2, 1.75rem);
+  line-height: 1.1;
+  color: var(--bmwm-ink-strong);
+  margin-bottom: var(--bmwm-space-4);
+}
+
+/* The range input, restyled off the native control in BMW blue. */
+.bmwm-slider-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 24px; /* generous hit area; visual track is drawn shorter below */
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Track — sharp corners, hairline fill, accent to the left of the thumb is
+   approximated by the fill colour (native range has no cheap "elapsed" fill,
+   so we keep a single neutral track with an accent thumb). */
+.bmwm-slider-input::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--bmwm-line);
+  border-radius: var(--bmwm-radius);
+}
+.bmwm-slider-input::-moz-range-track {
+  height: 4px;
+  background: var(--bmwm-line);
+  border-radius: var(--bmwm-radius);
+}
+.bmwm-slider-input::-moz-range-progress {
+  height: 4px;
+  background: var(--bmwm-accent);
+}
+
+.bmwm-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px; /* centre the 18px thumb on the 4px track */
+  background: var(--bmwm-accent);
+  border: 2px solid var(--bmwm-surface);
+  border-radius: var(--bmwm-radius); /* square, per the design system */
+  box-shadow: 0 0 0 1px var(--bmwm-accent);
+  transition: transform 0.1s ease;
+}
+.bmwm-slider-input::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--bmwm-accent);
+  border: 2px solid var(--bmwm-surface);
+  border-radius: var(--bmwm-radius);
+  box-shadow: 0 0 0 1px var(--bmwm-accent);
+}
+.bmwm-slider-input:hover::-webkit-slider-thumb { transform: scale(1.12); }
+.bmwm-slider-input:focus-visible { outline: none; }
+.bmwm-slider-input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(28, 105, 212, 0.35);
+}
+.bmwm-slider-input:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px rgba(28, 105, 212, 0.35);
+}
+
+/* Min/max end labels under the track. */
+.bmwm-slider-bounds {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--bmwm-space-2);
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+}
+
+/* Dual-thumb range (budget): two range inputs overlaid on one track. The track
+   is drawn once here; each input's own track is made transparent so only this
+   shared one shows, with an accent fill spanning the selected bracket. */
+.bmwm-range {
+  position: relative;
+  height: 24px;
+}
+.bmwm-range::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  background: var(--bmwm-line);
+}
+.bmwm-range-fill {
+  position: absolute;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  background: var(--bmwm-accent);
+}
+/* Both inputs fill the container and stack; the container's ::before is the
+   visible track, so hide each input's native track. Only the thumbs take
+   pointer events, so whichever thumb you grab wins even where they overlap. */
+.bmwm-range .bmwm-slider-input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 24px;
+  pointer-events: none;
+  background: transparent;
+}
+.bmwm-range .bmwm-slider-input::-webkit-slider-runnable-track { background: transparent; }
+.bmwm-range .bmwm-slider-input::-moz-range-track { background: transparent; }
+.bmwm-range .bmwm-slider-input::-moz-range-progress { background: transparent; }
+.bmwm-range .bmwm-slider-input::-webkit-slider-thumb { pointer-events: auto; }
+.bmwm-range .bmwm-slider-input::-moz-range-thumb { pointer-events: auto; }
+
 .bmwm-nav { display: flex; justify-content: space-between; gap: var(--bmwm-space-3); }
 
 /* --- results --- */
@@ -708,6 +834,8 @@ a.bmwm-ptile:focus-visible { outline: 2px solid var(--bmwm-accent); outline-offs
 @media (prefers-reduced-motion: reduce) {
   .bmwm-screen { animation: none; }
   .bmwm-btn, .bmwm-option, .bmwm-progress-bar { transition: none; }
+  .bmwm-slider-input::-webkit-slider-thumb { transition: none; }
+  .bmwm-slider-input:hover::-webkit-slider-thumb { transform: none; }
   /* Drop the sweep; keep a static grey tint so the skeleton still reads. */
   .bmwm-skel { animation: none; background-image: none; }
   /* Instant swap instead of the cross-fade when the guess re-ranks. */
