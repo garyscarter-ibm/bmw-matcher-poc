@@ -48,6 +48,11 @@ const BMW_TUNING = {
     image: { character: 1.0 },
   },
   stretchFactor: 1.15,
+  // Added to the fuel weight when the user names specific fuel(s) (not "help me
+  // decide"), so fuel binds hard: a wrong-fuel car can't top a matching-fuel
+  // one. At base 2.5 fuel is only ~14% of the blend, letting an EV flagship
+  // out-rank the petrol saloon a petrol buyer asked for; +4 fixes that.
+  fuelStrictBoost: 4.0,
   // 0-62 curve: (zeroBase - t) / span, clamped 0..1. BMW: 10.5s→0, 4.5s→1.
   performance: { zeroBase: 10.5, span: 6 },
   practicality: {
@@ -55,6 +60,13 @@ const BMW_TUNING = {
     seatsFloor: 5, // below this (unless solo) → *0.3
     crewBonusSeats: 7, // 7+ seats for a crew → perfect
   },
+  // A "crew" buyer ("5+ seats, regularly") really wants a 7-seater. A car below
+  // crewBonusSeats gets its FINAL blended score multiplied by this (applied in
+  // rankCars, like the stretch flag) — strong enough that genuine 7-seaters top
+  // when they're in stock, but 5-seaters still appear and win when none are (so
+  // it's stock-safe, not a hard filter). MINI keeps 1 (no 7-seaters; its
+  // crewBonusSeats is 5, so a 5-seat MINI is already the "full house").
+  crewSeatShortfall: 0.7,
   size: { roadtripMinClass: 3, cityDivisor: 5 },
   hardFilter: { crewBoot: 430, crewSeats: 5, familySeats: 4 },
   // Annual-mileage ramp: miles at/under lowMiles → 0, at/over highMiles → 1.

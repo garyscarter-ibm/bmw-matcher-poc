@@ -64,6 +64,22 @@ const MODEL_SPECS_BMW = {
   iX2: { boot: 525, seats: 5, zeroTo62: 8.6, sizeClass: 2 }, // base eDrive20; xDrive30 speeds up
   iX3: { boot: 510, seats: 5, zeroTo62: 6.8, sizeClass: 3 },
   M: { boot: 440, seats: 4, zeroTo62: 4.1, sizeClass: 2 }, // pure-M line (M2/M3/M4…)
+
+  // Filled from the used-stock dump (fixtures/bmw-cars.json) — lines that were
+  // falling back to DEFAULT_SPEC. Figures sourced from carwow / Auto Express /
+  // Parkers (Parkers 0-60 used as a close proxy for 0-62); see docs/bmw-spec-gaps.md.
+  i8: { boot: 154, seats: 4, zeroTo62: 4.4, sizeClass: 2 }, // I12 plug-in hybrid sports coupe
+  '2 Series Gran Tourer': { boot: 560, seats: 7, zeroTo62: 9.5, sizeClass: 2 }, // F46 7-seat MPV
+  '6 Series Gran Coupe': { boot: 460, seats: 5, zeroTo62: 5.4, sizeClass: 3 }, // F06 4-door coupe
+  '3 Series Gran Turismo': { boot: 520, seats: 5, zeroTo62: 7.7, sizeClass: 2 }, // F34 fastback
+  '5 Series Gran Turismo': { boot: 590, seats: 5, zeroTo62: 6.7, sizeClass: 3 }, // F07 fastback
+  Z8: { boot: 200, seats: 2, zeroTo62: 4.5, sizeClass: 1 }, // E52 V8 roadster (boot est.)
+  Z3: { boot: 165, seats: 2, zeroTo62: 6.7, sizeClass: 1 }, // roadster, 2.8i (boot est.)
+  // Alpina performance variants (own figures where found).
+  'Alpina B3': { boot: 500, seats: 5, zeroTo62: 3.8, sizeClass: 2 }, // G21 Touring, Bi-Turbo AWD
+  'Alpina D3': { boot: 500, seats: 5, zeroTo62: 4.6, sizeClass: 2 }, // diesel Touring (D3 S)
+  'Alpina D5': { boot: 530, seats: 5, zeroTo62: 4.7, sizeClass: 3 }, // 5-Series diesel saloon
+  'Alpina XB7': { boot: 326, seats: 7, zeroTo62: 4.1, sizeClass: 5 }, // X7-based luxury SUV
 };
 
 /* MINI range. Keyed by the `line` MINI's feed titles use ("MINI Hatch",
@@ -97,13 +113,38 @@ const warnedLines = new Set(); // log each unknown line once, not per-car
  * MODEL_SPECS key. Pure-M cars (M2/M3/M4/M5/M8) collapse to the "M" line;
  * "M135i" / "M340d" / "M40d" are trims of a normal line, NOT the M line.
  */
-function lineFromTitle(title = '') {
+function lineFromTitle(title = '', derivative = '') {
   const t = title.replace(/^BMW\s+/i, '').trim();
+  // Generic feed catch-all: the title is just "I Series" and the real model
+  // lives in the derivative ("iX xDrive50 M Sport…"). Derive the i-line from the
+  // derivative's leading token (iX, i4, i5, i7, iX1-3) so it isn't left on the
+  // default spec.
+  if (/^i series$/i.test(t)) {
+    const m = /^(iX[123]?|i[3457])\b/i.exec(derivative.trim());
+    if (m) {
+      const tok = m[1];
+      // Normalise case to the spec keys: iX, iX1, iX2, iX3, i4, i5, i7, i3.
+      return /^ix/i.test(tok) ? `iX${tok.slice(2)}` : tok.toLowerCase();
+    }
+  }
+  // Alpina: the feed titles these inconsistently ("Alpina B3", "Alpina XB7",
+  // or the catch-all "Alpina Unspecified Models" with the real model in the
+  // derivative, e.g. "ALPINA D3 2.0D TOURING"). Normalise to an "Alpina <model>"
+  // spec key from whichever field carries the model code.
+  if (/alpina/i.test(t)) {
+    const src = /unspecified/i.test(t) ? derivative : t;
+    const m = /\b(XB7|B\d|D\d)\b/i.exec(src);
+    if (m) return `Alpina ${m[1].toUpperCase()}`;
+    return 'Alpina B3'; // sensible fallback: a fast 3-Series-based Alpina
+  }
   // Pure M models: "M2", "M3 Competition", "M4", "M5", "M8" (standalone M<digit>).
   if (/^M[2-8]\b/.test(t)) return 'M';
   // The feed titles the electric i3 city car "i3 Series"; fold it to the "i3"
   // spec key (the "i3s"/"i3" derivatives are trims of the same line).
   if (/^i3\b/.test(t)) return 'i3';
+  // The feed titles the Z3/Z8 roadsters "Z3 Series" / "Z8 Series"; fold to the
+  // bare "Z3"/"Z8" spec keys (Z4 is already titled "Z4", so it's unaffected).
+  if (/^Z[38]\b/.test(t)) return t.slice(0, 2);
   return t;
 }
 
@@ -113,11 +154,20 @@ function lineFromTitle(title = '') {
  */
 function bodyFor(line, derivative = '') {
   const d = derivative.toLowerCase();
-  // X1-X7, the M-SUVs (X3M/X4M/X5 M/X6 M), the XM, iX1-iX3 and the bare iX
-  // flagship are all SUVs.
+  // X1-X7, the M-SUVs (X3M/X4M/X5 M/X6 M), the XM, iX1-iX3, the bare iX
+  // flagship and the Alpina XB7 are all SUVs.
   if (/^X[1-7]$/i.test(line) || /^X\d ?M$/i.test(line) || line === 'XM'
-    || /^iX[1-3]?$/i.test(line)) return 'suv';
+    || /^iX[1-3]?$/i.test(line) || line === 'Alpina XB7') return 'suv';
   if (line === 'i3') return 'hatchback';
+  // Gran Tourer (F45/F46) is a compact MPV; catch it before "coupe" keyword
+  // matching (its derivative says "Gran Tourer", not "coupe").
+  if (line === '2 Series Gran Tourer' || d.includes('gran tourer')) return 'mpv';
+  // The Gran Turismo fastbacks (3/5 Series GT) are large 5-door hatchbacks.
+  if (/gran turismo/i.test(line) || d.includes('gran turismo')) return 'hatchback';
+  if (line === 'i8' || line === 'Z8') return line === 'Z8' ? 'convertible' : 'coupe';
+  if (line === 'Z3') return 'convertible'; // roadster
+  // Alpina B3/D3 are Tourings (estates); D5 is a saloon — fall through to the
+  // "touring" keyword check below, which their derivatives carry.
   if (d.includes('active tourer')) return 'mpv';
   if (d.includes('gran coupe') || d.includes('gran coupé')) return 'saloon';
   if (d.includes('touring')) return 'estate';
@@ -400,7 +450,7 @@ export function mapVehicle(v, brand = 'bmw') {
 
   const title = v.title || m.defaultTitle;
   const derivative = v.derivative || '';
-  const line = m.line(title);
+  const line = m.line(title, derivative);
 
   const spec = m.specs[line] || m.fallbackSpec;
   if (!m.specs[line]) {

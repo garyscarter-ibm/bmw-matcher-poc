@@ -213,6 +213,10 @@ function scorePracticality(car, answers, tuning) {
   const seatsOk = answers.people === 'solo' || car.seats >= seatsFloor;
   let score = need === 0 ? 1 : clamp(car.boot / need);
   if (!seatsOk) score *= 0.3;
+  // A crew buyer with the bonus seats gets a perfect practicality score; the
+  // shortfall for a sub-7-seat crew car is applied as a whole-score penalty in
+  // rankCars (crewSeatShortfall), not here — practicality alone is too small a
+  // lever to overcome a 7-seater's budget/economy headwind.
   if (answers.people === 'crew' && car.seats >= crewBonusSeats) {
     return { score: 1, reason: `${car.seats} proper seats for the full crew` };
   }
@@ -345,6 +349,14 @@ function effectiveWeights(answers, tuning) {
   w.economy += mileageFraction(answers, tuning);
   if (Number(answers.style) >= 4) w.performance += 1;
   if (Number(answers.style) <= 2) w.performance = Math.max(0.5, w.performance - 0.5);
+  // When the user names specific fuel(s) — not "help me decide" — fuel binds
+  // hard: a car of the wrong fuel (however strong elsewhere) shouldn't top a
+  // matching-fuel car. Without this boost fuel is only ~14% of the blend, so an
+  // EV flagship could out-rank the petrol saloon a petrol buyer asked for.
+  // "open"/unanswered leaves fuel at its base weight (a range of fuels is fine).
+  const prefs = fuelPrefs(answers);
+  const specificFuel = prefs.length > 0 && !prefs.includes('open');
+  if (specificFuel) w.fuel += tuning.fuelStrictBoost;
   return w;
 }
 
@@ -400,7 +412,14 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
         .slice(0, 4)
         .map((c) => c.reason);
       if (stretch) reasons.push(`A stretch at ${gbp(car.priceMin)}+, but maybe worth it`);
-      return { car, score: Math.round((weighted / totalWeight) * 100), stretch, reasons };
+      let ratio = weighted / totalWeight;
+      // Whole-score penalty for a "crew" buyer's sub-7-seat car: strong enough
+      // that genuine 7-seaters top when in stock, but 5-seaters still rank (and
+      // win when no 7-seater exists) — so it's stock-safe, not a hard filter.
+      if (answers.people === 'crew' && car.seats < tuning.practicality.crewBonusSeats) {
+        ratio *= tuning.crewSeatShortfall ?? 1;
+      }
+      return { car, score: Math.round(ratio * 100), stretch, reasons };
     })
     // Deterministic tie-breaking: score, then cheaper car, then name.
     .sort(
