@@ -35,20 +35,11 @@
  */
 const BMW_TUNING = {
   weights: {
-    // Body is deliberately the heaviest soft dimension. When a shopper names
-    // specific shapes, a wrong-shape car — however strong elsewhere (e.g. the
-    // only EV, a JCW) — must not out-rank a right-shape car that also fits. At
-    // this weight, paired with body.miss = 0, a wrong shape can't reach #1 while
-    // any right-shape match exists (empirically: the JCW Aceman SUV drops from
-    // #2 to ~#12 for a "hatchback" search). A wrong shape can still surface when
-    // NO right-shape car satisfies the other answers (e.g. you want an estate
-    // EV and the retailer stocks none) — the honest "closest we've got".
-    budget: 3.0, body: 6.0, fuel: 2.5, practicality: 2.0,
+    budget: 3.0, body: 2.5, fuel: 2.5, practicality: 2.0,
     performance: 1.5, economy: 1.5, size: 1.0, character: 2.0,
   },
-  // Body-match scores. `neutral` = no preference / "any". `miss` at 0 means a
-  // wrong shape scores nothing on this (heaviest) dimension.
-  body: { match: 1, neutral: 0.7, miss: 0 },
+  // Body-match scores. `neutral` = no preference / "any"; `miss` = wrong shape.
+  body: { match: 1, neutral: 0.7, miss: 0.15 },
   priorityBoosts: {
     economy: { economy: 1.5, budget: 0.5 },
     performance: { performance: 1.8, character: 0.5 },
@@ -71,8 +62,24 @@ const BMW_TUNING = {
 };
 
 // MINI overrides. Recalibrated so a well-matched MINI reaches the same 85–95%
-// a well-matched BMW does — scored against MINI's own class.
+// a well-matched BMW does — scored against MINI's own class. Any weight MINI
+// lists here replaces just that dimension's weight (mergeTuning deep-merges the
+// weights object), so MINI tunes its own weighting without disturbing BMW.
 const MINI_TUNING = {
+  weights: {
+    // Body is MINI's heaviest soft dimension. MINI's thin, EV-heavy stock let a
+    // wrong-shape car that's strong elsewhere (the only EV, a JCW) top a search
+    // for a different shape — e.g. the JCW Aceman SUV beating hatchbacks on a
+    // "hatchback" search. At weight 6.0, paired with body.miss = 0 below, a
+    // wrong shape can't reach #1 while any right-shape car that also fits exists
+    // (empirically the Aceman drops from ~#2 to ~#12 on a "hatchback" search);
+    // it can still surface when NO right-shape car satisfies the other answers
+    // — the honest "closest we've got". BMW keeps its base weight of 2.5.
+    body: 6.0,
+  },
+  // Wrong shape scores nothing on the (now heaviest) body dimension for MINI.
+  // BMW keeps the gentler 0.15 miss from the base.
+  body: { match: 1, neutral: 0.7, miss: 0 },
   // 0-62: MINI range is ~6.0s (JCW) to ~8.5s. Solved so a JCW at 6.0s reads
   // ~0.9 and a brisk 7.7s Cooper ~0.6 (BMW's curve gives that 7.7s car only
   // 0.47): (11 - t)/5.5 → 6.0s=0.91, 7.7s=0.60, 8.3s=0.49.
