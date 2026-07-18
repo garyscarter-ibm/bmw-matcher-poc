@@ -273,3 +273,69 @@ test('bespoke answer folds into standard fields (jcw → performance + style) wi
   const bmw = applyBespokeAnswers('bmw', { style: '3' });
   assert.deepEqual(bmw, { style: '3' });
 });
+
+/* ---- BMW spec-gap fill + fuel/crew binding (from the used-stock eval) ---- */
+
+test('BMW spec gaps: I Series / Z3 / Z8 / Alpina map to real lines, not defaults', () => {
+  const line = (title, derivative) => mapVehicle(
+    { title, derivative, cash_price: { value: 40000 }, retailer_site: { id: 1 } },
+    'bmw',
+  );
+  // "I Series" generic title → real i-line from the derivative (was the bug).
+  assert.equal(line('BMW I Series', 'iX xDrive50 M Sport Edition').line, 'iX');
+  assert.equal(line('BMW I Series', 'iX xDrive50 M Sport Edition').body, 'suv');
+  // Z3/Z8 "… Series" titles fold to the bare spec keys, seats 2, convertible.
+  assert.equal(line('BMW Z3 Series', 'Z3 2.8i Roadster').seats, 2);
+  assert.equal(line('BMW Z8 Series', 'Z8 Roadster').body, 'convertible');
+  // Alpina normalises (incl. the "Unspecified Models" catch-all via derivative).
+  assert.equal(line('BMW Alpina Unspecified Models', 'ALPINA D3 2.0D TOURING').line, 'Alpina D3');
+  assert.equal(line('BMW Alpina XB7', 'ALPINA XB7').body, 'suv');
+  // A filled line no longer uses the default 0-62 (8.0); i8 is a 4.4s coupe.
+  assert.equal(line('BMW i8', 'i8 Coupe').zeroTo62, 4.4);
+});
+
+test('fuel binds hard when a specific fuel is chosen (wrong-fuel car cannot top)', () => {
+  const petrolSaloon = {
+    id: 'p', name: 'BMW 520i', line: '5 Series', body: 'saloon', fuel: 'petrol',
+    priceMin: 45000, priceMax: 45000, sizeClass: 3, seats: 5, boot: 520, zeroTo62: 7.5,
+    mpg: 45, tags: ['cruiser'], blurb: '',
+  };
+  const evFlagship = {
+    id: 'e', name: 'BMW i7 M70', line: 'i7', body: 'saloon', fuel: 'ev',
+    priceMin: 45000, priceMax: 45000, sizeClass: 5, seats: 5, boot: 500, zeroTo62: 3.9,
+    evRange: 350, tags: ['tech', 'cruiser', 'efficient'], blurb: '',
+  };
+  const wantsPetrol = {
+    budget: [40000, 120000], bodyStyles: ['saloon'], fuel: ['petrol'], charging: 'none',
+    primaryUse: 'roadtrips', people: 'solo', boot: 'medium', mileage: 8000, style: '1',
+    priorities: ['comfort', 'tech'],
+  };
+  const ranked = rankCars(wantsPetrol, [petrolSaloon, evFlagship], brandTuning('bmw'));
+  assert.equal(ranked[0].car.id, 'p', 'petrol saloon tops for a petrol buyer, not the EV');
+  // "help me decide" leaves fuel unbound → the strong EV can win again.
+  const openMinded = rankCars({ ...wantsPetrol, fuel: ['open'], charging: 'home' }, [petrolSaloon, evFlagship], brandTuning('bmw'));
+  assert.equal(openMinded[0].car.id, 'e', 'open-minded buyer with home charging can top the EV');
+});
+
+test('crew buyer: a 7-seater tops when one exists, but 5-seaters still rank (stock-safe)', () => {
+  const sevenSeat = {
+    id: 'x7', name: 'BMW X7', line: 'X7', body: 'suv', fuel: 'diesel',
+    priceMin: 55000, priceMax: 55000, sizeClass: 5, seats: 7, boot: 750, zeroTo62: 5.9,
+    mpg: 40, tags: ['family', 'practical', 'cruiser'], blurb: '',
+  };
+  const fiveSeat = {
+    id: 'x1', name: 'BMW X1', line: 'X1', body: 'suv', fuel: 'diesel',
+    priceMin: 35000, priceMax: 35000, sizeClass: 2, seats: 5, boot: 540, zeroTo62: 8.3,
+    mpg: 55, tags: ['family', 'practical', 'urban'], blurb: '',
+  };
+  const crew = {
+    budget: [30000, 60000], bodyStyles: ['suv'], fuel: ['diesel'], charging: 'none',
+    primaryUse: 'family', people: 'crew', boot: 'big', mileage: 15000, style: '3',
+    priorities: ['comfort', 'economy'],
+  };
+  const both = rankCars(crew, [sevenSeat, fiveSeat], brandTuning('bmw'));
+  assert.equal(both[0].car.id, 'x7', 'the 7-seater tops a crew search');
+  // With no 7-seater in stock the 5-seater still appears (not filtered out).
+  const only5 = rankCars(crew, [fiveSeat], brandTuning('bmw'));
+  assert.equal(only5.length, 1, 'a 5-seater is not hard-excluded from a crew search');
+});
