@@ -35,9 +35,20 @@
  */
 const BMW_TUNING = {
   weights: {
-    budget: 3.0, body: 2.5, fuel: 2.5, practicality: 2.0,
+    // Body is deliberately the heaviest soft dimension. When a shopper names
+    // specific shapes, a wrong-shape car — however strong elsewhere (e.g. the
+    // only EV, a JCW) — must not out-rank a right-shape car that also fits. At
+    // this weight, paired with body.miss = 0, a wrong shape can't reach #1 while
+    // any right-shape match exists (empirically: the JCW Aceman SUV drops from
+    // #2 to ~#12 for a "hatchback" search). A wrong shape can still surface when
+    // NO right-shape car satisfies the other answers (e.g. you want an estate
+    // EV and the retailer stocks none) — the honest "closest we've got".
+    budget: 3.0, body: 6.0, fuel: 2.5, practicality: 2.0,
     performance: 1.5, economy: 1.5, size: 1.0, character: 2.0,
   },
+  // Body-match scores. `neutral` = no preference / "any". `miss` at 0 means a
+  // wrong shape scores nothing on this (heaviest) dimension.
+  body: { match: 1, neutral: 0.7, miss: 0 },
   priorityBoosts: {
     economy: { economy: 1.5, budget: 0.5 },
     performance: { performance: 1.8, character: 0.5 },

@@ -129,17 +129,18 @@ function scoreBudget(car, answers) {
   return { score: 0.75 }; // straddles the band edge
 }
 
-function scoreBody(car, answers) {
+function scoreBody(car, answers, tuning) {
+  const b = tuning.body;
   const picks = answers.bodyStyles || [];
-  if (picks.length === 0 || picks.includes('any')) return { score: 0.7 };
+  if (picks.length === 0 || picks.includes('any')) return { score: b.neutral };
   if (picks.includes(car.body)) {
     const labels = {
       hatchback: 'hatchback', saloon: 'saloon', estate: 'estate', suv: 'SUV',
       coupe: 'coupé', convertible: 'convertible', mpv: 'family carrier',
     };
-    return { score: 1, reason: `The ${labels[car.body]} shape you asked for` };
+    return { score: b.match, reason: `The ${labels[car.body]} shape you asked for` };
   }
-  return { score: 0.15 };
+  return { score: b.miss };
 }
 
 const FUEL_LABELS = { petrol: 'petrol', diesel: 'diesel', phev: 'plug-in hybrid', ev: 'fully electric' };

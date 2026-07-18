@@ -198,6 +198,32 @@ test('brand tuning: MINI hard-filters do not exclude a Countryman for a family',
   assert.equal(survivors.length, 1, 'the Countryman survives the MINI family filter');
 });
 
+test('body binding: a wrong-shape car cannot top the list when a right-shape one exists', () => {
+  // Regression: a JCW EV crossover was topping "hatchback" searches because
+  // body was only lightly weighted. A wrong-shape car (however strong on fuel/
+  // performance/character) must rank below a right-shape car that also fits.
+  const jcwEvSuv = {
+    ...miniHatch, id: 'aceman', name: 'MINI JCW Aceman', body: 'suv', fuel: 'ev',
+    sizeClass: 2, seats: 5, boot: 300, zeroTo62: 6.4, evRange: 250,
+    tags: ['urban', 'drivers-car', 'image', 'tech', 'efficient'],
+  };
+  const plainHatchEv = {
+    ...miniHatch, id: 'hatchev', name: 'MINI Hatch Electric', body: 'hatchback', fuel: 'ev',
+    zeroTo62: 7.3, evRange: 200, tags: ['urban', 'tech', 'efficient'],
+  };
+  const wantsHatchEv = {
+    budget: [15000, 35000], bodyStyles: ['hatchback'], fuel: ['ev'], charging: 'home',
+    primaryUse: 'city', people: 'solo', boot: 'small', mileage: 8000, style: '5',
+    priorities: ['performance', 'image'],
+  };
+  const ranked = rankCars(wantsHatchEv, [jcwEvSuv, plainHatchEv], brandTuning('mini'));
+  assert.equal(ranked[0].car.id, 'hatchev', 'the right-shape hatchback tops, not the SUV');
+  assert.ok(
+    ranked.find((m) => m.car.id === 'hatchev').score > ranked.find((m) => m.car.id === 'aceman').score,
+    'right-shape scores strictly higher than the stronger-elsewhere wrong shape',
+  );
+});
+
 /* ---- mileage now moves the ranking for all fuels ---- */
 
 test('annual mileage changes the ranking (efficient cars rise at high mileage)', () => {
