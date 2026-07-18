@@ -1,15 +1,22 @@
 /*
  * Matching engine — pure, deterministic, dependency-free.
  *
- * Input:  answers object produced by the quiz (see questions.js)
+ * Input:  answers object produced by the quiz (see questions.js) + a per-brand
+ *         `tuning` object (see brands.js) holding every calibration constant.
  * Output: ranked matches with 0–100 scores and human-readable reasons
  *         generated from the actual score components.
  *
- * Tune behaviour in WEIGHTS / PRIORITY_BOOSTS below — the scoring
- * functions themselves shouldn't need touching for weight changes.
+ * The engine is brand-agnostic: every magic number lives in `tuning`, so a
+ * brand is calibrated by config, not by forking the scorers. `tuning` defaults
+ * to BMW's values (the engine's original constants), so a caller that omits it
+ * gets the original behaviour.
  */
 
 import { BUDGET_BANDS } from './questions.js';
+import { brandTuning } from './brands.js';
+
+/** Default tuning = BMW's (the engine's original constants). */
+const DEFAULT_TUNING = brandTuning('bmw');
 
 /** Base weight of each scoring dimension. */
 export const WEIGHTS = {
@@ -58,11 +65,24 @@ export function budgetRange(answers) {
   return BUDGET_BANDS[b] || null;
 }
 
-/** High annual mileage (the old 'vhigh' band): the diesel/economy boost line. */
-function isHighMileage(answers) {
+/**
+ * Annual mileage as a 0..1 fraction along the brand's ramp: at/under lowMiles
+ * → 0, at/over highMiles → 1. Drives how much running costs matter (see
+ * scoreEconomy / effectiveWeights) — for EVERY fuel now, not just diesel. The
+ * legacy string band 'vhigh' maps to 1; an unanswered mileage → 0 (no strong
+ * running-cost signal yet).
+ */
+function mileageFraction(answers, tuning) {
+  const { lowMiles, highMiles } = tuning.mileage;
   const m = answers.mileage;
-  if (typeof m === 'number') return m >= 20000;
-  return m === 'vhigh';
+  if (typeof m === 'number') return clamp((m - lowMiles) / (highMiles - lowMiles));
+  // Legacy string bands (old shared links / tests).
+  return { low: 0, mid: 0.35, high: 0.7, vhigh: 1 }[m] ?? 0;
+}
+
+/** Convenience: is this a high-mileage buyer? (top third of the ramp). */
+function isHighMileage(answers, tuning) {
+  return mileageFraction(answers, tuning) >= 0.66;
 }
 
 /** Normalise a fuel answer to an array of preference values (multi-select). */
@@ -132,7 +152,7 @@ const FUEL_TABLE = {
 };
 
 /** Score one car against a single fuel preference. Returns { score, reason? }. */
-function scoreOneFuel(pref, car, answers) {
+function scoreOneFuel(pref, car, answers, tuning) {
   const charging = answers.charging || 'none';
   const canCharge = canChargeAt(charging);
   // EVs and PHEVs make much less sense with no charging access. "either" and
@@ -144,7 +164,7 @@ function scoreOneFuel(pref, car, answers) {
     // "Help me decide": recommend by circumstance.
     if (car.fuel === 'ev') score = canCharge ? 0.95 : 0.25;
     else if (car.fuel === 'phev') score = canCharge ? 0.85 : 0.6;
-    else if (car.fuel === 'diesel') score = isHighMileage(answers) ? 0.9 : 0.55;
+    else if (car.fuel === 'diesel') score = isHighMileage(answers, tuning) ? 0.9 : 0.55;
     else score = 0.7;
   } else {
     score = FUEL_TABLE[pref][car.fuel];
@@ -160,14 +180,14 @@ function scoreOneFuel(pref, car, answers) {
         : `Fully electric with a ${car.evRange}-mile range`;
     } else if (pref !== 'open') {
       reason = `The ${FUEL_LABELS[car.fuel]} power you wanted`;
-    } else if (car.fuel === 'diesel' && isHighMileage(answers)) {
+    } else if (car.fuel === 'diesel' && isHighMileage(answers, tuning)) {
       reason = 'Diesel torque and economy suit your big annual mileage';
     }
   }
   return { score, reason };
 }
 
-function scoreFuel(car, answers) {
+function scoreFuel(car, answers, tuning) {
   // Fuel is multi-select: the user can pick several fuels (or none, which reads
   // as "help me decide"). Score the car against each chosen fuel and take the
   // best — a petrol car matching "Petrol + EV" scores on its petrol merit. An
@@ -176,34 +196,39 @@ function scoreFuel(car, answers) {
   const prefs = fuelPrefs(answers);
   let best = { score: -1 };
   for (const pref of prefs) {
-    const r = scoreOneFuel(pref, car, answers);
+    const r = scoreOneFuel(pref, car, answers, tuning);
     if (r.score > best.score) best = r;
   }
   return best;
 }
 
-function scorePracticality(car, answers) {
+function scorePracticality(car, answers, tuning) {
+  const { bootNeed, seatsFloor, crewBonusSeats } = tuning.practicality;
   // Unanswered boot question ⇒ no space requirement yet (treat as "small"),
   // so a partial answer set scores a real number rather than NaN from
-  // dividing by an undefined `need`.
-  const need = { small: 0, medium: 400, big: 500 }[answers.boot] ?? 0;
-  const seatsOk = answers.people === 'solo' || car.seats >= 5;
+  // dividing by an undefined `need`. Boot targets are per-brand (a MINI's
+  // "big" is smaller than a BMW's).
+  const need = bootNeed[answers.boot] ?? 0;
+  const seatsOk = answers.people === 'solo' || car.seats >= seatsFloor;
   let score = need === 0 ? 1 : clamp(car.boot / need);
   if (!seatsOk) score *= 0.3;
-  if (answers.people === 'crew' && car.seats >= 7) {
+  if (answers.people === 'crew' && car.seats >= crewBonusSeats) {
     return { score: 1, reason: `${car.seats} proper seats for the full crew` };
   }
   let reason;
-  if (need >= 500 && car.boot >= 500) {
+  if (need > 0 && car.boot >= need) {
     reason = `${car.boot}-litre boot swallows the dogs, the tip runs, the lot`;
-  } else if (need >= 400 && car.boot >= 450) {
+  } else if (need > 0 && car.boot >= need * 0.9) {
     reason = `Big ${car.boot}-litre boot for buggies and the weekly shop`;
   }
   return { score, reason };
 }
 
-function scorePerformance(car, answers) {
-  const score = clamp((10.5 - car.zeroTo62) / 6);
+function scorePerformance(car, answers, tuning) {
+  const { zeroBase, span } = tuning.performance;
+  // Per-brand 0-62 curve: a MINI is quick for its class but never fast in
+  // absolute BMW terms, so its curve tops out at a slower time.
+  const score = clamp((zeroBase - car.zeroTo62) / span);
   const wantsIt = Number(answers.style) >= 4 || (answers.priorities || []).includes('performance');
   let reason;
   if (score >= 0.85 && wantsIt) {
@@ -212,35 +237,56 @@ function scorePerformance(car, answers) {
   return { score, reason };
 }
 
-function scoreEconomy(car, answers) {
+function scoreEconomy(car, answers, tuning) {
   const canCharge = canChargeAt(answers.charging);
+  // How much running costs matter, 0..1 by annual mileage. High-mileage buyers
+  // want genuinely cheap-per-mile cars; low-mileage buyers can indulge a
+  // thirsty one. `miles` scales the reward for efficiency and the penalty for a
+  // gas-guzzler, so mileage now moves the ranking for EVERY fuel.
+  const miles = mileageFraction(answers, tuning);
   let score;
   let reason;
   if (car.fuel === 'ev') {
-    score = canCharge ? 1 : 0.5;
-    if (canCharge) reason = 'Pennies per mile charging at home or work';
+    // EVs are cheapest per mile — the higher the mileage, the more that wins.
+    score = canCharge ? 1 : clamp(0.5 + 0.2 * miles);
+    if (canCharge) {
+      reason = miles >= 0.66
+        ? 'Pennies per mile charging at home or work — ideal for your big annual mileage'
+        : 'Pennies per mile charging at home or work';
+    }
   } else if (car.fuel === 'phev') {
-    score = canCharge ? 0.9 : 0.6;
+    score = canCharge ? clamp(0.85 + 0.1 * miles) : clamp(0.6 - 0.1 * miles);
     if (canCharge && car.evRange) reason = `Around ${car.evRange} electric miles covers most daily driving`;
   } else {
-    score = clamp((car.mpg - 25) / 35);
-    if (score >= 0.8) reason = `Frugal for what it is, around ${car.mpg}mpg`;
+    // Petrol/diesel: base on mpg, then tilt by mileage — a frugal car is worth
+    // more the further you drive, a thirsty one worth less.
+    const base = clamp((car.mpg - 25) / 35);
+    // At high mileage, pull the score toward its mpg merit harder (thirsty cars
+    // sink, frugal cars rise); at low mileage, soften both extremes toward 0.7.
+    score = clamp(base + (base - 0.5) * miles);
+    if (score >= 0.8) {
+      reason = miles >= 0.66
+        ? `Frugal at around ${car.mpg}mpg — kind on a big annual mileage`
+        : `Frugal for what it is, around ${car.mpg}mpg`;
+    }
   }
   return { score, reason };
 }
 
-function scoreSize(car, answers) {
+function scoreSize(car, answers, tuning) {
+  const { roadtripMinClass, cityDivisor } = tuning.size;
   if (answers.primaryUse === 'city') {
-    const score = (6 - car.sizeClass) / 5;
+    const score = (cityDivisor + 1 - car.sizeClass) / cityDivisor;
     return {
-      score,
+      score: clamp(score),
       reason: car.sizeClass <= 2 ? 'Compact enough for city streets and tight parking' : undefined,
     };
   }
   if (answers.primaryUse === 'roadtrips') {
+    const big = car.sizeClass >= roadtripMinClass;
     return {
-      score: car.sizeClass >= 3 ? 1 : 0.6,
-      reason: car.sizeClass >= 3 ? 'Big-car refinement for long motorway days' : undefined,
+      score: big ? 1 : 0.6,
+      reason: big ? 'Big-car refinement for long motorway days' : undefined,
     };
   }
   return { score: 0.7 };
@@ -265,7 +311,7 @@ const TAG_REASONS = {
   practical: 'Genuinely practical day to day',
 };
 
-function scoreCharacter(car, answers) {
+function scoreCharacter(car, answers, tuning) {
   const wanted = new Set(USE_TAGS[answers.primaryUse] || []);
   const style = Number(answers.style);
   if (style >= 4) wanted.add('drivers-car');
@@ -286,23 +332,27 @@ function scoreCharacter(car, answers) {
  *  Orchestration                                                    *
  * ---------------------------------------------------------------- */
 
-function effectiveWeights(answers) {
-  const w = { ...WEIGHTS };
+function effectiveWeights(answers, tuning) {
+  const w = { ...tuning.weights };
   for (const p of answers.priorities || []) {
-    const boosts = PRIORITY_BOOSTS[p] || {};
+    const boosts = tuning.priorityBoosts[p] || {};
     for (const [dim, add] of Object.entries(boosts)) w[dim] += add;
   }
-  if (isHighMileage(answers)) w.economy += 1;
+  // Running costs matter more the further you drive — a smooth ramp (0..1)
+  // rather than the old diesel-only step, so it moves the ranking for every
+  // fuel. At max mileage the economy dimension gains a full +1.
+  w.economy += mileageFraction(answers, tuning);
   if (Number(answers.style) >= 4) w.performance += 1;
   if (Number(answers.style) <= 2) w.performance = Math.max(0.5, w.performance - 0.5);
   return w;
 }
 
-function passesHardFilters(car, answers) {
+function passesHardFilters(car, answers, tuning) {
+  const { crewBoot, crewSeats, familySeats } = tuning.hardFilter;
   const [, max] = budgetRange(answers);
-  if (car.priceMin > max * STRETCH_FACTOR) return false;
-  if (answers.people === 'crew' && (car.seats < 5 || car.boot < 430)) return false;
-  if (answers.people === 'family' && car.seats < 4) return false;
+  if (car.priceMin > max * tuning.stretchFactor) return false;
+  if (answers.people === 'crew' && (car.seats < crewSeats || car.boot < crewBoot)) return false;
+  if (answers.people === 'family' && car.seats < familySeats) return false;
   return true;
 }
 
@@ -326,18 +376,18 @@ const SCORERS = {
  *
  * @returns {Match[]} Match: { car, score (0–100), stretch, reasons: string[] }
  */
-export function rankCars(answers, cars) {
-  const weights = effectiveWeights(answers);
+export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
+  const weights = effectiveWeights(answers, tuning);
   const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
 
   return cars
-    .filter((car) => passesHardFilters(car, answers))
+    .filter((car) => passesHardFilters(car, answers, tuning))
     .map((car) => {
       let weighted = 0;
       let stretch = false;
       const candidates = [];
       for (const [dim, scorer] of Object.entries(SCORERS)) {
-        const r = scorer(car, answers);
+        const r = scorer(car, answers, tuning);
         weighted += weights[dim] * r.score;
         if (r.stretch) stretch = true;
         if (r.reason && r.score >= 0.7) {
@@ -367,6 +417,6 @@ export const TOP_MATCHES = 3;
  * The user's top matches from a pool of cars.
  * @returns {{ matches: Match[] }}
  */
-export function matchCars(answers, cars) {
-  return { matches: rankCars(answers, cars).slice(0, TOP_MATCHES) };
+export function matchCars(answers, cars, tuning = DEFAULT_TUNING) {
+  return { matches: rankCars(answers, cars, tuning).slice(0, TOP_MATCHES) };
 }

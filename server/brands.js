@@ -13,6 +13,86 @@
  * dealer directory (which is a combined BMW+MINI feed) — is brand-agnostic.
  */
 
+/*
+ * Engine tuning per brand — the calibration constants the scorers read
+ * (server/engine.js). BMW_TUNING holds the engine's original hardcoded values,
+ * so BMW output is unchanged; MINI overrides only what must differ because its
+ * cars are small, light and quick-for-their-class rather than big and fast.
+ * Adding a third brand = another tuning block, no engine change.
+ *
+ * Every field maps to a specific scorer:
+ *   weights/priorityBoosts/stretchFactor — orchestration (effectiveWeights,
+ *     passesHardFilters).
+ *   performance.{zeroBase,span} — scorePerformance's (zeroBase - 0-62s)/span
+ *     curve. Lower zeroBase + tighter span = a slower absolute car still reads
+ *     as brisk (MINI is quick for its class, never fast in BMW terms).
+ *   practicality.{bootNeed,seatsFloor,crewSeats,crewBonusSeats} — scorePracticality.
+ *   size.{roadtripMinClass,cityDivisor} — scoreSize.
+ *   hardFilter.{crewBoot,crewSeats,familySeats} — passesHardFilters (a HARD
+ *     exclusion, so MINI needs lower floors or it's filtered out entirely).
+ *   mileage.{lowMiles,highMiles} — the annual-mileage ramp (scoreEconomy /
+ *     effectiveWeights); shared shape, tunable per brand.
+ */
+const BMW_TUNING = {
+  weights: {
+    budget: 3.0, body: 2.5, fuel: 2.5, practicality: 2.0,
+    performance: 1.5, economy: 1.5, size: 1.0, character: 2.0,
+  },
+  priorityBoosts: {
+    economy: { economy: 1.5, budget: 0.5 },
+    performance: { performance: 1.8, character: 0.5 },
+    comfort: { character: 1.0, size: 0.5 },
+    tech: { character: 1.0 },
+    image: { character: 1.0 },
+  },
+  stretchFactor: 1.15,
+  // 0-62 curve: (zeroBase - t) / span, clamped 0..1. BMW: 10.5s→0, 4.5s→1.
+  performance: { zeroBase: 10.5, span: 6 },
+  practicality: {
+    bootNeed: { small: 0, medium: 400, big: 500 },
+    seatsFloor: 5, // below this (unless solo) → *0.3
+    crewBonusSeats: 7, // 7+ seats for a crew → perfect
+  },
+  size: { roadtripMinClass: 3, cityDivisor: 5 },
+  hardFilter: { crewBoot: 430, crewSeats: 5, familySeats: 4 },
+  // Annual-mileage ramp: miles at/under lowMiles → 0, at/over highMiles → 1.
+  mileage: { lowMiles: 4000, highMiles: 20000 },
+};
+
+// MINI overrides. Recalibrated so a well-matched MINI reaches the same 85–95%
+// a well-matched BMW does — scored against MINI's own class.
+const MINI_TUNING = {
+  // 0-62: MINI range is ~6.0s (JCW) to ~8.5s. Solved so a JCW at 6.0s reads
+  // ~0.9 and a brisk 7.7s Cooper ~0.6 (BMW's curve gives that 7.7s car only
+  // 0.47): (11 - t)/5.5 → 6.0s=0.91, 7.7s=0.60, 8.3s=0.49.
+  performance: { zeroBase: 11, span: 5.5 },
+  practicality: {
+    // MINI boots are small (160–460L). Scale needs down so a Countryman (460L)
+    // satisfies "big" and a Hatch (210L) isn't crushed for "medium".
+    bootNeed: { small: 0, medium: 220, big: 350 },
+    seatsFloor: 4, // MINIs are 4/5 seats; don't punish a 4-seat Hatch
+    crewBonusSeats: 5, // 5 seats is a full house for a MINI
+  },
+  // A Countryman/Clubman (class 2) is "big" for a MINI, so road trips top out
+  // at class 2 rather than the BMW class-3 SUV expectation.
+  size: { roadtripMinClass: 2, cityDivisor: 5 },
+  // Don't hard-exclude MINIs for family/crew: a 5-seat Countryman (460L) should
+  // survive, and 4-seat MINIs shouldn't be filtered out of a "family" search.
+  hardFilter: { crewBoot: 350, crewSeats: 5, familySeats: 4 },
+};
+
+/** Deep-merge a brand's overrides onto the BMW base so partial tuning works. */
+function mergeTuning(overrides) {
+  const out = { ...BMW_TUNING };
+  for (const key of Object.keys(overrides || {})) {
+    const base = BMW_TUNING[key];
+    out[key] = (base && typeof base === 'object' && !Array.isArray(base))
+      ? { ...base, ...overrides[key] }
+      : overrides[key];
+  }
+  return out;
+}
+
 export const BRANDS = {
   bmw: {
     label: 'BMW',
@@ -21,6 +101,7 @@ export const BRANDS = {
     // Budget slider bounds. BMW used stock genuinely reaches £100k+, so the
     // full £0–150k range is right. (This is the base defined in questions.js.)
     budget: { max: 150000, default: [40000, 75000] },
+    tuning: BMW_TUNING,
   },
   mini: {
     label: 'MINI',
@@ -30,6 +111,45 @@ export const BRANDS = {
     // £40k in the feed), so a £150k slider leaves both thumbs bunched at the far
     // left. Cap at £50k with a default bracket around the median.
     budget: { max: 50000, default: [15000, 30000] },
+    tuning: mergeTuning(MINI_TUNING),
+    // Bespoke per-brand questions. This is the extensibility hook: a brand can
+    // add questions the shared pool doesn't have. Each added question is a
+    // normal question object (the client renders it generically) PLUS a
+    // `scoresAs` map: value → partial standard-answers that the engine already
+    // understands. applyBespokeAnswers (questions.js) folds those into the
+    // answer set before scoring, so the ENGINE never learns a new question id —
+    // a MINI "vibe" pick just contributes the same style/priorities/fuel
+    // signals a normal answer would. `insertAfter` places it in the flow.
+    questions: {
+      add: [
+        {
+          id: 'miniVibe',
+          title: 'WHAT’S YOUR MINI VIBE?',
+          help: 'Sets the character we lean towards. Pick the one that’s most you.',
+          insertAfter: 'style',
+          options: [
+            {
+              value: 'classic',
+              label: 'Classic charm',
+              sub: 'Iconic looks, easy-going',
+              scoresAs: { priorities: ['image'] },
+            },
+            {
+              value: 'electric',
+              label: 'Electric era',
+              sub: 'Quiet, clever, low-running-cost',
+              scoresAs: { priorities: ['tech', 'economy'] },
+            },
+            {
+              value: 'jcw',
+              label: 'John Cooper Works',
+              sub: 'Full go-kart, maximum attack',
+              scoresAs: { style: '5', priorities: ['performance'] },
+            },
+          ],
+        },
+      ],
+    },
   },
 };
 
@@ -49,4 +169,10 @@ export function normalizeBrand(brand) {
 /** The config record for a brand (always resolves — falls back to the default). */
 export function brandConfig(brand) {
   return BRANDS[normalizeBrand(brand)];
+}
+
+/** The engine tuning for a brand (defaults to BMW's, which are the engine's
+ * original constants). */
+export function brandTuning(brand) {
+  return brandConfig(brand).tuning;
 }

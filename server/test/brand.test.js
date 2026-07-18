@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { mapVehicle } from '../mapping.js';
-import { questionsForBrand } from '../questions.js';
-import { normalizeBrand, brandConfig } from '../brands.js';
+import { questionsForBrand, applyBespokeAnswers } from '../questions.js';
+import { normalizeBrand, brandConfig, brandTuning } from '../brands.js';
+import { rankCars } from '../engine.js';
 
 /* Feed-shaped fixtures (the fields mapVehicle actually reads). */
 const bmwVehicle = {
@@ -148,4 +149,101 @@ test('questionsForBrand(bmw) keeps the full option set', () => {
   const fuelValues = byId.fuel.options.map((o) => o.value);
   assert.ok(bodyValues.includes('saloon') && bodyValues.includes('coupe') && bodyValues.includes('mpv'));
   assert.ok(fuelValues.includes('diesel'));
+});
+
+/* ---- brand tuning: MINI scored against its own class ---- */
+
+// A small, quick-for-its-class MINI hatch (the kind the BMW curve under-scores).
+const miniHatch = {
+  id: 'h', name: 'MINI Cooper', line: 'Hatch', body: 'hatchback', fuel: 'petrol',
+  priceMin: 22000, priceMax: 22000, sizeClass: 1, seats: 4, boot: 210,
+  zeroTo62: 7.7, mpg: 45, tags: ['urban', 'drivers-car'], blurb: '',
+};
+
+test('brand tuning: BMW default is unchanged (no tuning arg == BMW tuning)', () => {
+  const answers = {
+    budget: [15000, 35000], bodyStyles: ['hatchback'], fuel: ['petrol'], charging: 'none',
+    primaryUse: 'city', people: 'solo', boot: 'small', mileage: 8000, style: '5', priorities: ['performance'],
+  };
+  const noArg = rankCars(answers, [miniHatch])[0].score;
+  const bmwArg = rankCars(answers, [miniHatch], brandTuning('bmw'))[0].score;
+  assert.equal(noArg, bmwArg, 'omitting tuning must equal the BMW tuning');
+});
+
+test('brand tuning: a sporty MINI scores higher under MINI tuning than BMW tuning', () => {
+  // A JCW — genuinely quick for a MINI (6.0s) — is exactly the car the BMW
+  // curve under-scores and MINI tuning should reward.
+  const jcw = {
+    ...miniHatch, id: 'jcw', name: 'MINI John Cooper Works', zeroTo62: 6.0, tags: ['urban', 'drivers-car', 'image'],
+  };
+  const answers = {
+    budget: [15000, 35000], bodyStyles: ['hatchback'], fuel: ['petrol'], charging: 'none',
+    primaryUse: 'fun', people: 'solo', boot: 'small', mileage: 8000, style: '5', priorities: ['performance', 'image'],
+  };
+  const bmwScore = rankCars(answers, [jcw], brandTuning('bmw'))[0].score;
+  const miniScore = rankCars(answers, [jcw], brandTuning('mini'))[0].score;
+  assert.ok(miniScore > bmwScore, `MINI tuning should lift a JCW (${miniScore} vs ${bmwScore})`);
+  assert.ok(miniScore >= 80, `a well-matched sporty MINI should reach a high score, got ${miniScore}`);
+});
+
+test('brand tuning: MINI hard-filters do not exclude a Countryman for a family', () => {
+  const countryman = {
+    ...miniHatch, id: 'cm', name: 'MINI Countryman', body: 'suv', sizeClass: 2, seats: 5, boot: 460, zeroTo62: 8.3,
+  };
+  const familyAnswers = {
+    budget: [15000, 40000], bodyStyles: ['suv'], fuel: ['open'], charging: 'none',
+    primaryUse: 'family', people: 'family', boot: 'medium', mileage: 10000, style: '3', priorities: ['comfort'],
+  };
+  const survivors = rankCars(familyAnswers, [countryman], brandTuning('mini'));
+  assert.equal(survivors.length, 1, 'the Countryman survives the MINI family filter');
+});
+
+/* ---- mileage now moves the ranking for all fuels ---- */
+
+test('annual mileage changes the ranking (efficient cars rise at high mileage)', () => {
+  const thirstyPetrol = {
+    ...miniHatch, id: 'p', name: 'MINI JCW', fuel: 'petrol', mpg: 34, zeroTo62: 6.1, tags: ['urban', 'drivers-car', 'image'],
+  };
+  const ev = {
+    ...miniHatch, id: 'e', name: 'MINI Electric', fuel: 'ev', mpg: 0, evRange: 200, tags: ['urban', 'tech', 'efficient'],
+  };
+  const base = {
+    budget: [15000, 40000], bodyStyles: ['hatchback'], fuel: ['open'], charging: 'home',
+    primaryUse: 'commute', people: 'solo', boot: 'small', style: '3', priorities: ['economy'],
+  };
+  const low = rankCars({ ...base, mileage: 3000 }, [thirstyPetrol, ev], brandTuning('mini'));
+  const high = rankCars({ ...base, mileage: 24000 }, [thirstyPetrol, ev], brandTuning('mini'));
+  const evLow = low.find((m) => m.car.id === 'e').score;
+  const evHigh = high.find((m) => m.car.id === 'e').score;
+  const petrolLow = low.find((m) => m.car.id === 'p').score;
+  const petrolHigh = high.find((m) => m.car.id === 'p').score;
+  // The EV should gain (or the petrol lose) ground as mileage climbs — i.e. the
+  // EV-minus-petrol gap widens in the EV's favour. (Old engine: no change.)
+  assert.ok((evHigh - petrolHigh) > (evLow - petrolLow),
+    `high mileage should favour the EV more (low gap ${evLow - petrolLow}, high gap ${evHigh - petrolHigh})`);
+});
+
+/* ---- bespoke per-brand question ---- */
+
+test('bespoke MINI question: inserted for MINI, absent for BMW, scoresAs stripped', () => {
+  const mini = questionsForBrand('mini');
+  const ids = mini.map((q) => q.id);
+  assert.ok(ids.includes('miniVibe'), 'MINI has the bespoke question');
+  assert.equal(ids.indexOf('miniVibe'), ids.indexOf('style') + 1, 'inserted right after style');
+  assert.ok(!questionsForBrand('bmw').some((q) => q.id === 'miniVibe'), 'BMW does not');
+  const vibe = mini.find((q) => q.id === 'miniVibe');
+  for (const o of vibe.options) assert.equal(o.scoresAs, undefined, 'scoresAs is engine-internal, never sent to client');
+});
+
+test('bespoke answer folds into standard fields (jcw → performance + style) without overriding explicit answers', () => {
+  const folded = applyBespokeAnswers('mini', { priorities: ['image'], miniVibe: 'jcw' });
+  assert.equal(folded.style, '5', 'jcw fills the sporty style');
+  assert.ok(folded.priorities.includes('performance'), 'jcw adds the performance priority');
+  assert.ok(folded.priorities.includes('image'), 'existing priority preserved');
+  // An explicit style must win over the bespoke nudge.
+  const explicit = applyBespokeAnswers('mini', { style: '1', miniVibe: 'jcw' });
+  assert.equal(explicit.style, '1', 'explicit style is not overridden');
+  // BMW has no bespoke questions → answers pass through untouched.
+  const bmw = applyBespokeAnswers('bmw', { style: '3' });
+  assert.deepEqual(bmw, { style: '3' });
 });

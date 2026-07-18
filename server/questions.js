@@ -117,10 +117,12 @@ export const QUESTIONS = [
     id: 'mileage',
     title: 'How many miles a year?',
     help: 'Roughly, it helps us weigh fuel type and running costs.',
-    // A number. High-mileage scoring (the diesel/economy boost) kicks in at
-    // ≥20,000, matching the old 'vhigh' band — see isHighMileage in engine.js.
+    // Annual mileage as a number. Feeds the economy dimension + its weight for
+    // every fuel via a 0..1 ramp (see mileageFraction in engine.js): the more
+    // you drive, the more running costs matter. Starts at 1,000 — nobody drives
+    // zero — and tops out at "25,000+".
     type: 'slider',
-    min: 0,
+    min: 1000,
     max: 25000,
     step: 1000,
     format: 'int',
@@ -278,26 +280,84 @@ const BRAND_COPY = {
  * the same [min, max] shape, and reworded labels map to the same values.
  */
 export function questionsForBrand(brand = 'bmw') {
-  const { budget } = brandConfig(brand);
+  const { budget, questions: brandQuestions } = brandConfig(brand);
   const copy = BRAND_COPY[brand] || {};
-  return QUESTIONS.map((q) => {
-    const c = copy[q.id] || {};
-    // Base fields, then brand copy for title/help.
-    const out = { ...q };
-    if (c.title) out.title = c.title;
-    if (c.help) out.help = c.help;
-    // Budget slider bounds from the registry (only the fields it specifies).
-    if (q.id === 'budget' && budget) Object.assign(out, budget);
-    // Options: drop brand-excluded ones, strip the `brands` marker, and apply
-    // any per-option label/sub overrides.
-    if (q.options) {
-      out.options = q.options
-        .filter((o) => !o.brands || o.brands.includes(brand))
-        .map(({ brands, ...rest }) => {
-          const oc = c.options?.[rest.value];
-          return oc ? { ...rest, ...oc } : rest;
-        });
+  const drop = new Set(brandQuestions?.drop || []);
+
+  const base = QUESTIONS
+    .filter((q) => !drop.has(q.id))
+    .map((q) => {
+      const c = copy[q.id] || {};
+      // Base fields, then brand copy for title/help.
+      const out = { ...q };
+      if (c.title) out.title = c.title;
+      if (c.help) out.help = c.help;
+      // Budget slider bounds from the registry (only the fields it specifies).
+      if (q.id === 'budget' && budget) Object.assign(out, budget);
+      // Options: drop brand-excluded ones, strip the `brands` marker, and apply
+      // any per-option label/sub overrides.
+      if (q.options) {
+        out.options = q.options
+          .filter((o) => !o.brands || o.brands.includes(brand))
+          .map(({ brands, ...rest }) => {
+            const oc = c.options?.[rest.value];
+            return oc ? { ...rest, ...oc } : rest;
+          });
+      }
+      return out;
+    });
+
+  // Splice in any bespoke per-brand questions at their requested position.
+  // `scoresAs` is engine-internal (see applyBespokeAnswers) and is stripped so
+  // it never crosses to the client — the block renders the question generically.
+  for (const add of brandQuestions?.add || []) {
+    const clean = {
+      ...add,
+      options: (add.options || []).map(({ scoresAs, ...rest }) => rest),
+    };
+    delete clean.insertAfter;
+    const at = add.insertAfter
+      ? base.findIndex((q) => q.id === add.insertAfter)
+      : -1;
+    if (at >= 0) base.splice(at + 1, 0, clean);
+    else base.push(clean);
+  }
+  return base;
+}
+
+/**
+ * Fold a brand's bespoke-question answers into the standard answer fields the
+ * engine already scores, then return the merged answers. A bespoke question
+ * never reaches the engine as its own id — instead each chosen option's
+ * `scoresAs` contributes the same signals a normal answer would (a style value,
+ * extra priorities, a fuel lean). This is what keeps the engine brand-agnostic:
+ * new brands add questions + mappings, the scorers never change.
+ *
+ * Contributions merge conservatively: array fields (priorities, fuel,
+ * bodyStyles) are unioned; scalar fields (style) only fill a gap the user left
+ * blank, so an explicit answer always wins over a bespoke nudge.
+ */
+export function applyBespokeAnswers(brand, answers) {
+  const adds = brandConfig(brand).questions?.add || [];
+  if (!adds.length) return answers;
+  const merged = { ...answers };
+  for (const q of adds) {
+    const picked = merged[q.id];
+    if (picked == null) continue;
+    const values = Array.isArray(picked) ? picked : [picked];
+    for (const v of values) {
+      const opt = (q.options || []).find((o) => o.value === v);
+      const contrib = opt?.scoresAs;
+      if (!contrib) continue;
+      for (const [field, val] of Object.entries(contrib)) {
+        if (Array.isArray(val)) {
+          const existing = Array.isArray(merged[field]) ? merged[field] : [];
+          merged[field] = [...new Set([...existing, ...val])];
+        } else if (merged[field] == null) {
+          merged[field] = val; // scalar: only fill a blank, never override
+        }
+      }
     }
-    return out;
-  });
+  }
+  return merged;
 }
