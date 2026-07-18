@@ -81,47 +81,60 @@ it in line:
 
 ---
 
-# MINI (Sytner Luton) tone & style guide
+# MINI tone & style guide
 
-Observed from `sytnerlutonmini.co.uk` (homepage, about, finance). MINI's voice
-is the near-opposite of BMW's understatement — where BMW lets the cars do the
-talking, MINI *performs*. This is the register the MINI quiz copy adopts.
+Observed from `mini.co.uk` (national brand/product voice) and
+`sytnerlutonmini.co.uk` (retailer voice). Revisited against both, MINI's voice
+is **two layers** that the quiz should blend:
+
+- **MINI HQ (product) — playful & characterful.** Short punchy lines with a wink:
+  "Look who's gone electric.", "The original reborn.", "Meet the ace in the
+  pack.", "Powered up icon." This is where the "go-kart" spirit lives.
+- **Sytner (retailer) — warm & premium.** Service-forward and reassuring: "a
+  comfortable and relaxed environment", "a welcoming environment and a premium
+  experience", "expert guidance across sales, servicing and ownership".
+
+So MINI is **playful *and* premium**, not playful *instead of* premium — an
+earlier version of this guide overstated it as "the near-opposite of BMW". BMW is
+understated-premium; MINI is spirited-premium. Both are confident; MINI just
+smiles more.
 
 ## Voice in three words
 
-**Playful. Spirited. Iconic.** Cheeky and warm, leaning on MINI's "go-kart"
-character and heritage. It has fun with the words — but stays clear, never
-cryptic.
+**Spirited. Characterful. Warm.** Fun and full of personality, but never slangy
+or laddish, and always clear. The joy is in the framing, not in being cryptic.
 
 ## What MINI's copy actually does
 
 - **Headings are UPPERCASE with a full stop**: "FIND YOUR MINI.", "SYTNER
-  LUTON.", "WHY MINI?", "ALL IN. SIMPLY SMART." The full stop is a MINI
-  signature — a confident little beat, not a shout.
+  LUTON.", "NEW ELECTRIC COLOURS." The full stop is a MINI signature — a
+  confident little beat, not a shout.
 - **Short, punchy declaratives** with personality: "Look who's gone electric.",
-  "The original reborn.", "Meet the ace in the pack.", "Powered up icon." One
-  idea per line, landed with a full stop.
-- **"go-kart" is the core brand metaphor** — agility, fun, cornering. "Turning
-  a new corner go-kart style.", "From speed bumps to mountain peaks." Driving a
-  MINI is framed as a *feeling*, not a spec.
-- **Heritage + character words**: "icon", "original", "free spirit", "reborn",
-  "ace". MINI sells identity and joy, not refinement or status.
-- **Warm and human**, like Grassick's, but wittier — it allows itself a wink
-  where BMW stays earnest.
-- **Numbers still stated plainly** for prices/finance ("From £26,905 OTR*") —
-  the play is in the framing, not the facts.
+  "The original reborn.", "The refined free spirit.", "Powered up icon." One
+  idea per line.
+- **"go-kart" is the core brand metaphor** — agility, fun, cornering ("Turning a
+  new corner go-kart style."). Driving a MINI is framed as a *feeling*.
+- **Heritage + identity words**: "icon", "original", "free spirit", "reborn",
+  "ace" — plus MINI's design/personalisation streak, seen in edition names
+  (Monochrome, Paul Smith, Oxford Edition). MINI sells identity and joy.
+- **"All-Electric MINI …"** is the standard EV phrasing; prices are framed
+  invitingly as **"From £X OTR*"**. Numbers stay plain; the play is in the setup.
+- **Warm and human**, like Grassick's, but with a smile — never a joke at the
+  customer's expense, never crude.
 
 ## What this means for MINI matcher copy
 
-1. **Titles become UPPERCASE-with-a-full-stop and gain a bit of cheek** where it
-   fits: "What's your budget?" → "WHAT'S THE DAMAGE?"; "Comfort or sportiness?"
-   → "HOW DO YOU LIKE TO DRIVE?" Still a clear question, just in MINI's voice.
+1. **Titles are UPPERCASE-with-a-full-stop and spirited, but not slangy.** Good:
+   "WHICH SHAPE SPEAKS TO YOU?", "WHERE WILL IT LIVE?", "HOW DO YOU LIKE TO
+   DRIVE?", "HOW FAR DO YOU ROAM?" Avoid forced cheek or money slang — "WHAT'S
+   THE DAMAGE?" and "CART ABOUT" overshoot into laddish; MINI stays inviting.
 2. **Option labels lead with character, keep the meaning obvious.** "Weekend
-   driving" → "Weekend fun"; "Maximum sportiness" → "Full go-kart"; "City
-   driving" → "Nipping round town." The value it maps to is unchanged.
+   fun", "Full go-kart", "Nipping round town" — the mapped value is unchanged.
 3. **`sub` lines can be playful** ("go-kart grins on your favourite B-road")
-   rather than purely factual, but never at the cost of clarity.
-4. **Keep it kind and inclusive**, not laddish — MINI is joyful, not aggressive.
-5. **BMW copy is untouched** — these two voices live side by side, chosen by the
-   configured brand. Meaning and answer values are identical across both so the
-   shared scoring engine is unaffected; only the words change.
+   but never at the cost of clarity, and never crude.
+4. **Keep it warm and premium, not just cheeky.** A MINI buyer should feel
+   welcomed and understood, matching Sytner's "premium experience" — playful
+   framing over a genuinely helpful question.
+5. **BMW copy is untouched** — the two voices live side by side, chosen by the
+   configured brand. Meaning and answer `value`s are identical across both, so
+   the shared scoring engine is unaffected; only the words change.

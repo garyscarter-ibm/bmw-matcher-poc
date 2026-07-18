@@ -177,8 +177,8 @@ export const BUDGET_BANDS = {
 const BRAND_COPY = {
   mini: {
     budget: {
-      title: 'WHAT’S THE DAMAGE?',
-      help: 'A rough on-the-road figure. We’ll flag anything that’s a cheeky stretch.',
+      title: 'WHAT’S THE BUDGET?',
+      help: 'A rough on-the-road figure. We’ll flag anything that’s a slight stretch.',
     },
     bodyStyles: {
       title: 'WHICH SHAPE SPEAKS TO YOU?',
@@ -230,11 +230,11 @@ const BRAND_COPY = {
       },
     },
     boot: {
-      title: 'HOW MUCH DO YOU NEED TO CART ABOUT?',
+      title: 'HOW MUCH DO YOU NEED TO CARRY?',
       options: {
-        small: { label: 'Barely anything', sub: 'A weekend bag will do' },
+        small: { label: 'Not much', sub: 'A weekend bag will do' },
         medium: { label: 'A fair bit', sub: 'Weekly shop, buggy, luggage' },
-        big: { label: 'Cram it full', sub: 'Dogs, kit, the lot' },
+        big: { label: 'As much as it holds', sub: 'Dogs, kit, the lot' },
       },
     },
     mileage: {
