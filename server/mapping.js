@@ -72,12 +72,15 @@ const MODEL_SPECS_BMW = {
  * size scoring is comparable. zeroTo62 is the base trim; miniTrimZeroTo62
  * speeds up JCW / S / SE trims. Every current MINI is a 4/5-seat small car. */
 const MODEL_SPECS_MINI = {
-  Hatch: { boot: 210, seats: 4, zeroTo62: 7.7, sizeClass: 1 }, // 3/5-door Cooper
-  Convertible: { boot: 160, seats: 4, zeroTo62: 7.7, sizeClass: 1 },
-  Clubman: { boot: 360, seats: 5, zeroTo62: 7.2, sizeClass: 2 }, // estate-ish
-  Countryman: { boot: 460, seats: 5, zeroTo62: 8.3, sizeClass: 2 }, // crossover/SUV
-  Aceman: { boot: 300, seats: 5, zeroTo62: 7.9, sizeClass: 1 }, // small electric crossover
-  Electric: { boot: 210, seats: 4, zeroTo62: 7.3, sizeClass: 1 }, // electric Hatch
+  // zeroTo62 = the BASE (slowest common) trim for the line, i.e. the Cooper C;
+  // miniTrimZeroTo62 speeds up S / SE / JCW trims to their real figures.
+  Hatch: { boot: 210, seats: 4, zeroTo62: 7.7, sizeClass: 1 }, // Cooper C 3/5-door
+  Convertible: { boot: 160, seats: 4, zeroTo62: 7.7, sizeClass: 1 }, // Cooper C cabrio
+  Clubman: { boot: 360, seats: 5, zeroTo62: 9.1, sizeClass: 2 }, // Cooper Classic; JCW 306HP → 4.9
+  Countryman: { boot: 460, seats: 5, zeroTo62: 8.3, sizeClass: 2 }, // Countryman C crossover
+  Aceman: { boot: 300, seats: 5, zeroTo62: 7.9, sizeClass: 1 }, // Aceman E; SE 7.1, JCW 6.4
+  Electric: { boot: 210, seats: 4, zeroTo62: 7.3, sizeClass: 1 }, // electric Hatch (Cooper E)
+  Coupe: { boot: 280, seats: 2, zeroTo62: 6.9, sizeClass: 1 }, // discontinued R58 JCW two-seater
 };
 
 /** Fallback when the feed carries a line we have no specs for. */
@@ -238,6 +241,7 @@ function miniLine(title = '') {
   if (/clubman/i.test(t)) return 'Clubman';
   if (/aceman/i.test(t)) return 'Aceman';
   if (/convertible|cabrio/i.test(t)) return 'Convertible';
+  if (/coupe|coupé/i.test(t)) return 'Coupe'; // discontinued R58 two-seater
   if (/electric/i.test(t)) return 'Electric';
   return t.split(' ')[0] || 'Hatch';
 }
@@ -249,15 +253,34 @@ function miniBody(line, derivative = '') {
   if (line === 'Countryman' || line === 'Aceman') return 'suv';
   if (line === 'Clubman' || d.includes('clubman')) return 'estate';
   if (line === 'Convertible' || d.includes('convertible') || d.includes('cabrio')) return 'convertible';
+  if (line === 'Coupe' || d.includes('coupe') || d.includes('coupé')) return 'coupe';
   return 'hatchback';
 }
 
 /** 0-62 for a MINI trim: JCW is quick, S/SE quicker than the Cooper base. */
-function miniTrimZeroTo62(base, derivative = '') {
+function miniTrimZeroTo62(base, line = '', derivative = '') {
+  // MINI's 0-62 is set mostly by the trim badge, not the line, so map to the
+  // real absolute figure per trim (figures are current F66/J01-gen MINI, taken
+  // against the trim vocabulary in the feed — see fixtures/mini-raw.json).
   const d = derivative.toLowerCase();
-  if (/john cooper works|\bjcw\b/.test(d)) return Math.max(5.2, base - 2.2);
-  if (/\bcooper s\b|\bcooper se\b|\bs all4\b|\bse all4\b|\bcooper s\b/.test(d)) return Math.max(6.0, base - 1.2);
-  return base;
+  const jcw = /john cooper works|\bjcw\b/.test(d);
+  if (jcw) {
+    if (line === 'Clubman') return 4.9; // Clubman JCW 306HP
+    if (line === 'Countryman') return 5.4; // Countryman JCW ALL4
+    if (line === 'Aceman') return 6.4; // JCW Aceman (electric)
+    return 6.1; // Hatch JCW (petrol ~6.1, electric ~5.9)
+  }
+  // "Cooper S E" / "SE" / electric S = the quick electric; "Cooper S" = petrol S.
+  const electricS = /\bs\s?e\b|\bse\b/.test(d);
+  const cooperS = /\bcooper s\b|\bs all4\b|\bs sport\b|\bs exclusive\b|\bs classic\b|\bconvertible s\b/.test(d);
+  if (line === 'Countryman') {
+    if (electricS) return 5.6; // Countryman SE ALL4
+    if (cooperS) return 7.4; // Countryman S ALL4
+    return base; // Countryman C
+  }
+  if (electricS) return 6.7; // Cooper SE (electric hot hatch)
+  if (cooperS) return 6.6; // Cooper S (petrol)
+  return base; // Cooper C / Classic / Exclusive base petrol, or Electric base
 }
 
 /** Tags for a MINI — the MINI range skews playful/urban/tech. */

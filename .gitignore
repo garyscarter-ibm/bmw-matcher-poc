@@ -1,3 +1,7 @@
 node_modules/
 .DS_Store
 .claude/
+
+# Stock fixtures: keep the mapped-car snapshots (small, used for engine
+# validation); ignore the huge raw feed dumps (regenerate via scripts/dump-stock.js).
+/fixtures/*-raw.json
