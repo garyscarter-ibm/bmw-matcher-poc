@@ -34,8 +34,10 @@ import {
 import {
   fetchRetailerStock, fetchNearbyStock, startStockWarmer, StockUnavailableError,
 } from './stock.js';
-import { QUESTIONS, BUDGET_BANDS, questionsForBrand } from './questions.js';
-import { normalizeBrand } from './brands.js';
+import {
+  QUESTIONS, BUDGET_BANDS, questionsForBrand, applyBespokeAnswers,
+} from './questions.js';
+import { normalizeBrand, brandTuning } from './brands.js';
 
 const PORT = Number(process.env.PORT) || 8787;
 const MAX_BODY_BYTES = 16 * 1024; // quiz answers are tiny; reject anything bigger
@@ -194,7 +196,10 @@ async function handleMatch(req, res) {
     return sendJson(res, 500, { error: 'Something went wrong finding matches' });
   }
 
-  const { matches } = matchCars(answers, cars);
+  // Fold any bespoke per-brand question answers into the standard fields the
+  // engine scores (see applyBespokeAnswers) before ranking.
+  const scored = applyBespokeAnswers(brand, answers);
+  const { matches } = matchCars(scored, cars, brandTuning(brand));
   return sendJson(res, 200, { matches: matches.map(publicMatch) });
 }
 
@@ -228,7 +233,7 @@ async function handlePreview(req, res) {
   // never take the process down with an uncaught throw.
   let matches = [];
   try {
-    matches = rankCars(answers, cars).slice(0, PREVIEW_COUNT);
+    matches = rankCars(applyBespokeAnswers(brand, answers), cars, brandTuning(brand)).slice(0, PREVIEW_COUNT);
   } catch (err) {
     console.warn('[preview] ranking failed:', err?.message);
   }
@@ -251,7 +256,7 @@ async function handleNearby(req, res) {
   let nearby = [];
   try {
     const cars = await fetchNearbyStock(brand, retailer);
-    nearby = rankCars(answers, cars).slice(0, TOP_MATCHES);
+    nearby = rankCars(applyBespokeAnswers(brand, answers), cars, brandTuning(brand)).slice(0, TOP_MATCHES);
   } catch (err) {
     console.warn('[nearby] stock unavailable:', err?.message);
   }

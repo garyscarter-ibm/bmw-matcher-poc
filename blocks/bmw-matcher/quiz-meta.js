@@ -62,6 +62,8 @@ export const PILL_LABEL = {
     roadtrips: 'Road trips', fun: 'Weekend fun',
   },
   people: { solo: 'Just me', family: 'Small family', crew: '5+ seats' },
+  // Bespoke MINI-only question (see brands.js questions.add); harmless on BMW.
+  miniVibe: { classic: 'Classic charm', electric: 'Electric era', jcw: 'John Cooper Works' },
   boot: { small: 'Small boot', medium: 'Medium boot', big: 'Big boot' },
   mileage: {
     low: 'Under 6k mi/yr', mid: '6–12k mi/yr', high: '12–20k mi/yr', vhigh: '20k+ mi/yr',

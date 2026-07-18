@@ -26,6 +26,10 @@
   --bmwm-accent: #1c69d4;       /* BMW Blue — primary CTA, links, highlights */
   --bmwm-accent-ink: #ffffff;   /* text/icon colour on the accent */
   --bmwm-accent-secondary: #0085ac; /* BMW i teal */
+  /* Spot accent for small highlights (progress bar, score badge, slider fill).
+     BMW = the same blue; MINI overrides this to British Racing Green so its
+     buttons can be black while the green still appears, sparingly. */
+  --bmwm-accent-spot: var(--bmwm-accent);
   --bmwm-line: #d6d6d6;         /* hairline dividers/borders on the light theme */
 
   /* Semantic aliases so the shared selectors below read cleanly. */
@@ -86,10 +90,12 @@
 
 /* ------------------------------ MINI theme ---------------------------- *
  * Applied when the block is configured Brand: MINI (the .bmwm-mini class,
- * added in decorate). MINI's identity vs BMW: black/white base with a British
- * Racing Green accent, pill-shaped buttons + softly-rounded cards, and a serif
- * UPPERCASE headline face. Everything is a token override — no structural CSS
- * changes — because the base selectors all read the --bmwm-* custom properties.
+ * added in decorate). MINI's real identity (per sytnerlutonmini.co.uk): a
+ * BLACK-on-white base — black is the primary button, white-with-a-2px-black-
+ * pill-border is the secondary. British Racing Green + teal are rare SPOT
+ * accents (score badge, progress bar, slider fill, focus ring), never the
+ * button colour. Serif UPPERCASE headlines with tight leading. Everything is a
+ * token override + a few MINI-scoped rules — no structural change to the base.
  *
  * Fonts are MINI's real web faces, self-hosted from ./fonts for this private
  * demo (never publicly hosted). Fallbacks stay in each stack so a missing file
@@ -120,21 +126,28 @@
   --bmwm-font-bold: 'MINISansSerif-Bold', 'Helvetica Neue', arial, sans-serif;
   --bmwm-font-body: 'MINISansSerif-Regular', 'Helvetica Neue', arial, sans-serif;
 
-  /* colour: black/white base, British Racing Green accent */
+  /* colour: black-on-white. The "accent" (primary button fill, selected-state
+     border) is near-black — that's MINI's primary. British Racing Green + teal
+     are SPOT colours applied only to small highlights (see --bmwm-accent-spot
+     rules below), not the button colour. */
   --bmwm-ink: #000000;
   --bmwm-ink-strong: #000000;
   --bmwm-ink-muted: #555555;
-  --bmwm-accent: #01693e;          /* MINI British Racing Green */
+  --bmwm-accent: #111111;          /* near-black = MINI primary */
   --bmwm-accent-ink: #ffffff;
-  --bmwm-accent-secondary: #56c5e5;
-  --bmwm-line: #d0d0d0;
+  --bmwm-accent-spot: #01693e;     /* British Racing Green — used sparingly */
+  --bmwm-accent-secondary: #0085ac; /* MINI teal — secondary spot */
+  /* Card/tile hairlines stay a soft grey (MINI reserves solid black for
+     buttons + selected states, applied explicitly below), so the quiz doesn't
+     read as a grid of heavy black boxes. */
+  --bmwm-line: #cfcfcf;
 
-  /* geometry: pill buttons, softly-rounded cards */
-  --bmwm-radius: 4px;
+  /* geometry: fully-round pill controls, softly-rounded cards */
+  --bmwm-radius: 6px;
   --bmwm-radius-control: 999px;
 }
 
-/* MINI headlines are set UPPERCASE in the serif face. */
+/* MINI headlines: serif, UPPERCASE, tight leading (MINI sets ~0.95). */
 .bmwm.bmwm-mini .bmwm-title,
 .bmwm.bmwm-mini .bmwm-question,
 .bmwm.bmwm-mini .bmwm-subhead,
@@ -142,6 +155,43 @@
 .bmwm.bmwm-mini .bmwm-nearby-heading {
   text-transform: uppercase;
   font-family: var(--bmwm-font-heading);
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+}
+
+/* --- MINI buttons: black primary, outline-pill secondary --- */
+/* Secondary/ghost (Back): white fill, 2px black pill border — MINI's signature
+   secondary. The base .bmwm-btn uses a 1px border, so bump it to 2px here. */
+.bmwm.bmwm-mini .bmwm-btn-ghost {
+  border-width: 2px;
+  font-family: var(--bmwm-font-bold);
+}
+.bmwm.bmwm-mini .bmwm-btn-primary {
+  border-width: 2px; /* match the secondary's weight so the pair aligns */
+}
+.bmwm.bmwm-mini .bmwm-btn-primary:not(:disabled):hover { filter: none; background: #000; border-color: #000; }
+
+/* --- MINI spot-green touches (small highlights only) --- */
+/* Progress bar, score badges, slider fill and the focus ring carry the brand
+   green so it appears — but sparingly, the way the real site uses it. */
+.bmwm.bmwm-mini .bmwm-progress-bar { background: var(--bmwm-accent-spot); }
+.bmwm.bmwm-mini .bmwm-score {
+  background: var(--bmwm-accent-spot);
+  border-color: var(--bmwm-accent-spot);
+  color: #fff;
+}
+.bmwm.bmwm-mini .bmwm-range-fill,
+.bmwm.bmwm-mini .bmwm-slider-input::-webkit-slider-thumb,
+.bmwm.bmwm-mini .bmwm-slider-input::-moz-range-thumb { background: var(--bmwm-accent-spot); }
+.bmwm.bmwm-mini .bmwm-slider-input::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--bmwm-accent-spot); }
+.bmwm.bmwm-mini button:focus-visible,
+.bmwm.bmwm-mini .bmwm-slider-input:focus-visible::-webkit-slider-thumb {
+  outline-color: var(--bmwm-accent-spot);
+  box-shadow: 0 0 0 3px rgba(1, 105, 62, 0.35);
+}
+/* Selected option: black border (the accent) with a subtle green inner tick. */
+.bmwm.bmwm-mini .bmwm-option.is-selected {
+  box-shadow: inset 0 0 0 2px var(--bmwm-accent), inset 4px 0 0 var(--bmwm-accent-spot);
 }
 
 .bmwm-kicker {
