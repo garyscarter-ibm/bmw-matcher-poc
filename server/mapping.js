@@ -74,9 +74,11 @@ const MODEL_SPECS_BMW = {
 const MODEL_SPECS_MINI = {
   // zeroTo62 = the BASE (slowest common) trim for the line, i.e. the Cooper C;
   // miniTrimZeroTo62 speeds up S / SE / JCW trims to their real figures.
+  // Figures are official MINI 0-62 mph, sourced from carwow / Auto Express /
+  // ev-database / BMW Group Press (see docs/mini-0-62.md).
   Hatch: { boot: 210, seats: 4, zeroTo62: 7.7, sizeClass: 1 }, // Cooper C 3/5-door
-  Convertible: { boot: 160, seats: 4, zeroTo62: 7.7, sizeClass: 1 }, // Cooper C cabrio
-  Clubman: { boot: 360, seats: 5, zeroTo62: 9.1, sizeClass: 2 }, // Cooper Classic; JCW 306HP → 4.9
+  Convertible: { boot: 160, seats: 4, zeroTo62: 8.2, sizeClass: 1 }, // Cooper C cabrio
+  Clubman: { boot: 360, seats: 5, zeroTo62: 9.0, sizeClass: 2 }, // Cooper (F54); S 7.3, JCW 306HP 4.9
   Countryman: { boot: 460, seats: 5, zeroTo62: 8.3, sizeClass: 2 }, // Countryman C crossover
   Aceman: { boot: 300, seats: 5, zeroTo62: 7.9, sizeClass: 1 }, // Aceman E; SE 7.1, JCW 6.4
   Electric: { boot: 210, seats: 4, zeroTo62: 7.3, sizeClass: 1 }, // electric Hatch (Cooper E)
@@ -257,30 +259,46 @@ function miniBody(line, derivative = '') {
   return 'hatchback';
 }
 
-/** 0-62 for a MINI trim: JCW is quick, S/SE quicker than the Cooper base. */
+/** 0-62 for a MINI trim: JCW is quick, S/SE quicker than the Cooper base.
+ *  All figures are official MINI 0-62 mph (see docs/mini-0-62.md for sources). */
 function miniTrimZeroTo62(base, line = '', derivative = '') {
   // MINI's 0-62 is set mostly by the trim badge, not the line, so map to the
-  // real absolute figure per trim (figures are current F66/J01-gen MINI, taken
-  // against the trim vocabulary in the feed — see fixtures/mini-raw.json).
+  // real absolute figure per trim.
   const d = derivative.toLowerCase();
   const jcw = /john cooper works|\bjcw\b/.test(d);
   if (jcw) {
-    if (line === 'Clubman') return 4.9; // Clubman JCW 306HP
-    if (line === 'Countryman') return 5.4; // Countryman JCW ALL4
-    if (line === 'Aceman') return 6.4; // JCW Aceman (electric)
-    return 6.1; // Hatch JCW (petrol ~6.1, electric ~5.9)
+    if (line === 'Clubman') return 4.9; // Clubman JCW 306HP (Auto Express / BMW Press)
+    if (line === 'Countryman') return 5.4; // Countryman JCW ALL4 (carwow)
+    if (line === 'Aceman') return 6.4; // JCW Aceman electric (carwow / ev-database)
+    if (line === 'Convertible') return 6.4; // JCW Convertible (BMW Group Press)
+    return 6.1; // Hatch JCW (petrol 6.1; electric JCW 5.9 — feed can't split, use 6.1)
   }
-  // "Cooper S E" / "SE" / electric S = the quick electric; "Cooper S" = petrol S.
+  // "Cooper S E" / "SE" = the quick electric S; "Cooper S" = petrol S.
   const electricS = /\bs\s?e\b|\bse\b/.test(d);
   const cooperS = /\bcooper s\b|\bs all4\b|\bs sport\b|\bs exclusive\b|\bs classic\b|\bconvertible s\b/.test(d);
-  if (line === 'Countryman') {
-    if (electricS) return 5.6; // Countryman SE ALL4
-    if (cooperS) return 7.4; // Countryman S ALL4
-    return base; // Countryman C
+  if (line === 'Aceman') {
+    if (electricS) return 7.1; // Aceman SE (carwow / ev-database)
+    return base; // Aceman E — 7.9
   }
-  if (electricS) return 6.7; // Cooper SE (electric hot hatch)
-  if (cooperS) return 6.6; // Cooper S (petrol)
-  return base; // Cooper C / Classic / Exclusive base petrol, or Electric base
+  if (line === 'Countryman') {
+    if (electricS) return 5.6; // Countryman SE ALL4 (ev-database / carwow)
+    if (cooperS) return 7.1; // Countryman S ALL4 (carwow)
+    return base; // Countryman C — 8.3
+  }
+  if (line === 'Convertible') {
+    if (cooperS) return 6.9; // Cooper Convertible S (Auto Express official 0-62)
+    return base; // Cooper Convertible C — 8.2
+  }
+  if (line === 'Clubman') {
+    if (cooperS) return 7.3; // Clubman Cooper S (Auto Express 0-62)
+    return base; // Clubman Cooper — 9.0
+  }
+  // Hatch (petrol or electric). "Cooper E" (plain electric, no S) is 7.3s — the
+  // Hatch base is the petrol Cooper C (7.7), so give the plain electric its own.
+  if (electricS) return 6.7; // Cooper SE electric hot hatch (ev-database / carwow)
+  if (/\bcooper e\b|\belectric\b|\blevel \d\b/.test(d)) return 7.3; // Cooper E electric hatch
+  if (cooperS) return 6.6; // Cooper S petrol hatch (carwow / parkers)
+  return base; // Cooper C / Classic / Exclusive base petrol (7.7)
 }
 
 /** Tags for a MINI — the MINI range skews playful/urban/tech. */
