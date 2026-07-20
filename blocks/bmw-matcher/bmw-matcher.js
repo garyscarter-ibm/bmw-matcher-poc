@@ -98,10 +98,31 @@ function brand(block) {
 }
 
 /** Brand-specific display copy, keyed by brand. `name` is the marque, `title`
- * the intro headline, `noun` how we refer to the vehicles in body copy. */
+ * the intro headline, `cta` the intro button. `lede(count, retailer)` builds
+ * the intro paragraph — it's a function because the two brands phrase it
+ * differently, not just swap nouns.
+ *
+ * Voices follow docs/tone-style-guide.md: BMW is assured and understated (the
+ * flat, unapologetic close borrowed from bmw.co.uk's register), MINI keeps the
+ * warmth but smiles. Deliberately no "quiz" anywhere — this is a matcher, and
+ * the word undersold it. */
 const BRAND_COPY = {
-  bmw: { name: 'BMW', title: 'Find your perfect BMW', noun: 'cars' },
-  mini: { name: 'MINI', title: 'Find your perfect MINI', noun: 'MINIs' },
+  bmw: {
+    name: 'BMW',
+    title: 'Find your perfect BMW',
+    cta: 'Find my BMW',
+    lede: (count, retailer) => `${count} quick questions about your life, your miles and your budget. `
+      + `We’ll match you with the three approved-used cars at ${retailer} that suit you best, `
+      + 'and tell you why.',
+  },
+  mini: {
+    name: 'MINI',
+    title: 'Find your perfect MINI',
+    cta: 'Let’s find your MINI',
+    lede: (count, retailer) => `${count} quick questions about your life, your miles and your money. `
+      + `We’ll find the three MINIs at ${retailer} with your name on them — `
+      + 'and tell you exactly why.',
+  },
 };
 
 async function apiGetQuestions(base, retailer, brandKey) {
@@ -237,10 +258,9 @@ function renderIntro(root, ctx) {
   intro.append(
     el('p', 'bmwm-kicker', 'The unofficial UK matchmaker'),
     el('h1', 'bmwm-title', copy.title),
-    el('p', 'bmwm-lede',
-      `Answer ${count} quick questions about your life, your miles and your budget, and we’ll match you with your top three approved-used ${copy.noun} at ${ctx.retailerLabel}, with the reasons why. We hope it helps.`),
+    el('p', 'bmwm-lede', copy.lede(count, ctx.retailerLabel)),
   );
-  const start = el('button', 'bmwm-btn bmwm-btn-primary', 'Start the quiz');
+  const start = el('button', 'bmwm-btn bmwm-btn-primary', copy.cta);
   start.addEventListener('click', () => ctx.showQuestion(0));
   intro.append(start);
   root.append(intro);
@@ -818,17 +838,17 @@ function renderStatus(root, { kicker, title, message, retryLabel, onRetry }) {
 }
 
 /**
- * Skeleton placeholder for the intro screen, shown while the quiz definition
+ * Skeleton placeholder for the intro screen, shown while the question set
  * loads (GET /api/questions). Mirrors renderIntro — kicker, title, two lede
- * lines, a "Start" button block — so the boot reads as "the intro, arriving"
- * rather than a "Loading the quiz" status message that then swaps out. Reuses
+ * lines, a CTA button block — so the boot reads as "the intro, arriving"
+ * rather than a "Loading" status message that then swaps out. Reuses
  * the .bmwm-skel shimmer; reduced-motion users get a static tint.
  */
 function renderIntroSkeleton(root) {
   root.replaceChildren();
   const intro = el('div', 'bmwm-intro bmwm-intro-skeleton');
   intro.setAttribute('aria-busy', 'true');
-  intro.setAttribute('aria-label', 'Loading the quiz');
+  intro.setAttribute('aria-label', 'Loading the matcher');
   const skel = (mod) => el('div', `bmwm-skel ${mod}`);
   intro.append(
     skel('bmwm-skel-kicker'),
@@ -1109,9 +1129,9 @@ export default async function decorate(block) {
     renderResults(block, ctx, answers);
   };
 
-  // The quiz definition lives behind the API, so load it before rendering.
+  // The question set lives behind the API, so load it before rendering.
   const boot = async () => {
-    // Skeleton the intro while the quiz definition loads — reads as the page
+    // Skeleton the intro while the question set loads — reads as the page
     // arriving rather than a "Loading…" status. (A deep-link run swaps to the
     // results skeleton a moment later inside renderResults.)
     renderIntroSkeleton(block);
@@ -1120,7 +1140,7 @@ export default async function decorate(block) {
     } catch {
       renderStatus(block, {
         kicker: 'Sorry',
-        title: 'We couldn’t load the quiz',
+        title: 'We couldn’t load the matcher',
         message: 'The matching service didn’t respond. Check your connection and try again.',
         retryLabel: 'Try again',
         onRetry: boot,
