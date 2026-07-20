@@ -940,6 +940,15 @@ a.bmwm-ptile:focus-visible { outline: 2px solid var(--bmwm-accent); outline-offs
 .bmwm-skel-ptile .bmwm-skel-name { width: 70%; margin-bottom: var(--bmwm-space-2); }
 .bmwm-skel-ptile .bmwm-skel-specs { width: 45%; margin-bottom: 0; }
 
+/* Skeleton tiles drop the hairline everywhere — a borderless shimmer reads
+   cleaner. Only the border-COLOR goes (not the border itself) so the real
+   bordered card swaps in without a 1px layout shift. Lives down here so it
+   outranks the earlier same-specificity .bmwm-more .bmwm-card-compact and
+   .bmwm-ptile border rules. */
+.bmwm-card.bmwm-skel-card,
+.bmwm-more .bmwm-skel-card,
+.bmwm-skel-ptile { border-color: transparent; }
+
 /* Mobile: hero steps 40px → 32px (the one confirmed breakpoint data point);
    other headings scale down ~proportionally. Desktop values are the defaults
    above, so only the stepped-down overrides live here. */
