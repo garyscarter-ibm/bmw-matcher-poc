@@ -768,8 +768,11 @@
   line-height: 1.2;
 }
 
-/* The lede sits under the subhead, so drop the subhead's bottom margin. */
-.bmwm-nearby-lede { margin: 0 0 var(--bmwm-space-6); }
+/* The lede sits under the subhead, so drop the subhead's bottom margin.
+   Also release .bmwm-lede's 52ch reading measure: that's tuned for the intro's
+   narrow column, but here the lede captions a full-width band and the 52ch cap
+   made it wrap mid-band on desktop. One sentence across the band is fine. */
+.bmwm-nearby-lede { margin: 0 0 var(--bmwm-space-6); max-width: none; }
 
 /* Horizontal scroll-snap track. Three tiles fit on desktop; on mobile the
    clamp below leaves the next tile peeking, which is what signals "swipe". */
