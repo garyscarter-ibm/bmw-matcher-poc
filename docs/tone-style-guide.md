@@ -2,32 +2,73 @@
 
 The matcher is multi-brand. Each brand has its own voice, applied to the quiz
 copy per brand (see the per-brand copy overrides in `server/questions.js`,
-selected by `questionsForBrand(brand)`). The **BMW/Grassick** guide is below;
-the **MINI/Sytner Luton** guide follows it. Companion to
+selected by `questionsForBrand(brand)`). The **BMW** guide is below; the
+**MINI** guide follows it. Both are written as a two-layer split — the
+manufacturer's product voice and the retailer's service voice — because that's
+what both brands actually run. Companion to
 [design-tokens.md](design-tokens.md), which covers the visual system —
 this covers the words.
 
 ---
 
-# Grassick's (BMW) tone & style guide
+# BMW tone & style guide
 
-Extracted from `grassicksbmw.co.uk` (homepage copy, offer blurbs, section
-intros) to bring the matcher's wording in line with how a real BMW retailer
-site talks to customers.
+Observed from `bmw.co.uk` + `usedcars.bmw.co.uk` (national brand/product voice)
+and `grassicksbmw.co.uk` (retailer voice). Like MINI, BMW's voice is **two
+layers** the matcher should blend:
 
-## Voice in three words
+- **BMW HQ (product) — assured & aspirational.** Short declaratives, authored
+  in sentence case with a full stop: "Find Your BMW.", "The new BMW i3
+  Saloon.", "BMW Owner's Directory.". Hero lines go full caps: "LEADING WITH
+  CONFIDENCE.", "FEEL THE HEARTBEAT OF A NEW ERA." Body copy is unashamedly
+  evocative — "More sheer driving pleasure than ever before.", "Tailor-made for
+  true drivers.", "turns every journey into a true adventure." The emotional
+  register is *driving pleasure*, and it's stated outright, not implied.
+- **Grassick's (retailer) — direct, warm, understated.** Service-forward and
+  local: "We're proud to support customers across Perth as well as surrounding
+  areas…", "Our friendly staff are here to answer your questions", "We hope to
+  welcome you soon."
 
-**Direct. Warm. Understated.** Confident about the product, modest about
-itself. It never has to try hard to sound exciting — the cars do that.
+So BMW is **assured *and* approachable**. Both layers are confident; HQ reaches
+for the feeling, the retailer stays plain and helpful. Where MINI is
+spirited-premium, BMW is understated-premium — the difference is temperature,
+not confidence.
 
-## What Grassick's copy actually does
+**Approved Used has its own note.** `usedcars.bmw.co.uk` leads on *reassurance*,
+not aspiration: "With BMW Approved Used Cars there are no surprises, you can
+drive away with confidence", "Search, reserve and buy, all online." Since the
+matcher recommends approved-used stock, this is the closest register of the
+three — certainty and no-surprises, with a touch of HQ's warmth.
 
-Reading the homepage top to bottom:
+## Casing: a real difference between the two layers
+
+Grassick's sets headings in caps via CSS `text-transform` (underlying copy is
+sentence case). BMW.co.uk authors casing directly — `text-transform: none`
+throughout, with sentence-case-plus-full-stop for section headings and
+written-in-caps for hero lines. **The full stop is the BMW signature**, same as
+MINI's, just at a lower temperature. The matcher's `.bmwm-nearby-heading`
+already follows the BMW.co.uk convention (caps baked into the copy, no
+transform); keep new headings consistent with that.
+
+## What BMW/Grassick's copy actually does
+
+Reading both sites top to bottom:
 
 - **Headings are short noun phrases in sentence case**, not questions or
   jokes: "NEW CAR LOCATOR.", "EXPLORE OUR RANGE.", "BUSINESS AND FLEET."
-  (the site sets these in caps via CSS `text-transform`, but the underlying
-  copy is plain sentence case, not written-in-caps or title case).
+  (Grassick's sets these in caps via CSS `text-transform`, but the underlying
+  copy is plain sentence case, not written-in-caps or title case). BMW.co.uk
+  does the same shape but authors it directly: "Find Your BMW.", "BMW Finance
+  Offers.", "Find a used car."
+- **HQ states the feeling; the retailer states the service.** BMW.co.uk will
+  write "More sheer driving pleasure than ever before." and "Exceptional
+  driving pleasure, redefined." Grassick's writes "Save up to 40% on parts".
+  Both are confident — one sells the drive, the other sells the visit. Matcher
+  copy sits between: it's a retailer tool recommending cars, so lead with the
+  retailer's plainness and let one HQ-flavoured line carry the pleasure.
+- **"Driving pleasure" is BMW's core phrase**, the way "go-kart" is MINI's. It
+  is the sanctioned way to be emotional in BMW's voice — no other flourish is
+  needed, and reaching past it starts to sound like a different brand.
 - **CTAs are two or three words, verb-first, no exclamation marks**: "Search
   Now", "View offer", "Read more", "Find out more", "Contact us", "Book an
   appointment". No "Let's go!", no "Get started →", no filler.
@@ -73,10 +114,21 @@ it in line:
    exactly this much personality per section. The matcher's intro lede is
    the right place for it — factual first ("Answer N quick questions..."),
    one small human touch, not a joke.
-5. **No rhetorical flourishes or jokes in headings.** Drop "That's a tough
+5. **Where a line needs lift, borrow HQ's register, not a new one.** The
+   intro title and the results headline are the two places the matcher can
+   reach for BMW.co.uk's assurance ("Find Your BMW.") rather than Grassick's
+   plainness. Everything else — questions, options, nav — stays retailer-plain.
+   Reach for "driving pleasure" and its neighbours; don't invent a flourish
+   BMW itself wouldn't print.
+6. **Approved-used means no-surprises.** Results copy describes real stock the
+   customer can go and buy, so it inherits the used-car site's certainty:
+   state the fact, name the retailer, avoid overclaiming. "Approved-used 1
+   Series hatchback, petrol, ready to drive away from Grassicks Garage" is
+   exactly right.
+7. **No rhetorical flourishes or jokes in headings.** Drop "That's a tough
    brief…" style phrasing in favour of a plain statement of what happened
    and what to do next.
-6. **Keep disclaimers/legal copy fenced off at the bottom**, factual and
+8. **Keep disclaimers/legal copy fenced off at the bottom**, factual and
    plain, exactly as the matcher already does with `.bmwm-disclaimer`.
 
 ---
@@ -97,7 +149,10 @@ is **two layers** that the quiz should blend:
 So MINI is **playful *and* premium**, not playful *instead of* premium — an
 earlier version of this guide overstated it as "the near-opposite of BMW". BMW is
 understated-premium; MINI is spirited-premium. Both are confident; MINI just
-smiles more.
+smiles more. Note the two brands are structurally the same (HQ product voice +
+retailer service voice, full stop as the heading signature) — they differ in
+temperature, not in shape. BMW's sanctioned emotional phrase is "driving
+pleasure"; MINI's is "go-kart".
 
 ## Voice in three words
 
