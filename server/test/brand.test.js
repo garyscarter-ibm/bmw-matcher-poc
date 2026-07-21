@@ -130,7 +130,7 @@ test('MINI copy differs from BMW in words but keeps identical option values', ()
 
   // But every option VALUE is unchanged for questions common to both brands,
   // so the scoring engine sees the same answer space.
-  for (const id of ['primaryUse', 'people', 'boot', 'style', 'priorities', 'charging']) {
+  for (const id of ['primaryUse', 'people', 'style', 'priorities', 'charging']) {
     const bmwVals = (bmwById[id].options || []).map((o) => o.value).sort();
     const miniVals = (miniById[id].options || []).map((o) => o.value).sort();
     assert.deepEqual(miniVals, bmwVals, `${id} option values must match across brands`);
@@ -163,7 +163,7 @@ const miniHatch = {
 test('brand tuning: BMW default is unchanged (no tuning arg == BMW tuning)', () => {
   const answers = {
     budget: [15000, 35000], bodyStyles: ['hatchback'], fuel: ['petrol'], charging: 'none',
-    primaryUse: 'city', people: 'solo', boot: 'small', mileage: 8000, style: '5', priorities: ['performance'],
+    primaryUse: 'city', people: 'solo', mileage: 8000, style: '5', priorities: ['performance'],
   };
   const noArg = rankCars(answers, [miniHatch])[0].score;
   const bmwArg = rankCars(answers, [miniHatch], brandTuning('bmw'))[0].score;
@@ -178,7 +178,7 @@ test('brand tuning: a sporty MINI scores higher under MINI tuning than BMW tunin
   };
   const answers = {
     budget: [15000, 35000], bodyStyles: ['hatchback'], fuel: ['petrol'], charging: 'none',
-    primaryUse: 'fun', people: 'solo', boot: 'small', mileage: 8000, style: '5', priorities: ['performance', 'image'],
+    primaryUse: 'fun', people: 'solo', mileage: 8000, style: '5', priorities: ['performance', 'image'],
   };
   const bmwScore = rankCars(answers, [jcw], brandTuning('bmw'))[0].score;
   const miniScore = rankCars(answers, [jcw], brandTuning('mini'))[0].score;
@@ -192,7 +192,7 @@ test('brand tuning: MINI hard-filters do not exclude a Countryman for a family',
   };
   const familyAnswers = {
     budget: [15000, 40000], bodyStyles: ['suv'], fuel: ['open'], charging: 'none',
-    primaryUse: 'family', people: 'family', boot: 'medium', mileage: 10000, style: '3', priorities: ['comfort'],
+    primaryUse: 'family', people: 'family', mileage: 10000, style: '3', priorities: ['comfort'],
   };
   const survivors = rankCars(familyAnswers, [countryman], brandTuning('mini'));
   assert.equal(survivors.length, 1, 'the Countryman survives the MINI family filter');
@@ -213,7 +213,7 @@ test('body binding: a wrong-shape car cannot top the list when a right-shape one
   };
   const wantsHatchEv = {
     budget: [15000, 35000], bodyStyles: ['hatchback'], fuel: ['ev'], charging: 'home',
-    primaryUse: 'city', people: 'solo', boot: 'small', mileage: 8000, style: '5',
+    primaryUse: 'city', people: 'solo', mileage: 8000, style: '5',
     priorities: ['performance', 'image'],
   };
   const ranked = rankCars(wantsHatchEv, [jcwEvSuv, plainHatchEv], brandTuning('mini'));
@@ -235,7 +235,7 @@ test('annual mileage changes the ranking (efficient cars rise at high mileage)',
   };
   const base = {
     budget: [15000, 40000], bodyStyles: ['hatchback'], fuel: ['open'], charging: 'home',
-    primaryUse: 'commute', people: 'solo', boot: 'small', style: '3', priorities: ['economy'],
+    primaryUse: 'commute', people: 'solo', style: '3', priorities: ['economy'],
   };
   const low = rankCars({ ...base, mileage: 3000 }, [thirstyPetrol, ev], brandTuning('mini'));
   const high = rankCars({ ...base, mileage: 24000 }, [thirstyPetrol, ev], brandTuning('mini'));
@@ -307,7 +307,7 @@ test('fuel binds hard when a specific fuel is chosen (wrong-fuel car cannot top)
   };
   const wantsPetrol = {
     budget: [40000, 120000], bodyStyles: ['saloon'], fuel: ['petrol'], charging: 'none',
-    primaryUse: 'roadtrips', people: 'solo', boot: 'medium', mileage: 8000, style: '1',
+    primaryUse: 'roadtrips', people: 'solo', mileage: 8000, style: '1',
     priorities: ['comfort', 'tech'],
   };
   const ranked = rankCars(wantsPetrol, [petrolSaloon, evFlagship], brandTuning('bmw'));
@@ -330,7 +330,7 @@ test('crew buyer: a 7-seater tops when one exists, but 5-seaters still rank (sto
   };
   const crew = {
     budget: [30000, 60000], bodyStyles: ['suv'], fuel: ['diesel'], charging: 'none',
-    primaryUse: 'family', people: 'crew', boot: 'big', mileage: 15000, style: '3',
+    primaryUse: 'family', people: 'crew', mileage: 15000, style: '3',
     priorities: ['comfort', 'economy'],
   };
   const both = rankCars(crew, [sevenSeat, fiveSeat], brandTuning('bmw'));

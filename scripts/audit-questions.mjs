@@ -89,8 +89,6 @@ function satisfies(qid, value, car, t) {
       if (value === 'family') return car.seats >= t.hardFilter.familySeats;
       // 'crew': survives the hard filter (the score penalty is separate)
       return car.seats >= t.hardFilter.crewSeats && car.boot >= t.hardFilter.crewBoot;
-    case 'boot':
-      return car.boot >= t.practicality.bootNeed[value];
     default:
       return true; // charging/style/priorities/… aren't stock filters
   }

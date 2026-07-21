@@ -104,15 +104,15 @@ export const QUESTIONS = [
       { value: 'crew', label: 'A full crew', sub: 'Five or more seats, regularly' },
     ],
   },
-  {
-    id: 'boot',
-    title: 'How much boot space do you need?',
-    options: [
-      { value: 'small', label: 'Not much', sub: 'A weekend bag will do' },
-      { value: 'medium', label: 'A decent amount', sub: 'Weekly shop, buggy, luggage' },
-      { value: 'big', label: 'As much as possible', sub: 'Dogs, golf clubs, everything' },
-    ],
-  },
+  /*
+   * There is no boot-space question. It was cut after the stock audit
+   * (docs/question-stock-audit.md) measured it changing the top 3 in only 13%
+   * of BMW cases and ~25% of MINI's — a whole screen asking for something
+   * `people` and `primaryUse` already imply. The signal wasn't dropped with
+   * it: the engine derives the same small/medium/big need from those two
+   * answers (see bootNeedKey in engine.js), so the per-brand bootNeed tuning
+   * tables still calibrate practicality exactly as before.
+   */
   {
     id: 'mileage',
     title: 'How many miles a year?',
@@ -227,14 +227,6 @@ const BRAND_COPY = {
         solo: { label: 'Just me (and the odd passenger)' },
         family: { label: 'A small crew', sub: 'Child seats included' },
         crew: { label: 'A full house', sub: 'Five seats, regularly' },
-      },
-    },
-    boot: {
-      title: 'HOW MUCH DO YOU NEED TO CARRY?',
-      options: {
-        small: { label: 'Not much', sub: 'A weekend bag will do' },
-        medium: { label: 'A fair bit', sub: 'Weekly shop, buggy, luggage' },
-        big: { label: 'As much as it holds', sub: 'Dogs, kit, the lot' },
       },
     },
     mileage: {

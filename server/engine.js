@@ -203,13 +203,50 @@ function scoreFuel(car, answers, tuning) {
   return best;
 }
 
+/*
+ * How much luggage space this buyer needs, expressed as one of the per-brand
+ * bootNeed keys (small/medium/big — see tuning.practicality.bootNeed).
+ *
+ * There is no "how much boot space?" question any more: it changed the top 3
+ * in only 13% of BMW cases and ~25% of MINI's (docs/question-stock-audit.md),
+ * because it asked for something the rest of the answers already imply. The
+ * need is instead derived from the two answers that genuinely carry it, each
+ * scored 0/1/2 and summed:
+ *
+ *   people      solo 0, family 1, crew 2 — people displace luggage, and a
+ *               "full crew" is the one answer that asks for everything a car
+ *               has (it already drives the seat/boot hard filters too).
+ *   primaryUse  family duties and long motorway trips 1 (buggies, weekly
+ *               shops, a week's luggage); city, commuting and weekend
+ *               driving 0 — those are a bag and a coat.
+ *
+ * Summing rather than taking the larger is what preserves the discrimination
+ * the question used to provide: a small family on the school run (1+1 → big)
+ * genuinely needs more room than the same family commuting (1+0 → medium),
+ * a distinction the old three-way question could only capture if the user
+ * stopped to think about it. Unanswered ⇒ 0 ⇒ "small" ⇒ no space requirement,
+ * so a partial answer set (the mid-quiz preview) still scores a real number.
+ *
+ * A legacy shared link may still carry a `boot` answer. It is deliberately
+ * ignored, not honoured: every buyer's need is derived the same way, so two
+ * people who answer identically get identical results.
+ */
+const PEOPLE_SPACE = { solo: 0, family: 1, crew: 2 };
+const USE_SPACE = {
+  city: 0, commute: 0, fun: 0, family: 1, roadtrips: 1,
+};
+const SPACE_KEYS = ['small', 'medium', 'big'];
+
+function bootNeedKey(answers) {
+  const level = (PEOPLE_SPACE[answers.people] ?? 0) + (USE_SPACE[answers.primaryUse] ?? 0);
+  return SPACE_KEYS[Math.min(level, SPACE_KEYS.length - 1)];
+}
+
 function scorePracticality(car, answers, tuning) {
   const { bootNeed, seatsFloor, crewBonusSeats } = tuning.practicality;
-  // Unanswered boot question ⇒ no space requirement yet (treat as "small"),
-  // so a partial answer set scores a real number rather than NaN from
-  // dividing by an undefined `need`. Boot targets are per-brand (a MINI's
-  // "big" is smaller than a BMW's).
-  const need = bootNeed[answers.boot] ?? 0;
+  // Boot targets are per-brand (a MINI's "big" is smaller than a BMW's), so
+  // the derived key is looked up in the brand's own table.
+  const need = bootNeed[bootNeedKey(answers)] ?? 0;
   const seatsOk = answers.people === 'solo' || car.seats >= seatsFloor;
   let score = need === 0 ? 1 : clamp(car.boot / need);
   if (!seatsOk) score *= 0.3;
