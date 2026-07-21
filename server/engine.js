@@ -471,6 +471,40 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
     );
 }
 
+/*
+ * Which of the user's stated wants have NO car behind them in this pool.
+ *
+ * The engine already drags a wrong-fuel or wrong-shape car's score down, but a
+ * results page that silently shows petrol heroes to someone who asked for
+ * electric is quietly dishonest — the same family of sin as inventing a
+ * distance. So each pool reports what it couldn't offer, and the page says so
+ * (see the unmet note in bmw-matcher.js).
+ *
+ * Scoped to the two wants that are genuine stock facts: fuel and body style.
+ * "No preference" values (`any`, `open`) state no want and can never be unmet.
+ *
+ * Measured against the pool as fetched, NOT the survivors of the hard filters:
+ * "no fully electric cars at this retailer" is a fact about the stock, and
+ * saying it because the only EV happened to sit above the budget would be a
+ * different lie. Budget mismatch is already visible in the results themselves.
+ *
+ * @returns {Object} question id → the unmet values, omitting met ones entirely.
+ *   An empty object means every stated want has something behind it.
+ */
+export function unmetWants(answers, cars) {
+  const unmet = {};
+  // fuelPrefs turns "unanswered" into ['open'], which filters out to nothing.
+  const fuels = fuelPrefs(answers).filter((v) => v !== 'open');
+  const missingFuel = fuels.filter((v) => !cars.some((c) => c.fuel === v));
+  if (missingFuel.length) unmet.fuel = missingFuel;
+
+  const bodies = (answers.bodyStyles || []).filter((v) => v !== 'any');
+  const missingBody = bodies.filter((v) => !cars.some((c) => c.body === v));
+  if (missingBody.length) unmet.bodyStyles = missingBody;
+
+  return unmet;
+}
+
 /** How many cars the results screen shows as headline matches. */
 export const TOP_MATCHES = 3;
 

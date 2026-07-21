@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  matchCars, rankCars, budgetRange, STRETCH_FACTOR,
+  matchCars, rankCars, budgetRange, unmetWants, STRETCH_FACTOR,
 } from '../engine.js';
 import { CARS } from '../data.js';
 import { BUDGET_BANDS, QUESTIONS } from '../questions.js';
@@ -285,6 +285,54 @@ test('charging "either" gives EV access like home charging', () => {
   assert.ok(evHome, 'expected an EV with home charging');
   const evEither = either.find((m) => m.car.id === evHome.car.id);
   assert.equal(evEither.score, evHome.score, '"either" should match "home" for EV access');
+});
+
+/* ---- unmet wants: what the pool couldn't offer (results-page honesty) ---- */
+
+// A deliberately narrow pool: petrol saloons only. Anything else a user asks
+// for is genuinely absent, which is exactly the case the results note exists
+// to admit to.
+const petrolOnly = CARS.filter((c) => c.fuel === 'petrol' && c.body === 'saloon');
+
+test('an unmet fuel want is reported against the pool that was searched', () => {
+  assert.ok(petrolOnly.length, 'fixture sanity: some petrol saloons exist');
+  assert.deepEqual(unmetWants({ ...base, fuel: ['ev'] }, petrolOnly), { fuel: ['ev'] });
+  // Only the missing values are listed — a met pick alongside is not flagged.
+  assert.deepEqual(
+    unmetWants({ ...base, fuel: ['petrol', 'ev'] }, petrolOnly),
+    { fuel: ['ev'] },
+  );
+});
+
+test('an unmet body-style want is reported the same way', () => {
+  assert.deepEqual(
+    unmetWants({ ...base, bodyStyles: ['convertible'], fuel: ['petrol'] }, petrolOnly),
+    { bodyStyles: ['convertible'] },
+  );
+  // Both dimensions can be unmet at once, each listing only its own values.
+  assert.deepEqual(
+    unmetWants({ ...base, bodyStyles: ['convertible', 'saloon'], fuel: ['ev'] }, petrolOnly),
+    { fuel: ['ev'], bodyStyles: ['convertible'] },
+  );
+});
+
+test('a want the pool CAN meet produces nothing to apologise for', () => {
+  assert.deepEqual(
+    unmetWants({ ...base, fuel: ['petrol'], bodyStyles: ['saloon'] }, petrolOnly),
+    {},
+  );
+  // And against the full range, a normal answer set is entirely satisfiable.
+  assert.deepEqual(unmetWants({ ...base, fuel: ['ev'], bodyStyles: ['suv'] }, CARS), {});
+});
+
+test('"no preference" answers state no want, so can never be unmet', () => {
+  // 'open' fuel / 'any' body are the help-me-decide values: nothing was asked
+  // for, so nothing can be missing — even from a pool that has neither.
+  assert.deepEqual(unmetWants({ ...base, fuel: ['open'], bodyStyles: ['any'] }, petrolOnly), {});
+  assert.deepEqual(unmetWants({ ...base, fuel: 'open', bodyStyles: ['any'] }, []), {});
+  // Unanswered is the same: an absent fuel/body answer reads as no preference.
+  assert.deepEqual(unmetWants({ budget: 'b2' }, []), {});
+  assert.deepEqual(unmetWants({ ...base, fuel: [] }, []), {});
 });
 
 test('quiz answer keys line up with what the engine reads', () => {

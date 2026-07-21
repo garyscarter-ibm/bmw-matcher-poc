@@ -532,6 +532,42 @@
 
 /* --- results --- */
 
+/* Unmet-want note: "no fully electric cars here or nearby right now". Sits
+   between the results headline and the hero, because it changes how the hero
+   should be read — these are the closest fit, not the thing that was asked
+   for. Styled as a quiet grey field with a spot-colour edge (blue for BMW,
+   racing green for MINI, via --bmwm-accent-spot) rather than an alert: it's
+   an honest aside, not an error. Geometry comes from --bmwm-radius, so it's
+   sharp on BMW and softly rounded on MINI like every other surface. */
+.bmwm-unmet {
+  display: block;
+  background: var(--bmwm-surface-alt);
+  border-left: 3px solid var(--bmwm-accent-spot);
+  border-radius: var(--bmwm-radius);
+  padding: var(--bmwm-space-4) var(--bmwm-space-5);
+  margin: var(--bmwm-space-5) 0 0;
+}
+
+/* Brand lead-in (MINI only today — BMW states the fact without announcing
+   it), set as the block's standard eyebrow: bold, uppercase, spot colour. */
+.bmwm-unmet-label {
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-size: var(--bmwm-text-eyebrow);
+  line-height: 1.2;
+  color: var(--bmwm-accent-spot);
+  margin: 0 0 var(--bmwm-space-2);
+}
+
+.bmwm-unmet-text {
+  margin: 0;
+  font-size: var(--bmwm-text-body);
+  line-height: 1.5;
+  color: var(--bmwm-ink);
+}
+
 .bmwm-grid { display: grid; gap: var(--bmwm-space-4); margin: var(--bmwm-space-6) 0 var(--bmwm-space-2); }
 
 /* --- results skeleton (shown while /api/match is in flight) ---

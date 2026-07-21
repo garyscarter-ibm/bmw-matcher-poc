@@ -1,6 +1,9 @@
 # Question-vs-stock audit — findings & decision framework
 
-Status: **analysis complete, fixes not yet built.** Numbers from the national
+Status: **analysis complete; all three fixes built** (see "The fixes" below for
+what each one became). The headline numbers in this doc are the *pre-fix*
+measurements that motivated them — re-run the harness for current figures.
+Numbers from the national
 fixture dumps captured 2026-07-18 (~13k BMW / ~4.3k MINI); re-run
 `node scripts/audit-questions.mjs` after a `dump-stock` refresh to see if they
 still hold. The harness replays the real engine (`rankCars` + brand tuning)
@@ -91,10 +94,17 @@ belongs: **in the results** — see fix 3.
 1. **Cut or fold `boot`** (static, both brands) — the one genuinely wasted
    screen. Its only real signal (big-boot need) can live inside `people` /
    `primaryUse`.
+   *Built:* the question is gone; `bootNeedKey` (engine.js) derives the same
+   small/medium/big need from `people` (0/1/2) + `primaryUse` (0/1), summed.
+   A controlled A/B on identical answer sets shows every other question's
+   sensitivity, diversity and honesty unchanged to within a point.
 2. **Port MINI's body tuning to BMW** (static, tuning only): raise body's
    weight and drop `body.miss` toward 0 so a named shape is honoured whenever
    one fits. Re-run the `sens` pass after to confirm honesty rises without
    diversity collapsing.
+   *Built:* BMW moved to body weight 4.5 / `miss` 0 — not MINI's 6.0, which
+   BMW's deeper stock doesn't need. Honesty 53% → 67%, and diversity *rose*
+   62% → 66%. MINI unchanged (mergeTuning has it restating both fields).
 3. **Unmet-want honesty in results** (dynamic, replaces pruning). Today a
    user who asks for an EV at an all-petrol MINI retailer silently gets
    petrol heroes (fuelStrictBoost drags their scores down, but nothing says
@@ -102,6 +112,12 @@ belongs: **in the results** — see fix 3.
    the reachable pool, the results page says so plainly — "no electric MINIs
    near Luton right now" — and frames what it shows as the closest fit.
    Same data the pruning would have read; applied at the honest end.
+   *Built:* `unmetWants` (engine.js) is reported by `/api/match` and
+   `/api/nearby` for their own pools, measured against the stock as fetched
+   rather than the survivors of the hard filters (a budget mismatch is not a
+   stock gap). The block renders a brand-voiced note above the hero only when
+   both halves agree — a failed nearby lookup sends `unmet: null` and claims
+   nothing.
 
 ## Which pool decides what
 
