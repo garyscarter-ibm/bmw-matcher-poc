@@ -746,6 +746,31 @@
 .bmwm-reasons { margin: 0; padding: 0 0 0 var(--bmwm-space-5); font-size: var(--bmwm-text-body); }
 .bmwm-reasons li { margin-bottom: var(--bmwm-space-1); }
 
+/* The satisfaction line under the score ("Meets everything you asked for" /
+   "Meets 4 of your 5 asks") — quiet supporting text, the words behind the %. */
+.bmwm-match-line {
+  margin: 0 0 var(--bmwm-space-2);
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+}
+
+/* Trade-offs: the honest "here's what it doesn't do" counterpart to the
+   reasons. Deliberately neutral, not alarming — muted ink, no accent colour,
+   a plain dash marker rather than a bullet. */
+.bmwm-tradeoff { margin-top: var(--bmwm-space-4); }
+.bmwm-tradeoff-label {
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  margin: 0 0 var(--bmwm-space-2);
+  font-size: var(--bmwm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--bmwm-ink-muted);
+}
+.bmwm-tradeoffs { margin: 0; padding: 0; list-style: none; font-size: var(--bmwm-text-body); }
+.bmwm-tradeoffs li { margin-bottom: var(--bmwm-space-1); color: var(--bmwm-ink-muted); }
+.bmwm-tradeoffs li::before { content: "—"; margin-right: var(--bmwm-space-2); color: var(--bmwm-ink-muted); }
+
 .bmwm-subhead {
   font-family: var(--bmwm-font-heading);
   font-weight: 300;

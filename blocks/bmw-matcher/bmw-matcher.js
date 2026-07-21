@@ -130,6 +130,11 @@ const BRAND_COPY = {
     // BMW's copy states things rather than announcing them.
     unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
       + 'These are the closest matches to everything else you asked for.',
+    // The satisfaction line under the score. `matchAll` when every stated ask
+    // is met (a genuine 100%); `matchSome` names the shortfall count.
+    matchAll: 'Meets everything you asked for',
+    matchSome: ({ met, total }) => `Meets ${met} of your ${total} asks`,
+    tradeoffLabel: 'Worth knowing',
   },
   mini: {
     name: 'MINI',
@@ -143,6 +148,10 @@ const BRAND_COPY = {
     unmetLabel: 'SMALL SNAG.',
     unmet: ({ list, retailer }) => `No ${list} at ${retailer} or anywhere nearby right now. `
       + 'Here’s the closest we’ve got to the rest of your brief.',
+    // MINI's register: the UPPERCASE beat, then playful. Same meaning as BMW's.
+    matchAll: 'Ticks every box you gave us.',
+    matchSome: ({ met, total }) => `Ticks ${met} of your ${total} boxes.`,
+    tradeoffLabel: 'THE SMALL PRINT.',
   },
 };
 
@@ -221,6 +230,23 @@ function unmetNote(ctx, unmet) {
     list: orList(items), retailer: ctx.retailerLabel,
   })));
   return note;
+}
+
+/**
+ * Drop hero trade-off items the page-level unmet note now covers, so a shortfall
+ * isn't stated twice (the note says "no EVs near you", the card needn't also say
+ * "not electric"). Called once nearby resolves and `agreedUnmet` is known; hides
+ * the whole trade-off block if pruning empties it.
+ */
+function pruneTradeoffs(screen, agreed) {
+  const ids = new Set(Object.keys(agreed || {}));
+  if (!ids.size) return;
+  const section = screen.querySelector('.bmwm-tradeoff');
+  if (!section) return;
+  section.querySelectorAll('li[data-ask]').forEach((li) => {
+    if (ids.has(li.dataset.ask)) li.remove();
+  });
+  if (!section.querySelector('li')) section.remove();
 }
 
 /**
@@ -789,8 +815,11 @@ function distanceLabel(distance) {
  * `big` adds the "why it suits you" reasons; `compact` is the carousel tile —
  * same anatomy, but trades the blurb and reasons for a distance line.
  */
-function matchCard(match, { big = false, compact = false } = {}) {
-  const { car, score, reasons } = match;
+function matchCard(match, { big = false, compact = false, brand = 'bmw' } = {}) {
+  const {
+    car, score, matchPct, checklist, reasons,
+  } = match;
+  const copy = BRAND_COPY[brand] || BRAND_COPY.bmw;
   const card = el('article', `bmwm-card${big ? ' bmwm-card-big' : ''}${compact ? ' bmwm-card-compact' : ''}`);
 
   const media = el('div', 'bmwm-card-media');
@@ -824,10 +853,25 @@ function matchCard(match, { big = false, compact = false } = {}) {
   const body = el('div', 'bmwm-card-body');
   const head = el('div', 'bmwm-card-head');
   head.append(el('h3', 'bmwm-card-name', car.name));
-  const badge = el('span', 'bmwm-score', `${score}%`);
-  badge.title = 'Match score';
+  // The badge shows checklist satisfaction — "how many of your asks did it
+  // meet?" — which CAN read 100%, not the internal blended score (which never
+  // does and confuses buyers). Older API responses (no matchPct) fall back to
+  // the blend so a mixed deploy still renders.
+  const pct = matchPct ?? score;
+  const badge = el('span', `bmwm-score${matchPct === 100 ? ' bmwm-score-full' : ''}`, `${pct}%`);
+  badge.title = 'How many of your asks this car meets';
   head.append(badge);
   body.append(head);
+
+  // Satisfaction line: the plain-English version of the number. Only when we
+  // have a real checklist (matchPct present and some ask applied).
+  if (matchPct != null && checklist) {
+    const total = checklist.met.length + checklist.missed.length;
+    const line = checklist.missed.length === 0
+      ? copy.matchAll
+      : copy.matchSome({ met: checklist.met.length, total });
+    body.append(el('p', 'bmwm-match-line', line));
+  }
 
   // Single used price when min === max (live stock), else the range.
   const price = car.priceMin === car.priceMax
@@ -875,6 +919,24 @@ function matchCard(match, { big = false, compact = false } = {}) {
     body.append(el('p', 'bmwm-why-label', 'Why it suits you'), why);
   }
 
+  // Trade-offs: the honest counterpart to "why it suits you" — the asks this
+  // car doesn't meet, so the score explains itself. Hero only, and usually
+  // empty (the top match tends to meet everything — an empty section is itself
+  // a signal). Each item is tagged with its ask id so pruneTradeoffs() can drop
+  // any the page-level unmet note ends up covering (that note lands later, once
+  // nearby answers), sparing the page from saying the same shortfall twice.
+  if (big && checklist && checklist.missed.length) {
+    const section = el('div', 'bmwm-tradeoff');
+    const list = el('ul', 'bmwm-tradeoffs');
+    checklist.missed.forEach((m) => {
+      const li = el('li', null, m.label);
+      li.dataset.ask = m.id;
+      list.append(li);
+    });
+    section.append(el('p', 'bmwm-tradeoff-label', copy.tradeoffLabel), list);
+    body.append(section);
+  }
+
   // Link out to the retailer's live stock, when the feed gave us one.
   if (car.link) {
     const cta = el('a', 'bmwm-card-link', `View at ${car.retailerName || 'the retailer'} ›`);
@@ -895,7 +957,12 @@ function matchCard(match, { big = false, compact = false } = {}) {
  * tile is a link to the live listing when the feed gave us one.
  */
 function previewTile(match) {
-  const { car, score } = match;
+  const { car, score, matchPct } = match;
+  // Mid-quiz the drawer shows satisfaction against the asks answered SO FAR —
+  // matchPct is computed over whatever's been answered, so early on an in-budget
+  // car honestly reads 100% ("of what you've told us"), and differentiation
+  // appears as more asks land. Falls back to the blend for an older API.
+  const pct = matchPct ?? score;
   const price = car.priceMin === car.priceMax
     ? gbp(car.priceMin)
     : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`;
@@ -908,7 +975,7 @@ function previewTile(match) {
     tile.href = car.link;
     tile.target = '_blank';
     tile.rel = 'noopener noreferrer';
-    tile.setAttribute('aria-label', `${car.name}, ${price}, ${score}% match. View at ${car.retailerName || 'the retailer'}`);
+    tile.setAttribute('aria-label', `${car.name}, ${price}, ${pct}% match. View at ${car.retailerName || 'the retailer'}`);
   }
 
   // Photo band (or the shared "Images coming soon" placeholder), with the line
@@ -928,8 +995,8 @@ function previewTile(match) {
 
   const body = el('div', 'bmwm-ptile-body');
   const head = el('div', 'bmwm-ptile-head');
-  const badge = el('span', 'bmwm-score bmwm-ptile-score', `${score}%`);
-  badge.title = 'Match score';
+  const badge = el('span', 'bmwm-score bmwm-ptile-score', `${pct}%`);
+  badge.title = 'How many of your asks so far this car meets';
   head.append(el('span', 'bmwm-ptile-name', car.name.replace(/^BMW /, '')), badge);
   const specs = el('span', 'bmwm-ptile-specs',
     [SPEC_LABELS[car.body], FUEL_SPEC[car.fuel], price].filter(Boolean).join(' · '));
@@ -1074,7 +1141,7 @@ function fillNearbyBand(band, ctx, nearby) {
   track.tabIndex = 0;
   track.setAttribute('role', 'region');
   track.setAttribute('aria-label', `Matches at other retailers near ${ctx.retailerLabel}`);
-  nearby.forEach((m) => track.append(matchCard(m, { compact: true })));
+  nearby.forEach((m) => track.append(matchCard(m, { compact: true, brand: ctx.brand })));
   band.append(track);
 }
 
@@ -1122,7 +1189,7 @@ async function renderResults(root, ctx, answers) {
     const model = matches[0].car.name.replace(new RegExp(`^${brandName} `), '');
     screen.append(el('h2', 'bmwm-title', `Your perfect ${brandName} is the ${model}`));
     const grid = el('div', 'bmwm-grid');
-    grid.append(matchCard(matches[0], { big: true }));
+    grid.append(matchCard(matches[0], { big: true, brand: ctx.brand }));
     screen.append(grid);
 
     // Runners-up: the other local matches, as smaller compact tiles in a
@@ -1137,7 +1204,7 @@ async function renderResults(root, ctx, answers) {
           `Other cars in ${ctx.retailerLabel}'s stock that also fit your answers.`),
       );
       const moreGrid = el('div', 'bmwm-more');
-      runnersUp.forEach((m) => moreGrid.append(matchCard(m, { compact: true })));
+      runnersUp.forEach((m) => moreGrid.append(matchCard(m, { compact: true, brand: ctx.brand })));
       more.append(moreGrid);
       screen.append(more);
     }
@@ -1204,8 +1271,12 @@ async function renderResults(root, ctx, answers) {
       // The user may have navigated away (retake/tweak) before this resolves;
       // only touch the page if it's still in the document.
       if (!nearbyBand.isConnected) return;
-      const note = unmetNote(ctx, agreedUnmet(retailerUnmet, unmet));
+      const agreed = agreedUnmet(retailerUnmet, unmet);
+      const note = unmetNote(ctx, agreed);
       if (note) screen.insertBefore(note, screen.querySelector('.bmwm-grid'));
+      // Now the page owns the shortfall at the top, drop the duplicate from the
+      // hero's trade-offs.
+      pruneTradeoffs(screen, agreed);
       if (nearby.length) fillNearbyBand(nearbyBand, ctx, nearby);
       else nearbyBand.remove();
     });
