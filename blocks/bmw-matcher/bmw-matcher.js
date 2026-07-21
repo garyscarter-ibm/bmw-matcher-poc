@@ -1115,9 +1115,12 @@ async function renderResults(root, ctx, answers) {
     );
   } else {
     // #1 is the recommendation — a single full-width hero, matching the
-    // "Your perfect BMW is the …" headline (three co-equal heroes contradicted
-    // that claim). #2/#3 drop to a quieter "More at <retailer>" tier below.
-    screen.append(el('h2', 'bmwm-title', `Your perfect BMW is the ${matches[0].car.name.replace(/^BMW /, '')}`));
+    // "Your perfect <brand> is the …" headline (three co-equal heroes
+    // contradicted that claim). #2/#3 drop to a quieter "More at <retailer>"
+    // tier below. The car's name already leads with the brand, so strip it.
+    const { name: brandName } = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
+    const model = matches[0].car.name.replace(new RegExp(`^${brandName} `), '');
+    screen.append(el('h2', 'bmwm-title', `Your perfect ${brandName} is the ${model}`));
     const grid = el('div', 'bmwm-grid');
     grid.append(matchCard(matches[0], { big: true }));
     screen.append(grid);
