@@ -29,7 +29,7 @@
 import { createServer } from 'node:http';
 
 import {
-  matchCars, rankCars, budgetRange, TOP_MATCHES,
+  matchCars, rankCars, budgetRange, unmetWants, TOP_MATCHES,
 } from './engine.js';
 import {
   fetchRetailerStock, fetchNearbyStock, startStockWarmer, StockUnavailableError,
@@ -200,7 +200,15 @@ async function handleMatch(req, res) {
   // engine scores (see applyBespokeAnswers) before ranking.
   const scored = applyBespokeAnswers(brand, answers);
   const { matches } = matchCars(scored, cars, brandTuning(brand));
-  return sendJson(res, 200, { matches: matches.map(publicMatch) });
+  // What this retailer couldn't offer, so the page can say so instead of
+  // quietly serving the closest thing (see unmetWants). Reported against the
+  // folded answers — those are the wants actually searched for. Half the
+  // picture: the block waits for /api/nearby to agree before telling the user
+  // a want is genuinely unavailable.
+  return sendJson(res, 200, {
+    matches: matches.map(publicMatch),
+    unmet: unmetWants(scored, cars),
+  });
 }
 
 /**
@@ -246,6 +254,12 @@ async function handlePreview(req, res) {
  * never blocks the hero matches. This section is a bonus, so any failure
  * degrades to an empty list (HTTP 200) rather than an error the block must
  * surface — the block simply omits the "Worth the drive" section.
+ *
+ * `unmet` reports the wants this pool couldn't offer (see unmetWants), and is
+ * deliberately `null` — not `{}` — when the lookup failed. The block only
+ * tells a user a want is unavailable once both halves agree it is, so it has
+ * to tell "nearby found nothing that fits" (a fact) apart from "we never
+ * heard back from nearby" (an absence of facts, which claims nothing).
  */
 async function handleNearby(req, res) {
   const {
@@ -254,14 +268,17 @@ async function handleNearby(req, res) {
   if (error) return sendJson(res, status, { error });
 
   let nearby = [];
+  let unmet = null;
   try {
     const cars = await fetchNearbyStock(brand, retailer);
-    nearby = rankCars(applyBespokeAnswers(brand, answers), cars, brandTuning(brand)).slice(0, TOP_MATCHES);
+    const scored = applyBespokeAnswers(brand, answers);
+    nearby = rankCars(scored, cars, brandTuning(brand)).slice(0, TOP_MATCHES);
+    unmet = unmetWants(scored, cars);
   } catch (err) {
     console.warn('[nearby] stock unavailable:', err?.message);
   }
 
-  return sendJson(res, 200, { nearby: nearby.map(publicMatch) });
+  return sendJson(res, 200, { nearby: nearby.map(publicMatch), unmet });
 }
 
 const server = createServer(async (req, res) => {

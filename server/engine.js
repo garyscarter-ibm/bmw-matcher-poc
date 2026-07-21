@@ -18,10 +18,14 @@ import { brandTuning } from './brands.js';
 /** Default tuning = BMW's (the engine's original constants). */
 const DEFAULT_TUNING = brandTuning('bmw');
 
-/** Base weight of each scoring dimension. */
+/*
+ * Base weight of each scoring dimension. The engine itself reads the weights
+ * off the per-brand `tuning` argument (brands.js) — this export is the same
+ * table under the name the README points tuners at, so keep the two in step.
+ */
 export const WEIGHTS = {
   budget: 3.0,
-  body: 2.5,
+  body: 4.5,
   fuel: 2.5,
   practicality: 2.0,
   performance: 1.5,
@@ -203,13 +207,50 @@ function scoreFuel(car, answers, tuning) {
   return best;
 }
 
+/*
+ * How much luggage space this buyer needs, expressed as one of the per-brand
+ * bootNeed keys (small/medium/big — see tuning.practicality.bootNeed).
+ *
+ * There is no "how much boot space?" question any more: it changed the top 3
+ * in only 13% of BMW cases and ~25% of MINI's (docs/question-stock-audit.md),
+ * because it asked for something the rest of the answers already imply. The
+ * need is instead derived from the two answers that genuinely carry it, each
+ * scored 0/1/2 and summed:
+ *
+ *   people      solo 0, family 1, crew 2 — people displace luggage, and a
+ *               "full crew" is the one answer that asks for everything a car
+ *               has (it already drives the seat/boot hard filters too).
+ *   primaryUse  family duties and long motorway trips 1 (buggies, weekly
+ *               shops, a week's luggage); city, commuting and weekend
+ *               driving 0 — those are a bag and a coat.
+ *
+ * Summing rather than taking the larger is what preserves the discrimination
+ * the question used to provide: a small family on the school run (1+1 → big)
+ * genuinely needs more room than the same family commuting (1+0 → medium),
+ * a distinction the old three-way question could only capture if the user
+ * stopped to think about it. Unanswered ⇒ 0 ⇒ "small" ⇒ no space requirement,
+ * so a partial answer set (the mid-quiz preview) still scores a real number.
+ *
+ * A legacy shared link may still carry a `boot` answer. It is deliberately
+ * ignored, not honoured: every buyer's need is derived the same way, so two
+ * people who answer identically get identical results.
+ */
+const PEOPLE_SPACE = { solo: 0, family: 1, crew: 2 };
+const USE_SPACE = {
+  city: 0, commute: 0, fun: 0, family: 1, roadtrips: 1,
+};
+const SPACE_KEYS = ['small', 'medium', 'big'];
+
+function bootNeedKey(answers) {
+  const level = (PEOPLE_SPACE[answers.people] ?? 0) + (USE_SPACE[answers.primaryUse] ?? 0);
+  return SPACE_KEYS[Math.min(level, SPACE_KEYS.length - 1)];
+}
+
 function scorePracticality(car, answers, tuning) {
   const { bootNeed, seatsFloor, crewBonusSeats } = tuning.practicality;
-  // Unanswered boot question ⇒ no space requirement yet (treat as "small"),
-  // so a partial answer set scores a real number rather than NaN from
-  // dividing by an undefined `need`. Boot targets are per-brand (a MINI's
-  // "big" is smaller than a BMW's).
-  const need = bootNeed[answers.boot] ?? 0;
+  // Boot targets are per-brand (a MINI's "big" is smaller than a BMW's), so
+  // the derived key is looked up in the brand's own table.
+  const need = bootNeed[bootNeedKey(answers)] ?? 0;
   const seatsOk = answers.people === 'solo' || car.seats >= seatsFloor;
   let score = need === 0 ? 1 : clamp(car.boot / need);
   if (!seatsOk) score *= 0.3;
@@ -333,6 +374,47 @@ function scoreCharacter(car, answers, tuning) {
   return { score, reason: hits.length ? TAG_REASONS[hits[0]] : undefined };
 }
 
+const STYLE_LINE_LABEL = {
+  classic: 'Classic', exclusive: 'Exclusive', sport: 'Sport', jcw: 'John Cooper Works',
+};
+
+/**
+ * Trim-character match (MINI). The user's vibe answer arrives as answers.styleLine
+ * (folded in by applyBespokeAnswers); the car carries its own from the derivative.
+ * A "sport" want is satisfied by a JCW too — JCW is the sport line's extreme, so a
+ * go-kart-minded buyer shouldn't be marked down for landing on one.
+ *
+ * No-ops safely for any brand that doesn't tune it (no tuning.styleLine → neutral,
+ * multiplied by a zero weight), and treats an unknown car trim as neutral, never a
+ * miss — an unparsed derivative isn't a wrong answer. See docs/mini-first-questions.md.
+ */
+function scoreStyleLine(car, answers, tuning) {
+  const cfg = tuning.styleLine;
+  if (!cfg || !answers.styleLine || !car.styleLine) return { score: cfg?.neutral ?? 0.7 };
+  const want = answers.styleLine;
+  const hit = want === 'sport'
+    ? (car.styleLine === 'sport' || car.styleLine === 'jcw')
+    : car.styleLine === want;
+  return hit
+    ? { score: cfg.match, reason: `${STYLE_LINE_LABEL[car.styleLine]} trim, just the character you asked for` }
+    : { score: cfg.miss };
+}
+
+/**
+ * Door-count preference (MINI Hatch only). answers.doors is '3' | '5' | 'either';
+ * 'either' (or unanswered, or a non-hatch car with no door count) scores neutral.
+ * A soft preference: a wrong count is a gentle miss, never a hard filter, and an
+ * unknown car door count is neutral, not penalised.
+ */
+function scoreDoors(car, answers, tuning) {
+  const cfg = tuning.doors;
+  const want = Number(answers.doors);
+  if (!cfg || !want || !car.doors) return { score: cfg?.neutral ?? 0.7 };
+  return car.doors === want
+    ? { score: cfg.match, reason: `${want}-door body, exactly the shape you wanted` }
+    : { score: cfg.miss };
+}
+
 /* ---------------------------------------------------------------- *
  *  Orchestration                                                    *
  * ---------------------------------------------------------------- */
@@ -357,6 +439,13 @@ function effectiveWeights(answers, tuning) {
   const prefs = fuelPrefs(answers);
   const specificFuel = prefs.length > 0 && !prefs.includes('open');
   if (specificFuel) w.fuel += tuning.fuelStrictBoost;
+  // styleLine/doors only weigh in when their question was actually answered —
+  // an unasked (BMW never sets them) or no-preference dimension stays fully
+  // inert rather than diluting every score toward neutral. Once answered, the
+  // scorer still returns neutral for a car whose own trim/doors are unknown
+  // (unknown ≠ wrong), just at the now-active weight.
+  if (!answers.styleLine) delete w.styleLine;
+  if (!answers.doors || answers.doors === 'either') delete w.doors;
   return w;
 }
 
@@ -378,6 +467,11 @@ const SCORERS = {
   economy: scoreEconomy,
   size: scoreSize,
   character: scoreCharacter,
+  // Brand-optional dimensions: only weighted where a brand's tuning names them
+  // (MINI). A brand without the weight contributes 0 (see the `?? 0` in rankCars),
+  // so BMW's blend is unchanged and the scorers above never fire for it.
+  styleLine: scoreStyleLine,
+  doors: scoreDoors,
 };
 
 /**
@@ -400,11 +494,16 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
       let stretch = false;
       const candidates = [];
       for (const [dim, scorer] of Object.entries(SCORERS)) {
+        // A dimension a brand doesn't weight (e.g. styleLine/doors for BMW)
+        // contributes nothing and can't surface a reason — so adding a scorer
+        // is inert for every brand that doesn't opt in via its tuning weights.
+        const weight = weights[dim] ?? 0;
+        if (weight === 0) continue;
         const r = scorer(car, answers, tuning);
-        weighted += weights[dim] * r.score;
+        weighted += weight * r.score;
         if (r.stretch) stretch = true;
         if (r.reason && r.score >= 0.7) {
-          candidates.push({ reason: r.reason, rank: weights[dim] * r.score });
+          candidates.push({ reason: r.reason, rank: weight * r.score });
         }
       }
       const reasons = candidates
@@ -428,6 +527,40 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
         a.car.priceMin - b.car.priceMin ||
         a.car.name.localeCompare(b.car.name),
     );
+}
+
+/*
+ * Which of the user's stated wants have NO car behind them in this pool.
+ *
+ * The engine already drags a wrong-fuel or wrong-shape car's score down, but a
+ * results page that silently shows petrol heroes to someone who asked for
+ * electric is quietly dishonest — the same family of sin as inventing a
+ * distance. So each pool reports what it couldn't offer, and the page says so
+ * (see the unmet note in bmw-matcher.js).
+ *
+ * Scoped to the two wants that are genuine stock facts: fuel and body style.
+ * "No preference" values (`any`, `open`) state no want and can never be unmet.
+ *
+ * Measured against the pool as fetched, NOT the survivors of the hard filters:
+ * "no fully electric cars at this retailer" is a fact about the stock, and
+ * saying it because the only EV happened to sit above the budget would be a
+ * different lie. Budget mismatch is already visible in the results themselves.
+ *
+ * @returns {Object} question id → the unmet values, omitting met ones entirely.
+ *   An empty object means every stated want has something behind it.
+ */
+export function unmetWants(answers, cars) {
+  const unmet = {};
+  // fuelPrefs turns "unanswered" into ['open'], which filters out to nothing.
+  const fuels = fuelPrefs(answers).filter((v) => v !== 'open');
+  const missingFuel = fuels.filter((v) => !cars.some((c) => c.fuel === v));
+  if (missingFuel.length) unmet.fuel = missingFuel;
+
+  const bodies = (answers.bodyStyles || []).filter((v) => v !== 'any');
+  const missingBody = bodies.filter((v) => !cars.some((c) => c.body === v));
+  if (missingBody.length) unmet.bodyStyles = missingBody;
+
+  return unmet;
 }
 
 /** How many cars the results screen shows as headline matches. */

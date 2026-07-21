@@ -35,11 +35,40 @@
  */
 const BMW_TUNING = {
   weights: {
-    budget: 3.0, body: 2.5, fuel: 2.5, practicality: 2.0,
+    // Body at 4.5 (was 2.5) — see the body block below for why.
+    budget: 3.0, body: 4.5, fuel: 2.5, practicality: 2.0,
     performance: 1.5, economy: 1.5, size: 1.0, character: 2.0,
   },
-  // Body-match scores. `neutral` = no preference / "any"; `miss` = wrong shape.
-  body: { match: 1, neutral: 0.7, miss: 0.15 },
+  /*
+   * Body-match scores. `neutral` = no preference / "any"; `miss` = wrong shape.
+   *
+   * At the original 2.5 / miss 0.15, BMW honoured a named body style in the
+   * top 3 only 53% of the time (docs/question-stock-audit.md): a shape is the
+   * most concrete thing a user asks for, and nearly half of them didn't get
+   * it. MINI had already solved this for itself with 6.0 / miss 0, so the
+   * question was how much of that BMW needs — its stock is far richer (median
+   * 93 cars per retailer vs MINI's 33), and over-binding a rich pool would
+   * flatten the results to one shape.
+   *
+   * Swept over 40 retailers × 300 answer sets (honesty / outcome diversity):
+   *   2.5 / 0.15  53% / 62%   ← the old base
+   *   2.5 / 0     55% / 62%
+   *   3.5 / 0     61% / 64%
+   *   4.0 / 0     63% / 64%
+   *   4.5 / 0     66% / 66%   ← chosen
+   *   5.0 / 0     67% / 65%
+   *   6.0 / 0     71% / 63%   ← MINI's values, copied blind
+   *
+   * 4.5 / miss 0 is where diversity peaks: honesty +13 points and the results
+   * get *more* varied, not less, because a wrong-shape car can no longer
+   * out-muscle a right-shape one on the other dimensions. MINI's 6.0 buys 5
+   * more points of honesty but starts costing diversity, which BMW's deeper
+   * stock has no reason to pay. Dropping `miss` to 0 is worth ~2 points on its
+   * own and is what stops a wrong shape scoring at all — it can still surface
+   * when NO right-shape car satisfies the other answers, the honest "closest
+   * we've got".
+   */
+  body: { match: 1, neutral: 0.7, miss: 0 },
   priorityBoosts: {
     economy: { economy: 1.5, budget: 0.5 },
     performance: { performance: 1.8, character: 0.5 },
@@ -82,15 +111,37 @@ const MINI_TUNING = {
     // Body is MINI's heaviest soft dimension. MINI's thin, EV-heavy stock let a
     // wrong-shape car that's strong elsewhere (the only EV, a JCW) top a search
     // for a different shape — e.g. the JCW Aceman SUV beating hatchbacks on a
-    // "hatchback" search. At weight 6.0, paired with body.miss = 0 below, a
-    // wrong shape can't reach #1 while any right-shape car that also fits exists
+    // "hatchback" search. At weight 6.0, paired with body.miss = 0, a wrong
+    // shape can't reach #1 while any right-shape car that also fits exists
     // (empirically the Aceman drops from ~#2 to ~#12 on a "hatchback" search);
     // it can still surface when NO right-shape car satisfies the other answers
-    // — the honest "closest we've got". BMW keeps its base weight of 2.5.
+    // — the honest "closest we've got". BMW has since adopted the same
+    // calibration at a lower weight (4.5 — see BMW_TUNING), because its deeper
+    // stock doesn't need binding this hard to honour a shape. MINI keeps 6.0:
+    // with a 33-car median pool the extra force is what earns it 72% honesty.
     body: 6.0,
+    // MINI-only dimensions BMW leaves unweighted, so they no-op for BMW (see
+    // scoreStyleLine/scoreDoors — a brand that doesn't weight a dimension
+    // contributes 0). styleLine is the trim-character match the repointed
+    // `miniVibe` feeds; it carries signal the engine can't get elsewhere
+    // (Classic vs Exclusive share a 0-62 and price, so nothing else separates
+    // them), hence a near-character weight. doors is a lighter, Hatch-only
+    // use-case lean. Both tuned against the audit A/B (docs/mini-first-questions.md).
+    styleLine: 2.5,
+    doors: 1.5,
   },
+  // Trim-character scores (scoreStyleLine), same shape as body: a right trim is
+  // perfect, an unknown/neutral one middling, a wrong one weak but not zero —
+  // trim is a lean, not a hard requirement like shape, so miss stays off the floor.
+  styleLine: { match: 1, neutral: 0.7, miss: 0.25 },
+  // Door-count scores (scoreDoors). Gentler miss than styleLine: being shown a
+  // 5-door when you wanted 3 is a mild mismatch, not a character clash.
+  doors: { match: 1, neutral: 0.7, miss: 0.4 },
   // Wrong shape scores nothing on the (now heaviest) body dimension for MINI.
-  // BMW keeps the gentler 0.15 miss from the base.
+  // This now matches the BMW base's own miss of 0, so the field is currently
+  // redundant — kept stated rather than inherited because MINI's whole body
+  // calibration is deliberate, and it must not silently follow BMW if the base
+  // is ever softened again.
   body: { match: 1, neutral: 0.7, miss: 0 },
   // 0-62: MINI range is ~6.0s (JCW) to ~8.5s. Solved so a JCW at 6.0s reads
   // ~0.9 and a brisk 7.7s Cooper ~0.6 (BMW's curve gives that 7.7s car only
@@ -142,39 +193,69 @@ export const BRANDS = {
     // left. Cap at £50k with a default bracket around the median.
     budget: { max: 50000, default: [15000, 30000] },
     tuning: mergeTuning(MINI_TUNING),
-    // Bespoke per-brand questions. This is the extensibility hook: a brand can
-    // add questions the shared pool doesn't have. Each added question is a
-    // normal question object (the client renders it generically) PLUS a
-    // `scoresAs` map: value → partial standard-answers that the engine already
-    // understands. applyBespokeAnswers (questions.js) folds those into the
-    // answer set before scoring, so the ENGINE never learns a new question id —
-    // a MINI "vibe" pick just contributes the same style/priorities/fuel
-    // signals a normal answer would. `insertAfter` places it in the flow.
+    // Per-brand question surgery — the extensibility hook that lets MINI's set
+    // diverge from the shared pool without the engine learning a thing (see
+    // docs/mini-first-questions.md for the evidence behind each change):
+    //
+    //  drop — questions the shared pool asks but MINI's range makes near-dead.
+    //    `mileage` arbitrates diesel-vs-petrol running costs, and MINI sells no
+    //    diesel to speak of; `style` (comfort↔sporty) barely separates cars on a
+    //    one-model-per-shape range, so it's folded into `miniVibe` instead of
+    //    asked. BMW keeps both. The engine still *reads* mileage/style if a value
+    //    arrives (legacy links), so nothing breaks — they're just not asked.
+    //
+    //  add — questions MINI's range needs that BMW's doesn't:
+    //    `doors` (3- vs 5-door, a real split of MINI's biggest line, the Hatch;
+    //    BMW body style already implies doors) as a normal conditional question
+    //    scored by scoreDoors, and `miniVibe` repointed at MINI's real trim lines
+    //    (Classic/Exclusive/Sport). Each vibe option's `scoresAs` folds into the
+    //    standard answer set: `styleLine` feeds scoreStyleLine, and it also
+    //    supplies the `style` value the dropped question no longer collects —
+    //    which is exactly how `style` survives as signal without its own screen.
     questions: {
+      drop: ['mileage', 'style'],
       add: [
         {
+          id: 'doors',
+          title: 'THREE DOORS OR FIVE?',
+          help: 'Three is the icon. Five makes the back seats an easy in-and-out.',
+          insertAfter: 'bodyStyles',
+          // Only meaningful once they're open to a Hatch — the only MINI sold in
+          // both counts. Mirrored client-side by SHOW_IF.doors in quiz-meta.js.
+          showIf: (a) => {
+            const b = a.bodyStyles;
+            const picks = Array.isArray(b) ? b : (b != null ? [b] : []);
+            return picks.length === 0 || picks.some((v) => v === 'hatchback' || v === 'any');
+          },
+          options: [
+            { value: '3', label: 'Three doors', sub: 'The classic silhouette' },
+            { value: '5', label: 'Five doors', sub: 'Easier in the back' },
+            { value: 'either', label: 'Either’s fine', sub: 'No strong feelings' },
+          ],
+        },
+        {
           id: 'miniVibe',
-          title: 'WHAT’S YOUR MINI VIBE?',
-          help: 'Sets the character we lean towards. Pick the one that’s most you.',
-          insertAfter: 'style',
+          title: 'WHICH MINI ARE YOU?',
+          help: 'Sets the trim character we lean towards. Pick the one that’s most you.',
+          insertAfter: 'people',
           options: [
             {
               value: 'classic',
-              label: 'Classic charm',
-              sub: 'Iconic looks, easy-going',
-              scoresAs: { priorities: ['image'] },
+              label: 'Classic',
+              sub: 'Timeless, pared-back, the icon',
+              scoresAs: { styleLine: 'classic', style: '2', priorities: ['image'] },
             },
             {
-              value: 'electric',
-              label: 'Electric era',
-              sub: 'Quiet, clever, low-running-cost',
-              scoresAs: { priorities: ['tech', 'economy'] },
+              value: 'exclusive',
+              label: 'Exclusive',
+              sub: 'Plush, polished, a little fancy',
+              scoresAs: { styleLine: 'exclusive', style: '3', priorities: ['comfort'] },
             },
             {
-              value: 'jcw',
-              label: 'John Cooper Works',
-              sub: 'Full go-kart, maximum attack',
-              scoresAs: { style: '5', priorities: ['performance'] },
+              value: 'sport',
+              label: 'Sport',
+              sub: 'Stripes, spoilers, go-kart energy (JCW when you mean it)',
+              scoresAs: { styleLine: 'sport', style: '5', priorities: ['performance'] },
             },
           ],
         },

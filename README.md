@@ -152,13 +152,19 @@ The backend exposes two endpoints (plus `GET /health` → `{ ok: true }`):
   can state the number without hardcoding it. Both counts are server-owned: a
   brand gaining a question, or `TOP_MATCHES` changing, updates the intro copy on
   the next page load with no block rebuild.
-- **`POST /api/match`** with body `{ answers, retailer? }` → `{ matches, contenders }`.
+- **`POST /api/match`** with body `{ answers, retailer? }` → `{ matches, unmet }`.
   `retailer` is the retailer_site ID to match against; omit it to use the
   backend's default (`RETAILER_SITE` env var, or `96` if unset).
-  Each entry is `{ car, score, stretch, reasons }`, where `car` carries **only
+  Each match is `{ car, score, stretch, reasons }`, where `car` carries **only
   display fields** (name, line, body, fuel, price range, 0–62, mpg/range, blurb).
   Internal scoring fields (tags, size class, seats, boot…) are omitted, so the
   dataset can't be reconstructed from responses.
+  `unmet` is the stated wants — fuel and body style — with no car behind them
+  in the stock searched (e.g. `{ fuel: ['ev'] }`), so the results page can say
+  so plainly instead of quietly serving the closest thing. `/api/nearby`
+  reports the same for its own pool, and sends `unmet: null` when the lookup
+  failed: the block only tells the user something is unavailable once both
+  halves agree, and "we didn't hear back" is not agreement.
 
 ## Deploy the backend
 

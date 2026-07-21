@@ -125,6 +125,11 @@ const BRAND_COPY = {
     lede: ({ questions, matches, retailer }) => `${questions} quick questions about your life, `
       + `your miles and your budget. We’ll match you with the ${cardinal(matches)} approved-used `
       + `cars at ${retailer} that suit you best, and tell you why.`,
+    // Approved Used's no-surprises register: state the fact, name the
+    // retailer, don't dress it up (docs/tone-style-guide.md). No label —
+    // BMW's copy states things rather than announcing them.
+    unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
+      + 'These are the closest matches to everything else you asked for.',
   },
   mini: {
     name: 'MINI',
@@ -133,8 +138,90 @@ const BRAND_COPY = {
     lede: ({ questions, matches, retailer }) => `${questions} quick questions about your life, `
       + `your miles and your money. We’ll find the ${cardinal(matches)} MINIs at ${retailer} `
       + 'with your name on them — and tell you exactly why.',
+    // Same fact, MINI's register: the UPPERCASE-with-a-full-stop beat as the
+    // lead-in, then warm and plain. A shortage is a shrug, never a shrug-off.
+    unmetLabel: 'SMALL SNAG.',
+    unmet: ({ list, retailer }) => `No ${list} at ${retailer} or anywhere nearby right now. `
+      + 'Here’s the closest we’ve got to the rest of your brief.',
   },
 };
+
+/*
+ * How an unmet want is named in the results note, per brand — plural noun
+ * phrases that drop into "No ___ at <retailer>…". Per-brand because MINI
+ * names its own shapes (a Countryman, not an SUV) and calls its EVs
+ * all-electric, exactly as the quiz options do. Keyed by question id then
+ * answer value; an unrecognised value (an old shared link) falls back to the
+ * raw value rather than dropping the warning.
+ */
+const UNMET_PHRASES = {
+  bmw: {
+    fuel: {
+      petrol: 'petrol cars', diesel: 'diesels', phev: 'plug-in hybrids', ev: 'fully electric cars',
+    },
+    bodyStyles: {
+      hatchback: 'hatchbacks', saloon: 'saloons', estate: 'estates', suv: 'SUVs',
+      coupe: 'coupés', convertible: 'convertibles', mpv: 'family carriers',
+    },
+  },
+  mini: {
+    fuel: {
+      petrol: 'petrol MINIs', phev: 'plug-in hybrid MINIs', ev: 'all-electric MINIs',
+    },
+    bodyStyles: {
+      hatchback: 'hatchbacks', estate: 'Clubman estates', suv: 'Countryman crossovers',
+      convertible: 'convertibles',
+    },
+  },
+};
+
+/** "a", "a or b", "a, b or c" — the natural spoken list. */
+function orList(items) {
+  if (items.length < 2) return items[0] || '';
+  return `${items.slice(0, -1).join(', ')} or ${items[items.length - 1]}`;
+}
+
+/**
+ * The wants BOTH halves of the reachable pool agree they can't meet.
+ *
+ * The retailer's stock and the nearby tier are fetched independently, and a
+ * car one street over still counts as reachable — so a want is only truly
+ * unavailable when the retailer AND nearby both came back without it. A
+ * `nearbyUnmet` of null means nearby never answered (failed or still cold):
+ * that's an absence of facts, so we claim nothing at all.
+ */
+function agreedUnmet(retailerUnmet, nearbyUnmet) {
+  if (!nearbyUnmet) return {};
+  const agreed = {};
+  for (const [id, values] of Object.entries(retailerUnmet || {})) {
+    const both = values.filter((v) => (nearbyUnmet[id] || []).includes(v));
+    if (both.length) agreed[id] = both;
+  }
+  return agreed;
+}
+
+/**
+ * A brand-voiced note admitting that something the user asked for isn't in
+ * the stock we searched, and framing what's shown as the closest fit. Returns
+ * null when there's nothing to admit to — which is the common case.
+ */
+function unmetNote(ctx, unmet) {
+  const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
+  const phrases = UNMET_PHRASES[ctx.brand] || UNMET_PHRASES.bmw;
+  // Fuel first, then shape: "No fully electric cars or estates at …".
+  const items = ['fuel', 'bodyStyles'].flatMap(
+    (id) => (unmet[id] || []).map((v) => phrases[id]?.[v] || v),
+  );
+  if (!items.length) return null;
+
+  const note = el('aside', 'bmwm-unmet');
+  note.setAttribute('role', 'note');
+  if (copy.unmetLabel) note.append(el('p', 'bmwm-unmet-label', copy.unmetLabel));
+  note.append(el('p', 'bmwm-unmet-text', copy.unmet({
+    list: orList(items), retailer: ctx.retailerLabel,
+  })));
+  return note;
+}
 
 /**
  * The question set for a brand, plus `topMatches` — how many results the API
@@ -168,19 +255,29 @@ async function apiMatch(base, answers, retailer, brandKey) {
  * (a national distance-sorted search) so the hero matches can render first.
  * The section is a bonus, so any failure resolves to an empty list rather than
  * throwing: the caller just omits the "Worth the drive" section.
+ *
+ * Returns `{ nearby, unmet }`. `unmet` is the wants this pool had nothing
+ * behind (see the unmet note below) and is `null` whenever we didn't get a
+ * usable answer — a failed lookup, or an older API that doesn't send the
+ * field. An empty list of cars is a finding; a failed lookup is not, and the
+ * two must not be confused before telling a user something doesn't exist.
  */
 async function apiNearby(base, answers, retailer, brandKey) {
+  const noAnswer = { nearby: [], unmet: null };
   try {
     const res = await fetch(`${base}/api/nearby`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answers, retailer, brand: brandKey }),
     });
-    if (!res.ok) return [];
+    if (!res.ok) return noAnswer;
     const data = await res.json();
-    return Array.isArray(data.nearby) ? data.nearby : [];
+    return {
+      nearby: Array.isArray(data.nearby) ? data.nearby : [],
+      unmet: (data.unmet && typeof data.unmet === 'object') ? data.unmet : null,
+    };
   } catch {
-    return [];
+    return noAnswer;
   }
 }
 
@@ -989,8 +1086,12 @@ async function renderResults(root, ctx, answers) {
   // separately below so it never holds up the hero. See apiNearby / the
   // .bmwm-nearby placeholder wired up further down.
   let matches;
+  // What the retailer's own stock couldn't offer. Half the picture: nothing is
+  // said to the user until /api/nearby agrees (see agreedUnmet). An older API
+  // that doesn't send the field leaves this empty, so it simply never fires.
+  let retailerUnmet = {};
   try {
-    ({ matches } = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand));
+    ({ matches, unmet: retailerUnmet = {} } = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand));
   } catch {
     renderStatus(root, {
       kicker: 'Sorry',
@@ -1014,9 +1115,12 @@ async function renderResults(root, ctx, answers) {
     );
   } else {
     // #1 is the recommendation — a single full-width hero, matching the
-    // "Your perfect BMW is the …" headline (three co-equal heroes contradicted
-    // that claim). #2/#3 drop to a quieter "More at <retailer>" tier below.
-    screen.append(el('h2', 'bmwm-title', `Your perfect BMW is the ${matches[0].car.name.replace(/^BMW /, '')}`));
+    // "Your perfect <brand> is the …" headline (three co-equal heroes
+    // contradicted that claim). #2/#3 drop to a quieter "More at <retailer>"
+    // tier below. The car's name already leads with the brand, so strip it.
+    const { name: brandName } = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
+    const model = matches[0].car.name.replace(new RegExp(`^${brandName} `), '');
+    screen.append(el('h2', 'bmwm-title', `Your perfect ${brandName} is the ${model}`));
     const grid = el('div', 'bmwm-grid');
     grid.append(matchCard(matches[0], { big: true }));
     screen.append(grid);
@@ -1090,11 +1194,18 @@ async function renderResults(root, ctx, answers) {
 
   // Phase two: now the page is painted, load the nearby carousel in the
   // background and swap it into the placeholder band (or drop the band).
+  //
+  // This is also the moment we learn whether a want the retailer couldn't meet
+  // is genuinely unavailable, so the unmet note goes in here rather than with
+  // the hero — we'd otherwise be claiming "no electric cars near you" while
+  // still waiting to hear from the retailers that might have one.
   if (nearbyBand) {
-    apiNearby(ctx.api, answers, ctx.retailer, ctx.brand).then((nearby) => {
+    apiNearby(ctx.api, answers, ctx.retailer, ctx.brand).then(({ nearby, unmet }) => {
       // The user may have navigated away (retake/tweak) before this resolves;
-      // only touch the band if it's still in the document.
+      // only touch the page if it's still in the document.
       if (!nearbyBand.isConnected) return;
+      const note = unmetNote(ctx, agreedUnmet(retailerUnmet, unmet));
+      if (note) screen.insertBefore(note, screen.querySelector('.bmwm-grid'));
       if (nearby.length) fillNearbyBand(nearbyBand, ctx, nearby);
       else nearbyBand.remove();
     });

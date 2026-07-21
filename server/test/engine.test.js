@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  matchCars, rankCars, budgetRange, STRETCH_FACTOR,
+  matchCars, rankCars, budgetRange, unmetWants, STRETCH_FACTOR,
 } from '../engine.js';
 import { CARS } from '../data.js';
 import { BUDGET_BANDS, QUESTIONS } from '../questions.js';
@@ -23,7 +23,6 @@ const base = {
   charging: 'none',
   primaryUse: 'commute',
   people: 'solo',
-  boot: 'small',
   mileage: 'mid',
   style: '3',
   priorities: ['economy', 'comfort'],
@@ -51,7 +50,6 @@ test('large family with big boot needs gets practical 5+ seaters only', () => {
     budget: 'b4',
     bodyStyles: ['suv', 'estate'],
     people: 'crew',
-    boot: 'big',
     primaryUse: 'family',
     priorities: ['comfort', 'economy'],
   };
@@ -113,7 +111,6 @@ test('contradictory answers still produce ranked, in-filter results', () => {
     budget: 'b1',
     bodyStyles: ['convertible'],
     people: 'crew',
-    boot: 'big',
     style: '5',
     priorities: ['performance', 'image'],
   })) {
@@ -173,6 +170,34 @@ test('every dataset entry has the fields the engine needs', () => {
     if (car.fuel === 'ev') assert.ok(car.evRange > 0, `${car.name} needs evRange`);
     else assert.ok(car.mpg > 0, `${car.name} needs mpg`);
   }
+});
+
+test('boot need is derived from people + primaryUse, not from a boot question', () => {
+  // Two identical cars but for luggage space. A solo weekend driver asks
+  // nothing of a boot, so they tie; a small family on family duties (1 + 1 →
+  // "big") separates them. This is the signal the cut boot question used to
+  // carry, now folded into the answers that already implied it.
+  const small = {
+    ...CARS[0], id: 'sm', seats: 5, boot: 300, priceMin: 40000, priceMax: 40000,
+  };
+  const big = { ...small, id: 'bg', boot: 550 };
+  const scoreOf = (answers, id) => rankCars(answers, [small, big]).find((m) => m.car.id === id).score;
+
+  const soloFun = {
+    ...base, budget: [30000, 50000], people: 'solo', primaryUse: 'fun',
+  };
+  assert.equal(scoreOf(soloFun, 'sm'), scoreOf(soloFun, 'bg'),
+    'a solo weekend driver has no space requirement, so boot cannot separate them');
+
+  const familyDuties = {
+    ...base, budget: [30000, 50000], people: 'family', primaryUse: 'family',
+  };
+  assert.ok(scoreOf(familyDuties, 'bg') > scoreOf(familyDuties, 'sm'),
+    'a family on family duties needs the space, so the bigger boot wins');
+
+  // An old shared link may still carry a boot answer; it is ignored, not read.
+  assert.equal(scoreOf({ ...soloFun, boot: 'big' }, 'sm'), scoreOf(soloFun, 'sm'),
+    'a legacy boot answer neither throws nor changes the score');
 });
 
 /* ---- Stakeholder amendments: slider budget/mileage, multi-select fuel ---- */
@@ -262,9 +287,60 @@ test('charging "either" gives EV access like home charging', () => {
   assert.equal(evEither.score, evHome.score, '"either" should match "home" for EV access');
 });
 
+/* ---- unmet wants: what the pool couldn't offer (results-page honesty) ---- */
+
+// A deliberately narrow pool: petrol saloons only. Anything else a user asks
+// for is genuinely absent, which is exactly the case the results note exists
+// to admit to.
+const petrolOnly = CARS.filter((c) => c.fuel === 'petrol' && c.body === 'saloon');
+
+test('an unmet fuel want is reported against the pool that was searched', () => {
+  assert.ok(petrolOnly.length, 'fixture sanity: some petrol saloons exist');
+  assert.deepEqual(unmetWants({ ...base, fuel: ['ev'] }, petrolOnly), { fuel: ['ev'] });
+  // Only the missing values are listed — a met pick alongside is not flagged.
+  assert.deepEqual(
+    unmetWants({ ...base, fuel: ['petrol', 'ev'] }, petrolOnly),
+    { fuel: ['ev'] },
+  );
+});
+
+test('an unmet body-style want is reported the same way', () => {
+  assert.deepEqual(
+    unmetWants({ ...base, bodyStyles: ['convertible'], fuel: ['petrol'] }, petrolOnly),
+    { bodyStyles: ['convertible'] },
+  );
+  // Both dimensions can be unmet at once, each listing only its own values.
+  assert.deepEqual(
+    unmetWants({ ...base, bodyStyles: ['convertible', 'saloon'], fuel: ['ev'] }, petrolOnly),
+    { fuel: ['ev'], bodyStyles: ['convertible'] },
+  );
+});
+
+test('a want the pool CAN meet produces nothing to apologise for', () => {
+  assert.deepEqual(
+    unmetWants({ ...base, fuel: ['petrol'], bodyStyles: ['saloon'] }, petrolOnly),
+    {},
+  );
+  // And against the full range, a normal answer set is entirely satisfiable.
+  assert.deepEqual(unmetWants({ ...base, fuel: ['ev'], bodyStyles: ['suv'] }, CARS), {});
+});
+
+test('"no preference" answers state no want, so can never be unmet', () => {
+  // 'open' fuel / 'any' body are the help-me-decide values: nothing was asked
+  // for, so nothing can be missing — even from a pool that has neither.
+  assert.deepEqual(unmetWants({ ...base, fuel: ['open'], bodyStyles: ['any'] }, petrolOnly), {});
+  assert.deepEqual(unmetWants({ ...base, fuel: 'open', bodyStyles: ['any'] }, []), {});
+  // Unanswered is the same: an absent fuel/body answer reads as no preference.
+  assert.deepEqual(unmetWants({ budget: 'b2' }, []), {});
+  assert.deepEqual(unmetWants({ ...base, fuel: [] }, []), {});
+});
+
 test('quiz answer keys line up with what the engine reads', () => {
   const ids = QUESTIONS.map((q) => q.id);
-  for (const key of ['budget', 'bodyStyles', 'fuel', 'charging', 'primaryUse', 'people', 'boot', 'mileage', 'style', 'priorities']) {
+  for (const key of ['budget', 'bodyStyles', 'fuel', 'charging', 'primaryUse', 'people', 'mileage', 'style', 'priorities']) {
     assert.ok(ids.includes(key), `question "${key}" missing from quiz`);
   }
+  // And nothing the engine no longer reads is still on screen: `boot` was cut
+  // (its need is derived from people + primaryUse — see bootNeedKey).
+  assert.ok(!ids.includes('boot'), 'the boot question was folded into people/primaryUse');
 });

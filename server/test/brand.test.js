@@ -123,23 +123,23 @@ test('MINI copy differs from BMW in words but keeps identical option values', ()
   const bmwById = Object.fromEntries(bmw.map((q) => [q.id, q]));
   const miniById = Object.fromEntries(mini.map((q) => [q.id, q]));
 
-  // Titles are reworded for MINI (e.g. budget, style, priorities).
+  // Titles are reworded for MINI (e.g. budget, priorities).
   assert.notEqual(miniById.budget.title, bmwById.budget.title);
   assert.notEqual(miniById.priorities.title, bmwById.priorities.title);
-  assert.match(miniById.style.title, /DRIVE/i);
 
-  // But every option VALUE is unchanged for questions common to both brands,
-  // so the scoring engine sees the same answer space.
-  for (const id of ['primaryUse', 'people', 'boot', 'style', 'priorities', 'charging']) {
+  // But every option VALUE is unchanged for questions common to both brands
+  // (style is MINI-dropped, so it's not in this list), so the scoring engine
+  // sees the same answer space where a question is shared.
+  for (const id of ['primaryUse', 'people', 'priorities', 'charging']) {
     const bmwVals = (bmwById[id].options || []).map((o) => o.value).sort();
     const miniVals = (miniById[id].options || []).map((o) => o.value).sort();
     assert.deepEqual(miniVals, bmwVals, `${id} option values must match across brands`);
   }
-  // A reworded label actually changed (style value '5').
-  const miniS5 = miniById.style.options.find((o) => o.value === '5');
-  const bmwS5 = bmwById.style.options.find((o) => o.value === '5');
-  assert.notEqual(miniS5.label, bmwS5.label);
-  assert.match(miniS5.label, /go-kart/i);
+  // A reworded label actually changed (primaryUse value 'fun') while its value held.
+  const miniFun = miniById.primaryUse.options.find((o) => o.value === 'fun');
+  const bmwFun = bmwById.primaryUse.options.find((o) => o.value === 'fun');
+  assert.notEqual(miniFun.label, bmwFun.label);
+  assert.match(miniFun.sub, /go-kart/i);
 });
 
 test('questionsForBrand(bmw) keeps the full option set', () => {
@@ -163,7 +163,7 @@ const miniHatch = {
 test('brand tuning: BMW default is unchanged (no tuning arg == BMW tuning)', () => {
   const answers = {
     budget: [15000, 35000], bodyStyles: ['hatchback'], fuel: ['petrol'], charging: 'none',
-    primaryUse: 'city', people: 'solo', boot: 'small', mileage: 8000, style: '5', priorities: ['performance'],
+    primaryUse: 'city', people: 'solo', mileage: 8000, style: '5', priorities: ['performance'],
   };
   const noArg = rankCars(answers, [miniHatch])[0].score;
   const bmwArg = rankCars(answers, [miniHatch], brandTuning('bmw'))[0].score;
@@ -178,7 +178,7 @@ test('brand tuning: a sporty MINI scores higher under MINI tuning than BMW tunin
   };
   const answers = {
     budget: [15000, 35000], bodyStyles: ['hatchback'], fuel: ['petrol'], charging: 'none',
-    primaryUse: 'fun', people: 'solo', boot: 'small', mileage: 8000, style: '5', priorities: ['performance', 'image'],
+    primaryUse: 'fun', people: 'solo', mileage: 8000, style: '5', priorities: ['performance', 'image'],
   };
   const bmwScore = rankCars(answers, [jcw], brandTuning('bmw'))[0].score;
   const miniScore = rankCars(answers, [jcw], brandTuning('mini'))[0].score;
@@ -192,10 +192,37 @@ test('brand tuning: MINI hard-filters do not exclude a Countryman for a family',
   };
   const familyAnswers = {
     budget: [15000, 40000], bodyStyles: ['suv'], fuel: ['open'], charging: 'none',
-    primaryUse: 'family', people: 'family', boot: 'medium', mileage: 10000, style: '3', priorities: ['comfort'],
+    primaryUse: 'family', people: 'family', mileage: 10000, style: '3', priorities: ['comfort'],
   };
   const survivors = rankCars(familyAnswers, [countryman], brandTuning('mini'));
   assert.equal(survivors.length, 1, 'the Countryman survives the MINI family filter');
+});
+
+test('body binding applies to BMW too, but still yields when no right shape fits', () => {
+  // BMW honoured a named shape in only 53% of top-3s until body moved to
+  // 4.5 / miss 0 (see BMW_TUNING). A right-shape car that fits the brief must
+  // beat a wrong-shape one that's stronger everywhere else...
+  const estate = {
+    id: 'touring', name: 'BMW 320d Touring', line: '3 Series', body: 'estate', fuel: 'diesel',
+    priceMin: 34000, priceMax: 34000, sizeClass: 2, seats: 5, boot: 500, zeroTo62: 7.4,
+    mpg: 55, tags: ['practical', 'family'], blurb: '',
+  };
+  const suv = {
+    id: 'x5', name: 'BMW X5 xDrive40d', line: 'X5', body: 'suv', fuel: 'diesel',
+    priceMin: 34000, priceMax: 34000, sizeClass: 4, seats: 5, boot: 500, zeroTo62: 6.5,
+    mpg: 48, tags: ['practical', 'family', 'cruiser', 'image'], blurb: '',
+  };
+  const wantsEstate = {
+    budget: [30000, 45000], bodyStyles: ['estate'], fuel: ['diesel'], charging: 'none',
+    primaryUse: 'family', people: 'family', mileage: 15000, style: '3',
+    priorities: ['comfort', 'image'],
+  };
+  const ranked = rankCars(wantsEstate, [suv, estate], brandTuning('bmw'));
+  assert.equal(ranked[0].car.id, 'touring', 'the estate the buyer asked for tops, not the plusher SUV');
+  // ...but the binding is a weighting, not a filter: with no estate in stock
+  // the SUV is still offered as the closest available fit.
+  assert.equal(rankCars(wantsEstate, [suv], brandTuning('bmw')).length, 1,
+    'a wrong-shape car is never filtered out, only out-ranked');
 });
 
 test('body binding: a wrong-shape car cannot top the list when a right-shape one exists', () => {
@@ -213,7 +240,7 @@ test('body binding: a wrong-shape car cannot top the list when a right-shape one
   };
   const wantsHatchEv = {
     budget: [15000, 35000], bodyStyles: ['hatchback'], fuel: ['ev'], charging: 'home',
-    primaryUse: 'city', people: 'solo', boot: 'small', mileage: 8000, style: '5',
+    primaryUse: 'city', people: 'solo', mileage: 8000, style: '5',
     priorities: ['performance', 'image'],
   };
   const ranked = rankCars(wantsHatchEv, [jcwEvSuv, plainHatchEv], brandTuning('mini'));
@@ -235,7 +262,7 @@ test('annual mileage changes the ranking (efficient cars rise at high mileage)',
   };
   const base = {
     budget: [15000, 40000], bodyStyles: ['hatchback'], fuel: ['open'], charging: 'home',
-    primaryUse: 'commute', people: 'solo', boot: 'small', style: '3', priorities: ['economy'],
+    primaryUse: 'commute', people: 'solo', style: '3', priorities: ['economy'],
   };
   const low = rankCars({ ...base, mileage: 3000 }, [thirstyPetrol, ev], brandTuning('mini'));
   const high = rankCars({ ...base, mileage: 24000 }, [thirstyPetrol, ev], brandTuning('mini'));
@@ -251,27 +278,43 @@ test('annual mileage changes the ranking (efficient cars rise at high mileage)',
 
 /* ---- bespoke per-brand question ---- */
 
-test('bespoke MINI question: inserted for MINI, absent for BMW, scoresAs stripped', () => {
+test('MINI question surgery: drops mileage/style, adds doors + miniVibe; BMW keeps its full set', () => {
   const mini = questionsForBrand('mini');
   const ids = mini.map((q) => q.id);
-  assert.ok(ids.includes('miniVibe'), 'MINI has the bespoke question');
-  assert.equal(ids.indexOf('miniVibe'), ids.indexOf('style') + 1, 'inserted right after style');
-  assert.ok(!questionsForBrand('bmw').some((q) => q.id === 'miniVibe'), 'BMW does not');
-  const vibe = mini.find((q) => q.id === 'miniVibe');
-  for (const o of vibe.options) assert.equal(o.scoresAs, undefined, 'scoresAs is engine-internal, never sent to client');
+  // Dropped for MINI (dead against its range), kept for BMW.
+  assert.ok(!ids.includes('mileage'), 'MINI drops mileage');
+  assert.ok(!ids.includes('style'), 'MINI drops style (folded into miniVibe)');
+  const bmwIds = questionsForBrand('bmw').map((q) => q.id);
+  assert.ok(bmwIds.includes('mileage') && bmwIds.includes('style'), 'BMW keeps both');
+  // Added for MINI: doors right after bodyStyles, miniVibe after people.
+  assert.equal(ids.indexOf('doors'), ids.indexOf('bodyStyles') + 1, 'doors follows bodyStyles');
+  assert.equal(ids.indexOf('miniVibe'), ids.indexOf('people') + 1, 'miniVibe follows people');
+  assert.ok(!bmwIds.includes('doors') && !bmwIds.includes('miniVibe'), 'BMW has neither');
+  // scoresAs is engine-internal and must never cross to the client.
+  for (const o of mini.find((q) => q.id === 'miniVibe').options) {
+    assert.equal(o.scoresAs, undefined, 'miniVibe scoresAs stripped');
+  }
 });
 
-test('bespoke answer folds into standard fields (jcw → performance + style) without overriding explicit answers', () => {
-  const folded = applyBespokeAnswers('mini', { priorities: ['image'], miniVibe: 'jcw' });
-  assert.equal(folded.style, '5', 'jcw fills the sporty style');
-  assert.ok(folded.priorities.includes('performance'), 'jcw adds the performance priority');
+test('miniVibe folds trim + style into the standard answer set without overriding explicit answers', () => {
+  // "sport" carries the styleLine (for scoreStyleLine) AND supplies the style
+  // value the dropped style question no longer collects — the fold that keeps
+  // comfort-vs-sporty signal alive without its own screen.
+  const folded = applyBespokeAnswers('mini', { priorities: ['image'], miniVibe: 'sport' });
+  assert.equal(folded.styleLine, 'sport', 'sport sets the trim line');
+  assert.equal(folded.style, '5', 'sport fills the sporty style');
+  assert.ok(folded.priorities.includes('performance'), 'sport adds the performance priority');
   assert.ok(folded.priorities.includes('image'), 'existing priority preserved');
-  // An explicit style must win over the bespoke nudge.
-  const explicit = applyBespokeAnswers('mini', { style: '1', miniVibe: 'jcw' });
+  // classic/exclusive map to their own trim + a calmer style.
+  assert.equal(applyBespokeAnswers('mini', { miniVibe: 'classic' }).styleLine, 'classic');
+  assert.equal(applyBespokeAnswers('mini', { miniVibe: 'exclusive' }).style, '3');
+  // An explicit style still wins over the bespoke nudge (legacy shared links).
+  const explicit = applyBespokeAnswers('mini', { style: '1', miniVibe: 'sport' });
   assert.equal(explicit.style, '1', 'explicit style is not overridden');
+  // The doors answer passes straight through (no scoresAs) for scoreDoors.
+  assert.equal(applyBespokeAnswers('mini', { doors: '3' }).doors, '3');
   // BMW has no bespoke questions → answers pass through untouched.
-  const bmw = applyBespokeAnswers('bmw', { style: '3' });
-  assert.deepEqual(bmw, { style: '3' });
+  assert.deepEqual(applyBespokeAnswers('bmw', { style: '3' }), { style: '3' });
 });
 
 /* ---- BMW spec-gap fill + fuel/crew binding (from the used-stock eval) ---- */
@@ -307,7 +350,7 @@ test('fuel binds hard when a specific fuel is chosen (wrong-fuel car cannot top)
   };
   const wantsPetrol = {
     budget: [40000, 120000], bodyStyles: ['saloon'], fuel: ['petrol'], charging: 'none',
-    primaryUse: 'roadtrips', people: 'solo', boot: 'medium', mileage: 8000, style: '1',
+    primaryUse: 'roadtrips', people: 'solo', mileage: 8000, style: '1',
     priorities: ['comfort', 'tech'],
   };
   const ranked = rankCars(wantsPetrol, [petrolSaloon, evFlagship], brandTuning('bmw'));
@@ -330,7 +373,7 @@ test('crew buyer: a 7-seater tops when one exists, but 5-seaters still rank (sto
   };
   const crew = {
     budget: [30000, 60000], bodyStyles: ['suv'], fuel: ['diesel'], charging: 'none',
-    primaryUse: 'family', people: 'crew', boot: 'big', mileage: 15000, style: '3',
+    primaryUse: 'family', people: 'crew', mileage: 15000, style: '3',
     priorities: ['comfort', 'economy'],
   };
   const both = rankCars(crew, [sevenSeat, fiveSeat], brandTuning('bmw'));
@@ -338,4 +381,86 @@ test('crew buyer: a 7-seater tops when one exists, but 5-seaters still rank (sto
   // With no 7-seater in stock the 5-seater still appears (not filtered out).
   const only5 = rankCars(crew, [fiveSeat], brandTuning('bmw'));
   assert.equal(only5.length, 1, 'a 5-seater is not hard-excluded from a crew search');
+});
+
+/* ---- MINI-first: styleLine + doors parsing and scoring ---- */
+
+test('mapVehicle parses MINI styleLine + doors from the derivative; BMW leaves them null', () => {
+  const map = (derivative, title = 'MINI Hatch') => mapVehicle(
+    { advert_id: 1, title, derivative, fuel: 'Petrol', cash_price: { value: 22000 }, retailer_site: { id: 92 } },
+    'mini',
+  );
+  // Style LINE (Classic/Exclusive/Sport/JCW) is distinct from the perf TIER
+  // (Cooper C / Cooper S): ~47% of stock uses the older "Cooper S 3 Door"
+  // naming that states only the tier, no style word → styleLine null (neutral,
+  // never penalised). Doors still parse from either naming.
+  assert.deepEqual(
+    [map('Cooper S 3 Door').styleLine, map('Cooper S 3 Door').doors], [null, 3],
+    'Cooper S 3 Door states a tier, not a style line → styleLine null, 3 doors',
+  );
+  assert.deepEqual(
+    [map('3-Door Hatch Cooper S Sport').styleLine, map('3-Door Hatch Cooper S Sport').doors], ['sport', 3],
+    'the newer naming carries the Sport style word',
+  );
+  assert.deepEqual(
+    [map('5-Door Hatch Cooper Exclusive').styleLine, map('5-Door Hatch Cooper Exclusive').doors], ['exclusive', 5],
+  );
+  assert.equal(map('3-Door Hatch Cooper Classic').styleLine, 'classic');
+  assert.equal(map('Hatch John Cooper Works').styleLine, 'jcw', 'JCW is its own trim');
+  // Non-hatch bodies never carry a door count; edition names name no style line.
+  assert.equal(map('Countryman C', 'MINI Countryman').doors, null, 'SUV has no door question');
+  assert.equal(map('Cooper Untamed Edition').styleLine, null, 'unknown edition → null, not a guess');
+  // BMW never sets either — the fields exist but stay null.
+  const bmw = mapVehicle({ advert_id: 2, title: 'BMW X3', derivative: 'X3 M40d M Sport', fuel: 'Diesel', cash_price: { value: 45000 }, retailer_site: { id: 96 } }, 'bmw');
+  assert.deepEqual([bmw.styleLine, bmw.doors], [null, null], 'BMW styleLine/doors are null');
+});
+
+test('styleLine + doors move MINI ranking, and neither touches BMW', () => {
+  const sportHatch = {
+    id: 'sp', name: 'MINI Cooper S', line: 'Hatch', body: 'hatchback', fuel: 'petrol',
+    priceMin: 24000, priceMax: 24000, sizeClass: 1, seats: 4, boot: 210, zeroTo62: 6.6,
+    mpg: 44, tags: ['urban', 'drivers-car'], blurb: '', styleLine: 'sport', doors: 3,
+  };
+  const classicHatch = {
+    id: 'cl', name: 'MINI Cooper Classic', line: 'Hatch', body: 'hatchback', fuel: 'petrol',
+    priceMin: 24000, priceMax: 24000, sizeClass: 1, seats: 4, boot: 210, zeroTo62: 7.7,
+    mpg: 49, tags: ['urban'], blurb: '', styleLine: 'classic', doors: 5,
+  };
+  const base = {
+    budget: [15000, 30000], bodyStyles: ['hatchback'], fuel: ['petrol'], charging: 'none',
+    primaryUse: 'fun', people: 'solo', priorities: ['image'],
+  };
+  // A "classic" vibe should lift the classic-trim car over the otherwise-punchier
+  // sport car (which the 0-62 curve would otherwise favour).
+  const wantsClassic = applyBespokeAnswers('mini', { ...base, miniVibe: 'classic' });
+  const rankedC = rankCars(wantsClassic, [sportHatch, classicHatch], brandTuning('mini'));
+  assert.equal(rankedC[0].car.id, 'cl', 'classic vibe tops the Classic-trim car');
+  assert.ok(rankedC[0].reasons.some((r) => /Classic trim/i.test(r)), 'and says why');
+  // A 3-door preference reorders two otherwise-equal-trim hatches.
+  const equalTrim = { ...classicHatch, id: 'cl5', styleLine: 'classic', doors: 5 };
+  const equalTrim3 = { ...classicHatch, id: 'cl3', styleLine: 'classic', doors: 3 };
+  const wants3 = applyBespokeAnswers('mini', { ...base, miniVibe: 'classic', doors: '3' });
+  const rankedD = rankCars(wants3, [equalTrim, equalTrim3], brandTuning('mini'));
+  assert.equal(rankedD[0].car.id, 'cl3', '3-door preference tops the 3-door car');
+
+  // The same styleLine/doors answers must not change BMW output at all: build
+  // two BMWs, rank with and without the MINI-only answers under BMW tuning.
+  const bmwA = {
+    id: 'a', name: 'BMW 320i', line: '3 Series', body: 'saloon', fuel: 'petrol',
+    priceMin: 30000, priceMax: 30000, sizeClass: 2, seats: 5, boot: 480, zeroTo62: 7.4,
+    mpg: 45, tags: ['cruiser'], blurb: '', styleLine: null, doors: null,
+  };
+  const bmwB = { ...bmwA, id: 'b', name: 'BMW 330i', zeroTo62: 5.8, tags: ['drivers-car'] };
+  const bmwAnswers = {
+    budget: [20000, 50000], bodyStyles: ['saloon'], fuel: ['petrol'], charging: 'none',
+    primaryUse: 'commute', people: 'solo', mileage: 10000, style: '3', priorities: ['comfort'],
+  };
+  const plain = rankCars(bmwAnswers, [bmwA, bmwB], brandTuning('bmw'));
+  const withMiniAnswers = rankCars(
+    { ...bmwAnswers, styleLine: 'sport', doors: '3' }, [bmwA, bmwB], brandTuning('bmw'),
+  );
+  assert.deepEqual(
+    plain.map((m) => [m.car.id, m.score]), withMiniAnswers.map((m) => [m.car.id, m.score]),
+    'styleLine/doors answers are inert for BMW — identical ids and scores',
+  );
 });
