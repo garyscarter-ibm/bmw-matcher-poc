@@ -112,8 +112,21 @@ function publicCar(car) {
   };
 }
 
-function publicMatch({ car, score, stretch, reasons }) {
-  return { car: publicCar(car), score, stretch, reasons };
+function publicMatch({
+  car, score, matchPct, checklist, stretch, reasons,
+}) {
+  // matchPct + checklist are the user-facing "how many of my asks did it meet?"
+  // view (the labels are display strings, safe to expose); `score` is the
+  // internal blend, kept for ordering/debug. checklist carries only the labels
+  // the card needs — met (for the count) and missed (the trade-offs section).
+  return {
+    car: publicCar(car),
+    score,
+    matchPct,
+    checklist: checklist ? { met: checklist.met, missed: checklist.missed } : undefined,
+    stretch,
+    reasons,
+  };
 }
 
 function readJsonBody(req) {

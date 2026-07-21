@@ -2,10 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  matchCars, rankCars, budgetRange, unmetWants, STRETCH_FACTOR,
+  matchCars, rankCars, matchChecklist, budgetRange, unmetWants, STRETCH_FACTOR,
 } from '../engine.js';
 import { CARS } from '../data.js';
 import { BUDGET_BANDS, QUESTIONS } from '../questions.js';
+import { brandTuning } from '../brands.js';
 
 function run(answers) {
   return matchCars(answers, CARS);
@@ -126,7 +127,17 @@ test('scores are 0–100, sorted, deterministic, with reasons on the top match',
   const all = runAll(base);
   for (let i = 0; i < all.length; i += 1) {
     assert.ok(all[i].score >= 0 && all[i].score <= 100);
-    if (i > 0) assert.ok(all[i - 1].score >= all[i].score, 'sorted descending');
+    if (i > 0) {
+      // Satisfaction-first ordering: matchPct never increases down the list, and
+      // the blended score only breaks ties WITHIN an equal-matchPct tier (so a
+      // lower-blend car that meets more asks can legitimately sit higher).
+      const prev = all[i - 1];
+      const cur = all[i];
+      const p = prev.matchPct ?? 100;
+      const c = cur.matchPct ?? 100;
+      assert.ok(p >= c, 'matchPct sorted descending');
+      if (p === c) assert.ok(prev.score >= cur.score, 'blend breaks ties within a tier');
+    }
   }
   assert.ok(a.matches[0].reasons.length >= 1, 'top match explains itself');
 });
@@ -343,4 +354,134 @@ test('quiz answer keys line up with what the engine reads', () => {
   // And nothing the engine no longer reads is still on screen: `boot` was cut
   // (its need is derived from people + primaryUse — see bootNeedKey).
   assert.ok(!ids.includes('boot'), 'the boot question was folded into people/primaryUse');
+});
+
+/* ---- Match checklist: the "how many of my asks?" view (matchChecklist) ---- */
+
+const labels = (list) => list.map((x) => x.label);
+
+test('a car meeting every stated ask is a genuine 100% — missed is empty', () => {
+  const car = {
+    id: 'p', name: 'BMW 320i', line: '3 Series', body: 'saloon', fuel: 'petrol',
+    priceMin: 30000, priceMax: 30000, sizeClass: 2, seats: 5, boot: 480, zeroTo62: 7.4,
+    mpg: 45, tags: ['cruiser'], blurb: '',
+  };
+  const answers = {
+    budget: [20000, 40000], bodyStyles: ['saloon'], fuel: ['petrol'], charging: 'none',
+    primaryUse: 'commute', people: 'family', mileage: 10000, style: '3', priorities: ['comfort'],
+  };
+  const { met, missed } = matchChecklist(answers, car);
+  assert.equal(missed.length, 0, 'nothing missed');
+  // budget, body, fuel, seats — all four stated asks met.
+  assert.deepEqual(labels(met).sort(), ['Petrol', 'Room for the family', 'Saloon body', 'Within your £40k budget'].sort());
+  const [top] = rankCars(answers, [car]);
+  assert.equal(top.matchPct, 100, 'matchPct reads 100');
+});
+
+test('only asks count — context answers never appear on the checklist', () => {
+  const car = {
+    id: 'e', name: 'BMW i4', line: 'i4', body: 'saloon', fuel: 'ev',
+    priceMin: 45000, priceMax: 45000, sizeClass: 2, seats: 5, boot: 470, zeroTo62: 5.7,
+    evRange: 300, tags: ['tech'], blurb: '',
+  };
+  // Wants EV saloon; charging/mileage/style/priorities/primaryUse are context.
+  const answers = {
+    budget: [30000, 50000], bodyStyles: ['saloon'], fuel: ['ev'], charging: 'home',
+    primaryUse: 'roadtrips', people: 'solo', mileage: 20000, style: '5', priorities: ['tech', 'performance'],
+  };
+  const { met, missed } = matchChecklist(answers, car);
+  const ids = [...met, ...missed].map((x) => x.id);
+  assert.deepEqual(ids.sort(), ['bodyStyles', 'budget', 'fuel'], 'only budget/body/fuel — solo + context excluded');
+});
+
+test('no-preference answers (any/open/solo) state no ask', () => {
+  const car = {
+    id: 'x', name: 'BMW X1', line: 'X1', body: 'suv', fuel: 'diesel',
+    priceMin: 30000, priceMax: 30000, sizeClass: 2, seats: 5, boot: 540, zeroTo62: 8.3,
+    mpg: 55, tags: ['practical'], blurb: '',
+  };
+  const answers = {
+    budget: [20000, 40000], bodyStyles: ['any'], fuel: ['open'], charging: 'none',
+    primaryUse: 'family', people: 'solo', mileage: 8000, style: '3', priorities: ['economy'],
+  };
+  const { met, missed } = matchChecklist(answers, car);
+  // Only budget is a stated ask; everything else is "no preference" or context.
+  assert.deepEqual([...met, ...missed].map((x) => x.id), ['budget']);
+});
+
+test('a wrong-fuel car misses that ask and drops below 100%', () => {
+  const petrol = {
+    id: 'p', name: 'BMW 320i', line: '3 Series', body: 'saloon', fuel: 'petrol',
+    priceMin: 30000, priceMax: 30000, sizeClass: 2, seats: 5, boot: 480, zeroTo62: 7.4,
+    mpg: 45, tags: ['cruiser'], blurb: '',
+  };
+  const answers = {
+    budget: [20000, 40000], bodyStyles: ['saloon'], fuel: ['ev'], charging: 'home',
+    primaryUse: 'commute', people: 'solo', mileage: 8000, style: '3', priorities: ['tech'],
+  };
+  const { missed } = matchChecklist(answers, petrol);
+  assert.equal(missed.length, 1);
+  assert.equal(missed[0].id, 'fuel');
+  assert.match(missed[0].label, /not the fuel/i, 'miss reads as a shortfall');
+});
+
+test('a stretch buy counts budget as missed', () => {
+  const dear = {
+    id: 'm', name: 'BMW M340i', line: '3 Series', body: 'saloon', fuel: 'petrol',
+    priceMin: 44000, priceMax: 44000, sizeClass: 2, seats: 5, boot: 480, zeroTo62: 4.4,
+    mpg: 35, tags: ['drivers-car'], blurb: '',
+  };
+  // £44k against a £40k ceiling — within the 15% stretch tolerance, so it
+  // survives the hard filter but is honestly "above your budget".
+  const answers = {
+    budget: [20000, 40000], bodyStyles: ['saloon'], fuel: ['petrol'], charging: 'none',
+    primaryUse: 'fun', people: 'solo', mileage: 8000, style: '5', priorities: ['performance'],
+  };
+  const [top] = rankCars(answers, [dear]);
+  assert.ok(top.checklist.missed.some((m) => m.id === 'budget'), 'budget missed');
+  assert.ok(top.matchPct < 100);
+});
+
+test('unknown MINI trim is N/A, never a miss', () => {
+  const t = brandTuning('mini');
+  const unknownTrim = {
+    id: 'u', name: 'MINI Cooper S 3 Door', line: 'Hatch', body: 'hatchback', fuel: 'petrol',
+    priceMin: 24000, priceMax: 24000, sizeClass: 1, seats: 4, boot: 210, zeroTo62: 6.6,
+    mpg: 44, tags: ['urban', 'drivers-car'], blurb: '', styleLine: null, doors: 3,
+  };
+  // Asked for a Sport vibe + 3 doors; trim is unreadable → the trim ask simply
+  // doesn't apply to this car (not counted as met OR missed).
+  const answers = {
+    budget: [15000, 30000], bodyStyles: ['hatchback'], fuel: ['petrol'], charging: 'none',
+    primaryUse: 'fun', people: 'solo', priorities: ['performance'], styleLine: 'sport', doors: '3',
+  };
+  const { met, missed } = matchChecklist(answers, unknownTrim, t);
+  const ids = [...met, ...missed].map((x) => x.id);
+  assert.ok(!ids.includes('styleLine'), 'unknown trim is absent from the checklist');
+  assert.deepEqual(missed, [], 'nothing missed — 3 doors met, trim N/A');
+});
+
+test('ranking is satisfaction-first: a 100% car tops a higher-blend car that misses an ask', () => {
+  // Both petrol hatches for a sporty solo buyer who asked for a 3-door.
+  // fullMatch meets the door ask; fastMiss is quicker (higher blend) but 5-door.
+  const t = brandTuning('mini');
+  const fullMatch = {
+    id: 'full', name: 'MINI Cooper Sport 3dr', line: 'Hatch', body: 'hatchback', fuel: 'petrol',
+    priceMin: 22000, priceMax: 22000, sizeClass: 1, seats: 4, boot: 210, zeroTo62: 7.7,
+    mpg: 45, tags: ['urban'], blurb: '', styleLine: 'sport', doors: 3,
+  };
+  const fastMiss = {
+    id: 'fast', name: 'MINI JCW 5dr', line: 'Hatch', body: 'hatchback', fuel: 'petrol',
+    priceMin: 22000, priceMax: 22000, sizeClass: 1, seats: 4, boot: 210, zeroTo62: 6.1,
+    mpg: 44, tags: ['urban', 'drivers-car', 'image'], blurb: '', styleLine: 'jcw', doors: 5,
+  };
+  const answers = {
+    budget: [15000, 30000], bodyStyles: ['hatchback'], fuel: ['petrol'], charging: 'none',
+    primaryUse: 'fun', people: 'solo', priorities: ['performance'], styleLine: 'sport', doors: '3',
+  };
+  const ranked = rankCars(answers, [fastMiss, fullMatch], t);
+  assert.equal(ranked[0].car.id, 'full', 'the 100% (3-door) car leads');
+  assert.equal(ranked[0].matchPct, 100);
+  assert.ok(ranked[1].matchPct < 100, 'the door-missing car is second despite a higher blend');
+  assert.ok(ranked[1].score >= ranked[0].score, 'even though its blended score is higher');
 });

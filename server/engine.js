@@ -474,14 +474,127 @@ const SCORERS = {
   doors: scoreDoors,
 };
 
+/* ---------------------------------------------------------------- *
+ *  Match checklist — the user-facing "how many of my asks did it    *
+ *  meet?" view, distinct from the blended score below.              *
+ * ---------------------------------------------------------------- */
+
+/*
+ * The blended `score` answers "how good is this car for you, weighted by your
+ * priorities" — a panel of judges, some grading on a curve, so a real car tops
+ * out in the low 90s and a literal 100 never happens. That's honest but it
+ * doesn't match the model a buyer walks in with: "I asked for N things — how
+ * many did I get?" The checklist answers *that* question, and it CAN read 100%.
+ *
+ * The split that makes it work: not every answer is an ASK. Some are things a
+ * car can meet or miss (budget, body, fuel, seats, doors, trim); others are
+ * CONTEXT about the buyer that steer the ranking but that no car "meets"
+ * (charging access, annual mileage, the two priorities, primary use, the
+ * comfort/sport lean). Only asks count toward the checklist; context still
+ * moves the blended score, which orders cars of equal satisfaction.
+ *
+ * Applicability is per-car for the stock-derived asks: a trim or door count we
+ * couldn't read from the derivative is UNKNOWN, not a miss — it simply doesn't
+ * appear on that car's checklist (unknown ≠ wrong, the same rule the scorers
+ * follow). A "no preference" answer (`any`, `open`, solo) states no ask at all.
+ */
+const BODY_ASK_LABEL = {
+  hatchback: 'Hatchback', saloon: 'Saloon', estate: 'Estate', suv: 'SUV',
+  coupe: 'Coupé', convertible: 'Convertible', mpv: 'People carrier',
+};
+const FUEL_ASK_LABEL = {
+  petrol: 'Petrol', diesel: 'Diesel', phev: 'Plug-in hybrid', ev: 'Fully electric',
+};
+
+/**
+ * The user's stated asks scored against one car: which it meets, which it
+ * misses. Context answers and no-preference answers are excluded; unknowns are
+ * left off entirely (not counted as a miss).
+ *
+ * @returns {{ met: {id,label}[], missed: {id,label}[] }}
+ */
+export function matchChecklist(answers, car, tuning = DEFAULT_TUNING) {
+  const met = [];
+  const missed = [];
+  // Each ask pushes an outcome-appropriate label: the met list feeds the "X of
+  // Y asks" count, the missed list is shown verbatim as the trade-offs, so a
+  // miss must read as a shortfall ("Above your budget"), not the bare ask.
+  const mark = (hit, id, metLabel, missLabel) => (hit
+    ? met.push({ id, label: metLabel })
+    : missed.push({ id, label: missLabel }));
+
+  // Budget: within the stated ceiling is met; a stretch buy (survived the hard
+  // filter but sits above the max) is an honest miss. A car under the floor is
+  // still "within my means", so it counts as met.
+  const [, max] = budgetRange(answers) || [0, Infinity];
+  mark(car.priceMin <= max, 'budget', `Within your ${gbp(max)} budget`, `Above your ${gbp(max)} budget`);
+
+  // Body style: an ask only when a specific shape was named ("any" states none).
+  const bodies = (answers.bodyStyles || []).filter((v) => v !== 'any');
+  if (bodies.length) {
+    const carBody = BODY_ASK_LABEL[car.body] || car.body;
+    mark(bodies.includes(car.body), 'bodyStyles', `${carBody} body`, `A ${carBody}, not the shape you picked`);
+  }
+
+  // Fuel: an ask unless "help me decide" (open) or unanswered.
+  const fuels = fuelPrefs(answers).filter((v) => v !== 'open');
+  if (fuels.length) {
+    const carFuel = FUEL_ASK_LABEL[car.fuel] || car.fuel;
+    mark(fuels.includes(car.fuel), 'fuel', carFuel, `${carFuel}, not the fuel you picked`);
+  }
+
+  // Seats: only family/crew state a real requirement ("just me" asks nothing).
+  // Shown cars have already cleared the seat hard filter, so this reads as met —
+  // it's still a genuine ask the buyer made and the car satisfies.
+  if (answers.people === 'family') {
+    mark(car.seats >= tuning.hardFilter.familySeats, 'people', 'Room for the family', 'Tight on family space');
+  } else if (answers.people === 'crew') {
+    const ok = car.seats >= tuning.hardFilter.crewSeats && car.boot >= tuning.hardFilter.crewBoot;
+    mark(ok, 'people', 'Seats for the crew', 'Not quite crew-sized');
+  }
+
+  // Doors (MINI): an ask only when a count was chosen (not "either") AND the
+  // car has a known count — a non-hatch or unparsed derivative is N/A.
+  const wantDoors = Number(answers.doors);
+  if (wantDoors && car.doors) {
+    mark(car.doors === wantDoors, 'doors', `${wantDoors} doors`, `${car.doors} doors, not the ${wantDoors} you wanted`);
+  }
+
+  // Trim character (MINI, via the vibe → styleLine): an ask only when a vibe was
+  // picked AND the car's trim was readable. "sport" is met by a JCW too.
+  if (answers.styleLine && car.styleLine) {
+    const hit = answers.styleLine === 'sport'
+      ? (car.styleLine === 'sport' || car.styleLine === 'jcw')
+      : car.styleLine === answers.styleLine;
+    mark(hit, 'styleLine', `${STYLE_LINE_LABEL[car.styleLine]} character`,
+      `${STYLE_LINE_LABEL[car.styleLine]} trim, not the ${STYLE_LINE_LABEL[answers.styleLine]} you picked`);
+  }
+
+  return { met, missed };
+}
+
+/** Checklist satisfaction as a 0–100%, or null when no asks apply to this car
+ *  (all "no preference", or every stock-derived ask was unknown). 100 = a car
+ *  that meets every ask the buyer actually stated. */
+function satisfactionPct({ met, missed }) {
+  const total = met.length + missed.length;
+  return total ? Math.round((met.length / total) * 100) : null;
+}
+
 /**
  * Rank every car that survives the hard filters, best first.
+ *
+ * Ordering is satisfaction-first: a car that meets more of the buyer's stated
+ * asks (higher matchPct) outranks one that meets fewer, and the blended `score`
+ * breaks ties among equally-satisfying cars (so the quickest/best-charactered
+ * of the cars that tick every box still leads). A null matchPct (no asks
+ * stated) sorts as fully satisfied — there's nothing unmet to demote it.
  *
  * Callers slice this to taste: the block's hero grid takes the top 3 of the
  * configured retailer's stock, while the "worth the drive" carousel ranks a
  * separate pool (nearby retailers) through the same scoring.
  *
- * @returns {Match[]} Match: { car, score (0–100), stretch, reasons: string[] }
+ * @returns {Match[]} Match: { car, score, matchPct, checklist, stretch, reasons }
  */
 export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
   const weights = effectiveWeights(answers, tuning);
@@ -518,14 +631,20 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
       if (answers.people === 'crew' && car.seats < tuning.practicality.crewBonusSeats) {
         ratio *= tuning.crewSeatShortfall ?? 1;
       }
-      return { car, score: Math.round(ratio * 100), stretch, reasons };
+      const checklist = matchChecklist(answers, car, tuning);
+      const matchPct = satisfactionPct(checklist);
+      return {
+        car, score: Math.round(ratio * 100), matchPct, checklist, stretch, reasons,
+      };
     })
-    // Deterministic tie-breaking: score, then cheaper car, then name.
+    // Satisfaction-first ordering: fewest-broken-promises wins, the blended
+    // score breaks ties among equally-satisfying cars, then cheaper, then name.
+    // A null matchPct (no asks stated) counts as fully satisfied (100).
     .sort(
-      (a, b) =>
-        b.score - a.score ||
-        a.car.priceMin - b.car.priceMin ||
-        a.car.name.localeCompare(b.car.name),
+      (a, b) => (b.matchPct ?? 100) - (a.matchPct ?? 100)
+        || b.score - a.score
+        || a.car.priceMin - b.car.priceMin
+        || a.car.name.localeCompare(b.car.name),
     );
 }
 
