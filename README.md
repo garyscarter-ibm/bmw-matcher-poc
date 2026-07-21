@@ -144,10 +144,14 @@ Notes:
 
 The backend exposes two endpoints (plus `GET /health` → `{ ok: true }`):
 
-- **`GET /api/questions`** → `{ questions, budgetBands }`. The quiz definition,
-  with the conditional-visibility functions stripped (they can't cross JSON);
-  conditional questions are marked `conditional: true` and the block applies the
-  matching predicate from `quiz-meta.js`.
+- **`GET /api/questions`** → `{ questions, budgetBands, topMatches }`. The
+  question set, with the conditional-visibility functions stripped (they can't
+  cross JSON); conditional questions are marked `conditional: true` and the
+  block applies the matching predicate from `quiz-meta.js`. `topMatches` is
+  `TOP_MATCHES` — how many results `/api/match` returns — sent so the intro copy
+  can state the number without hardcoding it. Both counts are server-owned: a
+  brand gaining a question, or `TOP_MATCHES` changing, updates the intro copy on
+  the next page load with no block rebuild.
 - **`POST /api/match`** with body `{ answers, retailer? }` → `{ matches, contenders }`.
   `retailer` is the retailer_site ID to match against; omit it to use the
   backend's default (`RETAILER_SITE` env var, or `96` if unset).

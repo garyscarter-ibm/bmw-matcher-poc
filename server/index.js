@@ -277,10 +277,16 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && pathname === '/api/questions') {
-    // Brand comes on the query string (?brand=mini) for this GET; the quiz's
-    // option set is filtered to what that brand sells. Defaults to BMW.
+    // Brand comes on the query string (?brand=mini) for this GET; the question
+    // set's option list is filtered to what that brand sells. Defaults to BMW.
+    // topMatches ships too so the intro can say how many results it'll return
+    // without hardcoding it — see TOP_MATCHES, the value /api/match slices to.
     const brand = normalizeBrand(searchParams.get('brand'));
-    return sendJson(res, 200, { questions: publicQuestions(brand), budgetBands: BUDGET_BANDS });
+    return sendJson(res, 200, {
+      questions: publicQuestions(brand),
+      budgetBands: BUDGET_BANDS,
+      topMatches: TOP_MATCHES,
+    });
   }
 
   if (req.method === 'POST' && pathname === '/api/match') {

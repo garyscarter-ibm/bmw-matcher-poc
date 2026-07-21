@@ -97,10 +97,21 @@ function brand(block) {
   return b === 'mini' ? 'mini' : 'bmw';
 }
 
+/** Small cardinals as words, for prose where a numeral would read oddly ("the
+ * three cars" beats "the 3 cars"). Anything larger falls back to the numeral,
+ * which is fine — it only reads awkwardly at small counts. */
+const CARDINALS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const cardinal = (n) => CARDINALS[n] ?? String(n);
+
 /** Brand-specific display copy, keyed by brand. `name` is the marque, `title`
- * the intro headline, `cta` the intro button. `lede(count, retailer)` builds
- * the intro paragraph — it's a function because the two brands phrase it
- * differently, not just swap nouns.
+ * the intro headline, `cta` the intro button. `lede({ questions, matches,
+ * retailer })` builds the intro paragraph — a function because the two brands
+ * phrase it differently, not just swap nouns.
+ *
+ * Both counts are passed in rather than written into the copy: `questions`
+ * comes from the fetched question set (brands have different totals) and
+ * `matches` from the API's topMatches. Either can change server-side without
+ * the copy going stale.
  *
  * Voices follow docs/tone-style-guide.md: BMW is assured and understated (the
  * flat, unapologetic close borrowed from bmw.co.uk's register), MINI keeps the
@@ -111,20 +122,27 @@ const BRAND_COPY = {
     name: 'BMW',
     title: 'Find your perfect BMW',
     cta: 'Find my BMW',
-    lede: (count, retailer) => `${count} quick questions about your life, your miles and your budget. `
-      + `We’ll match you with the three approved-used cars at ${retailer} that suit you best, `
-      + 'and tell you why.',
+    lede: ({ questions, matches, retailer }) => `${questions} quick questions about your life, `
+      + `your miles and your budget. We’ll match you with the ${cardinal(matches)} approved-used `
+      + `cars at ${retailer} that suit you best, and tell you why.`,
   },
   mini: {
     name: 'MINI',
     title: 'Find your perfect MINI',
     cta: 'Let’s find your MINI',
-    lede: (count, retailer) => `${count} quick questions about your life, your miles and your money. `
-      + `We’ll find the three MINIs at ${retailer} with your name on them — `
-      + 'and tell you exactly why.',
+    lede: ({ questions, matches, retailer }) => `${questions} quick questions about your life, `
+      + `your miles and your money. We’ll find the ${cardinal(matches)} MINIs at ${retailer} `
+      + 'with your name on them — and tell you exactly why.',
   },
 };
 
+/**
+ * The question set for a brand, plus `topMatches` — how many results the API
+ * will return. Both are server-owned so the intro copy can state real numbers
+ * without the block hardcoding either; a brand gaining a question, or
+ * TOP_MATCHES changing, needs no block rebuild. Falls back to 3 for an older
+ * API that doesn't send it.
+ */
 async function apiGetQuestions(base, retailer, brandKey) {
   const url = new URL(`${base}/api/questions`);
   if (retailer) url.searchParams.set('retailer', retailer);
@@ -132,7 +150,7 @@ async function apiGetQuestions(base, retailer, brandKey) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Questions request failed (${res.status})`);
   const data = await res.json();
-  return data.questions;
+  return { questions: data.questions, topMatches: data.topMatches || 3 };
 }
 
 async function apiMatch(base, answers, retailer, brandKey) {
@@ -258,7 +276,9 @@ function renderIntro(root, ctx) {
   intro.append(
     el('p', 'bmwm-kicker', 'The unofficial UK matchmaker'),
     el('h1', 'bmwm-title', copy.title),
-    el('p', 'bmwm-lede', copy.lede(count, ctx.retailerLabel)),
+    el('p', 'bmwm-lede', copy.lede({
+      questions: count, matches: ctx.topMatches, retailer: ctx.retailerLabel,
+    })),
   );
   const start = el('button', 'bmwm-btn bmwm-btn-primary', copy.cta);
   start.addEventListener('click', () => ctx.showQuestion(0));
@@ -1103,6 +1123,9 @@ export default async function decorate(block) {
     retailerLabel,
     brand: brandKey,
     questions: [],
+    // How many matches the results page will show, per the API (see
+    // apiGetQuestions). Only the intro copy reads it.
+    topMatches: 3,
     // Live "best guess" strip state, kept on ctx so it survives the
     // per-question re-render (see renderPreviewSection / schedulePreviewRefresh).
     // `seq` is the latest-wins guard for the debounced refetch.
@@ -1136,7 +1159,9 @@ export default async function decorate(block) {
     // results skeleton a moment later inside renderResults.)
     renderIntroSkeleton(block);
     try {
-      ctx.questions = await apiGetQuestions(ctx.api, ctx.retailer, ctx.brand);
+      const meta = await apiGetQuestions(ctx.api, ctx.retailer, ctx.brand);
+      ctx.questions = meta.questions;
+      ctx.topMatches = meta.topMatches;
     } catch {
       renderStatus(block, {
         kicker: 'Sorry',
