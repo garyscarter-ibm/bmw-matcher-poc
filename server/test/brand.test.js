@@ -198,6 +198,33 @@ test('brand tuning: MINI hard-filters do not exclude a Countryman for a family',
   assert.equal(survivors.length, 1, 'the Countryman survives the MINI family filter');
 });
 
+test('body binding applies to BMW too, but still yields when no right shape fits', () => {
+  // BMW honoured a named shape in only 53% of top-3s until body moved to
+  // 4.5 / miss 0 (see BMW_TUNING). A right-shape car that fits the brief must
+  // beat a wrong-shape one that's stronger everywhere else...
+  const estate = {
+    id: 'touring', name: 'BMW 320d Touring', line: '3 Series', body: 'estate', fuel: 'diesel',
+    priceMin: 34000, priceMax: 34000, sizeClass: 2, seats: 5, boot: 500, zeroTo62: 7.4,
+    mpg: 55, tags: ['practical', 'family'], blurb: '',
+  };
+  const suv = {
+    id: 'x5', name: 'BMW X5 xDrive40d', line: 'X5', body: 'suv', fuel: 'diesel',
+    priceMin: 34000, priceMax: 34000, sizeClass: 4, seats: 5, boot: 500, zeroTo62: 6.5,
+    mpg: 48, tags: ['practical', 'family', 'cruiser', 'image'], blurb: '',
+  };
+  const wantsEstate = {
+    budget: [30000, 45000], bodyStyles: ['estate'], fuel: ['diesel'], charging: 'none',
+    primaryUse: 'family', people: 'family', mileage: 15000, style: '3',
+    priorities: ['comfort', 'image'],
+  };
+  const ranked = rankCars(wantsEstate, [suv, estate], brandTuning('bmw'));
+  assert.equal(ranked[0].car.id, 'touring', 'the estate the buyer asked for tops, not the plusher SUV');
+  // ...but the binding is a weighting, not a filter: with no estate in stock
+  // the SUV is still offered as the closest available fit.
+  assert.equal(rankCars(wantsEstate, [suv], brandTuning('bmw')).length, 1,
+    'a wrong-shape car is never filtered out, only out-ranked');
+});
+
 test('body binding: a wrong-shape car cannot top the list when a right-shape one exists', () => {
   // Regression: a JCW EV crossover was topping "hatchback" searches because
   // body was only lightly weighted. A wrong-shape car (however strong on fuel/

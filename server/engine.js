@@ -18,10 +18,14 @@ import { brandTuning } from './brands.js';
 /** Default tuning = BMW's (the engine's original constants). */
 const DEFAULT_TUNING = brandTuning('bmw');
 
-/** Base weight of each scoring dimension. */
+/*
+ * Base weight of each scoring dimension. The engine itself reads the weights
+ * off the per-brand `tuning` argument (brands.js) — this export is the same
+ * table under the name the README points tuners at, so keep the two in step.
+ */
 export const WEIGHTS = {
   budget: 3.0,
-  body: 2.5,
+  body: 4.5,
   fuel: 2.5,
   practicality: 2.0,
   performance: 1.5,

@@ -35,11 +35,40 @@
  */
 const BMW_TUNING = {
   weights: {
-    budget: 3.0, body: 2.5, fuel: 2.5, practicality: 2.0,
+    // Body at 4.5 (was 2.5) — see the body block below for why.
+    budget: 3.0, body: 4.5, fuel: 2.5, practicality: 2.0,
     performance: 1.5, economy: 1.5, size: 1.0, character: 2.0,
   },
-  // Body-match scores. `neutral` = no preference / "any"; `miss` = wrong shape.
-  body: { match: 1, neutral: 0.7, miss: 0.15 },
+  /*
+   * Body-match scores. `neutral` = no preference / "any"; `miss` = wrong shape.
+   *
+   * At the original 2.5 / miss 0.15, BMW honoured a named body style in the
+   * top 3 only 53% of the time (docs/question-stock-audit.md): a shape is the
+   * most concrete thing a user asks for, and nearly half of them didn't get
+   * it. MINI had already solved this for itself with 6.0 / miss 0, so the
+   * question was how much of that BMW needs — its stock is far richer (median
+   * 93 cars per retailer vs MINI's 33), and over-binding a rich pool would
+   * flatten the results to one shape.
+   *
+   * Swept over 40 retailers × 300 answer sets (honesty / outcome diversity):
+   *   2.5 / 0.15  53% / 62%   ← the old base
+   *   2.5 / 0     55% / 62%
+   *   3.5 / 0     61% / 64%
+   *   4.0 / 0     63% / 64%
+   *   4.5 / 0     66% / 66%   ← chosen
+   *   5.0 / 0     67% / 65%
+   *   6.0 / 0     71% / 63%   ← MINI's values, copied blind
+   *
+   * 4.5 / miss 0 is where diversity peaks: honesty +13 points and the results
+   * get *more* varied, not less, because a wrong-shape car can no longer
+   * out-muscle a right-shape one on the other dimensions. MINI's 6.0 buys 5
+   * more points of honesty but starts costing diversity, which BMW's deeper
+   * stock has no reason to pay. Dropping `miss` to 0 is worth ~2 points on its
+   * own and is what stops a wrong shape scoring at all — it can still surface
+   * when NO right-shape car satisfies the other answers, the honest "closest
+   * we've got".
+   */
+  body: { match: 1, neutral: 0.7, miss: 0 },
   priorityBoosts: {
     economy: { economy: 1.5, budget: 0.5 },
     performance: { performance: 1.8, character: 0.5 },
@@ -82,15 +111,21 @@ const MINI_TUNING = {
     // Body is MINI's heaviest soft dimension. MINI's thin, EV-heavy stock let a
     // wrong-shape car that's strong elsewhere (the only EV, a JCW) top a search
     // for a different shape — e.g. the JCW Aceman SUV beating hatchbacks on a
-    // "hatchback" search. At weight 6.0, paired with body.miss = 0 below, a
-    // wrong shape can't reach #1 while any right-shape car that also fits exists
+    // "hatchback" search. At weight 6.0, paired with body.miss = 0, a wrong
+    // shape can't reach #1 while any right-shape car that also fits exists
     // (empirically the Aceman drops from ~#2 to ~#12 on a "hatchback" search);
     // it can still surface when NO right-shape car satisfies the other answers
-    // — the honest "closest we've got". BMW keeps its base weight of 2.5.
+    // — the honest "closest we've got". BMW has since adopted the same
+    // calibration at a lower weight (4.5 — see BMW_TUNING), because its deeper
+    // stock doesn't need binding this hard to honour a shape. MINI keeps 6.0:
+    // with a 33-car median pool the extra force is what earns it 72% honesty.
     body: 6.0,
   },
   // Wrong shape scores nothing on the (now heaviest) body dimension for MINI.
-  // BMW keeps the gentler 0.15 miss from the base.
+  // This now matches the BMW base's own miss of 0, so the field is currently
+  // redundant — kept stated rather than inherited because MINI's whole body
+  // calibration is deliberate, and it must not silently follow BMW if the base
+  // is ever softened again.
   body: { match: 1, neutral: 0.7, miss: 0 },
   // 0-62: MINI range is ~6.0s (JCW) to ~8.5s. Solved so a JCW at 6.0s reads
   // ~0.9 and a brisk 7.7s Cooper ~0.6 (BMW's curve gives that 7.7s car only
