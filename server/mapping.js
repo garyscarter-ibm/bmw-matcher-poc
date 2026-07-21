@@ -351,6 +351,40 @@ function miniTrimZeroTo62(base, line = '', derivative = '') {
   return base; // Cooper C / Classic / Exclusive base petrol (7.7)
 }
 
+/**
+ * MINI style line (trim character) from the derivative: Classic / Exclusive /
+ * Sport, plus JCW as the sporting extreme. This is the axis the range actually
+ * splits on and the engine can't otherwise see — Classic and Exclusive share a
+ * ~7.7s 0-62 and overlapping prices, so nothing else distinguishes them (see
+ * docs/mini-first-questions.md). JCW is checked first (a JCW is always the sport
+ * end); one-off edition names (Resolute/Untamed/Favoured) name no style line and
+ * return null → scored neutral, never penalised. BMW has no equivalent (M Sport
+ * is 73% of stock), so only the MINI mapper sets this.
+ */
+function miniStyleLine(derivative = '') {
+  const d = derivative.toLowerCase();
+  if (/john cooper works|\bjcw\b/.test(d)) return 'jcw';
+  if (/\bsport\b/.test(d)) return 'sport';
+  if (/\bexclusive\b/.test(d)) return 'exclusive';
+  if (/\bclassic\b/.test(d)) return 'classic';
+  return null;
+}
+
+/**
+ * Door count for a MINI, but only where it's a real choice: the Hatch sells as
+ * 3- or 5-door and the derivative states which ("Cooper S 3 Door"). Every other
+ * body has a fixed door count implied by its shape, so we return null there and
+ * the scorer treats it as "no door question applies". ~17% of hatch derivatives
+ * don't state a count either → null → neutral, not a miss (unknown ≠ wrong).
+ */
+function miniDoors(body, derivative = '') {
+  if (body !== 'hatchback') return null;
+  const d = derivative.toLowerCase();
+  if (/\b3[\s-]?door\b/.test(d)) return 3;
+  if (/\b5[\s-]?door\b/.test(d)) return 5;
+  return null;
+}
+
 /** Tags for a MINI — the MINI range skews playful/urban/tech. */
 function miniTags(line, body, fuel, derivative = '') {
   const tags = new Set();
@@ -410,6 +444,10 @@ const BRAND_MAPPERS = {
     tags: tagsFor,
     displayName,
     blurb: blurbFor,
+    // BMW asks neither question (M Sport dominates trim; body implies doors),
+    // so these stay null and their scorers no-op — see docs/mini-first-questions.md.
+    styleLine: () => null,
+    doors: () => null,
   },
   mini: {
     defaultTitle: 'MINI',
@@ -421,6 +459,8 @@ const BRAND_MAPPERS = {
     tags: miniTags,
     displayName: miniDisplayName,
     blurb: miniBlurb,
+    styleLine: miniStyleLine,
+    doors: miniDoors,
   },
 };
 
@@ -483,6 +523,11 @@ export function mapVehicle(v, brand = 'bmw') {
     seats: spec.seats,
     boot: spec.boot,
     zeroTo62,
+    // MINI-only trim/door axes (null for BMW). Internal scoring fields — like
+    // seats/boot, they're withheld by index.js publicCar; the reason strings
+    // they produce are what reaches the card.
+    styleLine: m.styleLine(derivative),
+    doors: m.doors(body, derivative),
     mpg: num(v?.consumption?.fuel?.values?.combined),
     evRange: num(v?.consumption?.range?.values?.total),
     tags: m.tags(line, body, fuel, derivative),

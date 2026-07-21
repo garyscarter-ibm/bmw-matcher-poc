@@ -374,6 +374,47 @@ function scoreCharacter(car, answers, tuning) {
   return { score, reason: hits.length ? TAG_REASONS[hits[0]] : undefined };
 }
 
+const STYLE_LINE_LABEL = {
+  classic: 'Classic', exclusive: 'Exclusive', sport: 'Sport', jcw: 'John Cooper Works',
+};
+
+/**
+ * Trim-character match (MINI). The user's vibe answer arrives as answers.styleLine
+ * (folded in by applyBespokeAnswers); the car carries its own from the derivative.
+ * A "sport" want is satisfied by a JCW too — JCW is the sport line's extreme, so a
+ * go-kart-minded buyer shouldn't be marked down for landing on one.
+ *
+ * No-ops safely for any brand that doesn't tune it (no tuning.styleLine → neutral,
+ * multiplied by a zero weight), and treats an unknown car trim as neutral, never a
+ * miss — an unparsed derivative isn't a wrong answer. See docs/mini-first-questions.md.
+ */
+function scoreStyleLine(car, answers, tuning) {
+  const cfg = tuning.styleLine;
+  if (!cfg || !answers.styleLine || !car.styleLine) return { score: cfg?.neutral ?? 0.7 };
+  const want = answers.styleLine;
+  const hit = want === 'sport'
+    ? (car.styleLine === 'sport' || car.styleLine === 'jcw')
+    : car.styleLine === want;
+  return hit
+    ? { score: cfg.match, reason: `${STYLE_LINE_LABEL[car.styleLine]} trim, just the character you asked for` }
+    : { score: cfg.miss };
+}
+
+/**
+ * Door-count preference (MINI Hatch only). answers.doors is '3' | '5' | 'either';
+ * 'either' (or unanswered, or a non-hatch car with no door count) scores neutral.
+ * A soft preference: a wrong count is a gentle miss, never a hard filter, and an
+ * unknown car door count is neutral, not penalised.
+ */
+function scoreDoors(car, answers, tuning) {
+  const cfg = tuning.doors;
+  const want = Number(answers.doors);
+  if (!cfg || !want || !car.doors) return { score: cfg?.neutral ?? 0.7 };
+  return car.doors === want
+    ? { score: cfg.match, reason: `${want}-door body, exactly the shape you wanted` }
+    : { score: cfg.miss };
+}
+
 /* ---------------------------------------------------------------- *
  *  Orchestration                                                    *
  * ---------------------------------------------------------------- */
@@ -398,6 +439,13 @@ function effectiveWeights(answers, tuning) {
   const prefs = fuelPrefs(answers);
   const specificFuel = prefs.length > 0 && !prefs.includes('open');
   if (specificFuel) w.fuel += tuning.fuelStrictBoost;
+  // styleLine/doors only weigh in when their question was actually answered —
+  // an unasked (BMW never sets them) or no-preference dimension stays fully
+  // inert rather than diluting every score toward neutral. Once answered, the
+  // scorer still returns neutral for a car whose own trim/doors are unknown
+  // (unknown ≠ wrong), just at the now-active weight.
+  if (!answers.styleLine) delete w.styleLine;
+  if (!answers.doors || answers.doors === 'either') delete w.doors;
   return w;
 }
 
@@ -419,6 +467,11 @@ const SCORERS = {
   economy: scoreEconomy,
   size: scoreSize,
   character: scoreCharacter,
+  // Brand-optional dimensions: only weighted where a brand's tuning names them
+  // (MINI). A brand without the weight contributes 0 (see the `?? 0` in rankCars),
+  // so BMW's blend is unchanged and the scorers above never fire for it.
+  styleLine: scoreStyleLine,
+  doors: scoreDoors,
 };
 
 /**
@@ -441,11 +494,16 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
       let stretch = false;
       const candidates = [];
       for (const [dim, scorer] of Object.entries(SCORERS)) {
+        // A dimension a brand doesn't weight (e.g. styleLine/doors for BMW)
+        // contributes nothing and can't surface a reason — so adding a scorer
+        // is inert for every brand that doesn't opt in via its tuning weights.
+        const weight = weights[dim] ?? 0;
+        if (weight === 0) continue;
         const r = scorer(car, answers, tuning);
-        weighted += weights[dim] * r.score;
+        weighted += weight * r.score;
         if (r.stretch) stretch = true;
         if (r.reason && r.score >= 0.7) {
-          candidates.push({ reason: r.reason, rank: weights[dim] * r.score });
+          candidates.push({ reason: r.reason, rank: weight * r.score });
         }
       }
       const reasons = candidates

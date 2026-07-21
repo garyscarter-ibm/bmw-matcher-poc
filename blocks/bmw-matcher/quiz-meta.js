@@ -27,6 +27,14 @@ export const SHOW_IF = {
     const picks = Array.isArray(f) ? f : (f != null ? [f] : []);
     return picks.length === 0 || picks.some((v) => v === 'ev' || v === 'phev' || v === 'open');
   },
+  // MINI-only (see brands.js questions.add): the door count is only a real
+  // choice for the Hatch, so ask it only once a hatchback (or "any") is in play.
+  // Mirror of the `showIf` on the doors question in server/brands.js.
+  doors: (a) => {
+    const b = a.bodyStyles;
+    const picks = Array.isArray(b) ? b : (b != null ? [b] : []);
+    return picks.length === 0 || picks.some((v) => v === 'hatchback' || v === 'any');
+  },
 };
 
 /** Budget bands → [min, max] GBP. Mirror of server/questions.js BUDGET_BANDS. */
@@ -62,8 +70,11 @@ export const PILL_LABEL = {
     roadtrips: 'Road trips', fun: 'Weekend fun',
   },
   people: { solo: 'Just me', family: 'Small family', crew: '5+ seats' },
-  // Bespoke MINI-only question (see brands.js questions.add); harmless on BMW.
-  miniVibe: { classic: 'Classic charm', electric: 'Electric era', jcw: 'John Cooper Works' },
+  // Bespoke MINI-only questions (see brands.js questions.add); harmless on BMW.
+  miniVibe: { classic: 'Classic', exclusive: 'Exclusive', sport: 'Sport' },
+  doors: { 3: '3-door', 5: '5-door', either: 'Any doors' },
+  // BMW keeps mileage/style; MINI no longer asks them (dropped in brands.js), so
+  // these entries are only ever reached for BMW now.
   mileage: {
     low: 'Under 6k mi/yr', mid: '6–12k mi/yr', high: '12–20k mi/yr', vhigh: '20k+ mi/yr',
   },

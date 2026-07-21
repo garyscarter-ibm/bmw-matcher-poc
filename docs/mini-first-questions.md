@@ -1,10 +1,54 @@
 # A MINI-first question set — proposal
 
-Status: **proposal, nothing built.** Follows `docs/question-stock-audit.md`
-(which established the current set works for MINI but is inherited from
-BMW's range shape) and the range investigation of 2026-07-21 (no sanctioned
-source for the new-car range exists; everything below is measured from the
-used-stock dumps' `derivative` field, which carries trim and doors).
+Status: **built and validated (2026-07-21).** Follows
+`docs/question-stock-audit.md` (which established the current set works for
+MINI but is inherited from BMW's range shape) and the range investigation of
+2026-07-21 (no sanctioned source for the new-car range exists; everything
+below is measured from the used-stock dumps' `derivative` field, which
+carries trim and doors). The proposal below is preserved as written; the
+"Built + validated" section at the foot records what shipped and the audit
+numbers after.
+
+## Built + validated
+
+All four changes landed for MINI only (BMW is provably untouched — see below):
+
+- **Parsing** (`mapping.js`): MINI derivatives now yield `styleLine`
+  (classic/exclusive/sport/jcw, else null) and `doors` (3/5, Hatch only,
+  else null). Coverage: styleLine parses for **53%** of MINI stock, doors for
+  **50%** — the older "Cooper S 3 Door" naming states the performance *tier*
+  (C/S), not a style *word*, so ~47% score neutral on styleLine (never
+  penalised — unknown ≠ wrong). BMW: both null everywhere.
+- **Scoring** (`engine.js`): `scoreStyleLine` + `scoreDoors`, weighted only
+  for MINI. A dimension a brand doesn't weight, or whose question wasn't
+  answered (no vibe; doors = "either"), is fully inert — it never dilutes.
+- **Questions** (`brands.js`): MINI drops `mileage` + `style`; adds a
+  conditional `doors` question and repoints `miniVibe` at the real trim lines
+  (Classic/Exclusive/Sport). The vibe's `scoresAs` folds `styleLine` **and**
+  the `style` value the dropped question used to collect.
+
+Audit `sens` after (40 retailers/brand, 300 answer sets):
+
+| | MINI before | MINI after | BMW before | BMW after |
+|---|---:|---:|---:|---:|
+| Outcome diversity | 37% | **47%** | 66% | 66% |
+| Body honesty | 72% | 70% | 67% | 67% |
+| Top-1 score (median) | 79 | 77 | 76 | 76 |
+
+Per-question sensitivity, MINI after: budget 100%, bodyStyles 90%,
+people 90%, **miniVibe 87%**, fuel 80%, primaryUse 77%, priorities 70%,
+**doors 40%**, charging 40%.
+
+Reading it: MINI **outcome diversity rose 10 points** — the quiz is
+materially more expressive. The repointed **`miniVibe` jumped to 87%** (from
+~60% as invented vocabulary), now one of MINI's strongest questions. `doors`
+earns its conditional screen at 40% despite only half of stock stating a
+count. Body honesty and top-1 score held within run noise. **Every BMW
+figure is identical** — the new dimensions are inert for it, confirmed by a
+same-answers A/B test in `brand.test.js`.
+
+Open questions 1–3 below were resolved as the proposal recommended: JCW folds
+into Sport, "Electric era" dropped (fuel carries it), editions parse to null.
 
 ## The question this answers
 
@@ -95,6 +139,52 @@ listing page, so the "why this car" reasons can say *"Sport trim, just like
 you asked"* — a reason we currently cannot give. Sport keeps the
 `scoresAs: { style: 5-ish, priorities: performance }` nudge that JCW has
 today, so the perf-tier steering `miniVibe` already provides is preserved.
+
+### Remove 3 — drop `mileage` for MINI, fold `style` into the vibe
+
+The mirror of the additions: a MINI-first set is *shorter*, not just
+different. A removal A/B — rank identical answer sets with each answer
+present vs deleted (as if never asked), 40 MINI retailers × 200 sets, BMW
+as control — measured what each question is actually worth:
+
+| MINI question | top-3 changes | winner changes | Δ winner score |
+|---|---:|---:|---:|
+| mileage | 27% | **8%** | 0.6 |
+| style | 24% | **9%** | 0.8 |
+| miniVibe | 28% | 11% | 1.5 |
+| priorities | 42% | 16% | 2.1 |
+| charging | 27% | 17% | 2.4 |
+
+- **Drop `mileage` for MINI** (the never-used `questions.drop` hook). It
+  changes the recommended car for 8% of users, and by 0.6 points when it
+  does — the weakest question on every measure. Structural, not marginal:
+  mileage exists to arbitrate diesel-vs-petrol running costs, and MINI has
+  11 diesels in 4,285 cars. The EV-viability signal it also carries already
+  lives in `charging`. BMW keeps it (12% winner-change, and diesel
+  arbitration is real there) — so this is `drop`, MINI-only.
+- **Fold `style` into the repointed vibe, don't just delete it.** Also weak
+  standalone (9%), for the same structural reason as `boot`: on a
+  one-model-per-shape range, comfort-vs-sporty rarely separates cars the
+  body question hasn't. But its signal (the sporty→performance weight nudge,
+  the comfort tag) shouldn't vanish — the Classic/Exclusive/Sport vibe
+  carries it through `scoresAs`, exactly as `boot` folded into
+  `people`/`primaryUse`. Two overlapping character questions become one.
+
+**Keep `charging` and `priorities`.** The A/B first made `charging` look
+cuttable, but a missing charging answer defaults to `'none'` (engine.js) —
+i.e. "can't charge", which suppresses EVs — so its 17% is the question
+doing real work, and it gates whether an EV can be honestly recommended at
+all. It's already conditional (EV-curious users only). `priorities` (16%)
+feeds the reasons copy as well as the ranking.
+
+Net: MINI moves from 10 questions to ~8 (drop mileage, merge style into
+vibe, add doors — shown only to hatch-interested users), each earning more
+of its screen; BMW keeps all 10, both cuts being MINI-scoped via the hook.
+
+Caveat: random answer sets overstate answer independence (real users answer
+in correlated clusters), and this measures ranking impact only — being
+asked about annual miles may carry a "this quiz is thorough" trust value
+the numbers can't see. That last point is a product call.
 
 ### Not proposed
 
