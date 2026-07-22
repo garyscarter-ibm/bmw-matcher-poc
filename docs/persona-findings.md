@@ -1,16 +1,33 @@
 # Persona walkthrough findings — first replay, 2026-07-22
 
-Six personas ([personas.md](personas.md), answer sets in
+Personas ([personas.md](personas.md), answer sets in
 `fixtures/personas.json`) replayed end-to-end against live stock via
 `node scripts/persona-check.mjs`, with the interesting pages rendered in a
 real browser at desktop and mobile widths. This is the record of what served
 each persona, what failed them, and the feature list that falls out.
+The personas doc stays *pure persona* by owner decision; every
+tool-facing observation, per-persona gap and recommendation lives here.
+
+## What each persona asks that the tool can't hear yet
+
+Moved here from the persona pages (they describe the tool, not the person):
+
+| Persona | Unheard asks |
+|---|---|
+| Daniel | Monthly finance cost; warranty length and service history up front |
+| Priya | Safety ratings/ISOFIX; winter range honesty; monthly cost on PCP |
+| Martin | A way to act on the result: phone, enquiry, test-drive booking |
+| Tyler | Monthly payment and insurance group before anything else; zero-friction handoff |
+| Chloe | Monthly payment and insurance group |
+| Reyes | Boot size in buggy terms; running costs beyond mpg (tax, insurance) |
+| Meg | Winter range said honestly; gearbox stated on the card (all MINI EVs are automatic — she doesn't know that) |
 
 ## Result per persona
 
 | Persona | State landed | What they saw | Verdict |
 |---|---|---|---|
 | Daniel (Motorway Manager, BMW) | 1 DECREE | 91% 520d M Sport Touring, diesel, with "kind on a big annual mileage" reasoning; 530e PHEV visible as runner-up | **Served.** The high-mileage ramp and economy reasons speak his language |
+| Tyler (First-Premium Striver, BMW; added in the same-day revision) | 1 DECREE | 85% M135i xDrive in Alpine White, decisive, meets brief; 218i Gran Coupé as the nearby alternative | **Served on the match** — his exact car in his colour. His sharpest asks (monthly, insurance group, instant handoff) are all in the gaps list below |
 | Priya (Family Consolidator, BMW) | 2 FIT TIE | 7-way tie at 95%: iX2s and X1 PHEVs, all meeting the brief | **Served, with friction** — see duplicates + stronger-nearby findings |
 | Martin (Reward Buyer, BMW) | 3 CLOSEST HERE | "No convertibles at Grassicks, nearest 18.1 miles away"; M2 coupés owning the trade-off; 94% Z4 leading Worth the drive | **Served.** He's the state-3 design vindicated: happy to drive, told where to |
 | Chloe (Statement Buyer, MINI) | 2 FIT TIE | 6-way Cooper tie in five visible colours with swatches, colour chips to break it | **Served.** The refine step was built for her and it shows |

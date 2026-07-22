@@ -56,6 +56,24 @@
       }
     },
     {
+      "key": "tyler",
+      "name": "Tyler Brooks, 27",
+      "tagline": "The First-Premium Striver",
+      "brand": "bmw",
+      "retailer": "96",
+      "answers": {
+        "budget": [16000, 24000],
+        "bodyStyles": ["hatchback", "saloon"],
+        "fuel": ["petrol"],
+        "charging": "none",
+        "primaryUse": "commute",
+        "people": "solo",
+        "mileage": 12000,
+        "style": "4",
+        "priorities": ["image", "performance"]
+      }
+    },
+    {
       "key": "chloe",
       "name": "Chloe Bennett, 29",
       "tagline": "The Statement Buyer",

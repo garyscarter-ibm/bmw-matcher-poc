@@ -6,7 +6,9 @@
 <!--
   Print source for docs/personas-pack.pdf — the shareable, non-technical
   version of docs/personas.md (which stays the source of truth; regenerate
-  this pack when that changes). Rebuild with:
+  this pack when that changes). Pure persona by owner decision: test results
+  and recommendations live in docs/persona-findings.md, not here.
+  Rebuild with:
 
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
     --headless --print-to-pdf=docs/personas-pack.pdf --no-pdf-header-footer \
@@ -46,25 +48,27 @@
   .cover h1 { font-size: 30pt; font-weight: 300; line-height: 1.12; letter-spacing: -0.5px; }
   .cover h1 b { font-weight: 700; }
   .cover .sub { margin-top: 6mm; font-size: 11pt; color: #555; line-height: 1.55; max-width: 130mm; }
-  .cover-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5mm; margin-bottom: 14mm; }
-  .cover-card { border: 1px solid #e2e2e2; padding: 6mm 5mm; }
+  .row-label { font-size: 8pt; font-weight: 700; letter-spacing: 1.4px; color: #999; margin: 0 0 2.5mm; }
+  .cover-grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4mm; margin-bottom: 6mm; }
+  .cover-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; margin-bottom: 12mm; }
+  .cover-card { border: 1px solid #e2e2e2; padding: 5mm 4.5mm; }
   .cover-card.mini { border-radius: 4mm; }
-  .cover-card .avatar { margin-bottom: 3.5mm; }
-  .cover-card .cname { font-size: 10.5pt; font-weight: 700; }
-  .cover-card .ctag { font-size: 8.5pt; color: #666; margin-top: 1mm; }
+  .cover-card .avatar { margin-bottom: 3mm; }
+  .cover-card .cname { font-size: 9.5pt; font-weight: 700; }
+  .cover-card .ctag { font-size: 8pt; color: #666; margin-top: 1mm; line-height: 1.3; }
 
   .avatar {
-    width: 14mm; height: 14mm; display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 700; font-size: 11pt; letter-spacing: 0.5px;
+    width: 13mm; height: 13mm; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 10pt; letter-spacing: 0.5px;
   }
   .avatar.bmw { background: #1c69d4; border-radius: 0; }
   .avatar.mini { background: #01693e; border-radius: 50%; }
 
   /* ---------- research page ---------- */
   h2.section { font-size: 19pt; font-weight: 300; margin: 3mm 0 6mm; letter-spacing: -0.3px; }
-  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; margin: 4mm 0 8mm; }
-  .tile { border: 1px solid #e2e2e2; padding: 7mm 6mm 6mm; }
-  .tile .big { font-size: 30pt; font-weight: 700; color: #262626; line-height: 1; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; margin: 4mm 0 7mm; }
+  .tile { border: 1px solid #e2e2e2; padding: 6.5mm 6mm 5.5mm; }
+  .tile .big { font-size: 28pt; font-weight: 700; color: #262626; line-height: 1; }
   .tile .what { font-size: 10pt; color: #262626; margin-top: 2.5mm; line-height: 1.4; }
   .tile .src { font-size: 7.5pt; color: #999; margin-top: 2mm; }
   .prose { font-size: 10pt; line-height: 1.6; color: #333; max-width: 165mm; }
@@ -102,36 +106,14 @@
   .fact .k { font-size: 7.5pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #999; }
   .fact .v { font-size: 9.5pt; color: #262626; margin-top: 0.8mm; line-height: 1.4; }
 
-  .sec { margin-bottom: 4.5mm; }
+  .sec { margin-bottom: 5mm; }
   .sec h3 {
     font-size: 8.5pt; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
     margin-bottom: 1.6mm;
   }
   .sec.bmw h3 { color: #1c69d4; }
   .sec.mini h3 { color: #01693e; }
-  .sec p, .sec li { font-size: 9.5pt; line-height: 1.5; color: #333; }
-  .sec ul { padding-left: 4.5mm; }
-  .sec li { margin-bottom: 1mm; }
-
-  .replay {
-    margin-top: auto; background: #f5f5f5; padding: 4mm 5mm;
-    display: flex; gap: 5mm; align-items: baseline;
-  }
-  .replay.mini { border-radius: 3mm; }
-  .replay .state { font-size: 8pt; font-weight: 700; letter-spacing: 1px; white-space: nowrap; }
-  .replay.bmw .state { color: #1c69d4; }
-  .replay.mini .state { color: #01693e; }
-  .replay .what { font-size: 9pt; color: #444; line-height: 1.45; }
-
-  /* ---------- findings page ---------- */
-  .find-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; margin-top: 2mm; }
-  .find-col h3 { font-size: 10pt; font-weight: 700; margin-bottom: 2.5mm; }
-  .find-col ol { padding-left: 5mm; }
-  .find-col li { font-size: 9pt; line-height: 1.5; color: #333; margin-bottom: 2mm; }
-  .verdict {
-    background: #f5f5f5; border-left: 3px solid #1c69d4;
-    padding: 4.5mm 5mm; margin: 5mm 0 6mm; font-size: 10pt; line-height: 1.55; color: #333;
-  }
+  .sec p { font-size: 10pt; line-height: 1.55; color: #333; }
 </style>
 </head>
 <body>
@@ -141,19 +123,27 @@
   <div>
     <div class="eyebrow">BMW &amp; MINI Approved Used · Car Matcher</div>
     <div class="cover-rule"></div>
-    <h1>Six people looking<br>for <b>one right car</b></h1>
+    <h1>Seven people looking<br>for <b>one right car</b></h1>
     <p class="sub">Buyer personas for the approved-used matcher: who they are,
-    what they say they want, what actually decides it, and what happened when
-    each of them used the tool. Research-informed working personas, built July
-    2026, tested against live retailer stock the same day.</p>
+    what they say they want, and what actually decides it. Research-informed
+    working personas, July 2026, with every source audited and scored for
+    trust. These pages describe the people; how the tool performs for them is
+    reported separately.</p>
   </div>
-  <div class="cover-grid">
-    <div class="cover-card"><div class="avatar bmw">DO</div><div class="cname">Daniel, 47</div><div class="ctag">The Motorway Manager</div></div>
-    <div class="cover-card"><div class="avatar bmw">PS</div><div class="cname">Priya, 38</div><div class="ctag">The Family Consolidator</div></div>
-    <div class="cover-card"><div class="avatar bmw">MH</div><div class="cname">Martin, 56</div><div class="ctag">The Reward Buyer</div></div>
-    <div class="cover-card mini"><div class="avatar mini">CB</div><div class="cname">Chloe, 29</div><div class="ctag">The Statement Buyer</div></div>
-    <div class="cover-card mini"><div class="avatar mini">SJ</div><div class="cname">Sam &amp; Jordan, 34</div><div class="ctag">The Fun-Sized Family</div></div>
-    <div class="cover-card mini"><div class="avatar mini">MW</div><div class="cname">Meg, 58</div><div class="ctag">The Electric Downsizer</div></div>
+  <div>
+    <p class="row-label">BMW</p>
+    <div class="cover-grid4">
+      <div class="cover-card"><div class="avatar bmw">DO</div><div class="cname">Daniel, 47</div><div class="ctag">The Motorway Manager</div></div>
+      <div class="cover-card"><div class="avatar bmw">PS</div><div class="cname">Priya, 38</div><div class="ctag">The Family Consolidator</div></div>
+      <div class="cover-card"><div class="avatar bmw">MH</div><div class="cname">Martin, 56</div><div class="ctag">The Reward Buyer</div></div>
+      <div class="cover-card"><div class="avatar bmw">TB</div><div class="cname">Tyler, 27</div><div class="ctag">The First-Premium Striver</div></div>
+    </div>
+    <p class="row-label">MINI</p>
+    <div class="cover-grid3">
+      <div class="cover-card mini"><div class="avatar mini">CB</div><div class="cname">Chloe, 29</div><div class="ctag">The Statement Buyer</div></div>
+      <div class="cover-card mini"><div class="avatar mini">SJ</div><div class="cname">Sam &amp; Jordan, 34</div><div class="ctag">The Fun-Sized Family</div></div>
+      <div class="cover-card mini"><div class="avatar mini">MW</div><div class="cname">Meg, 58</div><div class="ctag">The Electric Downsizer</div></div>
+    </div>
   </div>
   <div class="footer"><span>Buyer personas · July 2026</span><span>Unofficial proof of concept</span></div>
 </section>
@@ -164,47 +154,51 @@
   <h2 class="section">What the research says about used-car buyers</h2>
   <div class="tiles">
     <div class="tile">
-      <div class="big">14 hrs</div>
-      <div class="what">of online research before a buyer contacts anyone, peaking 7–9pm</div>
-      <div class="src">Wonderful.co.uk, UK used market trends 2025</div>
+      <div class="big">~14 hrs</div>
+      <div class="what">of online research before a buyer contacts anyone, peaking in the evening</div>
+      <div class="src">What Car? survey via Wonderful.co.uk · confidence: medium</div>
     </div>
     <div class="tile">
-      <div class="big">47%</div>
-      <div class="what">of UK buyers travelled 25 miles or less to buy; the tool's "worth the drive" tier lives here</div>
-      <div class="src">UK buyer journey research, 2025</div>
+      <div class="big">40–50 mi</div>
+      <div class="what">the working radius buyers shop in; nearly half say they'd go further for the right car</div>
+      <div class="src">Auto Trader marketplace data · confidence: medium-high</div>
     </div>
     <div class="tile">
       <div class="big">60%</div>
       <div class="what">of under-35s' research happens on a phone; over-45s still skew desktop</div>
-      <div class="src">Motortech.ai, The UK Car Buyer in 2025</div>
+      <div class="src">Meta UK via Wonderful.co.uk · confidence: medium-low</div>
     </div>
     <div class="tile">
       <div class="big">88%</div>
       <div class="what">call colour a key purchase factor, even though most end up in white, black, grey or silver</div>
-      <div class="src">Axalta global colour survey</div>
+      <div class="src">Axalta global colour survey · confidence: medium-high</div>
     </div>
   </div>
   <div class="prose">
-    <p><b>The journey is online-first; the purchase stays local.</b> People do the
-    work in the evenings on their own sofa, then buy from a dealer they can
-    reach. A tool anchored to one retailer, honest about what sits just beyond
-    it, matches how buyers actually behave.</p>
-    <p><b>Affordability is the mood.</b> Large shares of buyers say they would
-    switch brands over price, and most budget in monthly payments rather than
-    totals. <b>Taste decides late:</b> people narrow to a shortlist on facts,
-    then choose between near-identical cars on colour and character, exactly
-    where the tool's refine step sits.</p>
-    <p><b>The brands attract different people.</b> BMW's approved-used buyer is
-    established, 35–55, and buys certainty: warranty, history, no surprises.
-    MINI's skews younger, urban and image-led; the car is a statement first
-    and transport second, and the Countryman exists so young families don't
-    have to trade the statement away.</p>
+    <p><b>The journey is online-first; the purchase stays local.</b> People do
+    the work in the evenings on their own sofa, then buy from a dealer they
+    can reach, inside a radius of roughly forty to fifty miles. A tool
+    anchored to one retailer, honest about what sits just beyond it, matches
+    how buyers actually behave.</p>
+    <p><b>Affordability is the mood.</b> Most buyers budget in monthly
+    payments rather than totals, and younger buyers barely think in any other
+    unit. <b>Taste decides late:</b> people narrow to a shortlist on facts,
+    then choose between near-identical cars on colour and character.</p>
+    <p><b>The brands attract different people.</b> BMW's approved-used buyer
+    is established, 35–55, and buys certainty: warranty, history, no
+    surprises. Approved used is also the brand's front door for the next
+    generation, which is what Tyler is here to represent. MINI's buyer skews
+    younger, urban and image-led; the Countryman exists so young families
+    don't have to trade the statement away.</p>
   </div>
-  <div class="note"><b>Evidence honesty:</b> these personas are synthesised from
-  published market research, the brands' own positioning, and this project's
-  stock analysis. They are not interview-based. Treat them as strong, testable
-  hypotheses about real customers, not as ground truth. Sources are cited in
-  full in the companion document, docs/personas.md.</div>
+  <div class="note"><b>Evidence honesty:</b> every source behind these numbers
+  was fetched and audited on 22 July 2026; each carries the confidence score
+  shown, and two travel-distance statistics from an earlier draft were
+  withdrawn when their claimed source turned out not to contain them. The
+  full audit table, with what each source was used for and why it earned its
+  score, is in docs/personas.md. These personas are synthesised from that
+  research plus brand positioning and this project's stock analysis; they are
+  hypotheses to test, not interview findings.</div>
   <div class="footer"><span>Buyer personas · July 2026</span><span>2</span></div>
 </section>
 
@@ -224,7 +218,7 @@
     <div class="facts">
       <div class="fact"><div class="k">Life</div><div class="v">Regional operations director, outside Perth. Married, two teenagers.</div></div>
       <div class="fact"><div class="k">Miles</div><div class="v">~22,000 a year, mostly A9/M90</div></div>
-      <div class="fact"><div class="k">Budget</div><div class="v">£22–38k</div></div>
+      <div class="fact"><div class="k">Budget</div><div class="v">£22–38k, and he thinks in monthly outgoings too</div></div>
       <div class="fact"><div class="k">Shopping for</div><div class="v">Diesel or plug-in hybrid saloon/estate</div></div>
       <div class="fact"><div class="k">Device</div><div class="v">Desktop, evenings, spreadsheet in the next tab</div></div>
     </div>
@@ -236,20 +230,12 @@
         <p>Total cost of ownership and the absence of doubt. First private
         purchase in a decade, which makes him the classic Approved Used
         customer: he is buying the warranty and the history as much as the
-        car.</p></div>
-      <div class="sec bmw"><h3>What success looks like</h3>
-        <p>A 520d-shaped answer with the economy argued in his terms: what
-        this car costs to run at his mileage.</p></div>
-      <div class="sec bmw"><h3>What he asks that the tool can't hear yet</h3>
-        <ul><li>Monthly finance cost, not just sticker price</li>
-        <li>Warranty length and service history up front</li></ul></div>
+        car. He will read every line of both.</p></div>
+      <div class="sec bmw"><h3>What winning him over looks like</h3>
+        <p>A sensible high-mileage answer with the economy argued in his
+        terms: what this car costs to run at his mileage, and the programme's
+        certainty stated where he can see it rather than assumed.</p></div>
     </div>
-  </div>
-  <div class="replay bmw">
-    <span class="state">TESTED · CLEAR WINNER</span>
-    <span class="what">The tool named a 520d M Sport Touring at 91%, reasoned
-    about his big annual mileage in plain words, and showed the plug-in
-    alternative beside it. Served.</span>
   </div>
   <div class="footer"><span>Buyer personas · July 2026</span><span>3</span></div>
 </section>
@@ -281,22 +267,12 @@
       <div class="sec bmw"><h3>Actually decides on</h3>
         <p>Whether she believes the boot claim (she thinks in buggies and
         dogs, not litres), ISOFIX in the back, and what the range really is
-        on a cold motorway run.</p></div>
-      <div class="sec bmw"><h3>What success looks like</h3>
-        <p>An iX1/X1-hybrid-shaped shortlist with practicality reasons front
-        and centre, shareable with her partner.</p></div>
-      <div class="sec bmw"><h3>What she asks that the tool can't hear yet</h3>
-        <ul><li>Safety ratings and ISOFIX</li>
-        <li>Winter range, said honestly</li>
-        <li>Monthly cost on PCP</li></ul></div>
+        on a cold motorway run to Glasgow.</p></div>
+      <div class="sec bmw"><h3>What winning her over looks like</h3>
+        <p>A shortlist she can defend to her partner: practicality reasons
+        front and centre, honest numbers, and nothing that smells like it is
+        hiding a compromise.</p></div>
     </div>
-  </div>
-  <div class="replay bmw">
-    <span class="state">TESTED · SEVEN-WAY TIE</span>
-    <span class="what">Seven electric SUVs fit her equally; the page says so
-    and lets her narrow by taste. Friction found: near-identical cars shown
-    as separate cards, and a slightly stronger match 23 miles away goes
-    unmentioned. Both are on the improvement list.</span>
   </div>
   <div class="footer"><span>Buyer personas · July 2026</span><span>4</span></div>
 </section>
@@ -326,25 +302,55 @@
         <p>A petrol convertible. He is decisive about the shape and
         open-minded about almost everything else.</p></div>
       <div class="sec bmw"><h3>Actually decides on</h3>
-        <p>How it makes him feel: the sound, the colour on his drive, the
-        test drive. Happily travels 50 miles for the right car, which makes
-        him the "worth the drive" tier's ideal customer.</p></div>
-      <div class="sec bmw"><h3>What success looks like</h3>
-        <p>The tool being straight with him: his local dealer has no
-        convertibles, and the right car is a short drive away.</p></div>
-      <div class="sec bmw"><h3>What he asks that the tool can't hear yet</h3>
-        <ul><li>A way to act: no phone number, enquiry or test-drive booking
-        on the results page</li></ul></div>
+        <p>How it makes him feel: the sound, the colour on his gravel drive,
+        the test drive. Will happily travel fifty miles for the right
+        car.</p></div>
+      <div class="sec bmw"><h3>What winning him over looks like</h3>
+        <p>Being told straight. If the right car isn't at his local dealer,
+        say so and say where it is; he has the time and the tank to go and
+        get it.</p></div>
     </div>
   </div>
-  <div class="replay bmw">
-    <span class="state">TESTED · NOT HERE, BUT NEARBY</span>
-    <span class="what">"No convertibles at Grassicks right now. The nearest is
-    18.1 miles away." Local coupés shown honestly as the closest here, a 94%
-    Z4 leading the nearby list. Exactly the honesty this page was rebuilt
-    for. Served.</span>
-  </div>
   <div class="footer"><span>Buyer personas · July 2026</span><span>5</span></div>
+</section>
+
+<!-- ============================= TYLER ============================== -->
+<section class="page">
+  <div class="p-head">
+    <div class="avatar bmw">TB</div>
+    <div>
+      <div class="p-name"><b>Tyler Brooks</b>, 27</div>
+      <div class="p-tagline">The First-Premium Striver</div>
+    </div>
+    <div class="brand-chip bmw">BMW</div>
+  </div>
+  <p class="quote bmw">“My mates rate the badge. My bank app rates the
+  monthlies. Both have to say yes.”</p>
+  <div class="cols">
+    <div class="facts">
+      <div class="fact"><div class="k">Life</div><div class="v">Software sales, Dundee. Commission just starting to land. First premium car.</div></div>
+      <div class="fact"><div class="k">Miles</div><div class="v">~12,000 a year, commute plus weekends</div></div>
+      <div class="fact"><div class="k">Budget</div><div class="v">£16–24k on paper; really a monthly number and an insurance quote</div></div>
+      <div class="fact"><div class="k">Shopping for</div><div class="v">Petrol 1 Series or 2 Series Gran Coupé, M Sport, black or white</div></div>
+      <div class="fact"><div class="k">Device</div><div class="v">Phone only, late night, YouTube and TikTok reviews running</div></div>
+    </div>
+    <div>
+      <div class="sec bmw"><h3>Says he wants</h3>
+        <p>The M Sport look for the money he has. He knows the exact trims
+        and the exact engines; the reviewers he trusts have opinions on
+        both.</p></div>
+      <div class="sec bmw"><h3>Actually decides on</h3>
+        <p>The monthly payment his bank app tolerates and the insurance quote
+        it doesn't. Then the colour in his building's car park. Approved used
+        is his way into the badge, even if nobody markets it to him that
+        way.</p></div>
+      <div class="sec bmw"><h3>What winning him over looks like</h3>
+        <p>The right car with numbers he can say out loud: the monthly, the
+        insurance group, the 0–62. Zero friction; one whiff of brochure-speak
+        and he's gone.</p></div>
+    </div>
+  </div>
+  <div class="footer"><span>Buyer personas · July 2026</span><span>6</span></div>
 </section>
 
 <!-- ============================= CHLOE ============================== -->
@@ -373,21 +379,13 @@
       <div class="sec mini"><h3>Actually decides on</h3>
         <p>The colour and the roof. Full stop. The one that photographs best
         outside her flat wins.</p></div>
-      <div class="sec mini"><h3>What success looks like</h3>
-        <p>A tie she gets to break herself: cars whose paint she can see,
-        one tap to say "the green one". She is the whole reason the refine
-        step exists.</p></div>
-      <div class="sec mini"><h3>What she asks that the tool can't hear yet</h3>
-        <ul><li>Monthly payment and insurance group</li></ul></div>
+      <div class="sec mini"><h3>What winning her over looks like</h3>
+        <p>Getting to make the final call herself, between real cars whose
+        paint she can see, not being told which one is "best" by a
+        spreadsheet.</p></div>
     </div>
   </div>
-  <div class="replay mini">
-    <span class="state">TESTED · SIX-WAY TIE</span>
-    <span class="what">Six Coopers in five visible colours, swatches on every
-    card, colour chips to narrow with. Two taps from "six-way tie" to "your
-    perfect MINI". Served, precisely as designed.</span>
-  </div>
-  <div class="footer"><span>Buyer personas · July 2026</span><span>6</span></div>
+  <div class="footer"><span>Buyer personas · July 2026</span><span>7</span></div>
 </section>
 
 <!-- ============================= REYES ============================== -->
@@ -418,22 +416,12 @@
         <p>Whether the buggy fits with the weekly shop, doors that open in
         tight car parks, and the styling still saying MINI, which the
         contrast roof carries.</p></div>
-      <div class="sec mini"><h3>What success looks like</h3>
-        <p>Countryman-shaped answers with practicality reasons they believe,
-        without being handed a grey box.</p></div>
-      <div class="sec mini"><h3>What they ask that the tool can't hear yet</h3>
-        <ul><li>Boot size in buggy terms, not litres</li>
-        <li>Running costs beyond mpg: tax, insurance</li></ul></div>
+      <div class="sec mini"><h3>What winning them over looks like</h3>
+        <p>Practicality they believe, in their own terms, from a car that
+        still looks like theirs in the photos.</p></div>
     </div>
   </div>
-  <div class="replay mini">
-    <span class="state">TESTED · FIVE-WAY TIE + AN HONEST ASIDE</span>
-    <span class="what">Five Countrymans fit their brief, and the page also
-    volunteers that the plug-in hybrid they wondered about is 21.9 miles
-    away. Two honest messages, one page, no contradiction. Served. (Also
-    caught: 21 refine chips is too many; on the fix list.)</span>
-  </div>
-  <div class="footer"><span>Buyer personas · July 2026</span><span>7</span></div>
+  <div class="footer"><span>Buyer personas · July 2026</span><span>8</span></div>
 </section>
 
 <!-- ============================== MEG =============================== -->
@@ -463,62 +451,13 @@
         size.</p></div>
       <div class="sec mini"><h3>Actually decides on</h3>
         <p>Trust. Range said plainly, heated seats and parking sensors
-        present, an automatic gearbox, a dealer she can reach, a warranty
-        page she reads twice.</p></div>
-      <div class="sec mini"><h3>What success looks like</h3>
-        <p>A MINI Electric with honest numbers and the comfort equipment
-        visible on the card, not buried in a brochure.</p></div>
-      <div class="sec mini"><h3>What she asks that the tool can't hear yet</h3>
-        <ul><li>Winter range, honestly stated</li>
-        <li>That it's automatic: true of every electric MINI, but nothing
-        tells her so</li></ul></div>
+        present, an automatic gearbox confirmed rather than assumed, a dealer
+        she can reach, a warranty page she reads twice.</p></div>
+      <div class="sec mini"><h3>What winning her over looks like</h3>
+        <p>Plain numbers, no cleverness, and the comfort equipment stated
+        where she can see it.</p></div>
     </div>
   </div>
-  <div class="replay mini">
-    <span class="state">TESTED · TWO-WAY TIE</span>
-    <span class="what">Two identical MINI Electrics, Chili Red versus Midnight
-    Black; the tool offers exactly that choice as two taps. Served, with one
-    gap: the gearbox is known but never shown. On the fix list.</span>
-  </div>
-  <div class="footer"><span>Buyer personas · July 2026</span><span>8</span></div>
-</section>
-
-<!-- ============================ FINDINGS ============================= -->
-<section class="page">
-  <div class="eyebrow">What testing through their eyes found</div>
-  <h2 class="section">Every persona was served. The gaps are around the match, not in it.</h2>
-  <div class="verdict">All six personas landed on honest, coherent results,
-  including the hard cases: the tool admits ties instead of inventing a
-  winner, says "not here, but 18 miles away" when that's the truth, and lets
-  taste make the final call. The sharpest unmet needs are money, trust and
-  action: what it costs monthly, why approved-used can be believed, and how
-  to actually get the car once you've found it.</div>
-  <div class="find-grid">
-    <div class="find-col">
-      <h3>Fix now (small and sharp)</h3>
-      <ol>
-        <li>Cap the refine chips (21 offered over five cars)</li>
-        <li>Group near-identical cars: "2 available, in blue and grey"</li>
-        <li>Correct the runner-up wording when a tie is bigger than the page shows</li>
-        <li>Show the gearbox on every card</li>
-        <li>Say "Countryman", not "SUV", in MINI's own voice</li>
-      </ol>
-    </div>
-    <div class="find-col">
-      <h3>Next (design and data)</h3>
-      <ol>
-        <li>Monthly-cost layer: indicative finance per car</li>
-        <li>Retailer handoff: phone, enquiry, test-drive booking</li>
-        <li>Approved-used trust strip: warranty, history, returns</li>
-        <li>Flag a stronger match nearby even when the local result is good</li>
-        <li>Investigate: insurance group, tax, winter range, safety data</li>
-      </ol>
-    </div>
-  </div>
-  <div class="note" style="margin-top:8mm"><b>Where to go deeper:</b> the full
-  personas with sources live in docs/personas.md; the complete test log and
-  prioritised feature list in docs/persona-findings.md; both replayable any
-  time with <b>npm run personas</b>.</div>
   <div class="footer"><span>Buyer personas · July 2026</span><span>9</span></div>
 </section>
 
