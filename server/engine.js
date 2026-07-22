@@ -481,7 +481,8 @@ const SCORERS = {
  * configured retailer's stock, while the "worth the drive" carousel ranks a
  * separate pool (nearby retailers) through the same scoring.
  *
- * @returns {Match[]} Match: { car, score (0–100), stretch, reasons: string[] }
+ * @returns {Match[]} Match: { car, score (0–100), stretch, reasons: string[],
+ *   tradeOffs: see tradeOffs() }
  */
 export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
   const weights = effectiveWeights(answers, tuning);
@@ -518,7 +519,9 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
       if (answers.people === 'crew' && car.seats < tuning.practicality.crewBonusSeats) {
         ratio *= tuning.crewSeatShortfall ?? 1;
       }
-      return { car, score: Math.round(ratio * 100), stretch, reasons };
+      return {
+        car, score: Math.round(ratio * 100), stretch, reasons, tradeOffs: tradeOffs(answers, car),
+      };
     })
     // Deterministic tie-breaking: score, then cheaper car, then name.
     .sort(
@@ -561,6 +564,33 @@ export function unmetWants(answers, cars) {
   if (missingBody.length) unmet.bodyStyles = missingBody;
 
   return unmet;
+}
+
+/*
+ * The stated wants THIS car fails to meet — the per-car companion to
+ * unmetWants. unmetWants tells the page "the pool has no fully electric cars
+ * at all"; tradeOffs tells one card "this car is petrol and you asked for
+ * electric" — which is still true, and still worth owning, when the pool DOES
+ * have EVs but a petrol car out-ranked them anyway. Same scope as unmetWants
+ * (fuel and body style, the two wants that are plain stock facts) and the
+ * same no-preference rule: `open`/`any` state no want, so nothing can be
+ * traded away. Structured facts, not prose — the block phrases them in the
+ * brand's voice, exactly as it does the unmet note.
+ *
+ * @returns {Array<{ dim: string, wants: string[], got: string }>} in the
+ *   note's fuel-then-shape order; empty when the car meets every stated want.
+ */
+export function tradeOffs(answers, car) {
+  const trades = [];
+  const fuels = fuelPrefs(answers).filter((v) => v !== 'open');
+  if (fuels.length && !fuels.includes(car.fuel)) {
+    trades.push({ dim: 'fuel', wants: fuels, got: car.fuel });
+  }
+  const bodies = (answers.bodyStyles || []).filter((v) => v !== 'any');
+  if (bodies.length && !bodies.includes(car.body)) {
+    trades.push({ dim: 'bodyStyles', wants: bodies, got: car.body });
+  }
+  return trades;
 }
 
 /** How many cars the results screen shows as headline matches. */

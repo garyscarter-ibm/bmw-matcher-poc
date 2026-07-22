@@ -746,6 +746,19 @@
 .bmwm-reasons { margin: 0; padding: 0 0 0 var(--bmwm-space-5); font-size: var(--bmwm-text-body); }
 .bmwm-reasons li { margin-bottom: var(--bmwm-space-1); }
 
+/* The hero card owning a want it doesn't meet ("Petrol, where you asked for
+   all-electric.") — the per-car sibling of the .bmwm-unmet note, so its
+   eyebrow takes the same spot colour as that note's edge: one colour for
+   honesty, everywhere it appears. Plain text under the eyebrow, no field or
+   border — it's a statement in the card's own voice, not a warning. */
+.bmwm-trade-label { color: var(--bmwm-accent-spot); }
+.bmwm-trade-text {
+  margin: 0;
+  font-size: var(--bmwm-text-body);
+  line-height: 1.5;
+  color: var(--bmwm-ink);
+}
+
 .bmwm-subhead {
   font-family: var(--bmwm-font-heading);
   font-weight: 300;

@@ -112,8 +112,8 @@ function publicCar(car) {
   };
 }
 
-function publicMatch({ car, score, stretch, reasons }) {
-  return { car: publicCar(car), score, stretch, reasons };
+function publicMatch({ car, score, stretch, reasons, tradeOffs }) {
+  return { car: publicCar(car), score, stretch, reasons, tradeOffs };
 }
 
 function readJsonBody(req) {

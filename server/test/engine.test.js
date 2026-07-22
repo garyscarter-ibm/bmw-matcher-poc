@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  matchCars, rankCars, budgetRange, unmetWants, STRETCH_FACTOR,
+  matchCars, rankCars, budgetRange, unmetWants, tradeOffs, STRETCH_FACTOR,
 } from '../engine.js';
 import { CARS } from '../data.js';
 import { BUDGET_BANDS, QUESTIONS } from '../questions.js';
@@ -333,6 +333,57 @@ test('"no preference" answers state no want, so can never be unmet', () => {
   // Unanswered is the same: an absent fuel/body answer reads as no preference.
   assert.deepEqual(unmetWants({ budget: 'b2' }, []), {});
   assert.deepEqual(unmetWants({ ...base, fuel: [] }, []), {});
+});
+
+/* ---- trade-offs: what THIS car gives up (hero-card honesty) ---- */
+
+// tradeOffs only reads the two stock facts, so a minimal car is enough.
+const petrolSaloon = { fuel: 'petrol', body: 'saloon' };
+
+test('a car of the wrong fuel owns the trade', () => {
+  assert.deepEqual(
+    tradeOffs({ ...base, fuel: ['ev'] }, petrolSaloon),
+    [{ dim: 'fuel', wants: ['ev'], got: 'petrol' }],
+  );
+  // Multi-select: matching ANY chosen fuel is a met want, not a trade.
+  assert.deepEqual(tradeOffs({ ...base, fuel: ['petrol', 'ev'] }, petrolSaloon), []);
+  // ...and missing all of them lists every want, so the copy can say
+  // "where you asked for diesel or fully electric".
+  assert.deepEqual(
+    tradeOffs({ ...base, fuel: ['diesel', 'ev'] }, petrolSaloon),
+    [{ dim: 'fuel', wants: ['diesel', 'ev'], got: 'petrol' }],
+  );
+});
+
+test('a car of the wrong shape owns the trade, fuel listed first', () => {
+  assert.deepEqual(
+    tradeOffs({ ...base, fuel: ['petrol'], bodyStyles: ['estate'] }, petrolSaloon),
+    [{ dim: 'bodyStyles', wants: ['estate'], got: 'saloon' }],
+  );
+  assert.deepEqual(
+    tradeOffs({ ...base, fuel: ['ev'], bodyStyles: ['estate', 'suv'] }, petrolSaloon),
+    [
+      { dim: 'fuel', wants: ['ev'], got: 'petrol' },
+      { dim: 'bodyStyles', wants: ['estate', 'suv'], got: 'saloon' },
+    ],
+  );
+});
+
+test('"no preference" answers trade nothing away', () => {
+  assert.deepEqual(tradeOffs({ ...base, fuel: ['open'], bodyStyles: ['any'] }, petrolSaloon), []);
+  assert.deepEqual(tradeOffs({ budget: 'b2' }, petrolSaloon), []);
+});
+
+test('every ranked match carries its own trade-offs', () => {
+  // Unlike the pool-level unmetWants, a trade-off is per car: with EVs in
+  // stock, an EV match owns nothing while a petrol match still owns its fuel.
+  for (const m of runAll({ ...base, fuel: ['ev'] })) {
+    assert.deepEqual(
+      m.tradeOffs,
+      m.car.fuel === 'ev' ? [] : [{ dim: 'fuel', wants: ['ev'], got: m.car.fuel }],
+      `${m.car.name} should own exactly its own misses`,
+    );
+  }
 });
 
 test('quiz answer keys line up with what the engine reads', () => {

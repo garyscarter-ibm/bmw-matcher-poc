@@ -175,10 +175,62 @@ const UNMET_PHRASES = {
   },
 };
 
+/*
+ * How the hero card owns a want it doesn't meet — "Petrol, where you asked
+ * for all-electric." Singular phrases (UNMET_PHRASES above are plurals for
+ * the pool-level note), same per-brand vocabulary rules: MINI names its own
+ * shapes and calls its EVs all-electric. `label` is the section eyebrow that
+ * mirrors "Why it suits you"; the CSS uppercases it, so it's authored plain.
+ */
+const TRADE_COPY = {
+  bmw: {
+    label: 'The trade-off',
+    fuel: {
+      petrol: 'petrol', diesel: 'diesel', phev: 'a plug-in hybrid', ev: 'fully electric',
+    },
+    bodyStyles: {
+      hatchback: 'a hatchback', saloon: 'a saloon', estate: 'an estate', suv: 'an SUV',
+      coupe: 'a coupé', convertible: 'a convertible', mpv: 'a family carrier',
+    },
+  },
+  mini: {
+    label: 'The trade',
+    fuel: { petrol: 'petrol', phev: 'a plug-in hybrid', ev: 'all-electric' },
+    bodyStyles: {
+      hatchback: 'a hatchback', estate: 'a Clubman', suv: 'a Countryman',
+      convertible: 'a convertible',
+    },
+    // The `got` side describes the car itself, not a quiz option — and MINI's
+    // suv bucket holds the Aceman as well as the Countryman, so naming the
+    // Countryman there would mislabel an Aceman on its own card. The want
+    // side stays "a Countryman": that's the word the quiz option used.
+    got: { bodyStyles: { suv: 'a crossover' } },
+  },
+};
+
 /** "a", "a or b", "a, b or c" — the natural spoken list. */
 function orList(items) {
   if (items.length < 2) return items[0] || '';
   return `${items.slice(0, -1).join(', ')} or ${items[items.length - 1]}`;
+}
+
+/*
+ * The hero card's trade-off line(s): one short declarative per missed want,
+ * in the engine's fuel-then-shape order — "Petrol, where you asked for fully
+ * electric. A saloon, where you asked for an estate." Both brands share the
+ * sentence shape (short, factual, full stop — the shared signature); the
+ * vocabulary and the eyebrow above carry the brand difference. An
+ * unrecognised value (an old shared link) falls back to the raw value rather
+ * than dropping the admission.
+ */
+function tradeLines(brandKey, trades) {
+  const vocab = TRADE_COPY[brandKey] || TRADE_COPY.bmw;
+  return trades.map(({ dim, wants, got }) => {
+    const gotPhrase = vocab.got?.[dim]?.[got] || vocab[dim]?.[got] || got;
+    const wantList = orList(wants.map((w) => vocab[dim]?.[w] || w));
+    const line = `${gotPhrase}, where you asked for ${wantList}.`;
+    return line.charAt(0).toUpperCase() + line.slice(1);
+  });
 }
 
 /**
@@ -789,7 +841,7 @@ function distanceLabel(distance) {
  * `big` adds the "why it suits you" reasons; `compact` is the carousel tile —
  * same anatomy, but trades the blurb and reasons for a distance line.
  */
-function matchCard(match, { big = false, compact = false } = {}) {
+function matchCard(match, { big = false, compact = false, brand: brandKey = 'bmw' } = {}) {
   const { car, score, reasons } = match;
   const card = el('article', `bmwm-card${big ? ' bmwm-card-big' : ''}${compact ? ' bmwm-card-compact' : ''}`);
 
@@ -873,6 +925,20 @@ function matchCard(match, { big = false, compact = false } = {}) {
     const why = el('ul', 'bmwm-reasons');
     reasons.forEach((r) => why.append(el('li', null, r)));
     body.append(el('p', 'bmwm-why-label', 'Why it suits you'), why);
+  }
+
+  // Owning the trade-off: when the recommendation misses a stated want (it's
+  // petrol and they asked for electric), the card says so itself, right under
+  // the case for it — not only the page-level unmet note, which fires solely
+  // when the whole pool is short. Hero card only: it's the one making the
+  // "your perfect car" claim, and the compact tiles already state fuel and
+  // shape in their spec line.
+  if (big && match.tradeOffs?.length) {
+    const { label } = TRADE_COPY[brandKey] || TRADE_COPY.bmw;
+    body.append(
+      el('p', 'bmwm-why-label bmwm-trade-label', label),
+      el('p', 'bmwm-trade-text', tradeLines(brandKey, match.tradeOffs).join(' ')),
+    );
   }
 
   // Link out to the retailer's live stock, when the feed gave us one.
@@ -1122,7 +1188,7 @@ async function renderResults(root, ctx, answers) {
     const model = matches[0].car.name.replace(new RegExp(`^${brandName} `), '');
     screen.append(el('h2', 'bmwm-title', `Your perfect ${brandName} is the ${model}`));
     const grid = el('div', 'bmwm-grid');
-    grid.append(matchCard(matches[0], { big: true }));
+    grid.append(matchCard(matches[0], { big: true, brand: ctx.brand }));
     screen.append(grid);
 
     // Runners-up: the other local matches, as smaller compact tiles in a

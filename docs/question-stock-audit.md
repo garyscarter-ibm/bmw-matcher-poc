@@ -118,6 +118,16 @@ belongs: **in the results** — see fix 3.
    stock gap). The block renders a brand-voiced note above the hero only when
    both halves agree — a failed nearby lookup sends `unmet: null` and claims
    nothing.
+   *Extended — the hero owns its own trade-off:* the pool note can't fire
+   when the pool DOES hold the wanted car but something else out-ranked it
+   (an EV crossover beating the petrol convertibles a convertible-seeker was
+   shown). So every ranked match also carries `tradeOffs` (engine.js) — the
+   stated wants THIS car misses, same fuel/body scope and no-preference
+   rules as `unmetWants` — and the hero card states its own under a "The
+   trade-off" (BMW) / "The trade" (MINI) eyebrow: "A crossover, where you
+   asked for a convertible." Hero only: it's the card making the "your
+   perfect car" claim, and the compact tiles already state fuel and shape
+   in their spec lines.
 
 ## Which pool decides what
 
