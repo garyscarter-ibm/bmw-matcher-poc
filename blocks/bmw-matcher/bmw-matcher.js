@@ -104,14 +104,14 @@ const CARDINALS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 
 const cardinal = (n) => CARDINALS[n] ?? String(n);
 
 /** Brand-specific display copy, keyed by brand. `name` is the marque, `title`
- * the intro headline, `cta` the intro button. `lede({ questions, matches,
- * retailer })` builds the intro paragraph — a function because the two brands
- * phrase it differently, not just swap nouns.
+ * the intro headline, `cta` the intro button. `lede({ questions, retailer })`
+ * builds the intro paragraph — a function because the two brands phrase it
+ * differently, not just swap nouns.
  *
- * Both counts are passed in rather than written into the copy: `questions`
- * comes from the fetched question set (brands have different totals) and
- * `matches` from the API's topMatches. Either can change server-side without
- * the copy going stale.
+ * The question count is passed in rather than written into the copy (brands
+ * have different totals, and a brand gaining a question needs no copy edit).
+ * Deliberately no match count anywhere: results show one clear winner or the
+ * whole tie, so any promised number would be wrong half the time.
  *
  * Voices follow docs/tone-style-guide.md: BMW is assured and understated (the
  * flat, unapologetic close borrowed from bmw.co.uk's register), MINI keeps the
@@ -122,8 +122,10 @@ const BRAND_COPY = {
     name: 'BMW',
     title: 'Find your perfect BMW',
     cta: 'Find my BMW',
-    lede: ({ questions, matches, retailer }) => `${questions} quick questions about your life, `
-      + `your miles and your budget. We’ll match you with the ${cardinal(matches)} approved-used `
+    // No promised count: results now show one clear winner or the whole tie
+    // (up to MAX_SHOWN), so naming a number here would be wrong half the time.
+    lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
+      + `your miles and your budget. We’ll match you with the approved-used `
       + `cars at ${retailer} that suit you best, and tell you why.`,
     // Approved Used's no-surprises register: state the fact, name the
     // retailer, don't dress it up (docs/tone-style-guide.md). No label —
@@ -158,9 +160,9 @@ const BRAND_COPY = {
     name: 'MINI',
     title: 'Find your perfect MINI',
     cta: 'Let’s find your MINI',
-    lede: ({ questions, matches, retailer }) => `${questions} quick questions about your life, `
-      + `your miles and your money. We’ll find the ${cardinal(matches)} MINIs at ${retailer} `
-      + 'with your name on them — and tell you exactly why.',
+    lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
+      + `your miles and your money. We’ll find the MINIs at ${retailer} `
+      + 'with your name on them, and tell you exactly why.',
     // Same fact, MINI's register: the UPPERCASE-with-a-full-stop beat as the
     // lead-in, then warm and plain. A shortage is a shrug, never a shrug-off.
     unmetLabel: 'SMALL SNAG.',
@@ -169,17 +171,17 @@ const BRAND_COPY = {
     // Same fact in MINI's register: a tie is a nice problem, not a shortfall.
     tiedTitle: ({ count }) => `It’s a ${cardinal(count)}-way tie`,
     tiedLede: () => 'They all fit what you told us, just as well as each other. '
-      + 'So it comes down to taste now — which is the fun bit.',
+      + 'So it comes down to taste now. Which is the fun bit.',
     // MINI asks rather than instructs, and treats a dead end as a shrug.
     refineLabel: 'So, what do you fancy?',
     refineStatus: ({ shown, total, wants }) => `${shown} of ${total} left, with ${wants}.`,
     refineStatusPlain: ({ shown, total }) => `${shown} of ${total} left.`,
-    refineEmpty: ({ wants }) => `Ah — nothing here has ${wants} all at once. `
+    refineEmpty: ({ wants }) => `Ah. Nothing here has ${wants} all at once. `
       + 'Let one of them go and we’ll show you what’s left.',
     refineEmptyHidden: 'Well, that’s the lot ruled out. Bring one back, or start over.',
     tiedEmptyTitle: 'That’s the lot, then',
     rejectOpen: 'Not this one',
-    rejectPrompt: 'Go on then — what’s wrong with it?',
+    rejectPrompt: 'Go on then, what’s wrong with it?',
     rejectJust: 'Just not feeling it',
     hiddenChip: ({ count }) => `${count} ruled out`,
   },
@@ -524,11 +526,11 @@ function unmetNote(ctx, unmet) {
 }
 
 /**
- * The question set for a brand, plus `topMatches` — how many results the API
- * will return. Both are server-owned so the intro copy can state real numbers
- * without the block hardcoding either; a brand gaining a question, or
- * TOP_MATCHES changing, needs no block rebuild. Falls back to 3 for an older
- * API that doesn't send it.
+ * The question set for a brand. Server-owned, so the intro copy can state the
+ * real question count without the block hardcoding it. (The API also sends
+ * `topMatches`; the block stopped reading it when results went cluster-aware —
+ * how many cars appear now depends on whether the engine could pick a winner,
+ * so the intro no longer promises a number.)
  */
 async function apiGetQuestions(base, retailer, brandKey) {
   const url = new URL(`${base}/api/questions`);
@@ -537,7 +539,7 @@ async function apiGetQuestions(base, retailer, brandKey) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Questions request failed (${res.status})`);
   const data = await res.json();
-  return { questions: data.questions, topMatches: data.topMatches || 3 };
+  return { questions: data.questions };
 }
 
 async function apiMatch(base, answers, retailer, brandKey) {
@@ -661,6 +663,31 @@ const SPEC_LABELS = {
 const FUEL_SPEC = { petrol: 'Petrol', diesel: 'Diesel', phev: 'Plug-in hybrid', ev: 'Electric' };
 
 /*
+ * Representative hex per basic colour, for the little swatch beside the paint
+ * name. Keyed by the feed's normalised `colour.colour` — a closed set of basic
+ * names, which is what makes a hand-authored table viable. Deliberately NOT
+ * the actual paint (the feed gives "Ocean Wave Green", not a hex): the swatch
+ * says "this one's the green one" at a glance, the name and photo carry the
+ * truth. An unknown name renders no swatch rather than a wrong one.
+ */
+const SWATCH_HEX = {
+  black: '#1d1d1f',
+  grey: '#8e9094',
+  silver: '#c8cacc',
+  white: '#f4f4f2',
+  blue: '#33567d',
+  red: '#a03236',
+  green: '#4a6b58',
+  orange: '#c47a3a',
+  yellow: '#d9b13b',
+  brown: '#6b543f',
+  beige: '#cfc3a8',
+  bronze: '#9c7a5b',
+  gold: '#b3945c',
+  purple: '#5d4a72',
+};
+
+/*
  * Human names for the equipment concepts the server parses out of the feed's
  * factory options list (mapping.js FEATURE_CONCEPTS). Display-only, so they
  * live here rather than on the wire — and only concepts a buyer would
@@ -763,7 +790,7 @@ function renderIntro(root, ctx) {
     el('p', 'bmwm-kicker', 'The unofficial UK matchmaker'),
     el('h1', 'bmwm-title', copy.title),
     el('p', 'bmwm-lede', copy.lede({
-      questions: count, matches: ctx.topMatches, retailer: ctx.retailerLabel,
+      questions: count, retailer: ctx.retailerLabel,
     })),
   );
   const start = el('button', 'bmwm-btn bmwm-btn-primary', copy.cta);
@@ -1231,20 +1258,28 @@ function matchCard(match, {
   // engine can't separate the cars, colour is very often the actual difference
   // between them — so it belongs on the card, not buried on the retailer's PDP.
   const paint = car.colour?.manufacturerColour || car.colour?.colour;
+  const lead = [SPEC_LABELS[car.body], FUEL_SPEC[car.fuel]].filter(Boolean);
   // Compact tiles are narrow — the headline specs only, no 0–62/economy.
-  const specBits = compact ? [
-    SPEC_LABELS[car.body],
-    FUEL_SPEC[car.fuel],
-    price,
-  ] : [
-    SPEC_LABELS[car.body],
-    FUEL_SPEC[car.fuel],
-    paint,
+  const tail = (compact ? [price] : [
     price,
     `0–62 ${car.zeroTo62}s`,
     car.fuel === 'ev' ? `${car.evRange} mi range` : `${car.mpg} mpg`,
-  ];
-  specs.textContent = specBits.filter(Boolean).join('  ·  ');
+  ]).filter(Boolean);
+  if (paint && !compact) {
+    // Paint gets a swatch as well as its name: in a tie the colour is very
+    // often the actual difference between the cars, and a dot you can see
+    // beats a name you have to read. No hex for the name → name alone.
+    specs.append(`${lead.join('  ·  ')}  ·  `);
+    const hex = SWATCH_HEX[(car.colour?.colour || '').toLowerCase()];
+    if (hex) {
+      const dot = el('span', 'bmwm-swatch');
+      dot.style.background = hex;
+      specs.append(dot);
+    }
+    specs.append(`${paint}  ·  ${tail.join('  ·  ')}`);
+  } else {
+    specs.textContent = [...lead, ...tail].join('  ·  ');
+  }
   body.append(specs);
 
   // The whole point of the carousel: how far away is it, and whose is it?
@@ -1704,9 +1739,6 @@ export default async function decorate(block) {
     retailerLabel,
     brand: brandKey,
     questions: [],
-    // How many matches the results page will show, per the API (see
-    // apiGetQuestions). Only the intro copy reads it.
-    topMatches: 3,
     // Live "best guess" strip state, kept on ctx so it survives the
     // per-question re-render (see renderPreviewSection / schedulePreviewRefresh).
     // `seq` is the latest-wins guard for the debounced refetch.
@@ -1742,7 +1774,6 @@ export default async function decorate(block) {
     try {
       const meta = await apiGetQuestions(ctx.api, ctx.retailer, ctx.brand);
       ctx.questions = meta.questions;
-      ctx.topMatches = meta.topMatches;
     } catch {
       renderStatus(block, {
         kicker: 'Sorry',

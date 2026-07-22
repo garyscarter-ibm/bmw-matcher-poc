@@ -628,6 +628,18 @@
 }
 .bmwm-chip-x { font-size: 11px; opacity: 0.85; }
 
+/* The paint swatch in a card's spec line: a small dot before the colour name.
+   Hairline border so the white swatch reads on a white card. */
+.bmwm-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 20%);
+  margin-right: 5px;
+  vertical-align: 1px;
+}
+
 /* --- "Not this one": rejection, and the why that makes it usable ---
    Deliberately quiet — a small text button at the foot of the card, not a
    red X. Rejecting is normal browsing behaviour, not an error state. */

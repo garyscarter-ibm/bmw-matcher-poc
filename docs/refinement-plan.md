@@ -214,35 +214,37 @@ one, here, among these. Widening either into a persistent, stock-wide filter
 would be a much stronger claim than the tap actually made — and would put the
 tool back into competing with advanced search, which it should not do.
 
-## Still open
+## Decisions (2026-07-22, project owner)
 
-- **Session state.** Refinements live in the page and don't survive a reload or
-  a share link (`#m=` encodes answers only). Fine for a demo; a real build has
-  to decide whether a narrowed shortlist is shareable.
-- **Rejection never reaches the server.** Every constraint filters the cluster
-  client-side, so a rejection can't pull in a better-fitting car from outside
-  it. The honest version of "show me more like this, but cheaper" is a re-rank
-  against the retailer's full stock, which is a server change.
-- **Intro copy still promises three.** The lede says "the three cars that suit
-  you best" while a tie can now show up to six. Not a lie, but loose.
-- **No colour swatches.** Colour is shown by name ("Ocean Wave Green"). A
-  swatch would need a name→hex table, which the feed doesn't provide.
+The open questions were reviewed together; where something stays as-is that is
+now a decision, not an omission.
 
-## Open questions
-
-- ~~**Does the PDP endpoint carry paint colour?**~~ **Closed, mostly.** Body
-  paint is confirmed absent from the list feed, and the PDP can't be probed
-  automatically (`Disallow: /vehicle/`). Design around the gap; MINI's
-  `contrastRoof` covers part of it. Still worth a *human* glance at one PDP in
-  a browser to know whether paint is shown to buyers at all — if it is, the
-  question becomes whether there's a sanctioned way to get it, not whether it
-  exists.
-- **What is the cluster threshold in the UI?** 3 points is the audit's
-  analytical choice. The product may want "everything within N% of #1", or
-  simply "the top 6 when the gap is small".
-- **Does refinement re-rank or filter?** A required concept could hard-filter
-  the cluster or just add weight. Filtering is honest and legible; weighting is
-  softer but risks showing a car that lacks the thing they just demanded.
-- **Session state.** Learned constraints currently have nowhere to live — the
-  share link (`#m=`) encodes answers only. Either extend it or accept that
-  refinements don't survive a share.
+- **Rejection stays client-side, for now — leaning toward server-side later.**
+  Today a constraint filters the cluster; it cannot pull a better-fitting car
+  in from outside it. The owner leans toward the server version ("show me more
+  like this, but cheaper" as a re-rank against the retailer's full stock) but
+  deferred it deliberately. **Revisit when phase 2 gets real-user feedback.**
+  Design note for whoever builds it: a rejection against six cars and a
+  rejection against a hundred are different claims — the hard/soft split in
+  the why-menu matters much more at full-stock scale.
+- **Cluster threshold (3 pts) — pending hands-on testing.** The owner is
+  trying the running build before judging whether ties feel right at this
+  width. The dead-tie share (gap exactly 0) needs no threshold and stands
+  regardless.
+- **A narrowed shortlist is deliberately not shareable.** `#m=` keeps encoding
+  answers only; refinements die with the page. Agreed that this one has no
+  easy answer: a shared "1 of 6 left" without the journey that produced it may
+  confuse more than it helps. Recorded as a genuine open design question, not
+  a TODO.
+- ~~**Intro copy promises three.**~~ Fixed — no promised count anywhere; the
+  block no longer reads `topMatches` at all (results show a winner or the
+  tie, so any number would be wrong half the time).
+- ~~**No colour swatches.**~~ Built — a hand-authored basic-name→hex table
+  (`SWATCH_HEX`) puts a dot beside the paint name on full cards. The swatch is
+  representative ("this one's the green one"), never a claim about the exact
+  paint; unknown names get no dot rather than a wrong one.
+- ~~**Does refinement re-rank or filter?**~~ Answered by building it: it
+  filters. A car lacking the thing just demanded must not reappear three cards
+  later on weight alone.
+- ~~**Does the PDP carry paint?**~~ Closed — it does, and it's fetched
+  (see [refinement-audit.md](refinement-audit.md)).
