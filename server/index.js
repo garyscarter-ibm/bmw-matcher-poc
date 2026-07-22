@@ -295,8 +295,31 @@ async function handleNearby(req, res) {
   try {
     const cars = await fetchNearbyStock(brand, retailer);
     const scored = applyBespokeAnswers(brand, answers);
-    nearby = rankCars(scored, cars, brandTuning(brand)).slice(0, TOP_MATCHES);
+    const ranked = rankCars(scored, cars, brandTuning(brand));
+    nearby = ranked.slice(0, TOP_MATCHES);
     unmet = unmetWants(scored, cars);
+
+    // Rescue slots. The top slice is ranked on the whole blend, which can
+    // squeeze out the very want this tier exists to honour: every MINI
+    // plug-in hybrid is a Countryman, so for a PHEV-hatchback ask the body
+    // penalty ranks all of them below the cut — and the response then claims
+    // the want is met (unmet says so, measured against the pool) while
+    // showing no car that meets it. "Never let the anchor retailer's
+    // inventory hide a preference the nearby tier could honour" has to hold
+    // for the SLICE, not just the pool: for each stated fuel/body value with
+    // no representative in the slice, append the best-ranked car that has it.
+    const stated = [
+      ...(Array.isArray(scored.fuel) ? scored.fuel : [])
+        .filter((v) => v !== 'open').map((v) => [(c) => c.fuel === v]),
+      ...(scored.bodyStyles || [])
+        .filter((v) => v !== 'any').map((v) => [(c) => c.body === v]),
+    ];
+    for (const [has] of stated) {
+      if (!nearby.some((m) => has(m.car))) {
+        const best = ranked.find((m) => has(m.car));
+        if (best) nearby.push(best);
+      }
+    }
   } catch (err) {
     console.warn('[nearby] stock unavailable:', err?.message);
   }

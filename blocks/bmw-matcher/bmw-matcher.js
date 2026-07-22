@@ -155,6 +155,22 @@ const BRAND_COPY = {
     rejectPrompt: 'What put you off?',
     rejectJust: 'Just not this one',
     hiddenChip: ({ count }) => `${count} ruled out`,
+    // The "closest here" frame (docs/results-page-states.md): the local cars
+    // miss something the buyer asked for, so no headline may crown one. First
+    // paint must be true whether or not the nearby tier later finds the real
+    // thing — this claims nothing beyond this retailer's stock.
+    closestTitle: ({ retailer }) => `The closest matches at ${retailer}`,
+    closestLede: () => 'Nothing here ticks every box you gave us. Each card says what it '
+      + 'gets right, and what it doesn’t.',
+    closestSettled: ({ model }) => `Your closest match here is the ${model}`,
+    // The rescue note: the want is missing HERE but met nearby — by owner
+    // decision (2026-07-22) the local cards keep the lead and this note
+    // carries the fact, so the buyer weighs proximity against fit themselves.
+    rescueNote: ({ list, retailer, miles, where }) => `No ${list} at ${retailer} right now. `
+      + `The nearest is ${miles} away at ${where}, under “Worth the drive” below.`,
+    // "Worth the drive" lede when it leads with the cars that DO meet the brief.
+    driveLedeRescue: ({ list }) => `Starting with the ${list} you asked for, then the closest `
+      + 'matches at other retailers.',
   },
   mini: {
     name: 'MINI',
@@ -184,6 +200,16 @@ const BRAND_COPY = {
     rejectPrompt: 'Go on then, what’s wrong with it?',
     rejectJust: 'Just not feeling it',
     hiddenChip: ({ count }) => `${count} ruled out`,
+    // The "closest here" frame, MINI register: honest shrug, no apology.
+    closestTitle: ({ retailer }) => `The closest we’ve got at ${retailer}`,
+    closestLede: () => 'None of these is the whole wish list, but they’re close. '
+      + 'And each one owns up to what’s missing.',
+    closestSettled: ({ model }) => `Closest to your brief: the ${model}`,
+    rescueLabel: 'NOT HERE, BUT NOT FAR.',
+    rescueNote: ({ list, miles, where }) => `No ${list} at ours right now. `
+      + `The nearest is ${miles} away at ${where}. Scroll down to “Worth the drive”.`,
+    driveLedeRescue: ({ list }) => `First up: the ${list} you asked for. `
+      + 'Then the rest of the closest matches.',
   },
 };
 
@@ -316,9 +342,14 @@ function agreedUnmet(retailerUnmet, nearbyUnmet) {
  * outcome that must be explained rather than rendered as an empty grid.
  *
  * @param {HTMLElement} title the results headline, re-worded as the set narrows
- * @param {HTMLElement} lede the "we can't split them" line, dropped once we can
+ * @param {HTMLElement} lede the framing line, dropped once one car remains
+ * @param {Object} frame how this group may be described (docs/
+ *   results-page-states.md): `tied({count})` while several remain,
+ *   `settled({model})` once one does. The fit-tie frame crowns the survivor
+ *   ("Your perfect BMW is…"); the closest-here frame must not — its survivor
+ *   still misses the brief, so it settles to "Your closest match here is…".
  */
-function renderRefine(ctx, lead, title, lede) {
+function renderRefine(ctx, lead, title, lede, frame) {
   const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
   const cars = lead.map((m) => m.car);
   const axes = refinementAxes(cars);
@@ -440,9 +471,9 @@ function renderRefine(ctx, lead, title, lede) {
       title.textContent = copy.tiedEmptyTitle;
     } else if (settled) {
       const model = shown[0].car.name.replace(new RegExp(`^${copy.name} `), '');
-      title.textContent = `Your perfect ${copy.name} is the ${model}`;
+      title.textContent = frame.settled({ model });
     } else {
-      title.textContent = copy.tiedTitle({ count: shown.length });
+      title.textContent = frame.tied({ count: shown.length });
     }
     // "We can't split them" only holds while there are several to split.
     lede.hidden = shown.length <= 1;
@@ -502,6 +533,15 @@ function renderRefine(ctx, lead, title, lede) {
   return host;
 }
 
+/** The unmet wants as brand-voiced plural phrases — fuel first, then shape:
+ * "fully electric cars", "estates". Shared by the two notes below. */
+function unmetPhrases(brandKey, unmet) {
+  const phrases = UNMET_PHRASES[brandKey] || UNMET_PHRASES.bmw;
+  return ['fuel', 'bodyStyles'].flatMap(
+    (id) => (unmet[id] || []).map((v) => phrases[id]?.[v] || v),
+  );
+}
+
 /**
  * A brand-voiced note admitting that something the user asked for isn't in
  * the stock we searched, and framing what's shown as the closest fit. Returns
@@ -509,11 +549,7 @@ function renderRefine(ctx, lead, title, lede) {
  */
 function unmetNote(ctx, unmet) {
   const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
-  const phrases = UNMET_PHRASES[ctx.brand] || UNMET_PHRASES.bmw;
-  // Fuel first, then shape: "No fully electric cars or estates at …".
-  const items = ['fuel', 'bodyStyles'].flatMap(
-    (id) => (unmet[id] || []).map((v) => phrases[id]?.[v] || v),
-  );
+  const items = unmetPhrases(ctx.brand, unmet);
   if (!items.length) return null;
 
   const note = el('aside', 'bmwm-unmet');
@@ -521,6 +557,37 @@ function unmetNote(ctx, unmet) {
   if (copy.unmetLabel) note.append(el('p', 'bmwm-unmet-label', copy.unmetLabel));
   note.append(el('p', 'bmwm-unmet-text', copy.unmet({
     list: orList(items), retailer: ctx.retailerLabel,
+  })));
+  return note;
+}
+
+/**
+ * The state-3 note (docs/results-page-states.md): the want is missing at THIS
+ * retailer but met nearby. The sibling of unmetNote with the opposite message
+ * — that one says "nobody reachable has it" (and almost never fires), this
+ * one says "not here, but N miles away" (and fires constantly). Same visual
+ * treatment: they are two polarities of one fact and can never both show.
+ *
+ * By owner decision the local cards keep the lead — someone may value
+ * proximity over the full brief, and that trade is theirs to make. This note
+ * is what puts the choice in front of them.
+ *
+ * @param {Object} rescued unmet-shaped: the wants missing here but met nearby
+ * @param {Object} nearest the closest nearby match that meets the whole brief
+ */
+function rescueNote(ctx, rescued, nearest) {
+  const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
+  const items = unmetPhrases(ctx.brand, rescued);
+  if (!items.length) return null;
+
+  const note = el('aside', 'bmwm-unmet');
+  note.setAttribute('role', 'note');
+  if (copy.rescueLabel) note.append(el('p', 'bmwm-unmet-label', copy.rescueLabel));
+  note.append(el('p', 'bmwm-unmet-text', copy.rescueNote({
+    list: orList(items),
+    retailer: ctx.retailerLabel,
+    miles: `${Math.round(nearest.car.distance * 10) / 10} miles`,
+    where: nearest.car.retailerName || 'a nearby retailer',
   })));
   return note;
 }
@@ -1614,7 +1681,16 @@ async function renderResults(root, ctx, answers) {
     const lead = matches.slice(0, leadCount);
     const rest = matches.slice(leadCount);
 
-    if (decisive) {
+    // Fit: does the best local car meet every stated stock-fact want? The
+    // decree and the tie copy both presuppose it ("your perfect BMW", "fit
+    // you equally well") — said over a card carrying a trade-off line, either
+    // is contradicted two inches down. When the leads miss the brief the page
+    // drops into the "closest here" frame (docs/results-page-states.md): the
+    // configured retailer's cars still lead — owner decision: proximity is
+    // the buyer's trade to make, not ours — but the words stop pretending.
+    const fit = (matches[0].tradeOffs || []).length === 0;
+
+    if (fit && decisive) {
       // A single full-width hero, matching the "Your perfect <brand> is the …"
       // headline (co-equal heroes contradicted that claim). The car's name
       // already leads with the brand, so strip it.
@@ -1624,15 +1700,23 @@ async function renderResults(root, ctx, answers) {
       grid.append(matchCard(lead[0], { big: true, brand: ctx.brand }));
       screen.append(grid);
     } else {
-      // The engine couldn't separate these (see matchCars). Naming one "your
-      // perfect BMW" would state a preference the model doesn't hold and bury
-      // the rest of the tie, so the page says so and shows them at one weight —
-      // then hands over: the refine panel lets the user separate them on the
-      // things the questions never asked about.
-      const title = el('h2', 'bmwm-title', copy.tiedTitle({ count: leadCount }));
-      const lede = el('p', 'bmwm-lede', copy.tiedLede());
+      // Several co-equal cards plus the refine/reject machinery, under one of
+      // two frames. Fit-tie: the engine couldn't separate genuinely good
+      // matches, so narrowing to one CROWNS it. Closest-here: the cards miss
+      // the brief (a decisive-but-unfit winner lands here too), so narrowing
+      // settles to "closest match", never "perfect" — the trade-off line on
+      // the card says why.
+      const frame = fit ? {
+        tied: copy.tiedTitle,
+        settled: ({ model }) => `Your perfect ${brandName} is the ${model}`,
+      } : {
+        tied: () => copy.closestTitle({ retailer: ctx.retailerLabel }),
+        settled: copy.closestSettled,
+      };
+      const title = el('h2', 'bmwm-title', frame.tied({ count: leadCount }));
+      const lede = el('p', 'bmwm-lede', fit ? copy.tiedLede() : copy.closestLede());
       screen.append(title, lede);
-      screen.append(renderRefine(ctx, lead, title, lede));
+      screen.append(renderRefine(ctx, lead, title, lede, frame));
     }
 
     // Whatever the lead didn't claim: smaller compact tiles in a static 2-up
@@ -1713,9 +1797,55 @@ async function renderResults(root, ctx, answers) {
       // The user may have navigated away (retake/tweak) before this resolves;
       // only touch the page if it's still in the document.
       if (!nearbyBand.isConnected) return;
-      const note = unmetNote(ctx, agreedUnmet(retailerUnmet, unmet));
-      if (note) screen.insertBefore(note, screen.querySelector('.bmwm-grid'));
-      if (nearby.length) fillNearbyBand(nearbyBand, ctx, nearby);
+
+      // One insertion slot, two polarities (docs/results-page-states.md).
+      // State 4: both halves lack the want → "not anywhere nearby" (rare).
+      // State 3: missing here, met nearby → "not here, but N miles away" (the
+      // common case). Either way this only ever ADDS to the page — first
+      // paint's headline was written to stay true, so nothing is retracted.
+      const agreed = agreedUnmet(retailerUnmet, unmet);
+      let note = unmetNote(ctx, agreed);
+      let ordered = nearby;
+      if (!note && unmet) {
+        // Nearby answered and disagreed: whatever the retailer lacks that
+        // didn't survive into `agreed` is met somewhere within reach.
+        const rescued = {};
+        for (const [id, values] of Object.entries(retailerUnmet || {})) {
+          const left = values.filter((v) => !(agreed[id] || []).includes(v));
+          if (left.length) rescued[id] = left;
+        }
+        // The cars the note is about: those that HAVE the rescued want itself
+        // — not "zero trade-offs overall", which claims more than the note
+        // says and can be empty when the note is still true. Nearly every
+        // MINI plug-in hybrid is a Countryman: for a PHEV-hatchback ask no
+        // nearby car meets the whole brief, but "the nearest plug-in hybrid
+        // is 12 miles away" remains exactly what the buyer asked to know.
+        const resolves = (car) => (rescued.fuel || []).includes(car.fuel)
+          || (rescued.bodyStyles || []).includes(car.body);
+        const fits = nearby.filter((m) => resolves(m.car));
+        const nearest = fits.filter((m) => m.car.distance != null)
+          .reduce((a, b) => (a && a.car.distance <= b.car.distance ? a : b), null);
+        if (Object.keys(rescued).length && nearest) {
+          note = rescueNote(ctx, rescued, nearest);
+          ordered = [...fits, ...nearby.filter((m) => !fits.includes(m))];
+          const bandLede = nearbyBand.querySelector('.bmwm-nearby-lede');
+          if (bandLede) {
+            bandLede.textContent = copy.driveLedeRescue({
+              list: orList(unmetPhrases(ctx.brand, rescued)),
+            });
+          }
+        }
+      }
+      if (note) {
+        // Above the cards, whatever frame they're in. The grid is a direct
+        // child of the screen on the hero page but lives inside the refine
+        // host on tie/closest pages — walk up to the screen-level ancestor,
+        // or insertBefore throws on a non-child reference node.
+        let anchor = screen.querySelector('.bmwm-refine, .bmwm-grid');
+        while (anchor && anchor.parentElement !== screen) anchor = anchor.parentElement;
+        screen.insertBefore(note, anchor || null);
+      }
+      if (ordered.length) fillNearbyBand(nearbyBand, ctx, ordered);
       else nearbyBand.remove();
     });
   }

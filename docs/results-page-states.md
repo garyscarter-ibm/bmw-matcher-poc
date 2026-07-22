@@ -1,11 +1,11 @@
 # Results page analysis — one honest frame for five states
 
-Status: **analysis, no code.** The proposal is a restructure of the results
-renderer's information architecture, not a reskin. Follows on from
-[refinement-plan.md](refinement-plan.md) (the lot-walk, built) and the finding
+Status: **built (2026-07-22), retailer-first per owner decision.** The
+restructure below is implemented and verified live in all five states; "The
+positioning decision" records how the one reserved call landed. Follows on
+from [refinement-plan.md](refinement-plan.md) (the lot-walk) and the finding
 in [refinement-audit.md](refinement-audit.md) that the decree was mostly a
-tie-break. Decisions taken here: none yet — one is explicitly reserved for the
-project owner (see "The positioning decision").
+tie-break.
 
 ## The trigger
 
@@ -71,7 +71,7 @@ into it.
 |---|---|---|---|---|
 | 1 | Met here, clear winner | leads meet brief, `decisive` | "Your perfect BMW is the …" | ✅ works |
 | 2 | Met here, tie | leads meet brief, `!decisive` | "It's a six-way tie" + refine | ✅ works |
-| 3 | **Not met here, met nearby** | `retailerUnmet` non-empty, nearby has cars without that trade-off | **"Not here — 18 miles away"** + best-local as honest runners-up | ❌ **no framing; the common case** |
+| 3 | **Not met here, met nearby** | `retailerUnmet` non-empty, nearby has cars without that trade-off | **"Not here — 18 miles away"** + best-local as honest runners-up | ✅ built (retailer-first) |
 | 4 | Not met anywhere reachable | `agreedUnmet` non-empty | SMALL SNAG note | ✅ built, ~never fires |
 | 5 | Nothing survives filters | `matches.length === 0` | "No matches found" | ✅ works |
 
@@ -137,23 +137,25 @@ headline must be true before and after the nearby response lands.**
 States 1/2 are unaffected: when the leads meet the brief, first paint is
 already the final frame.
 
-## The positioning decision (owner's call, not taken here)
+## The positioning decision — DECIDED: retailer-first (owner, 2026-07-22)
 
 In state 3 the better-fitting car is usually at a **different dealer group** —
-John Clark's Z4 promoted above Grassicks' own stock on what is notionally
-Grassicks' page. Two readings:
+John Clark's Z4 surfacing on what is notionally Grassicks' page. The owner's
+call: **the configured retailer's cards keep the lead.** The reasoning is a
+product argument, not a commercial dodge: *someone may value proximity over
+meeting every need, and that trade is the buyer's to make, not the tool's.*
+The page's job is to put the choice in front of them — local cards first,
+honestly framed (what each gets right, what it doesn't), with the fact and
+distance of the better match stated plainly up top.
 
-- **Brand-first (recommended for this POC):** the tool is BMW-facing; the
-  network is the inventory; honesty about where the car is *is the product*.
-  This is the layout above.
-- **Retailer-first:** the anchor retailer's stock always leads; nearby stays a
-  clearly-labelled second section, but state 3 still gets the honest headline
-  and the carousel promotion — the difference is only which group renders
-  first.
-
-Either way the *copy* tells the truth; the choice is purely which cards sit
-higher. A real multi-tenant deployment would likely make this a per-retailer
-config. **Decision needed before build.**
+So as built: the rescue note ("No convertibles at Grassicks BMW right now.
+The nearest is 18.1 miles away at John Clark Tayside…") sits above the local
+cards; the local cards lead under the "closest here" headline; the met-want
+cars lead the "Worth the drive" carousel, which the note points at. Brand-
+first — promoting the nearby cards above local — remains the documented
+alternative; a real multi-tenant deployment would make this per-retailer
+config. Revisit "in the first instance" wording if BMW stakeholders prefer
+brand-first for the network-wide view.
 
 ## Element-by-element audit of today's page
 
@@ -172,6 +174,33 @@ What the rebuild keeps, moves, rewrites, or retires:
 | "WORTH THE DRIVE" carousel | Keep, but it only carries nearby cars that *don't* resolve a missed want (those move up in state 3). Its "Not quite it?" lede is then accurate in every state. |
 | Share / tweak / start over | Keep as-is. |
 | Disclaimer | Keep as-is. |
+
+## Build notes (what changed against the plan)
+
+Implemented as designed, with three findings from building it:
+
+- **The "closest here" frame reuses the tie machinery.** `renderRefine` took a
+  `frame` parameter: fit-ties settle to the decree ("Your perfect BMW is…"),
+  closest-here settles to "Your closest match here is…" — a survivor that
+  misses the brief must not be crowned. Fit-gating rides along: a decisive
+  winner carrying a trade-off (a diesel 520d for a petrol-estate ask, live)
+  now gets the closest frame instead of a self-contradicting decree.
+- **The rescue-note filter must match the note's own claim.** First cut
+  pointed at nearby cars with *zero* trade-offs; but nearly every MINI PHEV is
+  a Countryman, so a PHEV-hatchback ask found none while "the nearest plug-in
+  hybrid is 28.7 miles away" was still true. The filter is now "has the
+  rescued want", exactly what the sentence says.
+- **The server needed a rescue slot.** The nearby top slice is ranked on the
+  whole blend, which squeezed out the very want the tier exists to honour —
+  the response claimed PHEVs were met (pool-measured `unmet`) while shipping
+  none. `/api/nearby` now appends the best-ranked car per stated want value
+  missing from its slice. The pool doctrine has to hold for the slice, not
+  just the pool.
+
+Also fixed en route: the note-insertion anchor assumed the card grid was a
+direct child of the screen, which is false in tie/closest frames (it lives
+inside the refine host) — `insertBefore` would have thrown the first time
+state 4 ever fired on a tie page.
 
 ## Build order
 
