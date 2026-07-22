@@ -570,6 +570,13 @@
 
 .bmwm-grid { display: grid; gap: var(--bmwm-space-4); margin: var(--bmwm-space-6) 0 var(--bmwm-space-2); }
 
+/* A tie: no hero, no runners-up tier — every car at the same weight, because
+   the engine rates them the same. Two up from 560px; one column below that,
+   which the base .bmwm-grid already gives. */
+@media (min-width: 560px) {
+  .bmwm-grid-tied { grid-template-columns: 1fr 1fr; }
+}
+
 /* --- results skeleton (shown while /api/match is in flight) ---
    Reuses the real .bmwm-card / .bmwm-grid / .bmwm-more structure so the
    placeholder occupies the same footprint the results will, avoiding a layout

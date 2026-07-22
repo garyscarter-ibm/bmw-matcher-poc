@@ -130,6 +130,15 @@ const BRAND_COPY = {
     // BMW's copy states things rather than announcing them.
     unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
       + 'These are the closest matches to everything else you asked for.',
+    // Shown instead of the "your perfect BMW is…" headline when the engine
+    // can't separate the top cars (see matchCars: decisive/clusterSize).
+    // Stated plainly, as a fact about the stock rather than an apology.
+    tiedTitle: ({ count }) => `${cardinal(count)} of these fit you equally well`,
+    // The retailer is named on every card, so the lede doesn't repeat it —
+    // and a brand plural appended to a retailer label reads "Sytner Luton
+    // MINI MINIs", which is why neither brand's copy builds one.
+    tiedLede: () => 'On your answers we can’t split them: each suits you as well as the next. '
+      + 'The difference now is which you prefer the look of.',
   },
   mini: {
     name: 'MINI',
@@ -143,6 +152,10 @@ const BRAND_COPY = {
     unmetLabel: 'SMALL SNAG.',
     unmet: ({ list, retailer }) => `No ${list} at ${retailer} or anywhere nearby right now. `
       + 'Here’s the closest we’ve got to the rest of your brief.',
+    // Same fact in MINI's register: a tie is a nice problem, not a shortfall.
+    tiedTitle: ({ count }) => `It’s a ${cardinal(count)}-way tie`,
+    tiedLede: () => 'They all fit what you told us, just as well as each other. '
+      + 'So it comes down to taste now — which is the fun bit.',
   },
 };
 
@@ -886,6 +899,11 @@ function matchCard(match, { big = false, compact = false, brand: brandKey = 'bmw
     ? gbp(car.priceMin)
     : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`;
   const specs = el('p', 'bmwm-specs');
+  // Paint, by its marketing name ("Legend Grey"), when the detail lookup got
+  // one. It reads as a spec, but it's carrying more weight than that: when the
+  // engine can't separate the cars, colour is very often the actual difference
+  // between them — so it belongs on the card, not buried on the retailer's PDP.
+  const paint = car.colour?.manufacturerColour || car.colour?.colour;
   // Compact tiles are narrow — the headline specs only, no 0–62/economy.
   const specBits = compact ? [
     SPEC_LABELS[car.body],
@@ -894,6 +912,7 @@ function matchCard(match, { big = false, compact = false, brand: brandKey = 'bmw
   ] : [
     SPEC_LABELS[car.body],
     FUEL_SPEC[car.fuel],
+    paint,
     price,
     `0–62 ${car.zeroTo62}s`,
     car.fuel === 'ev' ? `${car.evRange} mi range` : `${car.mpg} mpg`,
@@ -1152,12 +1171,19 @@ async function renderResults(root, ctx, answers) {
   // separately below so it never holds up the hero. See apiNearby / the
   // .bmwm-nearby placeholder wired up further down.
   let matches;
+  // Whether the engine could actually pick a winner, and how big the tie is if
+  // not (see matchCars). Defaults to the old behaviour — an API that doesn't
+  // send `decisive` keeps getting the single-hero page it always rendered.
+  let decisive = true;
+  let clusterSize = 1;
   // What the retailer's own stock couldn't offer. Half the picture: nothing is
   // said to the user until /api/nearby agrees (see agreedUnmet). An older API
   // that doesn't send the field leaves this empty, so it simply never fires.
   let retailerUnmet = {};
   try {
-    ({ matches, unmet: retailerUnmet = {} } = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand));
+    ({
+      matches, decisive = true, clusterSize = 1, unmet: retailerUnmet = {},
+    } = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand));
   } catch {
     renderStatus(root, {
       kicker: 'Sorry',
@@ -1171,6 +1197,8 @@ async function renderResults(root, ctx, answers) {
 
   root.replaceChildren();
   const screen = el('div', 'bmwm-screen bmwm-results');
+  const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
+  const { name: brandName } = copy;
 
   screen.append(el('p', 'bmwm-kicker', 'Your results'));
 
@@ -1180,22 +1208,42 @@ async function renderResults(root, ctx, answers) {
       el('p', 'bmwm-lede', `Nothing in ${ctx.retailerLabel}'s current stock fits those answers. Try loosening the budget or seating needs.`),
     );
   } else {
-    // #1 is the recommendation — a single full-width hero, matching the
-    // "Your perfect <brand> is the …" headline (three co-equal heroes
-    // contradicted that claim). #2/#3 drop to a quieter "More at <retailer>"
-    // tier below. The car's name already leads with the brand, so strip it.
-    const { name: brandName } = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
-    const model = matches[0].car.name.replace(new RegExp(`^${brandName} `), '');
-    screen.append(el('h2', 'bmwm-title', `Your perfect ${brandName} is the ${model}`));
-    const grid = el('div', 'bmwm-grid');
-    grid.append(matchCard(matches[0], { big: true, brand: ctx.brand }));
-    screen.append(grid);
+    // How many cars lead the page as EQUALS. One when the engine genuinely
+    // picked a winner; otherwise the tie itself — never more, because the
+    // headline counts these and "three fit you equally well" must not be said
+    // over a third car that's four points back. Anything beyond this leads a
+    // quieter "More at <retailer>" tier, so a near-miss is demoted rather than
+    // dropped.
+    const leadCount = decisive ? 1 : Math.min(clusterSize, matches.length);
+    const lead = matches.slice(0, leadCount);
+    const rest = matches.slice(leadCount);
 
-    // Runners-up: the other local matches, as smaller compact tiles in a
-    // static 2-up row (distinct from the horizontal "Worth the drive" carousel
-    // of OTHER retailers below). Same retailer as the hero, so "More at".
-    const runnersUp = matches.slice(1);
-    if (runnersUp.length) {
+    if (decisive) {
+      // A single full-width hero, matching the "Your perfect <brand> is the …"
+      // headline (co-equal heroes contradicted that claim). The car's name
+      // already leads with the brand, so strip it.
+      const model = lead[0].car.name.replace(new RegExp(`^${brandName} `), '');
+      screen.append(el('h2', 'bmwm-title', `Your perfect ${brandName} is the ${model}`));
+      const grid = el('div', 'bmwm-grid');
+      grid.append(matchCard(lead[0], { big: true, brand: ctx.brand }));
+      screen.append(grid);
+    } else {
+      // The engine couldn't separate these (see matchCars). Naming one "your
+      // perfect BMW" would state a preference the model doesn't hold and bury
+      // the rest of the tie, so the page says so and shows them at one weight.
+      screen.append(
+        el('h2', 'bmwm-title', copy.tiedTitle({ count: leadCount })),
+        el('p', 'bmwm-lede', copy.tiedLede()),
+      );
+      const grid = el('div', 'bmwm-grid bmwm-grid-tied');
+      lead.forEach((m) => grid.append(matchCard(m, { brand: ctx.brand })));
+      screen.append(grid);
+    }
+
+    // Whatever the lead didn't claim: smaller compact tiles in a static 2-up
+    // row (distinct from the horizontal "Worth the drive" carousel of OTHER
+    // retailers below). Same retailer as the lead, so "More at".
+    if (rest.length) {
       const more = el('section', 'bmwm-more-band');
       more.append(
         el('h3', 'bmwm-subhead bmwm-nearby-heading', `MORE AT ${ctx.retailerLabel.toUpperCase()}`),
@@ -1203,7 +1251,7 @@ async function renderResults(root, ctx, answers) {
           `Other cars in ${ctx.retailerLabel}'s stock that also fit your answers.`),
       );
       const moreGrid = el('div', 'bmwm-more');
-      runnersUp.forEach((m) => moreGrid.append(matchCard(m, { compact: true })));
+      rest.forEach((m) => moreGrid.append(matchCard(m, { compact: true })));
       more.append(moreGrid);
       screen.append(more);
     }

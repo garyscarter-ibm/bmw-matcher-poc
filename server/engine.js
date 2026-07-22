@@ -596,10 +596,49 @@ export function tradeOffs(answers, car) {
 /** How many cars the results screen shows as headline matches. */
 export const TOP_MATCHES = 3;
 
+/*
+ * When the engine can't actually separate the top cars.
+ *
+ * Measured over both national dumps (docs/refinement-audit.md): the #1 and #2
+ * scores land within 3 points in 52-67% of rankings and are EXACTLY equal in
+ * 19-35% — where the winner is whatever the tie-break in rankCars preferred,
+ * not a judgement. Naming one of those "your perfect BMW" states a preference
+ * the model doesn't hold, and at the same time hides the rest of the tie
+ * behind a 3-car cap (the tie runs deeper than 3 in up to 32% of cases).
+ *
+ * So the results are described by what the engine can honestly claim:
+ *   cluster    every car within CLUSTER_PTS of the top score — the set it is
+ *              treating as interchangeable.
+ *   decisive   true only when nothing else is within reach of #1, i.e. the
+ *              "your perfect X is…" headline is earned.
+ *
+ * A decisive result shows TOP_MATCHES as before. A tied one shows the cluster
+ * (capped at MAX_SHOWN, floored at TOP_MATCHES so the page never gets thinner
+ * than it is today) and lets the page say so. CLUSTER_PTS is the one judgement
+ * call here — 3 points out of 100, chosen because it's the median gap; the
+ * dead-tie half of the finding needs no threshold at all.
+ */
+export const CLUSTER_PTS = 3;
+export const MAX_SHOWN = 6;
+
 /**
- * The user's top matches from a pool of cars.
- * @returns {{ matches: Match[] }}
+ * The user's top matches from a pool of cars, plus whether picking a single
+ * winner out of them is honest.
+ *
+ * @returns {{ matches: Match[], decisive: boolean, clusterSize: number }}
+ *   `clusterSize` is the true size of the tie, which can exceed matches.length
+ *   when it runs past MAX_SHOWN — the page can say "six of these fit" while
+ *   showing what fits on screen.
  */
 export function matchCars(answers, cars, tuning = DEFAULT_TUNING) {
-  return { matches: rankCars(answers, cars, tuning).slice(0, TOP_MATCHES) };
+  const ranked = rankCars(answers, cars, tuning);
+  if (!ranked.length) return { matches: [], decisive: true, clusterSize: 0 };
+
+  const top = ranked[0].score;
+  const clusterSize = ranked.filter((m) => top - m.score <= CLUSTER_PTS).length;
+  const decisive = clusterSize === 1;
+  const shown = decisive
+    ? TOP_MATCHES
+    : Math.min(Math.max(clusterSize, TOP_MATCHES), MAX_SHOWN);
+  return { matches: ranked.slice(0, shown), decisive, clusterSize };
 }

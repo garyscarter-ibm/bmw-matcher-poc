@@ -32,7 +32,7 @@ import {
   matchCars, rankCars, budgetRange, unmetWants, TOP_MATCHES,
 } from './engine.js';
 import {
-  fetchRetailerStock, fetchNearbyStock, startStockWarmer, StockUnavailableError,
+  fetchRetailerStock, fetchNearbyStock, startStockWarmer, StockUnavailableError, enrichColours,
 } from './stock.js';
 import {
   QUESTIONS, BUDGET_BANDS, questionsForBrand, applyBespokeAnswers,
@@ -104,6 +104,13 @@ function publicCar(car) {
     mileage: car.mileage,
     plate: car.plate,
     photo: car.photo,
+    // Granular facts the life-fit questions never ask about, for the
+    // refinement step: equipment concepts (mapping.js FEATURE_CONCEPTS),
+    // gearbox, and paint — the last fetched per shown car from the PDP, so
+    // it's present on match results and absent elsewhere.
+    features: car.features,
+    transmission: car.transmission,
+    colour: car.colour,
     retailerName: car.retailerName,
     link: car.link,
     // Miles from the configured retailer. Only set on `nearby` cars — the
@@ -199,7 +206,13 @@ async function handleMatch(req, res) {
   // Fold any bespoke per-brand question answers into the standard fields the
   // engine scores (see applyBespokeAnswers) before ranking.
   const scored = applyBespokeAnswers(brand, answers);
-  const { matches } = matchCars(scored, cars, brandTuning(brand));
+  const { matches, decisive, clusterSize } = matchCars(scored, cars, brandTuning(brand));
+
+  // Paint only exists on the vehicle detail page, so it's fetched for the
+  // handful of cars we're about to show rather than the whole pool (see
+  // enrichColours). Enriches the cached car objects in place, so a second
+  // session at the same retailer gets them for free.
+  await enrichColours(brand, matches.map((m) => m.car));
   // What this retailer couldn't offer, so the page can say so instead of
   // quietly serving the closest thing (see unmetWants). Reported against the
   // folded answers — those are the wants actually searched for. Half the
@@ -207,6 +220,11 @@ async function handleMatch(req, res) {
   // a want is genuinely unavailable.
   return sendJson(res, 200, {
     matches: matches.map(publicMatch),
+    // Whether naming a single winner is honest, and how big the tie really is
+    // (it can exceed matches.length — see matchCars). The page decides between
+    // "your perfect BMW is…" and "any of these would suit you" on this.
+    decisive,
+    clusterSize,
     unmet: unmetWants(scored, cars),
   });
 }
