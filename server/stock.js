@@ -419,3 +419,127 @@ export function stopStockWarmer() {
     warmTimer = null;
   }
 }
+
+/* --------------------------- vehicle colour --------------------------- *
+ * Paint colour is the one thing buyers reach for first ("I want the blue
+ * one") and the ONLY place the platform serves it is the vehicle detail
+ * page — the list endpoint every other field comes from doesn't carry it
+ * (verified against a live list response and the national dumps). There is
+ * no detail JSON endpoint either; the PDP server-renders the whole vehicle
+ * into an inline `UVL.AD = {…}` variable, which is why the network tab shows
+ * no request to blame.
+ *
+ * So colour costs one page fetch per car, which rules it out for a whole
+ * retailer's stock and rules it IN for the handful we actually show. Two
+ * things make that cheap: it's only ever asked for the cars on screen, and a
+ * given advert's paint never changes — so the cache has no TTL. A car fetched
+ * once is coloured for the life of the process.
+ *
+ * Every failure here is silent by design. Colour is a bonus fact like
+ * distance or a photo: a card without it is fine, a results page that 502s
+ * because a PDP hiccuped is not.
+ * ---------------------------------------------------------------------- */
+
+// advert_id -> { colour, finish, manufacturerColour } | null (null = asked and
+// couldn't tell, so we don't ask again). No TTL: paint is immutable per advert.
+const colourByAdvert = new Map();
+const colourInflight = new Map(); // advert_id -> Promise, single-flight
+
+// How many PDPs to fetch at once. Deliberately small — this runs while a user
+// waits, against a site we're a guest on.
+const COLOUR_CONCURRENCY = 4;
+
+// Total wall-clock a single request will spend colouring before giving up on
+// the stragglers. Generous enough for a cold cluster on a warm connection,
+// short enough that the hero never feels stalled behind it.
+const COLOUR_BUDGET_MS = Number(process.env.COLOUR_BUDGET_MS) || 2500;
+
+/**
+ * Pull the vehicle object out of a PDP's inline `UVL.AD = {…}` and return its
+ * colour. Brace-balanced rather than regex-matched: the blob is a full vehicle
+ * with nested objects and escaped quotes, and a lazy regex would truncate it.
+ */
+function colourFromPdp(html) {
+  const marker = html.indexOf('UVL.AD = {');
+  if (marker < 0) return null;
+  const start = html.indexOf('{', marker);
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < html.length; i += 1) {
+    const c = html[i];
+    if (escaped) { escaped = false; continue; }
+    if (c === '\\') { escaped = true; continue; }
+    if (c === '"') inString = !inString;
+    if (inString) continue;
+    if (c === '{') depth += 1;
+    else if (c === '}') {
+      depth -= 1;
+      if (depth !== 0) continue;
+      try {
+        const { colour } = JSON.parse(html.slice(start, i + 1));
+        if (!colour?.colour) return null;
+        return {
+          // Normalised basic colour ("Grey") — what a preference matches on.
+          colour: colour.colour,
+          // "Metallic" / "Non-Metallic".
+          finish: colour.finish || undefined,
+          // The marketing name ("Brooklyn Grey") — what a card should say.
+          manufacturerColour: colour.manufacturer_colour || undefined,
+        };
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+/** One advert's colour, cached forever, single-flighted, never throwing. */
+function fetchColour(origin, advertId) {
+  const id = String(advertId);
+  if (colourByAdvert.has(id)) return Promise.resolve(colourByAdvert.get(id));
+  if (colourInflight.has(id)) return colourInflight.get(id);
+
+  const p = httpsGet(`${origin}/vehicle/${encodeURIComponent(id)}`, { Accept: 'text/html' })
+    .then((res) => (res.status === 200 ? colourFromPdp(res.body) : null))
+    .catch(() => null)
+    .then((colour) => {
+      colourByAdvert.set(id, colour);
+      colourInflight.delete(id);
+      return colour;
+    });
+  colourInflight.set(id, p);
+  return p;
+}
+
+/**
+ * Add `colour` to each car that has one, in place of nothing.
+ *
+ * Call this with the cars about to be SHOWN (the match cluster), never with a
+ * whole pool — it's one page fetch per uncached car. Returns the same array
+ * either way; a car whose colour couldn't be read simply doesn't gain the
+ * field, exactly like a car with no photo.
+ *
+ * @param {string} brand 'bmw' | 'mini'
+ * @param {Array} cars mapped car objects to enrich in place
+ */
+export async function enrichColours(brand, cars, budgetMs = COLOUR_BUDGET_MS) {
+  const { origin } = brandConfig(normalizeBrand(brand));
+  const queue = cars.filter((c) => c?.id);
+  const deadline = Date.now() + budgetMs;
+  for (let i = 0; i < queue.length; i += COLOUR_CONCURRENCY) {
+    // A results page must not wait on a slow PDP. Once the budget is spent we
+    // stop starting batches: the cars already coloured keep theirs, the rest
+    // render without — and because the cache is permanent, the next request
+    // for the same cars is instant and complete.
+    if (Date.now() > deadline) break;
+    const slice = queue.slice(i, i + COLOUR_CONCURRENCY);
+    // eslint-disable-next-line no-await-in-loop
+    const colours = await Promise.all(slice.map((c) => fetchColour(origin, c.id)));
+    slice.forEach((car, n) => {
+      if (colours[n]) car.colour = colours[n];
+    });
+  }
+  return cars;
+}
