@@ -123,3 +123,46 @@ mobile.
 - The mileage ramp, EV steering with home charging, and practicality
   reasoning read correctly in persona terms.
 - Mobile layout holds at 390px.
+
+## main vs main-v2, scored through persona eyes (2026-07-22)
+
+Both branches' backends run side by side against the same live stock, all
+seven personas replayed through each, scored on an identical rubric per
+persona: the basics (right shape/fuel leads, within budget, reasons in their
+language), honesty checks whose *applicability* comes from ground truth (is
+there really a tie; does the top car really miss a want; is a missing want
+really available nearby), taste/refinement material where the persona is
+taste-led, and their known unheard asks, which both versions are expected to
+fail so the ceiling stays honest. main includes the per-car trade-off commit
+(3ed1cd) and gets full credit for it.
+
+| Persona | main | main-v2 | What v2 changes for them |
+|---|---:|---:|---|
+| Daniel (Motorway Manager) | 4/6 | 4/6 | Nothing, and correctly so: a decisive clear winner never touches the new machinery |
+| Priya (Family Consolidator) | 3/10 | 7/10 | Her 7-way tie admitted and shown in full with paint; main crowned one of seven near-identical cars and hid four |
+| Martin (Reward Buyer) | 6/11 | 9/11 | main already admits the miss on the hero (trade-off line) and happens to rank the Z4 top nearby; v2 adds the tie honesty, paint and refinement |
+| Tyler (First-Premium Striver) | 4/7 | 5/7 | Paint on cards; his colour-led shortlist works |
+| Chloe (Statement Buyer) | 3/10 | 7/10 | The whole tie, the colours, and the chips: her entire decision lives in what main doesn't send |
+| Reyes (Fun-Sized Family) | 4/10 | 9/10 | Largest gap: tie honesty + paint + refinement + the PHEV pointed at 21.9 miles away (main's nearby list contains no PHEV at all) |
+| Meg (Electric Downsizer) | 5/10 | 8/10 | Red-vs-black is her actual decision; main can't show it |
+| **Total** | **29/64 (45%)** | **49/64 (77%)** | No regressions: every delta is v2 adding, never losing |
+
+Reading the deltas: every point v2 gains comes from exactly five capabilities
+(tie honesty, whole-tie display, paint on cards, refinable equipment on the
+wire, locally-missing wants pointed at nearby), which is the phase-2 work
+doing precisely what it claimed. Every point BOTH versions drop is an
+unheard ask from the feature list above: monthly cost (three personas),
+warranty/trust content, enquiry CTA, insurance group, gearbox display,
+winter range, ISOFIX. The ceiling for the current feature set is ~80%, and
+closing the rest is off-page work, not matching work.
+
+Neutral observation, same on both sides: Priya's and Chloe's top cards
+carried no reason phrased in their language (practicality words for Priya,
+character/urban words for Chloe) — worth a look at reason coverage for EV
+SUVs and city hatches.
+
+Method caveats: scored at the API level (what the page CAN render), against
+live stock on one day; ties and rescues are stock-dependent facts. Harness:
+a scratchpad one-off (compare.mjs) pairing `fixtures/personas.json` against
+two ports; scores are not comparable across stock refreshes without re-running
+both sides together.
