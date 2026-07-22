@@ -10,6 +10,7 @@
     "server": "node server/index.js",
     "audit": "node scripts/audit-questions.mjs",
     "audit:refine": "node scripts/audit-refinement.mjs",
+    "personas": "node scripts/persona-check.mjs",
     "test": "node --test server/test/**/*.test.js"
   }
 }

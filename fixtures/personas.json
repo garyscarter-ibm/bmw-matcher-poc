@@ -1,0 +1,112 @@
+{
+  "comment": "Canonical persona answer sets for the matcher. Narrative, evidence and success criteria live in docs/personas.md; this file is the machine-readable half, replayed by scripts/persona-check.mjs against a running API. Keys must track the per-brand question sets in server/questions.js.",
+  "personas": [
+    {
+      "key": "daniel",
+      "name": "Daniel Okafor, 47",
+      "tagline": "The Motorway Manager",
+      "brand": "bmw",
+      "retailer": "96",
+      "answers": {
+        "budget": [22000, 38000],
+        "bodyStyles": ["saloon", "estate"],
+        "fuel": ["diesel", "phev"],
+        "charging": "none",
+        "primaryUse": "commute",
+        "people": "family",
+        "mileage": 22000,
+        "style": "2",
+        "priorities": ["economy", "comfort"]
+      }
+    },
+    {
+      "key": "priya",
+      "name": "Priya Sharma, 38",
+      "tagline": "The Family Consolidator",
+      "brand": "bmw",
+      "retailer": "96",
+      "answers": {
+        "budget": [25000, 45000],
+        "bodyStyles": ["suv", "estate"],
+        "fuel": ["ev", "phev"],
+        "charging": "home",
+        "primaryUse": "family",
+        "people": "family",
+        "mileage": 9000,
+        "style": "2",
+        "priorities": ["comfort", "tech"]
+      }
+    },
+    {
+      "key": "martin",
+      "name": "Martin Hughes, 56",
+      "tagline": "The Reward Buyer",
+      "brand": "bmw",
+      "retailer": "96",
+      "answers": {
+        "budget": [30000, 60000],
+        "bodyStyles": ["convertible"],
+        "fuel": ["petrol"],
+        "charging": "none",
+        "primaryUse": "fun",
+        "people": "solo",
+        "mileage": 6000,
+        "style": "5",
+        "priorities": ["performance", "image"]
+      }
+    },
+    {
+      "key": "chloe",
+      "name": "Chloe Bennett, 29",
+      "tagline": "The Statement Buyer",
+      "brand": "mini",
+      "retailer": "92",
+      "answers": {
+        "budget": [14000, 22000],
+        "bodyStyles": ["hatchback"],
+        "doors": "3",
+        "fuel": ["petrol"],
+        "charging": "none",
+        "primaryUse": "city",
+        "people": "solo",
+        "miniVibe": "classic",
+        "priorities": ["image", "economy"]
+      }
+    },
+    {
+      "key": "reyes",
+      "name": "Sam & Jordan Reyes, 34",
+      "tagline": "The Fun-Sized Family",
+      "brand": "mini",
+      "retailer": "92",
+      "answers": {
+        "budget": [18000, 30000],
+        "bodyStyles": ["suv", "estate"],
+        "fuel": ["petrol", "phev"],
+        "charging": "none",
+        "primaryUse": "family",
+        "people": "family",
+        "miniVibe": "classic",
+        "priorities": ["comfort", "economy"]
+      }
+    },
+    {
+      "key": "meg",
+      "name": "Meg Whitlow, 58",
+      "tagline": "The Electric Downsizer",
+      "brand": "mini",
+      "retailer": "92",
+      "answers": {
+        "budget": [15000, 25000],
+        "bodyStyles": ["hatchback"],
+        "doors": "either",
+        "fuel": ["ev"],
+        "charging": "home",
+        "primaryUse": "city",
+        "people": "solo",
+        "miniVibe": "exclusive",
+        "priorities": ["comfort", "tech"]
+      }
+    }
+  ]
+}
