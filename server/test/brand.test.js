@@ -464,3 +464,56 @@ test('styleLine + doors move MINI ranking, and neither touches BMW', () => {
     'styleLine/doors answers are inert for BMW — identical ids and scores',
   );
 });
+
+/* ---- equipment concepts: the granular facts refinement will need ---- */
+
+/** A feed vehicle carrying the three option shapes the real feed mixes. */
+const equipped = (...strings) => ({
+  ...miniVehicle,
+  features: {
+    interior: { standard: strings.slice(0, 1), additional: [] },
+    exterior: { standard: [], additional: strings.slice(1, 2) },
+    additional: strings.slice(2).map((s) => ({ category: 'other', description: s })),
+  },
+});
+
+test('mapVehicle parses equipment concepts from every feed shape', () => {
+  const car = mapVehicle(equipped('Panoramic glass roof', 'Head-Up Display', 'Harman Kardon speakers'), 'mini');
+  assert.deepEqual(car.features, ['headUpDisplay', 'panoRoof', 'premiumAudio'], 'sorted concept keys, all three nestings read');
+  // A car with no options list is an absence of facts, not a car with nothing.
+  assert.deepEqual(mapVehicle(miniVehicle, 'mini').features, []);
+});
+
+test('concepts match per string, so context can exclude a false positive', () => {
+  // The blob-matching bug this replaced: a leather WHEEL read as leather seats,
+  // and "heated steering wheel" + "sport seats" combined into heated seats.
+  const car = mapVehicle(equipped('Sport leather steering wheel', 'Heated steering wheel', 'Sport seats'), 'mini');
+  assert.ok(car.features.includes('leatherWheel') && car.features.includes('heatedWheel'));
+  assert.ok(!car.features.includes('heatedSeats'), 'must not pair "heated steering" with a separate "seats" string');
+  // A panoramic roof is not what someone picturing a small sunroof means.
+  assert.deepEqual(mapVehicle(equipped('Panoramic sunroof'), 'mini').features, ['panoRoof']);
+});
+
+test('BMW names the parking pack its own way and still matches', () => {
+  // "Parking Assistant" (59% of BMW stock) vs MINI/plain "Park Distance Control".
+  assert.ok(mapVehicle(equipped('Parking Assistant'), 'bmw').features.includes('parkingSensors'));
+  assert.ok(mapVehicle(equipped('Park Distance Control'), 'mini').features.includes('parkingSensors'));
+});
+
+test('transmission normalises to auto/manual, undefined when the feed is silent', () => {
+  assert.equal(mapVehicle({ ...miniVehicle, transmission: 'Automatic' }, 'mini').transmission, 'auto');
+  assert.equal(mapVehicle({ ...miniVehicle, transmission: 'Manual' }, 'mini').transmission, 'manual');
+  assert.equal(mapVehicle(miniVehicle, 'mini').transmission, undefined);
+});
+
+test('contrast roof reads as styling, not as any string with a colour in it', () => {
+  // MINI's one aesthetic fact: a contrast roof vs one painted body colour.
+  assert.ok(mapVehicle(equipped('Roof in Black'), 'mini').features.includes('contrastRoof'));
+  assert.ok(mapVehicle(equipped('Black Roof and Mirror Caps'), 'mini').features.includes('contrastRoof'));
+  assert.ok(mapVehicle(equipped('Roof and Mirror Caps in Chili Red'), 'mini').features.includes('contrastRoof'));
+  // Same roof, no contrast — the buyer who wants one hasn't got one here.
+  assert.ok(!mapVehicle(equipped('Roof in Body Colour'), 'mini').features.includes('contrastRoof'));
+  // Things that merely mention a roof or a colour are not a contrast roof.
+  assert.ok(!mapVehicle(equipped('Roof Rails', 'Anthracite Roof Lining'), 'mini').features.includes('contrastRoof'));
+  assert.ok(!mapVehicle(equipped('19" M Double-spoke Jet Black Alloy Wheels'), 'bmw').features.includes('contrastRoof'));
+});
