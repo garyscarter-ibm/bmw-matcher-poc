@@ -17,7 +17,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, question-overhaul]
+    branches: [main, main-v2]
   workflow_dispatch:
 
 permissions:
@@ -34,7 +34,7 @@ env:
   # The branch published at /next/. Change this to point the preview slot at
   # different work; delete the branch and the site still deploys with just main
   # (the checkout below is allowed to fail).
-  NEXT_BRANCH: question-overhaul
+  NEXT_BRANCH: main-v2
 
   # Backend each version talks to, baked into its copy of the harness at deploy
   # time so a shared link needs no query string. The two versions run different
