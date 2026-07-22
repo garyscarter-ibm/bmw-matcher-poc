@@ -168,9 +168,17 @@ const BRAND_COPY = {
     // carries the fact, so the buyer weighs proximity against fit themselves.
     rescueNote: ({ list, retailer, miles, where }) => `No ${list} at ${retailer} right now. `
       + `The nearest is ${miles} away at ${where}, under “Worth the drive” below.`,
-    // "Worth the drive" lede when it leads with the cars that DO meet the brief.
-    driveLedeRescue: ({ list }) => `Starting with the ${list} you asked for, then the closest `
-      + 'matches at other retailers.',
+    // The "Worth the drive" lede, per frame. `default` follows a page that
+    // had something to show; `rescue` leads with the cars that meet the want
+    // the retailer couldn't; `empty` is state 5, where nearby is the only
+    // road left and the band is the opposite of an afterthought.
+    driveLede: {
+      default: ({ retailer }) => `Not quite it? These are the closest matches at other retailers near ${retailer}.`,
+      rescue: ({ list }) => `Starting with the ${list} you asked for, then the closest `
+        + 'matches at other retailers.',
+      empty: ({ retailer }) => `Nothing at ${retailer} fits those answers, so these are the `
+        + 'closest matches at other retailers instead.',
+    },
     // The "More at <retailer>" lede, per result frame. One sentence used to
     // cover all three ("that also fit your answers"), which was false in two
     // of them: the band holds cars ranked BELOW the lead group, and in the
@@ -219,8 +227,12 @@ const BRAND_COPY = {
     rescueLabel: 'NOT HERE, BUT NOT FAR.',
     rescueNote: ({ list, miles, where }) => `No ${list} at ours right now. `
       + `The nearest is ${miles} away at ${where}. Scroll down to “Worth the drive”.`,
-    driveLedeRescue: ({ list }) => `First up: the ${list} you asked for. `
-      + 'Then the rest of the closest matches.',
+    driveLede: {
+      default: () => 'Nothing jumping out? These are the closest at other retailers nearby.',
+      rescue: ({ list }) => `First up: the ${list} you asked for. `
+        + 'Then the rest of the closest matches.',
+      empty: () => 'Nothing at ours fits that brief. These nearby MINIs get closest.',
+    },
     moreLede: {
       decree: ({ retailer }) => `The next nearest things to it at ${retailer}.`,
       tie: () => 'So nearly in the tie.',
@@ -1600,13 +1612,12 @@ function renderResultsSkeleton(root) {
  * <section> so the caller can fill it (fillNearbyBand) or remove it. Built to
  * match the real band exactly so filling it in causes no layout shift.
  */
-function renderNearbySkeleton(ctx) {
+function renderNearbySkeleton(ctx, lede) {
   const band = el('section', 'bmwm-nearby-band');
   band.setAttribute('aria-busy', 'true');
   band.append(
     el('h3', 'bmwm-subhead bmwm-nearby-heading', 'WORTH THE DRIVE'),
-    el('p', 'bmwm-lede bmwm-nearby-lede',
-      `Not quite it? These are the closest matches at other retailers near ${ctx.retailerLabel}.`),
+    el('p', 'bmwm-lede bmwm-nearby-lede', lede),
   );
   const track = el('div', 'bmwm-nearby');
   // A few placeholder tiles mirroring the compact card (media band + 2 lines).
@@ -1763,12 +1774,17 @@ async function renderResults(root, ctx, answers) {
   // already on screen; a slim skeleton band holds the space until it resolves.
   // When it does: fill the carousel, or drop the band entirely if nothing came
   // back (empty result or a failed lookup — the section is a bonus, never an
-  // error). Only shown when there are matches to be "not quite" about.
-  let nearbyBand = null;
-  if (matches.length) {
-    nearbyBand = renderNearbySkeleton(ctx);
-    screen.append(nearbyBand);
-  }
+  // error).
+  //
+  // Rendered in EVERY state, including no-matches: when nothing local
+  // survives, nearby is not a bonus but the only road left, and gating the
+  // band on local matches dead-ended exactly the buyer who needed it most.
+  // The hard filters apply to the nearby pool too, so when nothing anywhere
+  // fits, the band comes back empty and removes itself.
+  const nearbyBand = renderNearbySkeleton(ctx, matches.length
+    ? copy.driveLede.default({ retailer: ctx.retailerLabel })
+    : copy.driveLede.empty({ retailer: ctx.retailerLabel }));
+  screen.append(nearbyBand);
 
   const actions = el('div', 'bmwm-actions');
   const share = el('button', 'bmwm-btn bmwm-btn-primary', 'Copy share link');
@@ -1852,7 +1868,7 @@ async function renderResults(root, ctx, answers) {
           ordered = [...fits, ...nearby.filter((m) => !fits.includes(m))];
           const bandLede = nearbyBand.querySelector('.bmwm-nearby-lede');
           if (bandLede) {
-            bandLede.textContent = copy.driveLedeRescue({
+            bandLede.textContent = copy.driveLede.rescue({
               list: orList(unmetPhrases(ctx.brand, rescued)),
             });
           }
@@ -1865,7 +1881,10 @@ async function renderResults(root, ctx, answers) {
         // or insertBefore throws on a non-child reference node.
         let anchor = screen.querySelector('.bmwm-refine, .bmwm-grid');
         while (anchor && anchor.parentElement !== screen) anchor = anchor.parentElement;
-        screen.insertBefore(note, anchor || null);
+        // No cards at all (state 5): the note still belongs with the results,
+        // directly above the band it points at, not appended after the
+        // disclaimer, which is where a null anchor would land it.
+        screen.insertBefore(note, anchor || nearbyBand);
       }
       if (ordered.length) fillNearbyBand(nearbyBand, ctx, ordered);
       else nearbyBand.remove();

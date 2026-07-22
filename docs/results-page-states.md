@@ -171,7 +171,7 @@ What the rebuild keeps, moves, rewrites, or retires:
 | Reject ("Not this one") | Keep, and **fix the inconsistency: it exists only in ties.** A decisive hero can't be rejected today. In the new frame, every full card offers it, decree included — rejecting the decree is exactly the signal that the decree was wrong. |
 | Per-card reasons + trade-off + swatch | Keep everywhere full cards render (the trade-off's `big`-only gating was already widened to all lead cards). |
 | "MORE AT <retailer>" band | ~~Rewrite.~~ **Done** (`moreLede` per frame): runners-up behind a decree, the near-miss below a tie, or further-from-the-brief stock in the closest frame. The old lede claimed the cards "also fit your answers", false in two of three frames, and compact tiles carry no trade-off line, so this sentence is the band's only honesty layer. Rank claims, never fit claims. |
-| "WORTH THE DRIVE" carousel | Keep, but it only carries nearby cars that *don't* resolve a missed want (those move up in state 3). Its "Not quite it?" lede is then accurate in every state. |
+| "WORTH THE DRIVE" carousel | **Done, further than planned.** Per-frame, per-brand lede (`driveLede`: default / rescue / empty) — it was the last un-brand-voiced sentence on the page. And the band now renders in EVERY state including no-matches: gating it on local matches dead-ended exactly the buyer who needed it most (verified live: a £10k cap at Vertu Exeter finds nothing local and a 90% match 55 miles away). When nothing anywhere fits, the band comes back empty and removes itself. |
 | Share / tweak / start over | Keep as-is. |
 | Disclaimer | Keep as-is. |
 
