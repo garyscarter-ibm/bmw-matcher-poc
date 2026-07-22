@@ -1308,13 +1308,17 @@ function matchCard(match, {
     body.append(el('p', 'bmwm-why-label', 'Why it suits you'), why);
   }
 
-  // Owning the trade-off: when the recommendation misses a stated want (it's
+  // Owning the trade-off: when a recommendation misses a stated want (it's
   // petrol and they asked for electric), the card says so itself, right under
   // the case for it — not only the page-level unmet note, which fires solely
-  // when the whole pool is short. Hero card only: it's the one making the
-  // "your perfect car" claim, and the compact tiles already state fuel and
-  // shape in their spec line.
-  if (big && match.tradeOffs?.length) {
+  // when the whole reachable pool is short, and in practice almost never does.
+  //
+  // Every card that leads the page, not just the hero: a tie renders medium
+  // cards, and that's precisely where the admission matters most — six coupés
+  // offered to someone who asked for a convertible should say so on each of
+  // them, not go quiet because none of them is a "hero". Only the compact
+  // carousel tiles skip it, and they already state the shape in their specs.
+  if (!compact && match.tradeOffs?.length) {
     const { label } = TRADE_COPY[brandKey] || TRADE_COPY.bmw;
     body.append(
       el('p', 'bmwm-why-label bmwm-trade-label', label),
