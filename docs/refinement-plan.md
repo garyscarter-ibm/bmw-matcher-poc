@@ -197,6 +197,11 @@ II, Ocean Wave Green, Melting Silver III, Nanuq White), by concept count (3 to
 11 of them), and on gearbox. That is the raw material for the questions, and
 it's now all on the wire.
 
+> **Next chapter:** the features built here exposed that the results page's
+> *frame* is a generation behind them — see
+> [results-page-states.md](results-page-states.md) for the five-state
+> restructure that follows from this work.
+
 ## Where it ended up
 
 The loop is closed: qualify (questions) → admit the tie → let the buyer break

@@ -112,7 +112,8 @@ scripts/audit-refinement.mjs  # do the RESULTS pick a real winner? (npm run audi
 Both audits replay the real engine over the fixture dumps and are written up in
 `docs/` — [question-stock-audit.md](docs/question-stock-audit.md) and
 [refinement-audit.md](docs/refinement-audit.md), the latter feeding the phase-2
-design in [refinement-plan.md](docs/refinement-plan.md).
+design in [refinement-plan.md](docs/refinement-plan.md) and the results-page
+restructure proposed in [results-page-states.md](docs/results-page-states.md).
 
 The block folder is the EDS deliverable; the `server/` folder is what you host.
 
