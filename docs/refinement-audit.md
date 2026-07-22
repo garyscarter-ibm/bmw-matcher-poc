@@ -99,25 +99,39 @@ measurement, so it needs no per-brand authoring: **selection is by live stock
 variance, not by an authored list.** (Same conclusion the question audit
 reached about pruning, arrived at from the other end.)
 
+## Colour: absent from the list feed, present on the PDP
+
+**Resolved — colour is available, and now fetched.** The list endpoint every
+other field comes from genuinely has no paint on it, confirmed twice over: a
+walk across every string value in the raw dumps looking for known BMW/MINI paint
+names returns only *alloy wheel* colours ("19\" M Double-spoke Jet Black Alloy
+Wheels"), one edition name inside a derivative ("Protonic Frozen Yellow
+Edition"), and MINI's roof/mirror trim — and a live list response has no
+`colour` key at all.
+
+The **vehicle detail page** has it. There's no detail JSON endpoint (the
+obvious paths 404); the PDP server-renders the entire vehicle into an inline
+`UVL.AD = {…}` variable, which is why the browser's network tab shows no
+request carrying the colour you can see on screen. Inside it:
+
+```json
+"colour": {"colour": "White", "finish": "Metallic", "manufacturer_colour": "Mineral White"}
+```
+
+Verified across both brands (BMW Brooklyn Grey / Alpine White, MINI Ocean Wave
+Green / Chili Red II / Nanuq White). `enrichColours` in `server/stock.js` reads
+it for the cars a page is about to show — one page fetch per car makes it
+unaffordable for a whole pool and cheap for a cluster of six, and since an
+advert's paint is immutable the cache never expires.
+
+Note for anyone extending this: `robots.txt` carries `Disallow: /vehicle/`,
+which covers the PDP *and* the `/vehicle/api/list/` endpoint this tool already
+runs on. Fetching it is a deliberate call for a BMW-facing POC over BMW's own
+public data, taken with the project owner's sign-off — not a default to copy
+into something public-facing without asking again.
+
 ## Known blind spots in the feed
 
-Two things buyers demonstrably care about that this data **cannot** answer:
-
-- **Body colour.** Confirmed absent, not merely un-parsed: a walk over every
-  string value in the raw payload looking for known BMW/MINI paint names
-  (Alpine White, Storm Bay, Chili Red, Pepper White…) returns only *alloy wheel*
-  colours for BMW ("19\" M Double-spoke Jet Black Alloy Wheels"), one edition
-  name in a derivative ("Protonic Frozen Yellow Edition"), and MINI's
-  roof/mirror trim. There is no paint field. The canonical "I want the blue
-  one" is unanswerable, so colour handling must be exclude-and-diversify
-  against the photos, never a filter.
-
-  **The PDP was not probed for it: `robots.txt` on usedcars.bmw.co.uk carries
-  `Disallow: /vehicle/` for all agents**, which covers both the detail page and
-  the `/vehicle/api/list/` endpoint. Automating it is out, on the same
-  reasoning that rejected the UCP configurator and the VCA CSV automation in
-  the range investigation. A human opening one PDP in a browser to see whether
-  paint is displayed at all is fine, and is the cheap way to settle it.
 - **Seat upholstery.** Grades (Vernasca, Dakota, MINI Yours Lounge) appear on
   <1% of either brand's stock. "Leather seats" is not answerable. What the feed
   *does* state, often, is a leather steering wheel — hence the concept is named

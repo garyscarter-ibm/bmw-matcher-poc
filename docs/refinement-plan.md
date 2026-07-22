@@ -97,20 +97,18 @@ dictates the constraints:
   dealbreakers → filters. Scalar reasons (price, mileage) are directions, not
   cliffs — rejecting a £24k car doesn't mean £23,999 is fine → re-weight, don't
   filter.
-- **"Don't like the look of it" mostly maps to nothing** — the feed has no
-  body-colour field, confirmed exhaustively, and the PDP that might carry one
-  is `robots.txt`-disallowed ([refinement-audit.md](refinement-audit.md), blind
-  spots). The honest handling is exclude-this-car and diversify what's shown
-  next, never a fake filter. **The one exception is MINI's contrast roof**
-  (`contrastRoof`, known for 88% of MINI stock, splits at every retailer) —
-  a real aesthetic axis the tool *can* offer, and the closest thing available
-  to the "I want the blue one" want.
+- **"Don't like the look of it" now maps to something real.** Colour was the
+  gap this whole design was built around; it turned out to live on the PDP and
+  is now fetched for shown cars ([refinement-audit.md](refinement-audit.md)).
+  So a look-based rejection can exclude *that colour*, not merely that car —
+  with MINI's `contrastRoof` as a second aesthetic axis. Interior trim remains
+  unanswerable, so "don't like the inside" still means exclude-and-diversify.
 
 Proposed why-menu (each mapped to its action):
 
 | reason | action |
 |---|---|
-| Don't like the look | exclude this car; diversify the next cards. **No colour data — do not pretend otherwise.** |
+| Don't like the look | exclude this colour (paint is now on every shown car), else just this car |
 | Too expensive / cheaper than I want | re-weight budget toward the stated direction |
 | Too many miles | soft-penalise above this car's mileage |
 | Wrong gearbox | filter (MINI-relevant; ~dead for BMW) |
@@ -143,17 +141,29 @@ carrying nearly as much signal.
 1. ~~Data layer — parse equipment concepts + gearbox onto every mapped car.~~
    **Done** (`FEATURE_CONCEPTS`, `featuresFor`, `transmissionFor` in
    `server/mapping.js`; fixtures re-mapped via `dump-stock.js --remap`).
-2. **Expose it.** `publicCar` currently withholds `features`/`transmission`
-   (deliberately — no consumer yet). Phase 2 starts by exposing them.
-3. **Cluster-aware results.** Compute the cluster server-side; return it with
-   the margin so the block can choose between decree and "any of these".
-   Requires replacing the fixed `TOP_MATCHES` slice.
+2. ~~**Expose it.**~~ **Done** — `publicCar` sends `features`, `transmission`
+   and `colour`. Colour needed its own source: `enrichColours` (stock.js),
+   fetched per shown car from the PDP.
+3. ~~**Cluster-aware results.**~~ **Done** — `matchCars` returns `decisive` +
+   `clusterSize`; the block renders a hero when the win is real and co-equal
+   cards when it isn't, demoting non-tied cars to "More at <retailer>" so the
+   headline count is always the true tie. Cards now name their paint, which is
+   what makes a tie navigable.
 4. **Refinement questions from cluster variance** — the push half. Pure
-   function of the cluster: no authoring, no per-brand lists.
+   function of the cluster: no authoring, no per-brand lists. **Next.**
 5. **Reject + why** — the pull half, with visible revocable chips.
 6. **Empty-pool handling** — reuse `tradeOffs`/`unmetWants` copy patterns.
 
-Steps 3–5 are the design lift; 1–2 are plumbing.
+Steps 4–5 are the remaining design lift.
+
+### What step 4 has to work with, now that 1–3 are in
+
+A live six-way tie at Sytner Luton (petrol city hatch, £20–35k) returns two JCW
+Hatches at 88% and four Cooper C/S at 87%. Within that cluster the engine has
+nothing left to say — but the cars differ by paint (Legend Grey, Midnight Black
+II, Ocean Wave Green, Melting Silver III, Nanuq White), by concept count (3 to
+11 of them), and on gearbox. That is the raw material for the questions, and
+it's now all on the wire.
 
 ## Open questions
 
