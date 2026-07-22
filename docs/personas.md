@@ -6,6 +6,13 @@ three per brand. The machine-readable answer sets live in
 `node scripts/persona-check.mjs`; end-to-end findings from the first replay
 are in [persona-findings.md](persona-findings.md).
 
+**Sharing with non-technical stakeholders:** use the visual pack,
+[personas-pack.pdf](personas-pack.pdf) (nine A4 pages: cover, research
+context, one page per persona with their test result, findings summary).
+Its print source is [personas-pack.html](personas-pack.html) — regenerate the
+PDF after editing with the Chrome command in that file's header comment. This
+doc remains the source of truth; the pack is the presentation of it.
+
 **Evidence honesty:** these are synthesised from published market research
 (sources at the bottom), the brands' own positioning, and this project's stock
 audits. They are not interview-based. Treat them as strong hypotheses that
