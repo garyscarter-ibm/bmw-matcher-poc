@@ -14,6 +14,8 @@
  *          body-style honesty (you named a shape — is it in your top 3?).
  *   size   The `sens` measure split by retailer stock size (small/medium/
  *          large), which is the test for stock-*level*-dependent questions.
+ *   fuel   Does a named fuel bind? Tests engine.js's own claim that a
+ *          wrong-fuel car shouldn't top a matching-fuel one.
  *
  * Findings + the adapt-to-which-pool decision framework are written up in
  * docs/question-stock-audit.md — re-run this after a fixture refresh to see
@@ -288,17 +290,96 @@ function auditBySize(brand) {
   console.log(`  ${'DIVERSITY'.padEnd(12)} ${Object.values(perBucket).map(({ div }) => `${(div * 100).toFixed(0)}%`.padStart(15)).join('')}`);
 }
 
+
+// ---------------------------------------------------------------- fuel ----
+
+/*
+ * Does a named fuel actually bind?
+ *
+ * engine.js says of fuelStrictBoost: "a car of the wrong fuel (however strong
+ * elsewhere) shouldn't top a matching-fuel car." This measures whether that
+ * holds. Two numbers, and the second is the one that tests the claim:
+ *
+ *   honesty    named a fuel, and a car of that fuel is in the top 3 — the
+ *              direct analogue of the body-honesty measure above.
+ *   violations named a fuel, a matching car SURVIVED the hard filters (so it
+ *              could have won), and a wrong-fuel car topped it anyway.
+ *
+ * Cases where no matching car survives are excluded from both: that's an
+ * unmet want, which the results page handles with its own copy, not a
+ * ranking failure. Also reports the margin, because it says how much
+ * retuning would be needed, and the wanted→got pairs, because the fix may
+ * be narrower than the whole table (FUEL_TABLE is generous between petrol
+ * and diesel, harsh toward EV).
+ */
+function auditFuel(brand) {
+  const { byRetailer, tuning: t, budgetCfg, questions: qs } = loadBrand(brand);
+  const sample = sampleRetailers(byRetailer, N_RETAILERS);
+
+  let named = 0; let honoured = 0;
+  let testable = 0; let violations = 0; let explained = 0;
+  const margins = [];
+  const pairs = new Map();
+
+  for (const stock of sample) {
+    for (let i = 0; i < N_ANSWERS; i += 1) {
+      const a = randomAnswers(qs, budgetCfg);
+      const picks = Array.isArray(a.fuel) ? a.fuel : [a.fuel].filter(Boolean);
+      // Mirror the engine's own test for "the user named a fuel".
+      if (!picks.length || picks.includes('open')) continue;
+      const ranked = rankCars(applyBespokeAnswers(brand, a), stock, t);
+      if (!ranked.length) continue;
+      const match = ranked.filter((m) => picks.includes(m.car.fuel));
+      if (!match.length) continue; // unmet want, not a ranking failure
+
+      named += 1;
+      if (ranked.slice(0, TOP_MATCHES).some((m) => picks.includes(m.car.fuel))) honoured += 1;
+
+      testable += 1;
+      if (!picks.includes(ranked[0].car.fuel)) {
+        // Wanting an EV/PHEV with nowhere to charge is penalised ON PURPOSE
+        // (scoreOneFuel's evAccess), so steering to petrol there is advice,
+        // not a ranking failure. Counted separately so the headline number
+        // is only the cases the engine can't justify.
+        const canCharge = ['home', 'work', 'either'].includes(a.charging);
+        const plugWanted = picks.every((v) => v === 'ev' || v === 'phev');
+        if (plugWanted && !canCharge) {
+          explained += 1;
+        } else {
+          violations += 1;
+          margins.push(ranked[0].score - match[0].score);
+          const k = `${picks.join('+')} → ${ranked[0].car.fuel}`;
+          pairs.set(k, (pairs.get(k) || 0) + 1);
+        }
+      }
+    }
+  }
+
+  console.log(`\n${'='.repeat(72)}\n${brand.toUpperCase()} — ${sample.length} retailers, ${N_ANSWERS} answer sets each`);
+  console.log(`  (only cases where a matching-fuel car survived the filters: ${testable})`);
+  console.log(`\n  Fuel honesty (named a fuel, got one in the top ${TOP_MATCHES}): ${pct(honoured, named)}`);
+  console.log(`  Steered off a plug for lack of charging (deliberate): ${pct(explained, testable)}`);
+  console.log(`  INTENT VIOLATIONS (wrong fuel tops a matching car, unjustified): ${pct(violations, testable)}`);
+  if (margins.length) {
+    console.log(`  Margin when it happens: median ${median(margins)} pts, p90 ${quantile(margins, 0.9)}`);
+  }
+  console.log('\n  Which swaps (violations only):');
+  [...pairs.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .forEach(([k, n]) => console.log(`    ${k.padEnd(26)} ${String(n).padStart(4)}  ${pct(n, violations)}`));
+}
+
 // ----------------------------------------------------------------- run ----
 
 const PASSES = {
   dead: [auditDead],
   sens: [auditSensitivity],
   size: [auditBySize],
-  all: [auditDead, auditSensitivity, auditBySize],
+  fuel: [auditFuel],
+  all: [auditDead, auditSensitivity, auditBySize, auditFuel],
 };
 const passes = PASSES[MODE];
 if (!passes) {
-  console.error('Usage: node scripts/audit-questions.mjs [dead|sens|size|all]');
+  console.error('Usage: node scripts/audit-questions.mjs [dead|sens|size|fuel|all]');
   process.exit(1);
 }
 for (const pass of passes) {
