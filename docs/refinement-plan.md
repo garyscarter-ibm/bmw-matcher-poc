@@ -156,8 +156,17 @@ carrying nearly as much signal.
    No authoring and no per-brand lists, exactly as planned — gearbox surfaces
    for a mixed MINI cluster and stays quiet for BMW's all-automatic stock
    purely because of what's in front of it.
-5. **Reject + why** — the pull half. **Next.**
-6. **Empty-pool handling** — reuse `tradeOffs`/`unmetWants` copy patterns.
+5. ~~**Reject + why**~~ — **Done.** Every card in a tie carries a quiet "Not
+   this one"; the menu offers only reasons that would change something ("Not
+   the grey" needs another colour present, "Under £31,250" needs a cheaper car
+   to fall back to), always with a skippable "just not this one" last.
+   Positive and negative constraints live in one set and render as the same
+   removable chips, so a required feature and a rejected colour are equally
+   visible and equally undoable.
+6. ~~**Empty-pool handling**~~ — **Done for the cluster.** Ruling out
+   everything is now reachable (via rejection, not chips) and lands on a
+   brand-voiced explanation plus one tap back. Extending the same treatment to
+   an empty *retailer* pool is untouched and still worth doing.
 
 ### How step 4 landed, and one property worth keeping
 
@@ -187,6 +196,37 @@ nothing left to say — but the cars differ by paint (Legend Grey, Midnight Blac
 II, Ocean Wave Green, Melting Silver III, Nanuq White), by concept count (3 to
 11 of them), and on gearbox. That is the raw material for the questions, and
 it's now all on the wire.
+
+## Where it ended up
+
+The loop is closed: qualify (questions) → admit the tie → let the buyer break
+it, by pulling toward what they want or pushing away what they don't → land on
+one car, which gets its hero page back and has now genuinely earned it.
+
+Everything after the match runs in the page, because everything it needs
+arrives with the match. That's what makes it feel like walking a forecourt
+rather than re-running a search.
+
+**One decision worth defending if it's ever questioned:** refinements and
+rejections are scoped to the cluster, not to the retailer's stock. Rejecting
+"the grey one" doesn't mean the buyer never wants grey; it means not this grey
+one, here, among these. Widening either into a persistent, stock-wide filter
+would be a much stronger claim than the tap actually made — and would put the
+tool back into competing with advanced search, which it should not do.
+
+## Still open
+
+- **Session state.** Refinements live in the page and don't survive a reload or
+  a share link (`#m=` encodes answers only). Fine for a demo; a real build has
+  to decide whether a narrowed shortlist is shareable.
+- **Rejection never reaches the server.** Every constraint filters the cluster
+  client-side, so a rejection can't pull in a better-fitting car from outside
+  it. The honest version of "show me more like this, but cheaper" is a re-rank
+  against the retailer's full stock, which is a server change.
+- **Intro copy still promises three.** The lede says "the three cars that suit
+  you best" while a tie can now show up to six. Not a lie, but loose.
+- **No colour swatches.** Colour is shown by name ("Ocean Wave Green"). A
+  swatch would need a name→hex table, which the feed doesn't provide.
 
 ## Open questions
 

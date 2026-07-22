@@ -628,6 +628,63 @@
 }
 .bmwm-chip-x { font-size: 11px; opacity: 0.85; }
 
+/* --- "Not this one": rejection, and the why that makes it usable ---
+   Deliberately quiet — a small text button at the foot of the card, not a
+   red X. Rejecting is normal browsing behaviour, not an error state. */
+.bmwm-reject { margin-top: var(--bmwm-space-4); }
+
+.bmwm-reject-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: var(--bmwm-font-body);
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.bmwm-reject-open:hover { color: var(--bmwm-ink); }
+.bmwm-reject-open:focus-visible {
+  outline: 2px solid var(--bmwm-accent-spot);
+  outline-offset: 2px;
+}
+
+.bmwm-reject-menu {
+  margin-top: var(--bmwm-space-3);
+  padding: var(--bmwm-space-3);
+  background: var(--bmwm-surface-alt);
+  border-radius: var(--bmwm-radius);
+}
+.bmwm-reject-prompt {
+  margin: 0 0 var(--bmwm-space-2);
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+}
+
+/* One reason per row: they're read, not scanned, and a wrapped row of pills
+   would invite a fast mis-tap on something that teaches us a dealbreaker. */
+.bmwm-reject-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--bmwm-space-2) var(--bmwm-space-3);
+  margin-bottom: 2px;
+  border: 0;
+  border-radius: var(--bmwm-radius);
+  background: var(--bmwm-surface);
+  cursor: pointer;
+  font-family: var(--bmwm-font-body);
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink);
+}
+.bmwm-reject-option:last-child { margin-bottom: 0; }
+.bmwm-reject-option:hover { background: var(--bmwm-accent-spot); color: #fff; }
+.bmwm-reject-option:focus-visible {
+  outline: 2px solid var(--bmwm-accent-spot);
+  outline-offset: -2px;
+}
+
 .bmwm-refine-status {
   margin: var(--bmwm-space-3) 0 0;
   font-size: var(--bmwm-text-label);

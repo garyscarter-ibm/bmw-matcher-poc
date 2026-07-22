@@ -90,6 +90,11 @@ function publicQuestions(brand) {
  */
 function publicCar(car) {
   return {
+    // The advert id — already public in `link` (/vehicle/{advert_id}), and the
+    // only stable identity the page has for a car. Refinement state needs it:
+    // without it every card compares equal to every other, so "not this one"
+    // would rule out the lot.
+    id: car.id,
     name: car.name,
     line: car.line,
     body: car.body,

@@ -143,8 +143,16 @@ const BRAND_COPY = {
     // cheerleading (docs/tone-style-guide.md).
     refineLabel: 'Narrow it down',
     refineStatus: ({ shown, total, wants }) => `${shown} of ${total}, with ${wants}.`,
+    refineStatusPlain: ({ shown, total }) => `${shown} of ${total}.`,
     refineEmpty: ({ wants }) => `Nothing here has ${wants} together. `
       + 'Drop one of those and we’ll show you what does.',
+    refineEmptyHidden: 'That’s all of them ruled out. Bring one back, or start over.',
+    tiedEmptyTitle: 'Nothing left to show',
+    // Rejection, in the retailer's plain register — a question, not a plea.
+    rejectOpen: 'Not this one',
+    rejectPrompt: 'What put you off?',
+    rejectJust: 'Just not this one',
+    hiddenChip: ({ count }) => `${count} ruled out`,
   },
   mini: {
     name: 'MINI',
@@ -165,8 +173,15 @@ const BRAND_COPY = {
     // MINI asks rather than instructs, and treats a dead end as a shrug.
     refineLabel: 'So, what do you fancy?',
     refineStatus: ({ shown, total, wants }) => `${shown} of ${total} left, with ${wants}.`,
+    refineStatusPlain: ({ shown, total }) => `${shown} of ${total} left.`,
     refineEmpty: ({ wants }) => `Ah — nothing here has ${wants} all at once. `
       + 'Let one of them go and we’ll show you what’s left.',
+    refineEmptyHidden: 'Well, that’s the lot ruled out. Bring one back, or start over.',
+    tiedEmptyTitle: 'That’s the lot, then',
+    rejectOpen: 'Not this one',
+    rejectPrompt: 'Go on then — what’s wrong with it?',
+    rejectJust: 'Just not feeling it',
+    hiddenChip: ({ count }) => `${count} ruled out`,
   },
 };
 
@@ -307,6 +322,14 @@ function renderRefine(ctx, lead, title, lede) {
   const axes = refinementAxes(cars);
   const active = new Map(); // axis id -> axis
 
+  // Everything narrowing the set, positive or negative, in one place: a
+  // required feature and a rejected colour differ only in what they keep. Both
+  // render as removable chips, because a filter the user can't see is one they
+  // can't argue with — and at this stock depth two constraints can empty a
+  // tie, which must be explainable rather than mysterious.
+  const constraints = new Map(); // id -> { label, keep(car) }
+  const hidden = new Set(); // cars waved away with no reason given
+
   const host = el('div', 'bmwm-refine');
   const chipRow = el('div', 'bmwm-chips');
   const status = el('p', 'bmwm-refine-status');
@@ -320,7 +343,57 @@ function renderRefine(ctx, lead, title, lede) {
   }
   host.append(grid);
 
-  const matching = () => lead.filter((m) => [...active.values()].every((a) => a.test(m.car)));
+  const matching = () => lead.filter((m) => !hidden.has(m.car.id)
+    && [...active.values()].every((a) => a.test(m.car))
+    && [...constraints.values()].every((c) => c.keep(m.car)));
+
+  /*
+   * What this car could be rejected FOR, given what's still on screen.
+   *
+   * Attribution is the whole point of asking. A rejection on its own says
+   * nothing usable — reject a white 3-door with 40k miles and we don't know
+   * which of those three things you objected to, and guessing is how you learn
+   * a dealbreaker that isn't real and empty someone's shortlist. So each
+   * reason names one property and rules out exactly that.
+   *
+   * A reason is only offered when it would change something: "too expensive"
+   * needs a cheaper car to fall back to, "not the colour" needs another colour
+   * in the set. Anything else is a dead end dressed as a choice. "Just not
+   * this one" is always last and always available — a shrug is a legitimate
+   * answer, and forcing a reason produces invented ones, which are worse than
+   * no signal at all.
+   */
+  function rejectOptions(car) {
+    const shown = matching().map((m) => m.car);
+    const others = shown.filter((c) => c.id !== car.id);
+    const opts = [];
+    const add = (id, label, keep) => opts.push({
+      label,
+      apply: () => { constraints.set(id, { label, keep }); redraw(); },
+    });
+
+    const shade = car.colour?.colour;
+    if (shade && others.some((c) => c.colour?.colour && c.colour.colour !== shade)) {
+      add(`!c:${shade}`, `Not the ${shade.toLowerCase()}`, (c) => c.colour?.colour !== shade);
+    }
+    if (others.some((c) => c.priceMin < car.priceMin)) {
+      add(`!p:${car.priceMin}`, `Under ${gbp(car.priceMin)}`, (c) => c.priceMin < car.priceMin);
+    }
+    if (car.mileage != null && others.some((c) => c.mileage != null && c.mileage < car.mileage)) {
+      add(`!m:${car.mileage}`, `Fewer than ${car.mileage.toLocaleString('en-GB')} miles`,
+        (c) => c.mileage != null && c.mileage < car.mileage);
+    }
+    const gear = car.transmission;
+    if (gear && others.some((c) => c.transmission && c.transmission !== gear)) {
+      const want = gear === 'auto' ? 'manual' : 'automatic';
+      add(`!g:${gear}`, `Only ${want}`, (c) => c.transmission !== gear);
+    }
+    opts.push({
+      label: copy.rejectJust,
+      apply: () => { hidden.add(car.id); redraw(); },
+    });
+    return opts;
+  }
 
   function redraw() {
     const shown = matching();
@@ -330,18 +403,26 @@ function renderRefine(ctx, lead, title, lede) {
     // an axis that can't change the result is noise, so they're recomputed
     // against the current set rather than the original one.
     chipRow.replaceChildren();
+    const applied = (label, undo) => {
+      const chip = el('button', 'bmwm-chip is-on', label);
+      chip.type = 'button';
+      chip.setAttribute('aria-pressed', 'true');
+      chip.append(el('span', 'bmwm-chip-x', '✕'));
+      chip.addEventListener('click', () => { undo(); redraw(); });
+      chipRow.append(chip);
+    };
+    // Applied first — what's been decided leads what's still on offer.
+    for (const [id, axis] of active) applied(axis.label, () => active.delete(id));
+    for (const [id, c] of constraints) applied(c.label, () => constraints.delete(id));
+    if (hidden.size) applied(copy.hiddenChip({ count: hidden.size }), () => hidden.clear());
+
     const live = refinementAxes(shown.map((m) => m.car)).map((a) => a.id);
     for (const axis of axes) {
-      const on = active.has(axis.id);
-      if (!on && !live.includes(axis.id)) continue;
-      const chip = el('button', `bmwm-chip${on ? ' is-on' : ''}`, axis.label);
+      if (active.has(axis.id) || !live.includes(axis.id)) continue;
+      const chip = el('button', 'bmwm-chip', axis.label);
       chip.type = 'button';
-      chip.setAttribute('aria-pressed', String(on));
-      if (on) chip.append(el('span', 'bmwm-chip-x', '✕'));
-      chip.addEventListener('click', () => {
-        if (on) active.delete(axis.id); else active.set(axis.id, axis);
-        redraw();
-      });
+      chip.setAttribute('aria-pressed', 'false');
+      chip.addEventListener('click', () => { active.set(axis.id, axis); redraw(); });
       chipRow.append(chip);
     }
 
@@ -349,18 +430,31 @@ function renderRefine(ctx, lead, title, lede) {
     // isn't, and the moment it lands on one car is the answer the whole tool
     // exists to give. The tie lede goes with it — "we can't split them" is
     // false once the user has split them.
-    const wants = [...active.values()].map((a) => a.label.toLowerCase());
+    const wants = [...active.values(), ...constraints.values()].map((a) => a.label.toLowerCase());
     const settled = shown.length === 1;
-    if (settled) {
+    if (!shown.length) {
+      // Nothing left to be a tie between — "a one-way tie" is the nonsense a
+      // count-driven headline produces if it isn't stopped here.
+      title.textContent = copy.tiedEmptyTitle;
+    } else if (settled) {
       const model = shown[0].car.name.replace(new RegExp(`^${copy.name} `), '');
       title.textContent = `Your perfect ${copy.name} is the ${model}`;
     } else {
-      title.textContent = copy.tiedTitle({ count: Math.max(shown.length, 1) });
+      title.textContent = copy.tiedTitle({ count: shown.length });
     }
-    lede.hidden = settled;
-    status.textContent = active.size
-      ? copy.refineStatus({ shown: shown.length, total: lead.length, wants: andList(wants) })
-      : '';
+    // "We can't split them" only holds while there are several to split.
+    lede.hidden = shown.length <= 1;
+    // A car waved away with no reason narrows the count but adds no words —
+    // there's nothing to report about "just not that one".
+    if (wants.length) {
+      status.textContent = copy.refineStatus({
+        shown: shown.length, total: lead.length, wants: andList(wants),
+      });
+    } else if (hidden.size) {
+      status.textContent = copy.refineStatusPlain({ shown: shown.length, total: lead.length });
+    } else {
+      status.textContent = '';
+    }
 
     grid.replaceChildren();
     if (!shown.length) {
@@ -372,19 +466,34 @@ function renderRefine(ctx, lead, title, lede) {
       // stock, which we haven't checked. Rejection (the next step) can empty a
       // set for real, and this is what it will land on.
       const dead = el('div', 'bmwm-refine-empty');
-      dead.append(el('p', 'bmwm-refine-empty-text', copy.refineEmpty({ wants: andList(wants) })));
+      dead.append(el('p', 'bmwm-refine-empty-text', wants.length
+        ? copy.refineEmpty({ wants: andList(wants) })
+        : copy.refineEmptyHidden));
       const clear = el('button', 'bmwm-btn bmwm-btn-ghost', 'Start again');
       clear.type = 'button';
-      clear.addEventListener('click', () => { active.clear(); redraw(); });
+      clear.addEventListener('click', () => {
+        active.clear();
+        constraints.clear();
+        hidden.clear();
+        redraw();
+      });
       dead.append(clear);
       grid.append(dead);
       return;
     }
     // One car left is a recommendation again, so it gets the hero treatment
     // (photo, reasons, its trade-off) rather than staying a tile in a grid.
+    // It keeps its reject menu: the answer still has to survive being looked
+    // at, and "actually, not that one either" is a real thing to want to say.
     const single = shown.length === 1;
     grid.classList.toggle('bmwm-grid-tied', !single);
-    shown.forEach((m) => grid.append(matchCard(m, { big: single, brand: ctx.brand })));
+    shown.forEach((m) => grid.append(matchCard(m, {
+      big: single,
+      brand: ctx.brand,
+      rejectOptions,
+      rejectLabel: copy.rejectOpen,
+      rejectPrompt: copy.rejectPrompt,
+    })));
   }
 
   redraw();
@@ -1069,7 +1178,10 @@ function distanceLabel(distance) {
  * `big` adds the "why it suits you" reasons; `compact` is the carousel tile —
  * same anatomy, but trades the blurb and reasons for a distance line.
  */
-function matchCard(match, { big = false, compact = false, brand: brandKey = 'bmw' } = {}) {
+function matchCard(match, {
+  big = false, compact = false, brand: brandKey = 'bmw',
+  rejectOptions, rejectLabel, rejectPrompt,
+} = {}) {
   const { car, score, reasons } = match;
   const card = el('article', `bmwm-card${big ? ' bmwm-card-big' : ''}${compact ? ' bmwm-card-compact' : ''}`);
 
@@ -1173,6 +1285,36 @@ function matchCard(match, { big = false, compact = false, brand: brandKey = 'bmw
       el('p', 'bmwm-why-label bmwm-trade-label', label),
       el('p', 'bmwm-trade-text', tradeLines(brandKey, match.tradeOffs).join(' ')),
     );
+  }
+
+  // "Not this one" — the other half of choosing. Rejecting a car is the
+  // highest-signal thing a buyer does, because it's a reaction to a real car
+  // rather than an answer about a hypothetical one; the menu is what turns it
+  // into something actionable (see rejectOptions). Only offered where a
+  // caller supplies the options, so it appears in a tie and nowhere else.
+  if (rejectOptions) {
+    const options = rejectOptions(car);
+    if (options.length) {
+      const rejectWrap = el('div', 'bmwm-reject');
+      const open = el('button', 'bmwm-reject-open', rejectLabel || 'Not this one');
+      open.type = 'button';
+      open.setAttribute('aria-expanded', 'false');
+      const menu = el('div', 'bmwm-reject-menu');
+      menu.hidden = true;
+      menu.append(el('p', 'bmwm-reject-prompt', rejectPrompt || 'What put you off?'));
+      options.forEach((o) => {
+        const b = el('button', 'bmwm-reject-option', o.label);
+        b.type = 'button';
+        b.addEventListener('click', o.apply);
+        menu.append(b);
+      });
+      open.addEventListener('click', () => {
+        menu.hidden = !menu.hidden;
+        open.setAttribute('aria-expanded', String(!menu.hidden));
+      });
+      rejectWrap.append(open, menu);
+      body.append(rejectWrap);
+    }
   }
 
   // Link out to the retailer's live stock, when the feed gave us one.
