@@ -44,8 +44,8 @@ env:
   # Leave either blank to skip the substitution — that version then keeps the
   # localhost default and needs the usual ?api=<url> override. `?api=` keeps
   # working regardless, so a deployed page can always be pointed elsewhere.
-  API_URL_MAIN: 'https://bmw-matcher-api.onrender.com'
-  API_URL_NEXT: 'https://bmw-matcher-api-wl6w.onrender.com'
+  API_URL_MAIN: https://bmw-matcher-api.onrender.com
+  API_URL_NEXT: https://bmw-matcher-api-wl6w.onrender.com
 
 jobs:
   deploy:
