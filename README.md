@@ -104,7 +104,15 @@ server/
   package.json      # server: start / test scripts
 index.html          # standalone preview harness (sets data-api)
 scripts/serve.js    # zero-dep static server for the block (npm run serve)
+scripts/dump-stock.js         # national stock snapshot -> fixtures/ (--remap: no network)
+scripts/audit-questions.mjs   # do the QUESTIONS earn their screen? (npm run audit)
+scripts/audit-refinement.mjs  # do the RESULTS pick a real winner? (npm run audit:refine)
 ```
+
+Both audits replay the real engine over the fixture dumps and are written up in
+`docs/` — [question-stock-audit.md](docs/question-stock-audit.md) and
+[refinement-audit.md](docs/refinement-audit.md), the latter feeding the phase-2
+design in [refinement-plan.md](docs/refinement-plan.md).
 
 The block folder is the EDS deliverable; the `server/` folder is what you host.
 
