@@ -149,12 +149,35 @@ carrying nearly as much signal.
    cards when it isn't, demoting non-tied cars to "More at <retailer>" so the
    headline count is always the true tie. Cards now name their paint, which is
    what makes a tie navigable.
-4. **Refinement questions from cluster variance** — the push half. Pure
-   function of the cluster: no authoring, no per-brand lists. **Next.**
-5. **Reject + why** — the pull half, with visible revocable chips.
+4. ~~**Refinement questions from cluster variance**~~ — **Done.**
+   `refinementAxes` (block) derives one tappable axis per thing that actually
+   splits the tied set: equipment concepts, gearbox, and paint. Ranked by how
+   evenly each splits, because a 3/3 question tells us more per tap than 5/1.
+   No authoring and no per-brand lists, exactly as planned — gearbox surfaces
+   for a mixed MINI cluster and stays quiet for BMW's all-automatic stock
+   purely because of what's in front of it.
+5. **Reject + why** — the pull half. **Next.**
 6. **Empty-pool handling** — reuse `tradeOffs`/`unmetWants` copy patterns.
 
-Steps 4–5 are the remaining design lift.
+### How step 4 landed, and one property worth keeping
+
+It runs entirely in the page. Everything it needs — features, gearbox, colour —
+already arrives with the match, so narrowing six cars to one costs no round
+trip. The chip row recomputes after every tap against what's *still on screen*,
+which produces a property the design didn't originally plan for and should
+keep: **an axis is only offered while it still splits the visible set**, so
+applying one always leaves at least one car, and an impossible combination is
+never presented. The empty state therefore can't be reached by chips alone; it
+remains in the code because rejection (step 5) *can* empty a set for real.
+
+That "only offer live axes" rule is also the honest one. The axes describe this
+cluster, not the retailer's stock — so telling someone "nothing has a pano roof
+in green" would be a claim about inventory we never checked.
+
+The payoff: tap "Panoramic roof" and a six-way tie becomes a three-way one; add
+"Grey" and the page says *"Your perfect MINI is the Hatch John Cooper Works"* —
+this time having earned it, with the tie lede dropped because it's no longer
+true. The user got there in two taps without stating a spec upfront.
 
 ### What step 4 has to work with, now that 1–3 are in
 

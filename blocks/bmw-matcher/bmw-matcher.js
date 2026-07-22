@@ -139,6 +139,12 @@ const BRAND_COPY = {
     // MINI MINIs", which is why neither brand's copy builds one.
     tiedLede: () => 'On your answers we can’t split them: each suits you as well as the next. '
       + 'The difference now is which you prefer the look of.',
+    // The refine panel: BMW states the instruction, no exclamation, no
+    // cheerleading (docs/tone-style-guide.md).
+    refineLabel: 'Narrow it down',
+    refineStatus: ({ shown, total, wants }) => `${shown} of ${total}, with ${wants}.`,
+    refineEmpty: ({ wants }) => `Nothing here has ${wants} together. `
+      + 'Drop one of those and we’ll show you what does.',
   },
   mini: {
     name: 'MINI',
@@ -156,6 +162,11 @@ const BRAND_COPY = {
     tiedTitle: ({ count }) => `It’s a ${cardinal(count)}-way tie`,
     tiedLede: () => 'They all fit what you told us, just as well as each other. '
       + 'So it comes down to taste now — which is the fun bit.',
+    // MINI asks rather than instructs, and treats a dead end as a shrug.
+    refineLabel: 'So, what do you fancy?',
+    refineStatus: ({ shown, total, wants }) => `${shown} of ${total} left, with ${wants}.`,
+    refineEmpty: ({ wants }) => `Ah — nothing here has ${wants} all at once. `
+      + 'Let one of them go and we’ll show you what’s left.',
   },
 };
 
@@ -227,6 +238,14 @@ function orList(items) {
   return `${items.slice(0, -1).join(', ')} or ${items[items.length - 1]}`;
 }
 
+/** The same, for things that hold at once: "a and b", "a, b and c". Applied
+ * refinements are ANDed, and "with a pano roof or grey" would describe a
+ * different, looser search than the one actually run. */
+function andList(items) {
+  if (items.length < 2) return items[0] || '';
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
 /*
  * The hero card's trade-off line(s): one short declarative per missed want,
  * in the engine's fuel-then-shape order — "Petrol, where you asked for fully
@@ -263,6 +282,113 @@ function agreedUnmet(retailerUnmet, nearbyUnmet) {
     if (both.length) agreed[id] = both;
   }
   return agreed;
+}
+
+/**
+ * The tie, plus the means to break it.
+ *
+ * Renders the tied cars at equal weight and, above them, one tappable chip per
+ * axis that actually separates them (see refinementAxes). Tapping requires
+ * that thing; tapping again drops it. Everything happens here in the page —
+ * the cars, their equipment, gearbox and paint all arrived with the match, so
+ * narrowing six cars to one costs no round trip and no waiting.
+ *
+ * Two rules the plan insists on, both visible in the code below: an applied
+ * refinement is always shown and always revocable (a chip you can't see is a
+ * filter you can't argue with), and narrowing to nothing is a legitimate
+ * outcome that must be explained rather than rendered as an empty grid.
+ *
+ * @param {HTMLElement} title the results headline, re-worded as the set narrows
+ * @param {HTMLElement} lede the "we can't split them" line, dropped once we can
+ */
+function renderRefine(ctx, lead, title, lede) {
+  const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
+  const cars = lead.map((m) => m.car);
+  const axes = refinementAxes(cars);
+  const active = new Map(); // axis id -> axis
+
+  const host = el('div', 'bmwm-refine');
+  const chipRow = el('div', 'bmwm-chips');
+  const status = el('p', 'bmwm-refine-status');
+  const grid = el('div', 'bmwm-grid bmwm-grid-tied');
+
+  // Only worth offering when there's something to offer. A cluster of
+  // identical-spec cars in identical paint has no axes, and the page simply
+  // stays as it was.
+  if (axes.length) {
+    host.append(el('p', 'bmwm-refine-label', copy.refineLabel), chipRow, status);
+  }
+  host.append(grid);
+
+  const matching = () => lead.filter((m) => [...active.values()].every((a) => a.test(m.car)));
+
+  function redraw() {
+    const shown = matching();
+
+    // Chips: every axis that still splits what's on screen, plus the ones
+    // already applied (which by definition no longer split anything). Offering
+    // an axis that can't change the result is noise, so they're recomputed
+    // against the current set rather than the original one.
+    chipRow.replaceChildren();
+    const live = refinementAxes(shown.map((m) => m.car)).map((a) => a.id);
+    for (const axis of axes) {
+      const on = active.has(axis.id);
+      if (!on && !live.includes(axis.id)) continue;
+      const chip = el('button', `bmwm-chip${on ? ' is-on' : ''}`, axis.label);
+      chip.type = 'button';
+      chip.setAttribute('aria-pressed', String(on));
+      if (on) chip.append(el('span', 'bmwm-chip-x', '✕'));
+      chip.addEventListener('click', () => {
+        if (on) active.delete(axis.id); else active.set(axis.id, axis);
+        redraw();
+      });
+      chipRow.append(chip);
+    }
+
+    // The headline follows the set: a narrowing tie is still a tie until it
+    // isn't, and the moment it lands on one car is the answer the whole tool
+    // exists to give. The tie lede goes with it — "we can't split them" is
+    // false once the user has split them.
+    const wants = [...active.values()].map((a) => a.label.toLowerCase());
+    const settled = shown.length === 1;
+    if (settled) {
+      const model = shown[0].car.name.replace(new RegExp(`^${copy.name} `), '');
+      title.textContent = `Your perfect ${copy.name} is the ${model}`;
+    } else {
+      title.textContent = copy.tiedTitle({ count: Math.max(shown.length, 1) });
+    }
+    lede.hidden = settled;
+    status.textContent = active.size
+      ? copy.refineStatus({ shown: shown.length, total: lead.length, wants: andList(wants) })
+      : '';
+
+    grid.replaceChildren();
+    if (!shown.length) {
+      // A guard, not a path the chips can currently reach: an axis is only
+      // offered while it still splits what's on screen, so applying one always
+      // leaves at least one car, and a combination that would empty the set is
+      // never presented. That's deliberate — the axes describe THIS cluster,
+      // so "nothing has both" would read as a claim about the retailer's whole
+      // stock, which we haven't checked. Rejection (the next step) can empty a
+      // set for real, and this is what it will land on.
+      const dead = el('div', 'bmwm-refine-empty');
+      dead.append(el('p', 'bmwm-refine-empty-text', copy.refineEmpty({ wants: andList(wants) })));
+      const clear = el('button', 'bmwm-btn bmwm-btn-ghost', 'Start again');
+      clear.type = 'button';
+      clear.addEventListener('click', () => { active.clear(); redraw(); });
+      dead.append(clear);
+      grid.append(dead);
+      return;
+    }
+    // One car left is a recommendation again, so it gets the hero treatment
+    // (photo, reasons, its trade-off) rather than staying a tile in a grid.
+    const single = shown.length === 1;
+    grid.classList.toggle('bmwm-grid-tied', !single);
+    shown.forEach((m) => grid.append(matchCard(m, { big: single, brand: ctx.brand })));
+  }
+
+  redraw();
+  return host;
 }
 
 /**
@@ -424,6 +550,95 @@ const SPEC_LABELS = {
   coupe: 'Coupé', convertible: 'Convertible', mpv: 'Family carrier',
 };
 const FUEL_SPEC = { petrol: 'Petrol', diesel: 'Diesel', phev: 'Plug-in hybrid', ev: 'Electric' };
+
+/*
+ * Human names for the equipment concepts the server parses out of the feed's
+ * factory options list (mapping.js FEATURE_CONCEPTS). Display-only, so they
+ * live here rather than on the wire — and only concepts a buyer would
+ * recognise by name are listed: an unlabelled key is silently skipped, which
+ * is how a concept can be parsed and measured long before it's offered as a
+ * refinement.
+ */
+const CONCEPT_LABELS = {
+  panoRoof: 'Panoramic roof',
+  contrastRoof: 'Contrast roof',
+  sunroof: 'Sunroof',
+  heatedSeats: 'Heated seats',
+  heatedWheel: 'Heated steering wheel',
+  sportsSeats: 'Sports seats',
+  electricSeats: 'Electric seats',
+  leatherWheel: 'Leather steering wheel',
+  parkingCamera: 'Parking camera',
+  parkingSensors: 'Parking sensors',
+  navigation: 'Navigation',
+  smartphoneIntegration: 'Apple CarPlay',
+  premiumAudio: 'Premium audio',
+  headUpDisplay: 'Head-up display',
+  cruiseControl: 'Cruise control',
+  adaptiveLights: 'Adaptive LED lights',
+  keylessEntry: 'Keyless entry',
+  climateControl: 'Climate control',
+  ambientLighting: 'Ambient lighting',
+  tintedGlass: 'Privacy glass',
+  towbar: 'Tow bar',
+};
+
+/*
+ * What actually separates a set of cars the engine scored the same.
+ *
+ * This is the digital version of the bit of a dealership visit the tool has
+ * been missing: once the brief is satisfied several times over, a good
+ * salesperson stops asking about your life and starts asking about the cars in
+ * front of you — and only about the ways they differ. Nobody is asked "do you
+ * want a sunroof?" when all six have one.
+ *
+ * So the axes are computed from the cluster itself, never authored. An axis
+ * exists only where it splits the set (at least one car has it, at least one
+ * doesn't), which means a refinement can never be dead and can never empty the
+ * list on its own — the two failure modes that killed asking this sort of
+ * thing upfront (docs/question-stock-audit.md, and the plan's rejected
+ * approaches). It also needs no per-brand configuration: gearbox surfaces for
+ * a MINI cluster because MINI stock is mixed, and stays quiet for BMW because
+ * it isn't.
+ *
+ * Ranked by how evenly each axis splits the set, because a 3/3 split is worth
+ * more than a 5/1 — it's the question that tells us most about you per tap.
+ *
+ * @returns {Array<{ id, label, test(car), have }>}
+ */
+function refinementAxes(cars) {
+  const axes = [];
+
+  for (const [key, label] of Object.entries(CONCEPT_LABELS)) {
+    const have = cars.filter((c) => (c.features || []).includes(key)).length;
+    if (have > 0 && have < cars.length) {
+      axes.push({ id: `f:${key}`, label, have, test: (c) => (c.features || []).includes(key) });
+    }
+  }
+
+  // Gearbox: a genuine dealbreaker, and a live split for MINI (~12% manual).
+  for (const [value, label] of [['auto', 'Automatic'], ['manual', 'Manual']]) {
+    const have = cars.filter((c) => c.transmission === value).length;
+    if (have > 0 && have < cars.length) {
+      axes.push({ id: `g:${value}`, label, have, test: (c) => c.transmission === value });
+    }
+  }
+
+  // Colour, by its normalised name ("Grey"), each shade its own axis. Only
+  // present on cars the detail lookup reached — a car with no colour simply
+  // never matches a colour axis, which is the honest behaviour: we can't
+  // claim it's the blue one.
+  const shades = new Set(cars.map((c) => c.colour?.colour).filter(Boolean));
+  for (const shade of shades) {
+    const have = cars.filter((c) => c.colour?.colour === shade).length;
+    if (have > 0 && have < cars.length) {
+      axes.push({ id: `c:${shade}`, label: shade, have, test: (c) => c.colour?.colour === shade });
+    }
+  }
+
+  const balance = (a) => Math.abs(a.have / cars.length - 0.5);
+  return axes.sort((a, b) => balance(a) - balance(b) || a.label.localeCompare(b.label));
+}
 
 /* ------------------------------ screens ------------------------------ */
 
@@ -1230,14 +1445,13 @@ async function renderResults(root, ctx, answers) {
     } else {
       // The engine couldn't separate these (see matchCars). Naming one "your
       // perfect BMW" would state a preference the model doesn't hold and bury
-      // the rest of the tie, so the page says so and shows them at one weight.
-      screen.append(
-        el('h2', 'bmwm-title', copy.tiedTitle({ count: leadCount })),
-        el('p', 'bmwm-lede', copy.tiedLede()),
-      );
-      const grid = el('div', 'bmwm-grid bmwm-grid-tied');
-      lead.forEach((m) => grid.append(matchCard(m, { brand: ctx.brand })));
-      screen.append(grid);
+      // the rest of the tie, so the page says so and shows them at one weight —
+      // then hands over: the refine panel lets the user separate them on the
+      // things the questions never asked about.
+      const title = el('h2', 'bmwm-title', copy.tiedTitle({ count: leadCount }));
+      const lede = el('p', 'bmwm-lede', copy.tiedLede());
+      screen.append(title, lede);
+      screen.append(renderRefine(ctx, lead, title, lede));
     }
 
     // Whatever the lead didn't claim: smaller compact tiles in a static 2-up
