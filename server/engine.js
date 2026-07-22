@@ -297,7 +297,7 @@ function scoreEconomy(car, answers, tuning) {
     score = canCharge ? 1 : clamp(0.5 + 0.2 * miles);
     if (canCharge) {
       reason = miles >= 0.66
-        ? 'Pennies per mile charging at home or work — ideal for your big annual mileage'
+        ? 'Pennies per mile charging at home or work, ideal for your big annual mileage'
         : 'Pennies per mile charging at home or work';
     }
   } else if (car.fuel === 'phev') {
@@ -312,7 +312,7 @@ function scoreEconomy(car, answers, tuning) {
     score = clamp(base + (base - 0.5) * miles);
     if (score >= 0.8) {
       reason = miles >= 0.66
-        ? `Frugal at around ${car.mpg}mpg — kind on a big annual mileage`
+        ? `Frugal at around ${car.mpg}mpg, kind on a big annual mileage`
         : `Frugal for what it is, around ${car.mpg}mpg`;
     }
   }

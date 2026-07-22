@@ -170,7 +170,7 @@ What the rebuild keeps, moves, rewrites, or retires:
 | Refine panel (chips) | Keep; applies to whichever group leads the page. Open question, deliberately deferred: refine on decisive pages too? Today chips exist only in ties — defensible (nothing to separate), revisit with user feedback. |
 | Reject ("Not this one") | Keep, and **fix the inconsistency: it exists only in ties.** A decisive hero can't be rejected today. In the new frame, every full card offers it, decree included — rejecting the decree is exactly the signal that the decree was wrong. |
 | Per-card reasons + trade-off + swatch | Keep everywhere full cards render (the trade-off's `big`-only gating was already widened to all lead cards). |
-| "MORE AT <retailer>" band | Rewrite. Today it holds non-tied locals with no explanation of why they rank below. In the new frame it's the "closest here" group of state 3, or the runners-up of states 1–2, and its lede should say which. |
+| "MORE AT <retailer>" band | ~~Rewrite.~~ **Done** (`moreLede` per frame): runners-up behind a decree, the near-miss below a tie, or further-from-the-brief stock in the closest frame. The old lede claimed the cards "also fit your answers", false in two of three frames, and compact tiles carry no trade-off line, so this sentence is the band's only honesty layer. Rank claims, never fit claims. |
 | "WORTH THE DRIVE" carousel | Keep, but it only carries nearby cars that *don't* resolve a missed want (those move up in state 3). Its "Not quite it?" lede is then accurate in every state. |
 | Share / tweak / start over | Keep as-is. |
 | Disclaimer | Keep as-is. |

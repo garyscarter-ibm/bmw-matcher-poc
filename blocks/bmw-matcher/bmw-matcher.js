@@ -171,6 +171,17 @@ const BRAND_COPY = {
     // "Worth the drive" lede when it leads with the cars that DO meet the brief.
     driveLedeRescue: ({ list }) => `Starting with the ${list} you asked for, then the closest `
       + 'matches at other retailers.',
+    // The "More at <retailer>" lede, per result frame. One sentence used to
+    // cover all three ("that also fit your answers"), which was false in two
+    // of them: the band holds cars ranked BELOW the lead group, and in the
+    // closest-here frame nothing on the page fits the whole brief. Compact
+    // tiles carry no trade-off line, so this sentence is the band's only
+    // honesty layer. Rank claims, never fit claims.
+    moreLede: {
+      decree: ({ retailer }) => `The next closest matches in ${retailer}’s stock.`,
+      tie: () => 'Close, but not level with the cars above.',
+      closest: () => 'Also here, a step further from your brief.',
+    },
   },
   mini: {
     name: 'MINI',
@@ -210,6 +221,11 @@ const BRAND_COPY = {
       + `The nearest is ${miles} away at ${where}. Scroll down to “Worth the drive”.`,
     driveLedeRescue: ({ list }) => `First up: the ${list} you asked for. `
       + 'Then the rest of the closest matches.',
+    moreLede: {
+      decree: ({ retailer }) => `The next nearest things to it at ${retailer}.`,
+      tie: () => 'So nearly in the tie.',
+      closest: () => 'Also at ours, a bit further from the wish list.',
+    },
   },
 };
 
@@ -1721,13 +1737,19 @@ async function renderResults(root, ctx, answers) {
 
     // Whatever the lead didn't claim: smaller compact tiles in a static 2-up
     // row (distinct from the horizontal "Worth the drive" carousel of OTHER
-    // retailers below). Same retailer as the lead, so "More at".
+    // retailers below). Same retailer as the lead, so "More at" — the heading
+    // is just a location; the lede changes with the frame, because what these
+    // cards ARE changes with it: runners-up behind a real winner, the
+    // near-miss below a tie, or further-from-the-brief stock in the closest
+    // frame. Only the fit+decisive hero's runners-up ever half-deserved the
+    // old "also fit your answers", and even they can carry a trade-off.
     if (rest.length) {
+      const moreFrame = !fit ? 'closest' : decisive ? 'decree' : 'tie';
       const more = el('section', 'bmwm-more-band');
       more.append(
         el('h3', 'bmwm-subhead bmwm-nearby-heading', `MORE AT ${ctx.retailerLabel.toUpperCase()}`),
         el('p', 'bmwm-lede bmwm-nearby-lede',
-          `Other cars in ${ctx.retailerLabel}'s stock that also fit your answers.`),
+          copy.moreLede[moreFrame]({ retailer: ctx.retailerLabel })),
       );
       const moreGrid = el('div', 'bmwm-more');
       rest.forEach((m) => moreGrid.append(matchCard(m, { compact: true })));
