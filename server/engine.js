@@ -149,11 +149,32 @@ function scoreBody(car, answers, tuning) {
 
 const FUEL_LABELS = { petrol: 'petrol', diesel: 'diesel', phev: 'plug-in hybrid', ev: 'fully electric' };
 
+/*
+ * How acceptable each fuel is as a substitute for the one asked for, read as
+ * rows of "wanted → offered".
+ *
+ * The substitute scores used to sit around 0.5–0.7, which read as "a diesel is
+ * 70% as good as the petrol you asked for". Combined with fuelStrictBoost that
+ * still left a wrong-fuel car only ~8 points behind, so a car that was strong
+ * on economy and character routinely beat one that actually matched: measured
+ * at 15% of BMW cases and 8% of MINI's where a matching car was available and
+ * lost anyway (`npm run audit fuel`). That directly contradicted the promise
+ * made just below at fuelStrictBoost.
+ *
+ * Body style had the same flaw and was fixed the same way in July (miss → 0,
+ * honesty 53% → 67%, diversity rose). Fuel can't go to zero — the degrees of
+ * similarity are real, a plug-in genuinely is the closest thing to an EV — so
+ * the ordering is kept and the scale compressed: a substitute now has to be
+ * overwhelmingly better elsewhere to win, rather than merely better.
+ *
+ * "Help me decide" (`open`) never reads this table; it's scored by
+ * circumstance in scoreOneFuel, and is unaffected.
+ */
 const FUEL_TABLE = {
-  petrol: { petrol: 1, diesel: 0.7, phev: 0.6, ev: 0.15 },
-  diesel: { diesel: 1, petrol: 0.6, phev: 0.5, ev: 0.15 },
-  phev: { phev: 1, ev: 0.55, petrol: 0.5, diesel: 0.4 },
-  ev: { ev: 1, phev: 0.5, petrol: 0.1, diesel: 0.1 },
+  petrol: { petrol: 1, diesel: 0.25, phev: 0.3, ev: 0.1 },
+  diesel: { diesel: 1, petrol: 0.25, phev: 0.25, ev: 0.1 },
+  phev: { phev: 1, ev: 0.35, petrol: 0.25, diesel: 0.2 },
+  ev: { ev: 1, phev: 0.3, petrol: 0.05, diesel: 0.05 },
 };
 
 /** Score one car against a single fuel preference. Returns { score, reason? }. */

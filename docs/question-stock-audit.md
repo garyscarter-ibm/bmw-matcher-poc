@@ -105,6 +105,19 @@ belongs: **in the results** — see fix 3.
    *Built:* BMW moved to body weight 4.5 / `miss` 0 — not MINI's 6.0, which
    BMW's deeper stock doesn't need. Honesty 53% → 67%, and diversity *rose*
    62% → 66%. MINI unchanged (mergeTuning has it restating both fields).
+   *Follow-up (2026-07-23) — fuel had the same flaw, fixed the same way:* a
+   named fuel didn't bind. `FUEL_TABLE`'s substitute scores (~0.5–0.7) plus
+   `fuelStrictBoost` left a wrong-fuel car only ~8 points back, so a diesel
+   estate strong on economy topped the petrol estate actually asked for. The
+   new `fuel` audit pass (`npm run audit fuel`) measured it: a matching-fuel
+   car available and beaten anyway in **15% of BMW / 8% of MINI** cases.
+   Compressing the substitute scale (petrol→diesel 0.7 → 0.25, keeping the
+   ordering because a PHEV genuinely IS the nearest thing to an EV) cut that
+   to **5% / 5%**, lifted fuel honesty 95%→98% / 94%→96%, and held diversity
+   (66%→65% / 47%→47%). Body honesty dipped 67%→63% for BMW — expected, and
+   the point: when a buyer names both a fuel and a shape the two now compete
+   fairly, where fuel used to roll over. `open`/"help me decide" is scored by
+   circumstance, not this table, so it's untouched.
 3. **Unmet-want honesty in results** (dynamic, replaces pruning). Today a
    user who asks for an EV at an all-petrol MINI retailer silently gets
    petrol heroes (fuelStrictBoost drags their scores down, but nothing says
