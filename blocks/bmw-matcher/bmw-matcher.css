@@ -1264,3 +1264,17 @@ a.bmwm-ptile:focus-visible { outline: 2px solid var(--bmwm-accent); outline-offs
   .bmwm-preview-track { transition: none; }
   .bmwm-preview-track.is-fading { opacity: 1; }
 }
+
+/* Availability line on a grouped card: "4 available · £31k–£37k · Portimao
+   Blue, Brooklyn Grey or Alpine White". Quiet, factual, sits under the specs. */
+.bmwm-avail {
+  margin: var(--bmwm-space-2) 0 0;
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+  line-height: 1.4;
+}
+.bmwm-avail-count {
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  color: var(--bmwm-accent-spot);
+}

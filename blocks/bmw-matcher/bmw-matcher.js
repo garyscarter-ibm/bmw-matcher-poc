@@ -910,11 +910,19 @@ function refinementAxes(cars) {
   // present on cars the detail lookup reached — a car with no colour simply
   // never matches a colour axis, which is the honest behaviour: we can't
   // claim it's the blue one.
-  const shades = new Set(cars.map((c) => c.colour?.colour).filter(Boolean));
+  // A grouped card counts as having every colour its listings come in, so
+  // "Blue" keeps a model that offers blue rather than only the one listing
+  // that happened to rank first.
+  const shadesOf = (c) => (c.colours?.length
+    ? c.colours
+    : [c.colour?.manufacturerColour || c.colour?.colour].filter(Boolean));
+  const shades = new Set(cars.flatMap(shadesOf));
   for (const shade of shades) {
-    const have = cars.filter((c) => c.colour?.colour === shade).length;
+    const have = cars.filter((c) => shadesOf(c).includes(shade)).length;
     if (have > 0 && have < cars.length) {
-      axes.push({ id: `c:${shade}`, label: shade, have, test: (c) => c.colour?.colour === shade });
+      axes.push({
+        id: `c:${shade}`, label: shade, have, test: (c) => shadesOf(c).includes(shade),
+      });
     }
   }
 
@@ -1399,9 +1407,12 @@ function matchCard(match, {
   body.append(head);
 
   // Single used price when min === max (live stock), else the range.
-  const price = car.priceMin === car.priceMax
-    ? gbp(car.priceMin)
-    : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`;
+  // A grouped card prices the whole group; a single listing prices itself.
+  const price = car.listingCount > 1 && car.priceFrom !== car.priceTo
+    ? `from ${gbp(car.priceFrom)}`
+    : (car.priceMin === car.priceMax
+      ? gbp(car.priceMin)
+      : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`);
   const specs = el('p', 'bmwm-specs');
   // Paint, by its marketing name ("Legend Grey"), when the detail lookup got
   // one. It reads as a spec, but it's carrying more weight than that: when the
@@ -1440,6 +1451,20 @@ function matchCard(match, {
     where.append(el('span', 'bmwm-distance-miles', distanceLabel(car.distance)));
     if (car.retailerName) where.append(el('span', null, ` · ${car.retailerName}`));
     body.append(where);
+  }
+
+  // When repeat listings of the same car were grouped into this card, say so:
+  // how many, the price spread, and the colours they come in. Without this the
+  // page showed four identical iX2 cards and looked like it was stuttering.
+  if (car.listingCount > 1) {
+    const avail = el('p', 'bmwm-avail');
+    const span = car.priceFrom === car.priceTo
+      ? gbp(car.priceFrom)
+      : `${gbp(car.priceFrom)}–${gbp(car.priceTo)}`;
+    avail.append(el('span', 'bmwm-avail-count', `${car.listingCount} available`));
+    avail.append(el('span', null, ` · ${span}`));
+    if (car.colours?.length) avail.append(el('span', null, ` · ${orList(car.colours)}`));
+    body.append(avail);
   }
 
   // Real used-car detail from the live feed, when present.
@@ -1527,9 +1552,12 @@ function matchCard(match, {
  */
 function previewTile(match) {
   const { car, score } = match;
-  const price = car.priceMin === car.priceMax
-    ? gbp(car.priceMin)
-    : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`;
+  // A grouped card prices the whole group; a single listing prices itself.
+  const price = car.listingCount > 1 && car.priceFrom !== car.priceTo
+    ? `from ${gbp(car.priceFrom)}`
+    : (car.priceMin === car.priceMax
+      ? gbp(car.priceMin)
+      : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`);
 
   // Whole tile is the tap target — an <a> when we have a link, else a plain
   // article (still a valid tile, just not clickable).

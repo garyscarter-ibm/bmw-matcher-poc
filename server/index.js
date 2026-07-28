@@ -116,6 +116,13 @@ function publicCar(car) {
     features: car.features,
     transmission: car.transmission,
     colour: car.colour,
+    // Set when repeat listings of the same car were grouped (see
+    // groupListings): how many the retailer has, the price spread and the
+    // colours they come in, so one card can speak for all of them.
+    listingCount: car.listingCount,
+    priceFrom: car.priceFrom,
+    priceTo: car.priceTo,
+    colours: car.colours,
     retailerName: car.retailerName,
     link: car.link,
     // Miles from the configured retailer. Only set on `nearby` cars — the
@@ -124,8 +131,27 @@ function publicCar(car) {
   };
 }
 
-function publicMatch({ car, score, stretch, reasons, tradeOffs }) {
-  return { car: publicCar(car), score, stretch, reasons, tradeOffs };
+function publicMatch({
+  car, score, stretch, reasons, tradeOffs, listings,
+}) {
+  return {
+    car: publicCar(car),
+    score,
+    stretch,
+    reasons,
+    tradeOffs,
+    // The individual cars behind a grouped card — enough to let the page offer
+    // "this one in Chili Red" without shipping the internal scoring fields.
+    listings: listings && listings.length > 1
+      ? listings.map((c) => ({
+        id: c.id,
+        colour: c.colour?.manufacturerColour || c.colour?.colour,
+        priceMin: c.priceMin,
+        mileage: c.mileage,
+        link: c.link,
+      }))
+      : undefined,
+  };
 }
 
 function readJsonBody(req) {
@@ -219,7 +245,19 @@ async function handleMatch(req, res) {
   // handful of cars we're about to show rather than the whole pool (see
   // enrichColours). Enriches the cached car objects in place, so a second
   // session at the same retailer gets them for free.
-  await enrichColours(brand, matches.map((m) => m.car));
+  // Enrich the grouped card AND the listings behind it: a card that says "4
+  // available in Portimao Blue, Brooklyn Grey or Alpine White" needs every
+  // listing's paint, not just the one that ranked first.
+  await enrichColours(brand, matches.flatMap((m) => [m.car, ...(m.listings || [])]));
+  // Paint is only known after that call, so the group's colour list is filled
+  // in here rather than at grouping time.
+  for (const m of matches) {
+    if (m.listings?.length > 1) {
+      m.car.colours = [...new Set(m.listings
+        .map((c) => c.colour?.manufacturerColour || c.colour?.colour)
+        .filter(Boolean))];
+    }
+  }
   // What this retailer couldn't offer, so the page can say so instead of
   // quietly serving the closest thing (see unmetWants). Reported against the
   // folded answers — those are the wants actually searched for. Half the

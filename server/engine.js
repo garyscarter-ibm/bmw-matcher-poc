@@ -769,6 +769,57 @@ export const MAX_SHOWN = 6;
  */
 export const TASTE_PTS = 6;
 
+/*
+ * Collapse repeat listings of the same car into one match.
+ *
+ * A retailer holding four iX2 eDrive20 M Sports produced four cards, all at
+ * 96%, the top two in the same colour and £1,400 apart. The page said "six of
+ * these fit you equally well" when it meant two models and six listings, which
+ * reads as the page stuttering rather than as a choice. It also suppressed the
+ * taste pick entirely: the top two matches were usually the SAME model, which
+ * scores identically on character, performance and trim by definition, so
+ * there was never a taste gap to name a winner on.
+ *
+ * Grouped on line + body + fuel + 0-62 + trim, which is "the same car" as a
+ * buyer means it — deliberately not on `name`, because the feed writes the
+ * same car two ways ("BMW iX2 eDrive20 M Sport" and "BMW iX2 20 66.5kWh M
+ * Sport SUV 5dr Electric Auto"). The best-scoring listing represents the
+ * group and carries the spread: how many, what price range, which colours.
+ *
+ * The union of the group's equipment goes on the representative so the refine
+ * chips filter on what's actually AVAILABLE in that model, not on whichever
+ * listing happened to rank first.
+ */
+function groupListings(ranked) {
+  const key = (c) => [c.line, c.body, c.fuel, c.zeroTo62, c.styleLine ?? ''].join('|');
+  const groups = new Map();
+  for (const match of ranked) {
+    const k = key(match.car);
+    if (!groups.has(k)) groups.set(k, { match, listings: [] });
+    groups.get(k).listings.push(match.car);
+  }
+  return [...groups.values()].map(({ match, listings }) => {
+    const prices = listings.map((c) => c.priceMin).filter(Number.isFinite);
+    const colours = [...new Set(listings
+      .map((c) => c.colour?.manufacturerColour || c.colour?.colour)
+      .filter(Boolean))];
+    return {
+      ...match,
+      car: {
+        ...match.car,
+        // The feed's tidiest name for this car wins the card.
+        name: listings.reduce((a, b) => (b.name.length < a.length ? b.name : a), match.car.name),
+        listingCount: listings.length,
+        priceFrom: prices.length ? Math.min(...prices) : match.car.priceMin,
+        priceTo: prices.length ? Math.max(...prices) : match.car.priceMin,
+        colours,
+        features: [...new Set(listings.flatMap((c) => c.features || []))],
+      },
+      listings,
+    };
+  });
+}
+
 /**
  * The user's top matches from a pool of cars, plus whether picking a single
  * winner out of them is honest.
@@ -779,7 +830,9 @@ export const TASTE_PTS = 6;
  *   showing what fits on screen.
  */
 export function matchCars(answers, cars, tuning = DEFAULT_TUNING) {
-  const ranked = rankCars(answers, cars, tuning);
+  // Group first, so everything downstream — the cluster count, the headline,
+  // the taste comparison — is about CARS rather than listings.
+  const ranked = groupListings(rankCars(answers, cars, tuning));
   if (!ranked.length) {
     return { matches: [], decisive: true, clusterSize: 0, tasteLead: false };
   }

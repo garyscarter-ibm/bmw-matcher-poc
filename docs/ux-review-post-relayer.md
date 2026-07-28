@@ -42,6 +42,8 @@ it. Group the duplicates and the comparison becomes iX2 (taste 86) versus X1
 
 **One fix unlocks both problems.**
 
+## BUILT (2026-07-28) — see the results below
+
 ## Recommended: group listings by model
 
 One card per model+trim, carrying the cluster of individual listings:
@@ -93,3 +95,34 @@ need; if it doesn't, add "fewest miles" / "lowest price" as axes.
 - Meg's genuine tie (two identical Electrics, Chili Red vs Midnight Black) is
   still exactly the case the refine chips were built for, and still lands
   there. That one is a real choice and should stay a tie.
+
+
+---
+
+## Outcome after implementing the grouping
+
+Grouped on line + body + fuel + 0-62 + trim (not on `name` — the feed writes
+the same car two ways). Measured on live stock:
+
+| Persona | Before | After |
+|---|---|---|
+| Priya | "SIX fit you equally well" over 4 iX2s + 2 X1s | **"TWO fit you equally well"** — iX2 (4 available) vs X1 25e (2 available) |
+| Tyler | fit tie, 3 cars | **decree restored** — his 3 were one car |
+| Meg | 2-way tie, identical Electrics | **decree**, one card, "2 available in Chili Red or Midnight Black" |
+| Reyes | fit tie, no pick | **taste pick fires**: "We'd go for the Countryman C." |
+| Chloe | 6 cards, 3 identical | 4 cars, genuine tie |
+
+The prediction held: grouping unlocked the taste-pick state, because the top
+two are now different cars rather than the same one twice. It also fixed
+Tyler's regression from the re-layer for free.
+
+Each card now carries its stock depth — "4 available · £31,498–£36,890 ·
+Portimao Blue, Brooklyn Grey or Alpine White" — and the refine chips filter on
+what a model is *available* in rather than on whichever listing ranked first.
+
+**Honest note on stickiness:** it barely moved (70% → 72% BMW, 76% MINI). That
+metric is now partly measuring the wrong thing: if a buyer changes one answer
+and the iX2 is still genuinely the best car for them, returning it is correct,
+not deaf. The metric can't tell a stable right answer from an unresponsive one.
+What did improve is what the page *says* and whether the preference questions
+have any influence at all (BMW `priorities` 0% → 20%, MINI `miniVibe` 50%).
