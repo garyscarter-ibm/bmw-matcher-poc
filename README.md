@@ -125,22 +125,34 @@ after the block, self-contained folder), so porting is a copy-paste:
 1. Copy `blocks/bmw-matcher/` into your EDS project's `blocks/` directory.
 2. In the document that drives the page, add a block table named
    **BMW Matcher** (a one-cell table containing `bmw-matcher` works too).
-3. To match against a specific retailer's live stock, add a config row below
-   the block name with **Retailer ID** in the first cell and that retailer's
-   `retailer_site` ID (e.g. `96`) in the second. This is the standard EDS
-   block-config convention — the block reads it with a `readBlockConfig()`
-   helper, the same pattern used across `aem-boilerplate`. Omit the row to
-   fall back to the backend's own default retailer.
-4. Point the block at your deployed backend by setting a `data-api` attribute on
-   the block element to your API's base URL. It defaults to
-   `http://localhost:8787` for local dev.
-5. Publish. EDS auto-loads `bmw-matcher.css` and calls the block's
+3. Add config rows below the block name — first cell the key, second the value.
+   All are read with a `readBlockConfig()` helper, the standard `aem-boilerplate`
+   convention:
+   - **Brand** — `BMW` or `MINI` (defaults to BMW).
+   - **Retailer ID** — the retailer's `retailer_site` ID (e.g. `96`); omit to
+     fall back to the backend's default retailer.
+   - **Retailer Name** — the display name shown in copy.
+   - **API** — your deployed backend's base URL. **This is how you point an
+     EDS-authored block at its backend**: authored content can set config rows
+     but not HTML attributes, so the block reads the API base from this row
+     (falling back to a `data-api` attribute for the local harness, then
+     `http://localhost:8787`). Without it, a published block would try to reach
+     localhost.
+4. Publish. EDS auto-loads `bmw-matcher.css` and calls the block's
    `decorate()` — no other wiring needed.
 
-The standalone `index.html` harness simulates the Retailer ID config row
-locally (no DA needed) — see the comment above the block markup there. Pass
-`?retailer=<id>` on the harness URL to try a different retailer without
-editing the file.
+Example authored table:
+
+| bmw-matcher |  |
+|---|---|
+| Brand | MINI |
+| Retailer ID | 92 |
+| Retailer Name | Sytner Luton MINI |
+| API | https://your-backend.onrender.com |
+
+The standalone `index.html` harness uses a `data-api` attribute + `?api=`
+override instead (no DA needed); `?retailer=<id>` tries a different retailer
+without editing the file. Both paths resolve through the same `apiBase()`.
 
 Notes:
 - The block itself ships no dataset or weights — those stay behind the API.

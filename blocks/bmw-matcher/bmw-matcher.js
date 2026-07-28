@@ -6,8 +6,10 @@
  * car dataset live behind an API (see server/) so they never reach the
  * browser — the block fetches the quiz definition and match results over HTTP.
  *
- * The API base is read from the block's `data-api` attribute (set per-site in
- * EDS) and falls back to http://localhost:8787 for local preview.
+ * The API base comes from an authored "API" config row when running on EDS
+ * (authored content can set config rows but not HTML attributes), or from a
+ * `data-api` attribute for the local harness and the GitHub Pages build,
+ * falling back to http://localhost:8787 for local preview. See apiBase.
  *
  * Share links encode the quiz answers in the URL hash (#m=<base64url>); the
  * link is decoded/validated client-side (quiz-meta.js), then the results are
@@ -42,9 +44,20 @@ function validBudget(value) {
   return !!BUDGET_BANDS[value];
 }
 
-/** API base for this block: `data-api` attribute, else the localhost default. */
+/**
+ * API base for this block, in precedence order:
+ *   1. the `data-api` attribute — the local harness and the Pages build set
+ *      it (the harness's ?api= override writes here too), so a query override
+ *      always wins;
+ *   2. an authored "API" config row — the EDS path, because authored content
+ *      can produce config rows but not HTML attributes;
+ *   3. the localhost default, for `npm run serve`.
+ * Trailing slashes are trimmed so `${base}/api/...` never doubles up. An empty
+ * or absent row is falsy and simply falls through.
+ */
 function apiBase(block) {
-  return (block.dataset.api || DEFAULT_API).replace(/\/+$/, '');
+  const authored = readBlockConfig(block).api;
+  return (block.dataset.api || authored || DEFAULT_API).replace(/\/+$/, '');
 }
 
 /**
