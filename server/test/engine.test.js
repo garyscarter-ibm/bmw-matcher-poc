@@ -206,7 +206,8 @@ test('a tie wider than MAX_SHOWN is capped for display but counted in full', () 
 });
 
 test('an empty pool is decisive by vacuum, not by claim', () => {
-  assert.deepEqual(matchCars(base, []), { matches: [], decisive: true, clusterSize: 0 });
+  assert.deepEqual(matchCars(base, []),
+    { matches: [], decisive: true, clusterSize: 0, tasteLead: false });
 });
 
 test('every dataset entry has the fields the engine needs', () => {

@@ -211,7 +211,9 @@ async function handleMatch(req, res) {
   // Fold any bespoke per-brand question answers into the standard fields the
   // engine scores (see applyBespokeAnswers) before ranking.
   const scored = applyBespokeAnswers(brand, answers);
-  const { matches, decisive, clusterSize } = matchCars(scored, cars, brandTuning(brand));
+  const {
+    matches, decisive, clusterSize, tasteLead,
+  } = matchCars(scored, cars, brandTuning(brand));
 
   // Paint only exists on the vehicle detail page, so it's fetched for the
   // handful of cars we're about to show rather than the whole pool (see
@@ -230,6 +232,9 @@ async function handleMatch(req, res) {
     // "your perfect BMW is…" and "any of these would suit you" on this.
     decisive,
     clusterSize,
+    // Fit couldn't separate the leaders but the buyer's stated preferences
+    // could, so the page may name one honestly (see matchCars).
+    tasteLead,
     unmet: unmetWants(scored, cars),
   });
 }

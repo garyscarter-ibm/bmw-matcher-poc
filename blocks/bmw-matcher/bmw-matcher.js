@@ -177,6 +177,12 @@ const BRAND_COPY = {
     // can't separate the top cars (see matchCars: decisive/clusterSize).
     // Stated plainly, as a fact about the stock rather than an apology.
     tiedTitle: ({ count }) => `${cardinal(count)} of these fit you equally well.`,
+    // Fit couldn't separate them, but what they told us matters could. Naming
+    // the pick is honest here, and it's what finally makes the preference
+    // questions capable of changing the recommendation.
+    tasteTitle: ({ model }) => `Your best match is the ${model}.`,
+    tasteLede: () => 'Several of these suit you equally well on paper. This one lines up '
+      + 'best with what you said matters.',
     // The retailer is named on every card, so the lede doesn't repeat it —
     // and a brand plural appended to a retailer label reads "Sytner Luton
     // MINI MINIs", which is why neither brand's copy builds one.
@@ -229,6 +235,7 @@ const BRAND_COPY = {
     moreLede: {
       decree: ({ retailer }) => `The next closest matches in ${retailer}’s stock.`,
       tie: () => 'Close, but not level with the cars above.',
+      taste: () => 'These suit you just as well, they just match your priorities less closely.',
       closest: () => 'Also here, a step further from your brief.',
     },
   },
@@ -246,6 +253,8 @@ const BRAND_COPY = {
       + 'Here’s the closest we’ve got to the rest of your brief.',
     // Same fact in MINI's register: a tie is a nice problem, not a shortfall.
     tiedTitle: ({ count }) => `It’s a ${cardinal(count)}-way tie.`,
+    tasteTitle: ({ model }) => `We’d go for the ${model}.`,
+    tasteLede: () => 'A few of these fit your brief just as well. This one’s the most you.',
     tiedLede: () => 'They all fit what you told us, just as well as each other. '
       + 'So it comes down to taste now. Which is the fun bit.',
     // MINI asks rather than instructs, and treats a dead end as a shrug.
@@ -277,6 +286,7 @@ const BRAND_COPY = {
     moreLede: {
       decree: ({ retailer }) => `The next nearest things to it at ${retailer}.`,
       tie: () => 'So nearly in the tie.',
+      taste: () => 'Every bit as good a fit, just less your sort of thing.',
       closest: () => 'Also at ours, a bit further from the wish list.',
     },
   },
@@ -1711,13 +1721,16 @@ async function renderResults(root, ctx, answers) {
   // send `decisive` keeps getting the single-hero page it always rendered.
   let decisive = true;
   let clusterSize = 1;
+  // Fit tied, but their stated priorities picked a winner (see matchCars).
+  let tasteLead = false;
   // What the retailer's own stock couldn't offer. Half the picture: nothing is
   // said to the user until /api/nearby agrees (see agreedUnmet). An older API
   // that doesn't send the field leaves this empty, so it simply never fires.
   let retailerUnmet = {};
   try {
     ({
-      matches, decisive = true, clusterSize = 1, unmet: retailerUnmet = {},
+      matches, decisive = true, clusterSize = 1, tasteLead = false,
+      unmet: retailerUnmet = {},
     } = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand));
   } catch {
     renderStatus(root, {
@@ -1749,10 +1762,6 @@ async function renderResults(root, ctx, answers) {
     // over a third car that's four points back. Anything beyond this leads a
     // quieter "More at <retailer>" tier, so a near-miss is demoted rather than
     // dropped.
-    const leadCount = decisive ? 1 : Math.min(clusterSize, matches.length);
-    const lead = matches.slice(0, leadCount);
-    const rest = matches.slice(leadCount);
-
     // Fit: does the best local car meet every stated stock-fact want? The
     // decree and the tie copy both presuppose it ("your perfect BMW", "fit
     // you equally well") — said over a card carrying a trade-off line, either
@@ -1762,12 +1771,31 @@ async function renderResults(root, ctx, answers) {
     // the buyer's trade to make, not ours — but the words stop pretending.
     const fit = (matches[0].tradeOffs || []).length === 0;
 
-    if (fit && decisive) {
+    // A taste-led pick leads alone, like a decisive winner — the difference is
+    // in the words, not the layout: we're naming the best of several equally
+    // suitable cars, not claiming the others don't fit.
+    const heroLed = decisive || (fit && tasteLead);
+    const leadCount = heroLed ? 1 : Math.min(clusterSize, matches.length);
+    const lead = matches.slice(0, leadCount);
+    const rest = matches.slice(leadCount);
+
+    if (fit && heroLed) {
       // A single full-width hero, matching the "Your perfect <brand> is the …"
       // headline (co-equal heroes contradicted that claim). The car's name
       // already leads with the brand, so strip it.
       const model = lead[0].car.name.replace(new RegExp(`^${brandName} `), '');
-      screen.append(el('h2', 'bmwm-title', `Your perfect ${brandName} is the ${model}.`));
+      if (decisive) {
+        // Nothing else came close: the decree is earned.
+        screen.append(el('h2', 'bmwm-title', `Your perfect ${brandName} is the ${model}.`));
+      } else {
+        // Several suit them equally; their stated priorities picked this one.
+        // Deliberately NOT "your perfect X" — that would overclaim, and the
+        // lede has to say the others fit too.
+        screen.append(
+          el('h2', 'bmwm-title', copy.tasteTitle({ model })),
+          el('p', 'bmwm-lede', copy.tasteLede()),
+        );
+      }
       const grid = el('div', 'bmwm-grid');
       grid.append(matchCard(lead[0], { big: true, brand: ctx.brand }));
       screen.append(grid);
@@ -1800,7 +1828,7 @@ async function renderResults(root, ctx, answers) {
     // frame. Only the fit+decisive hero's runners-up ever half-deserved the
     // old "also fit your answers", and even they can carry a trade-off.
     if (rest.length) {
-      const moreFrame = !fit ? 'closest' : decisive ? 'decree' : 'tie';
+      const moreFrame = !fit ? 'closest' : decisive ? 'decree' : (tasteLead ? 'taste' : 'tie');
       const more = el('section', 'bmwm-more-band');
       more.append(
         el('h3', 'bmwm-subhead bmwm-nearby-heading', `MORE AT ${ctx.retailerLabel.toUpperCase()}`),

@@ -293,10 +293,19 @@ function scorePracticality(car, answers, tuning) {
 
 function scorePerformance(car, answers, tuning) {
   const { zeroBase, span } = tuning.performance;
+  const wantsIt = Number(answers.style) >= 4 || (answers.priorities || []).includes('performance');
   // Per-brand 0-62 curve: a MINI is quick for its class but never fast in
   // absolute BMW terms, so its curve tops out at a slower time.
-  const score = clamp((zeroBase - car.zeroTo62) / span);
-  const wantsIt = Number(answers.style) >= 4 || (answers.priorities || []).includes('performance');
+  //
+  // Two curves, because one can't serve both buyers. The default is generous:
+  // to someone who didn't ask for speed, anything reasonably brisk is fine.
+  // But it clamps everything under ~4.5s to a flat 1.0, so to an enthusiast a
+  // 3.5s M2 and a 5.0s grand tourer scored within 8% of each other — and the
+  // tourer won on practicality, which is not the car that buyer asked for.
+  // When performance is explicitly wanted, resolve the fast end properly.
+  const base = wantsIt ? zeroBase - 3 : zeroBase;
+  const range = wantsIt ? span - 2 : span;
+  const score = clamp((base - car.zeroTo62) / range);
   let reason;
   if (score >= 0.85 && wantsIt) {
     reason = `0–62 in ${car.zeroTo62}s, as quick as you hoped`;
@@ -326,8 +335,13 @@ function scoreEconomy(car, answers, tuning) {
     if (canCharge && car.evRange) reason = `Around ${car.evRange} electric miles covers most daily driving`;
   } else {
     // Petrol/diesel: base on mpg, then tilt by mileage — a frugal car is worth
-    // more the further you drive, a thirsty one worth less.
-    const base = clamp((car.mpg - 25) / 35);
+    // more the further you drive, a thirsty one worth less. A car the feed
+    // gave no consumption figure for (7 of 13k) scores neutral rather than
+    // NaN — unknown is not the same as thirsty, and a NaN here poisons the
+    // whole blend and can sort the car to the top.
+    const mpg = Number(car.mpg);
+    if (!Number.isFinite(mpg)) return { score: 0.5 };
+    const base = clamp((mpg - 25) / 35);
     // At high mileage, pull the score toward its mpg merit harder (thirsty cars
     // sink, frugal cars rise); at low mileage, soften both extremes toward 0.7.
     score = clamp(base + (base - 0.5) * miles);
@@ -440,6 +454,88 @@ function scoreDoors(car, answers, tuning) {
  *  Orchestration                                                    *
  * ---------------------------------------------------------------- */
 
+/*
+ * Constraints eliminate. Fit ranks. Taste chooses.
+ *
+ * The dimensions below are the SUBJECTIVE ones — what a buyer likes, as
+ * opposed to what actually suits them. They're scored separately and never
+ * enter the match %, because a weighted sum that blends the two can't tell a
+ * constraint ("it must be a convertible") from a preference ("I like
+ * comfort"), and so fails in both directions: preferences out-voting a stated
+ * fuel, or — measured at 77% winner-stickiness — constraints drowning the
+ * preference questions until four of nine could never change the answer.
+ *
+ * Everything not listed here is fit: budget, body, fuel, practicality,
+ * economy, size, doors. See docs/engine-relayer-design.md.
+ */
+const TASTE_DIMENSIONS = new Set(['character', 'performance', 'styleLine']);
+
+/*
+ * How much of the match score is "what you'd like" rather than "what suits
+ * you". Fixed deliberately: as a share of one big weighted sum, taste got
+ * squeezed to nothing every time a constraint was made to bind harder (the
+ * fuel fix did exactly that), which is how four questions ended up unable to
+ * change the recommendation. A guaranteed share can't be squeezed.
+ *
+ * 0.2 is calibrated, not chosen. Swept 0.15/0.2/0.25/0.3 against the whole
+ * harness: below it the preference questions stay inert, above it constraint
+ * honesty starts to go (fuel violations 3% at 0.2, 8% at 0.3). Overridable via
+ * TASTE_SHARE for further sweeps.
+ *
+ * Worth noting the split IMPROVED fuel binding rather than costing it (5% → 3%):
+ * fuel is now a share of the smaller fit-only total, so it binds harder inside
+ * fit while taste is capped at its own 20%.
+ */
+const TASTE_SHARE = Number(process.env.TASTE_SHARE ?? 0.2);
+
+/**
+ * Weights for the objective half: how well the car suits the buyer's stated
+ * needs and circumstances. Deliberately free of `priorities` — what someone
+ * *likes* must not change how well a car actually fits them.
+ */
+function fitWeights(answers, tuning) {
+  const w = {};
+  for (const [dim, weight] of Object.entries(tuning.weights)) {
+    if (!TASTE_DIMENSIONS.has(dim)) w[dim] = weight;
+  }
+  // Running costs matter more the further you drive. Objective, so it stays
+  // on the fit side.
+  w.economy += mileageFraction(answers, tuning);
+  // A named fuel binds hard (see the fuelStrictBoost note below).
+  const prefs = fuelPrefs(answers);
+  if (prefs.length > 0 && !prefs.includes('open')) w.fuel += tuning.fuelStrictBoost;
+  // An unanswered/no-preference doors question stays fully inert.
+  if (!answers.doors || answers.doors === 'either') delete w.doors;
+  return w;
+}
+
+/**
+ * Weights for the subjective half. `priorities` drives this — and ONLY this,
+ * which is the change that gives the preference questions something to decide.
+ * Boosts that used to land on fit dimensions (budget, economy, size) are
+ * dropped: those priorities still speak through `character`, which tags cars
+ * as efficient / cruiser / drivers-car / tech / image from the same answers.
+ */
+function tasteWeights(answers, tuning) {
+  const w = {};
+  for (const dim of TASTE_DIMENSIONS) {
+    if (tuning.weights[dim] != null) w[dim] = tuning.weights[dim];
+  }
+  for (const p of answers.priorities || []) {
+    const boosts = tuning.priorityBoosts[p] || {};
+    for (const [dim, add] of Object.entries(boosts)) {
+      if (dim in w) w[dim] += add;
+    }
+  }
+  // How spirited they want it — taste by definition.
+  if (Number(answers.style) >= 4) w.performance += 1;
+  if (Number(answers.style) <= 2) w.performance = Math.max(0.5, w.performance - 0.5);
+  // styleLine only weighs in when its question was actually answered.
+  if (!answers.styleLine) delete w.styleLine;
+  return w;
+}
+
+/** @deprecated kept for the audit harness's A/B; see fitWeights/tasteWeights. */
 function effectiveWeights(answers, tuning) {
   const w = { ...tuning.weights };
   for (const p of answers.priorities || []) {
@@ -506,23 +602,27 @@ const SCORERS = {
  *   tradeOffs: see tradeOffs() }
  */
 export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
-  const weights = effectiveWeights(answers, tuning);
-  const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
+  const fitW = fitWeights(answers, tuning);
+  const tasteW = tasteWeights(answers, tuning);
+  const fitTotal = Object.values(fitW).reduce((a, b) => a + b, 0);
+  const tasteTotal = Object.values(tasteW).reduce((a, b) => a + b, 0);
 
   return cars
     .filter((car) => passesHardFilters(car, answers, tuning))
     .map((car) => {
-      let weighted = 0;
+      let fitWeighted = 0;
+      let tasteWeighted = 0;
       let stretch = false;
       const candidates = [];
       for (const [dim, scorer] of Object.entries(SCORERS)) {
         // A dimension a brand doesn't weight (e.g. styleLine/doors for BMW)
         // contributes nothing and can't surface a reason — so adding a scorer
         // is inert for every brand that doesn't opt in via its tuning weights.
-        const weight = weights[dim] ?? 0;
+        const weight = (fitW[dim] ?? 0) + (tasteW[dim] ?? 0);
         if (weight === 0) continue;
         const r = scorer(car, answers, tuning);
-        weighted += weight * r.score;
+        if (fitW[dim]) fitWeighted += fitW[dim] * r.score;
+        if (tasteW[dim]) tasteWeighted += tasteW[dim] * r.score;
         if (r.stretch) stretch = true;
         if (r.reason && r.score >= 0.7) {
           candidates.push({ reason: r.reason, rank: weight * r.score });
@@ -533,21 +633,39 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
         .slice(0, 4)
         .map((c) => c.reason);
       if (stretch) reasons.push(`A stretch at ${gbp(car.priceMin)}+, but maybe worth it`);
-      let ratio = weighted / totalWeight;
+      let ratio = fitWeighted / fitTotal;
       // Whole-score penalty for a "crew" buyer's sub-7-seat car: strong enough
       // that genuine 7-seaters top when in stock, but 5-seaters still rank (and
       // win when no 7-seater exists) — so it's stock-safe, not a hard filter.
       if (answers.people === 'crew' && car.seats < tuning.practicality.crewBonusSeats) {
         ratio *= tuning.crewSeatShortfall ?? 1;
       }
+      const tasteRatio = tasteTotal ? tasteWeighted / tasteTotal : 0;
       return {
-        car, score: Math.round(ratio * 100), stretch, reasons, tradeOffs: tradeOffs(answers, car),
+        car,
+        // The match %: mostly how well the car suits them, plus a guaranteed
+        // slice of how much they'd like it. The fixed TASTE_SHARE is the point.
+        // Before, taste dimensions were nominally ~16-25% of a single weighted
+        // sum, but fuelStrictBoost inflated the fit side until the preference
+        // questions couldn't move the answer at all. Pinning the ratio means
+        // taste keeps its say no matter how hard the constraints bind.
+        score: Math.round((ratio * (1 - TASTE_SHARE) + tasteRatio * TASTE_SHARE) * 100),
+        // The two halves kept separately: `fit` is what the honesty layer talks
+        // about, `taste` orders cars the fit score can't separate.
+        fit: Math.round(ratio * 100),
+        taste: Math.round(tasteRatio * 100),
+        stretch,
+        reasons,
+        tradeOffs: tradeOffs(answers, car),
       };
     })
-    // Deterministic tie-breaking: score, then cheaper car, then name.
+    // Fit first, then taste — so within a group of equally suitable cars the
+    // buyer's stated preferences pick the order. Price and name remain as the
+    // final deterministic tie-break.
     .sort(
       (a, b) =>
         b.score - a.score ||
+        b.taste - a.taste ||
         a.car.priceMin - b.car.priceMin ||
         a.car.name.localeCompare(b.car.name),
     );
@@ -642,6 +760,15 @@ export const TOP_MATCHES = 3;
 export const CLUSTER_PTS = 3;
 export const MAX_SHOWN = 6;
 
+/*
+ * How far ahead on TASTE a car must be, inside a fit-tie, before we'll name it.
+ * Below this the cars are alike on what suits them AND on what they like, so
+ * there is genuinely nothing left for the engine to say and the page hands the
+ * choice over (the refine chips). Meg's two identical MINI Electrics in
+ * different colours are the case this protects.
+ */
+export const TASTE_PTS = 6;
+
 /**
  * The user's top matches from a pool of cars, plus whether picking a single
  * winner out of them is honest.
@@ -653,13 +780,23 @@ export const MAX_SHOWN = 6;
  */
 export function matchCars(answers, cars, tuning = DEFAULT_TUNING) {
   const ranked = rankCars(answers, cars, tuning);
-  if (!ranked.length) return { matches: [], decisive: true, clusterSize: 0 };
+  if (!ranked.length) {
+    return { matches: [], decisive: true, clusterSize: 0, tasteLead: false };
+  }
 
   const top = ranked[0].score;
-  const clusterSize = ranked.filter((m) => top - m.score <= CLUSTER_PTS).length;
+  const cluster = ranked.filter((m) => top - m.score <= CLUSTER_PTS);
+  const clusterSize = cluster.length;
   const decisive = clusterSize === 1;
+  // Fit can't separate them, but taste can: rankCars has already sorted the
+  // cluster by taste, so the leader is the one that best matches what they
+  // said matters. Naming it is honest — and it's the only thing that makes
+  // the preference questions capable of changing the recommendation.
+  const tasteLead = !decisive && (cluster[0].taste - cluster[1].taste) >= TASTE_PTS;
   const shown = decisive
     ? TOP_MATCHES
     : Math.min(Math.max(clusterSize, TOP_MATCHES), MAX_SHOWN);
-  return { matches: ranked.slice(0, shown), decisive, clusterSize };
+  return {
+    matches: ranked.slice(0, shown), decisive, clusterSize, tasteLead,
+  };
 }
