@@ -2022,5 +2022,12 @@ export default async function decorate(block) {
     }
   };
 
-  await boot();
+  // Deliberately NOT awaited. EDS awaits every block's decorate() before it
+  // reveals the page (body gains `appear`), so awaiting a network round-trip
+  // here holds the WHOLE document hostage — including scrolling. Against a
+  // cold Render backend that's 30–50s of a page that looks broken: content
+  // visible, scroll dead. boot() paints its own skeleton immediately and swaps
+  // in the real thing whenever the questions land, so decorate() can return
+  // now and let the page finish loading.
+  boot();
 }

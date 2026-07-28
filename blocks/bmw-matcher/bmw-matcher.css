@@ -39,6 +39,9 @@
      BMW = the same blue; MINI overrides this to British Racing Green so its
      buttons can be black while the green still appears, sparingly. */
   --bmwm-accent-spot: var(--bmwm-accent);
+  /* A soft wash of the accent, for the selected answer's fill. Kept as a
+     token so each brand tints with its own colour. */
+  --bmwm-accent-soft: rgba(28, 105, 212, 0.06);
   --bmwm-line: #d6d6d6;         /* hairline dividers/borders on the light theme */
 
   /* Semantic aliases so the shared selectors below read cleanly. */
@@ -116,10 +119,24 @@
 }
 
 @media (min-width: 900px) {
-  /* Matches the gutter the host's own sections use, so the left edges align. */
+  /* Matches the gutter the host's own sections use, so the left edges align.
+     On the BMW site the section is already a 1200px column, so 48px here puts
+     the content at 168px — exactly where the host's own sections sit. */
   .bmw-matcher-wrapper .bmwm {
     padding-left: 48px;
     padding-right: 48px;
+  }
+
+  /* MINI pages put this block in a FULL-BLEED section, so without a cap it ran
+     the whole 1440 and dwarfed its neighbours. The host's own sections there
+     ("FIND YOUR MINI.", "MINI OFFERS.") sit in a 1280px column — measured at
+     left 80 / right 1360 — so the block takes the same column and drops the
+     gutter, putting its content on exactly the same line. */
+  .bmw-matcher-wrapper .bmwm.bmwm-mini {
+    max-width: 1280px;
+    margin-inline: auto;
+    padding-left: 0;
+    padding-right: 0;
   }
 }
 
@@ -177,6 +194,9 @@
   --bmwm-accent-ink: #ffffff;
   --bmwm-accent-spot: #01693e;     /* British Racing Green — used sparingly */
   --bmwm-accent-secondary: #0085ac; /* MINI teal — secondary spot */
+  /* Tinted with the green spot rather than the near-black accent, which
+     would just read as grey. */
+  --bmwm-accent-soft: rgba(1, 105, 62, 0.07);
   /* Card/tile hairlines stay a soft grey (MINI reserves solid black for
      buttons + selected states, applied explicitly below), so the quiz doesn't
      read as a grid of heavy black boxes. */
@@ -448,12 +468,27 @@
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.bmwm-option:hover { border-color: var(--bmwm-ink); }
+/* Hover is a quiet neutral — a faint tint and a slightly darker edge. It used
+   to jump straight to full ink, which shouted next to the unselected boxes. */
+.bmwm-option:hover {
+  border-color: var(--bmwm-ink-muted);
+  background: var(--bmwm-surface-alt);
+}
 
+/* Keyboard focus keeps a real, visible ring (hover styling alone is not an
+   accessible focus indicator). */
+.bmwm-option:focus-visible {
+  outline: 2px solid var(--bmwm-accent-spot);
+  outline-offset: 2px;
+}
+
+/* Selected: ONE clean accent edge plus a soft wash of the same colour.
+   Previously this painted an accent border AND an inset accent ring, which
+   doubled into a thick saturated outline — the harsh blue box on BMW. */
 .bmwm-option.is-selected {
   border-color: var(--bmwm-accent);
-  background: var(--bmwm-surface);
-  box-shadow: inset 0 0 0 1px var(--bmwm-accent);
+  background: var(--bmwm-accent-soft);
+  box-shadow: none;
 }
 
 .bmwm-option-label { font-family: var(--bmwm-font-bold); font-weight: 700; }
