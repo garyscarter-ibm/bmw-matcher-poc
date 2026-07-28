@@ -36,8 +36,10 @@ squeezed out when a constraint is made to bind harder.
 has four of, not four choices. They become one card carrying the spread:
 "4 available · £31,498–£36,890 · Portimao Blue, Brooklyn Grey or Alpine White".
 
-**5. Say which situation this is.** The page has one honest thing to say per
-situation, and this is the whole of it:
+**5. Say which situation this is.** One ranked list, every car in it, each
+card saying where it is ("At Grassicks Garage", "23 miles away · Arnold Clark
+Kirkcaldy"). The page has one honest thing to say per situation, re-derived
+from the scores on screen every time the buyer narrows:
 
 | Situation | What the page says |
 |---|---|
@@ -66,6 +68,10 @@ Six, all in `server/engine.js`:
 | `TASTE_PTS` | 6 | How far ahead on taste before we'll name a winner inside a tie |
 | `TOP_MATCHES` | 3 | Cards shown when one car clearly wins |
 | `MAX_SHOWN` | 6 | Cap on cards shown in a tie |
+
+The page holds its own copy of `CLUSTER_PTS` (blocks/bmw-matcher), because it
+re-decides which situation it is in after every chip and rejection rather than
+trusting the server's first verdict. Keep the two in step.
 
 Per-brand weights and thresholds live in `server/brands.js`.
 

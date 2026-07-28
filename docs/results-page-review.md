@@ -137,3 +137,71 @@ information needed to re-derive which state it is in. It just doesn't.
 - **The brief panel's content** (not its position). "Fully electric · The
   classic hatch · £15k–25k", growing as the buyer adds constraints, is exactly
   the "the tool is listening" signal we wanted.
+
+
+---
+
+# BUILT (2026-07-28)
+
+All of it. Commit `2beac75`. What changed and what it cost.
+
+## Verified fixed
+
+| Was | Now |
+|---|---|
+| Priya's page ran 96, 95 → 78 → 99, 97 | One list, monotonic in all six persona states |
+| "TWO OF THESE FIT YOU EQUALLY WELL" over 96% and 73% | Narrowing that same page produces "Your perfect BMW is the iX2 eDrive20 M Sport" |
+| A diesel admitting it misses the brief, inside the tie | Lead cluster is re-derived; a trade-off in the leader forces the closest frame |
+| Picker on hero cards only | On every card that speaks for several cars |
+| Chips and brief above the cars | Below them |
+| "3 of 9 still match" over two cards | Counts what is on screen |
+| "Not this one" as an underlined footnote | A bordered control saying what it does |
+
+The headline is now derived from the scores on screen on every redraw, which
+is why the tie → decree transition happens by itself. Previously the state was
+decided once, by the server, and never revisited.
+
+## The cost, which is a decision rather than a defect
+
+**Merging nearby stock into the list has all but removed the decree state.**
+
+Meg used to get "Your perfect MINI is the Hatch Electric Level 3". She now gets
+"It's a four-way tie" over four cars at 97%: her local one, and three at Group
+1 Bedford, Group 1 Bedford and Berry Heathrow, 17 to 26 miles away. Every
+persona now lands on a tie. The decree and taste-pick states still exist in the
+code and still fire on the retailer's own stock (`npm run personas` shows all
+seven states unchanged, because it reads the API rather than the page), but on
+the page they are almost always outvoted by an equally good car down the road.
+
+This is honest. Those four cars do fit equally well, and pretending otherwise
+was the old page's problem. But it costs two things worth naming:
+
+1. **The payoff moment.** "Your perfect MINI is X" is what makes this feel like
+   a matcher rather than a search. A four-way tie is a result; a decree is an
+   answer.
+2. **The commercial frame.** This block is authored onto a retailer's page. It
+   now routinely leads with three competitors' cars. The old "Worth the drive"
+   band was partly commercial framing, not only information architecture, and
+   removing it removed that too.
+
+### Three ways out, if this matters
+
+**a. Weight distance into the score.** A car 20 miles away is not worth the
+same as an identical one you can walk to, so a small distance penalty is
+defensible on the merits rather than as a fudge. Meg's local 97 leads, the
+nearby 97s drop to ~94 and fall out of the cluster into NEXT BEST. The decree
+comes back and the list stays monotonic and merged. Changes what the % means,
+so it needs saying on the page.
+
+**b. Scope the headline to the retailer.** "The best at Sytner Luton is the
+Hatch Electric Level 3", with nearby cars still in the list below. Preserves
+the decree and the commercial frame, but the headline then names a car that is
+not always first in the list, which is a smaller version of the contradiction
+we just removed.
+
+**c. Leave it.** The page is truthful and the buyer is better served. Accept
+that the decree is now rare.
+
+My recommendation is (a): it is the only one that keeps the page honest, keeps
+the decree, and keeps one list. It is also the only one that requires a
+scoring change, so it is the user's call, not mine.
