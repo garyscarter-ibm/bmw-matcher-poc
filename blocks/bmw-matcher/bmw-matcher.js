@@ -202,6 +202,8 @@ const BRAND_COPY = {
     rejectPrompt: 'What put you off?',
     rejectJust: 'Just not this one',
     pickLabel: 'Choose yours',
+    briefLabel: 'What I’ve picked up',
+    briefCount: ({ shown, total }) => `${shown} of ${total} still match.`,
     hiddenChip: ({ count }) => `${count} ruled out`,
     // The "closest here" frame (docs/results-page-states.md): the local cars
     // miss something the buyer asked for, so no headline may crown one. First
@@ -270,6 +272,8 @@ const BRAND_COPY = {
     rejectPrompt: 'Go on then, what’s wrong with it?',
     rejectJust: 'Just not feeling it',
     pickLabel: 'Which one, then?',
+    briefLabel: 'So, what I know so far',
+    briefCount: ({ shown, total }) => `${shown} of ${total} still in the running.`,
     hiddenChip: ({ count }) => `${count} ruled out`,
     // The "closest here" frame, MINI register: honest shrug, no apology.
     closestTitle: ({ retailer }) => `The closest we’ve got at ${retailer}.`,
@@ -409,6 +413,32 @@ function agreedUnmet(retailerUnmet, nearbyUnmet) {
 }
 
 /**
+ * The buyer's original brief, in short phrases, taken from the questions they
+ * actually answered. Only the defining three — fuel, shape, budget — because
+ * this is a reminder of what they said, not a transcript of it.
+ */
+function briefFromAnswers(ctx) {
+  const labelsFor = (id, values) => {
+    const q = ctx.questions.find((x) => x.id === id);
+    if (!q?.options) return [];
+    return values
+      .map((v) => q.options.find((o) => o.value === v)?.label)
+      .filter(Boolean);
+  };
+  const bits = [];
+  const fuels = (Array.isArray(ctx.answers.fuel) ? ctx.answers.fuel : [ctx.answers.fuel])
+    .filter((v) => v && v !== 'open');
+  bits.push(...labelsFor('fuel', fuels));
+  bits.push(...labelsFor('bodyStyles', (ctx.answers.bodyStyles || []).filter((v) => v !== 'any')));
+  const budgetQ = ctx.questions.find((x) => x.id === 'budget');
+  if (budgetQ) {
+    const b = pillFor(budgetQ, ctx.answers);
+    if (b) bits.push(b);
+  }
+  return bits;
+}
+
+/**
  * The tie, plus the means to break it.
  *
  * Renders the tied cars at equal weight and, above them, one tappable chip per
@@ -448,7 +478,14 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
 
   const host = el('div', 'bmwm-refine');
   const chipRow = el('div', 'bmwm-chips');
-  const status = el('p', 'bmwm-refine-status');
+  /*
+   * The running brief: what the buyer said at the start, plus everything
+   * they've told us since by tapping a chip or turning a car down. It grows as
+   * they go, so the tool visibly holds a model of them rather than silently
+   * re-filtering. This replaced a flat "2 of 6 left, with X and Y" line —
+   * accurate, but it read as a filter count rather than as listening.
+   */
+  const status = el('div', 'bmwm-brief');
   const grid = el('div', 'bmwm-grid bmwm-grid-tied');
 
   // Only worth offering when there's something to offer. A cluster of
@@ -569,16 +606,32 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
     lede.hidden = !frame.lede || (shown.length <= 1 && !frame.ledeSurvivesNarrowing);
     // A car waved away with no reason narrows the count but adds no words —
     // there's nothing to report about "just not that one".
-    if (wants.length) {
-      status.textContent = copy.refineStatus({
-        shown: surviving().length, total: pool.length, wants: andList(wants),
+    // Rebuild the running brief.
+    status.replaceChildren();
+    const said = briefFromAnswers(ctx);
+    const learned = [
+      ...[...active.values()].map((a) => ({ kind: 'want', text: a.label })),
+      ...[...constraints.values()].map((c) => ({ kind: 'rule', text: c.label })),
+    ];
+    if (hidden.size) learned.push({ kind: 'rule', text: copy.hiddenChip({ count: hidden.size }) });
+
+    if (said.length || learned.length) {
+      status.append(el('p', 'bmwm-brief-label', copy.briefLabel));
+      if (said.length) status.append(el('p', 'bmwm-brief-said', said.join('  ·  ')));
+      learned.forEach((item) => {
+        const row = el('p', `bmwm-brief-item is-${item.kind}`);
+        row.append(el('span', 'bmwm-brief-mark', item.kind === 'want' ? '+' : '−'));
+        row.append(el('span', null, item.text));
+        status.append(row);
       });
-    } else if (hidden.size) {
-      status.textContent = copy.refineStatusPlain({
-        shown: surviving().length, total: pool.length,
-      });
-    } else {
-      status.textContent = '';
+      // Only once they've told us something. Before that the count is noise:
+      // it read "Showing 9 of 9" beside two visible cards, which is both
+      // confusing and not what the number meant.
+      if (learned.length) {
+        status.append(el('p', 'bmwm-brief-count', copy.briefCount({
+          shown: surviving().length, total: pool.length,
+        })));
+      }
     }
 
     grid.replaceChildren();

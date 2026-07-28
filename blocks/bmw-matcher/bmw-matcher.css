@@ -789,6 +789,54 @@
   outline-offset: -2px;
 }
 
+/* --- the running brief: what the tool has picked up so far ---
+   Grows as the buyer taps a chip or turns a car down, so the page visibly
+   holds a model of them instead of silently re-filtering. Deliberately quiet:
+   it's the tool listening, not the tool talking. */
+.bmwm-brief {
+  margin-top: var(--bmwm-space-4);
+  padding: var(--bmwm-space-4) var(--bmwm-space-5);
+  background: var(--bmwm-surface-alt);
+  border-left: 3px solid var(--bmwm-accent-spot);
+  border-radius: var(--bmwm-radius);
+}
+.bmwm-brief-label {
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  font-size: var(--bmwm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--bmwm-accent-spot);
+  margin: 0 0 var(--bmwm-space-2);
+}
+/* What they told us in the quiz — the starting brief. */
+.bmwm-brief-said {
+  margin: 0 0 var(--bmwm-space-2);
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+}
+/* Everything learned since, one line at a time. */
+.bmwm-brief-item {
+  margin: 0 0 2px;
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink);
+  display: flex;
+  gap: var(--bmwm-space-2);
+  align-items: baseline;
+}
+.bmwm-brief-mark {
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  width: 0.9em;
+  color: var(--bmwm-accent-spot);
+}
+.bmwm-brief-item.is-rule .bmwm-brief-mark { color: var(--bmwm-ink-muted); }
+.bmwm-brief-count {
+  margin: var(--bmwm-space-2) 0 0;
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+}
+
 .bmwm-refine-status {
   margin: var(--bmwm-space-3) 0 0;
   font-size: var(--bmwm-text-label);
