@@ -12,6 +12,10 @@ never shipped to the browser.
 > Unofficial tool. Not affiliated with or endorsed by BMW. Prices and specs are
 > indicative — always check with a retailer.
 
+> **New here, or coming back to it?** Read
+> **[docs/how-it-works.md](docs/how-it-works.md)** — the whole system on one
+> page. The rest of `docs/` is the record of *why* each decision was made.
+
 ## Architecture: UI block + backend
 
 Two deployables:

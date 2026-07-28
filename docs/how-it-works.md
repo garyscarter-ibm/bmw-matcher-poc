@@ -1,0 +1,108 @@
+# How it works
+
+The whole system on one page. Everything else in `docs/` is the record of *why*
+a decision was made; this is *what it does now*. If the two disagree, this file
+is wrong — fix it.
+
+## The idea in one sentence
+
+Ask about someone's life, rule out the cars that can't work, rank what's left
+on how well it suits them, and be honest about the rest.
+
+## The six steps
+
+**1. Nine questions.** Budget, body style, fuel, charging, use, people,
+mileage, style and priorities. (MINI swaps mileage/style for doors and a "vibe"
+question.) The question set lives on the server so the copy and count can
+change without touching the block.
+
+**2. Rule out what can't work.** Over budget by more than 15%, too few seats
+for the family, too small a boot for a crew. This is elimination, not scoring:
+these cars never appear.
+
+**3. Score what's left, out of 100.** Two halves, blended **80/20**:
+
+- **Fit (80%)** — does it actually suit them: budget, body, fuel, practicality,
+  economy, size.
+- **Taste (20%)** — would they like it: character, performance, trim. Driven by
+  the `priorities` answer.
+
+The split exists because a single blended score couldn't tell a *requirement*
+("must be a convertible") from a *preference* ("I like comfort"), and kept
+failing in one direction or the other. The 20% is fixed so preferences can't be
+squeezed out when a constraint is made to bind harder.
+
+**4. Collapse repeat listings.** Four identical iX2s are one car the retailer
+has four of, not four choices. They become one card carrying the spread:
+"4 available · £31,498–£36,890 · Portimao Blue, Brooklyn Grey or Alpine White".
+
+**5. Say which situation this is.** The page has one honest thing to say per
+situation, and this is the whole of it:
+
+| Situation | What the page says |
+|---|---|
+| One car clearly wins | "Your perfect BMW is the X7." |
+| Several tie, their priorities favour one | "We'd go for the Countryman C. A few of these fit just as well." |
+| Several genuinely tie | "It's a six-way tie." — then chips to narrow by colour, kit, gearbox |
+| The best car misses something they asked for | "The closest matches at Grassicks." — and each card says what it misses |
+| That thing exists, but not here | "No convertibles at Grassicks. The nearest is 18 miles away." |
+| Nothing fits at all | "No matches found." — plus what's nearby |
+
+**6. Pick the actual car.** Once it's down to one model, the buyer chooses
+which of the retailer's copies — colour, price, mileage.
+
+That's it. Constraints eliminate, fit ranks, taste chooses the model, the buyer
+chooses the car.
+
+## The numbers you can turn
+
+Six, all in `server/engine.js`:
+
+| Constant | Now | What it does |
+|---|---|---|
+| `STRETCH_FACTOR` | 1.15 | How far over budget a car may still appear |
+| `TASTE_SHARE` | 0.2 | How much of the score is preference rather than suitability |
+| `CLUSTER_PTS` | 3 | Within how many points cars count as "tied" |
+| `TASTE_PTS` | 6 | How far ahead on taste before we'll name a winner inside a tie |
+| `TOP_MATCHES` | 3 | Cards shown when one car clearly wins |
+| `MAX_SHOWN` | 6 | Cap on cards shown in a tie |
+
+Per-brand weights and thresholds live in `server/brands.js`.
+
+## How to check you haven't broken it
+
+```sh
+npm run audit stick    # do the questions change the answer?
+npm run audit fuel     # does a named fuel actually bind?
+npm run audit sens     # diversity and body-style honesty
+npm run personas       # all seven personas end to end
+cd server && npm test  # 61 unit tests
+```
+
+The audits replay the real engine over a national stock snapshot. Any tuning
+change should be measured with them before and after — that's how every change
+in this repo was justified, and how two of them were caught being wrong.
+
+## Where the code lives
+
+| File | Job |
+|---|---|
+| `server/engine.js` | Scoring, grouping, clustering. The whole brain. |
+| `server/brands.js` | Per-brand weights and tuning. BMW and MINI differ only here. |
+| `server/questions.js` | The question set. |
+| `server/stock.js` | Live retailer feed, plus paint fetched per shown car. |
+| `server/mapping.js` | Feed vehicle → the shape the engine scores. |
+| `blocks/bmw-matcher/` | The EDS block: quiz, results, refine, reject. |
+
+## Which doc to read when
+
+Most of `docs/` is history. The ones worth opening:
+
+- **This file** — what it does.
+- `personas.md` — who it's for.
+- `same-car-investigation.md` — why the engine works the way it does now.
+- `results-page-states.md` — why the page says what it says.
+- `tone-style-guide.md` — how each brand speaks.
+
+The rest are decision records: useful when you want to know *why* something is
+the way it is, not what it currently does.
