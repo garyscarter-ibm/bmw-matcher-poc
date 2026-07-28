@@ -570,6 +570,155 @@
 
 .bmwm-grid { display: grid; gap: var(--bmwm-space-4); margin: var(--bmwm-space-6) 0 var(--bmwm-space-2); }
 
+/* A tie: no hero, no runners-up tier — every car at the same weight, because
+   the engine rates them the same. Two up from 560px; one column below that,
+   which the base .bmwm-grid already gives. */
+@media (min-width: 560px) {
+  .bmwm-grid-tied { grid-template-columns: 1fr 1fr; }
+}
+
+/* --- refine panel: breaking a tie on the things the questions didn't ask ---
+   Deliberately light — a row of chips, not a filter sidebar. This tool is for
+   the buyer who can't yet state a spec; the moment it looks like advanced
+   search it's competing with the real site's filters and losing. */
+.bmwm-refine { margin-top: var(--bmwm-space-5); }
+
+.bmwm-refine-label {
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  font-size: var(--bmwm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--bmwm-accent-spot);
+  margin: 0 0 var(--bmwm-space-3);
+}
+
+.bmwm-chips { display: flex; flex-wrap: wrap; gap: var(--bmwm-space-2); }
+
+/* Pill on both brands (MINI's --bmwm-radius-control is already a pill; BMW's
+   is square, so this is one of the few places the two geometries diverge on
+   purpose — a tappable filter reads as a chip, not a button). */
+.bmwm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--bmwm-space-2);
+  padding: 8px 14px;
+  font-family: var(--bmwm-font-body);
+  font-size: var(--bmwm-text-label);
+  line-height: 1.2;
+  color: var(--bmwm-ink);
+  background: var(--bmwm-surface);
+  border: 1px solid var(--bmwm-line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.bmwm-chip:hover { border-color: var(--bmwm-accent-spot); }
+.bmwm-chip:focus-visible {
+  outline: 2px solid var(--bmwm-accent-spot);
+  outline-offset: 2px;
+}
+
+/* Applied: filled with the spot colour, carrying its own ✕ so it's obvious
+   both that it's on and that it can be taken off. */
+.bmwm-chip.is-on {
+  background: var(--bmwm-accent-spot);
+  border-color: var(--bmwm-accent-spot);
+  color: #fff;
+}
+.bmwm-chip-x { font-size: 11px; opacity: 0.85; }
+
+/* The paint swatch in a card's spec line: a small dot before the colour name.
+   Hairline border so the white swatch reads on a white card. */
+.bmwm-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 20%);
+  margin-right: 5px;
+  vertical-align: 1px;
+}
+
+/* --- "Not this one": rejection, and the why that makes it usable ---
+   Deliberately quiet — a small text button at the foot of the card, not a
+   red X. Rejecting is normal browsing behaviour, not an error state. */
+.bmwm-reject { margin-top: var(--bmwm-space-4); }
+
+.bmwm-reject-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: var(--bmwm-font-body);
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.bmwm-reject-open:hover { color: var(--bmwm-ink); }
+.bmwm-reject-open:focus-visible {
+  outline: 2px solid var(--bmwm-accent-spot);
+  outline-offset: 2px;
+}
+
+.bmwm-reject-menu {
+  margin-top: var(--bmwm-space-3);
+  padding: var(--bmwm-space-3);
+  background: var(--bmwm-surface-alt);
+  border-radius: var(--bmwm-radius);
+}
+.bmwm-reject-prompt {
+  margin: 0 0 var(--bmwm-space-2);
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+}
+
+/* One reason per row: they're read, not scanned, and a wrapped row of pills
+   would invite a fast mis-tap on something that teaches us a dealbreaker. */
+.bmwm-reject-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--bmwm-space-2) var(--bmwm-space-3);
+  margin-bottom: 2px;
+  border: 0;
+  border-radius: var(--bmwm-radius);
+  background: var(--bmwm-surface);
+  cursor: pointer;
+  font-family: var(--bmwm-font-body);
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink);
+}
+.bmwm-reject-option:last-child { margin-bottom: 0; }
+.bmwm-reject-option:hover { background: var(--bmwm-accent-spot); color: #fff; }
+.bmwm-reject-option:focus-visible {
+  outline: 2px solid var(--bmwm-accent-spot);
+  outline-offset: -2px;
+}
+
+.bmwm-refine-status {
+  margin: var(--bmwm-space-3) 0 0;
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+}
+
+/* Refined down to nothing — only reachable by combining chips, so it's an
+   explanation plus a way back, never a bare empty grid. */
+.bmwm-refine-empty {
+  grid-column: 1 / -1;
+  background: var(--bmwm-surface-alt);
+  border-left: 3px solid var(--bmwm-accent-spot);
+  border-radius: var(--bmwm-radius);
+  padding: var(--bmwm-space-5);
+}
+.bmwm-refine-empty-text {
+  margin: 0 0 var(--bmwm-space-4);
+  font-size: var(--bmwm-text-body);
+  line-height: 1.5;
+  color: var(--bmwm-ink);
+}
+
 /* --- results skeleton (shown while /api/match is in flight) ---
    Reuses the real .bmwm-card / .bmwm-grid / .bmwm-more structure so the
    placeholder occupies the same footprint the results will, avoiding a layout

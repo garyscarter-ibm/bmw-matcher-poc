@@ -10,14 +10,18 @@
  * These are point-in-time snapshots (used stock churns), refreshed by re-running
  * this script — NOT a live source. The app itself still fetches live; this is a
  * dev/validation aid so we can replay rankings against real cars without hitting
- * the network. Run:  node scripts/dump-stock.js [bmw|mini|all]
+ * the network. Run:  node scripts/dump-stock.js [bmw|mini|all] [--remap]
+ *
+ * `--remap` skips the network entirely and re-projects the existing raw dump
+ * through the current mapVehicle — what you want after mapping.js gains a
+ * field, when you don't want the cars themselves to change underneath you.
  *
  * Zero-dep, node:https (same handshake as server/stock.js). Whole national feed,
  * so it paginates past the app's small PAGE_LIMIT.
  */
 
 import { request } from 'node:https';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -100,9 +104,28 @@ async function dumpBrand(brand) {
   console.log(`  ${label}: wrote ${vehicles.length} raw + ${cars.length} mapped → fixtures/${brand}-{raw,cars}.json`);
 }
 
-const arg = (process.argv[2] || 'all').toLowerCase();
+/*
+ * Re-project the raw dump we already have through the CURRENT mapVehicle,
+ * without touching the network — for when mapping.js gains a field (styleLine,
+ * doors, features…) and the mapped fixture would otherwise be stale against a
+ * mapper the tests and audits now assume. Same point-in-time cars, new
+ * columns. Use `--remap` for that; re-run without it to fetch genuinely
+ * current stock.
+ */
+function remapBrand(brand) {
+  const { label } = BRANDS[brand];
+  const vehicles = JSON.parse(readFileSync(join(OUT_DIR, `${brand}-raw.json`), 'utf8'));
+  const cars = vehicles.map((v) => mapVehicle(v, brand)).filter(Boolean);
+  writeFileSync(join(OUT_DIR, `${brand}-cars.json`), JSON.stringify(cars, null, 2));
+  console.log(`  ${label}: re-mapped ${vehicles.length} raw → ${cars.length} cars (no network) → fixtures/${brand}-cars.json`);
+}
+
+const args = process.argv.slice(2).map((a) => a.toLowerCase());
+const remap = args.includes('--remap');
+const arg = args.find((a) => !a.startsWith('--')) || 'all';
 const brands = arg === 'all' ? Object.keys(BRANDS) : [normalizeBrand(arg)];
 for (const b of brands) {
+  if (remap) remapBrand(b);
   // eslint-disable-next-line no-await-in-loop
-  await dumpBrand(b);
+  else await dumpBrand(b);
 }

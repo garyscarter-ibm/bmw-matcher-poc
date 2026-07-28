@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  matchCars, rankCars, budgetRange, unmetWants, tradeOffs, STRETCH_FACTOR,
+  matchCars, rankCars, budgetRange, unmetWants, tradeOffs, STRETCH_FACTOR, MAX_SHOWN,
 } from '../engine.js';
 import { CARS } from '../data.js';
 import { BUDGET_BANDS, QUESTIONS } from '../questions.js';
@@ -153,12 +153,60 @@ test('rankCars ranks a mixed-retailer pool on merit alone', () => {
   assert.equal(ranked[0].score, ranked[1].score, 'distance must not affect score');
 });
 
-test('rankCars returns every survivor, not just the top 3', () => {
+test('rankCars returns every survivor, not just the headline matches', () => {
   const all = rankCars(base, CARS);
   const { matches } = run(base);
   assert.ok(all.length > matches.length, 'ranking is wider than the headline matches');
-  assert.equal(matches.length, 3);
-  assert.deepEqual(matches, all.slice(0, 3), 'matches are the head of the full ranking');
+  assert.deepEqual(matches, all.slice(0, matches.length), 'matches are the head of the full ranking');
+});
+
+/* ---- clusters: only claim a winner when there is one ---- */
+
+test('a clear winner is decisive and shows the usual three', () => {
+  // One car engineered to beat everything: exactly the answers it satisfies.
+  const runaway = {
+    id: 'runaway', name: 'BMW i5 Touring', line: '5 Series', body: 'estate', fuel: 'ev',
+    priceMin: 40000, priceMax: 40000, sizeClass: 3, seats: 5, boot: 570, zeroTo62: 5.9,
+    evRange: 350, mpg: 0, tags: ['cruiser'], blurb: '', styleLine: null, doors: null,
+  };
+  const answers = {
+    ...base, budget: [35000, 45000], bodyStyles: ['estate'], fuel: ['ev'], charging: 'home',
+  };
+  const { matches, decisive, clusterSize } = matchCars(answers, [runaway, ...CARS]);
+  assert.equal(matches[0].car.id, 'runaway');
+  assert.equal(decisive, true, 'nothing else is within reach, so the decree is earned');
+  assert.equal(clusterSize, 1);
+  assert.equal(matches.length, 3, 'a decisive result is the familiar hero + two');
+});
+
+test('a tie is reported as a tie, and stops hiding the rest of it', () => {
+  // Five identical cars: the engine cannot separate them, and shouldn't pretend.
+  const clone = (id) => ({
+    id, name: `BMW 320i ${id}`, line: '3 Series', body: 'saloon', fuel: 'petrol',
+    priceMin: 30000, priceMax: 30000, sizeClass: 2, seats: 5, boot: 480, zeroTo62: 7.4,
+    mpg: 45, tags: ['cruiser'], blurb: '', styleLine: null, doors: null,
+  });
+  const fivesome = ['a', 'b', 'c', 'd', 'e'].map(clone);
+  const { matches, decisive, clusterSize } = matchCars({ ...base, budget: [25000, 35000] }, fivesome);
+  assert.equal(decisive, false);
+  assert.equal(clusterSize, 5, 'the whole tie is counted, not just what fits');
+  assert.equal(matches.length, 5, 'and shown — the old 3-car cap hid two of them');
+  assert.equal(new Set(matches.map((m) => m.score)).size, 1, 'fixture sanity: genuinely tied');
+});
+
+test('a tie wider than MAX_SHOWN is capped for display but counted in full', () => {
+  const many = Array.from({ length: 10 }, (_, i) => ({
+    id: `c${i}`, name: `BMW 320i ${i}`, line: '3 Series', body: 'saloon', fuel: 'petrol',
+    priceMin: 30000, priceMax: 30000, sizeClass: 2, seats: 5, boot: 480, zeroTo62: 7.4,
+    mpg: 45, tags: ['cruiser'], blurb: '', styleLine: null, doors: null,
+  }));
+  const { matches, clusterSize } = matchCars({ ...base, budget: [25000, 35000] }, many);
+  assert.equal(clusterSize, 10, 'the page can say how big the tie really is');
+  assert.equal(matches.length, MAX_SHOWN, 'without rendering all ten');
+});
+
+test('an empty pool is decisive by vacuum, not by claim', () => {
+  assert.deepEqual(matchCars(base, []), { matches: [], decisive: true, clusterSize: 0 });
 });
 
 test('every dataset entry has the fields the engine needs', () => {

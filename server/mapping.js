@@ -464,6 +464,142 @@ const BRAND_MAPPERS = {
   },
 };
 
+/* ------------------------- equipment concepts -------------------------- *
+ * The feed carries a full factory options list per car (100% of stock, both
+ * brands) as manufacturer option names — a controlled vocabulary, not free
+ * text: ~260 distinct strings above 1% frequency for BMW, ~230 for MINI. That
+ * makes the granular "must have a panoramic roof" kind of want parseable,
+ * which the life-fit question set never asks about.
+ *
+ * Concepts are deliberately brand-NEUTRAL: a car either has a heated steering
+ * wheel or it doesn't, and that fact doesn't change between marques. Only the
+ * vocabulary differs, so a concept's pattern covers both brands' wording
+ * (BMW's "comfort access" and MINI's "keyless" are one concept; CarPlay is
+ * "smartphone integration" on MINI and unnamed on BMW).
+ *
+ * What varies per brand is which concepts are worth ASKING about, and that is
+ * measured live rather than authored: a concept every car at a retailer has
+ * (heated seats on 96% of BMW stock) can't refine anything, and one no car has
+ * is dead. See docs/refinement-plan.md — the refinement step reads stock
+ * variance, so this table stays a generous parse and the selection happens
+ * downstream. Parsing a rarely-split concept costs nothing; missing one that
+ * turns out to matter costs a question we can never ask.
+ *
+ * Coverage and split rates per concept: docs/refinement-audit.md
+ * (`npm run audit:refine features` re-measures them).
+ * ---------------------------------------------------------------------- */
+/*
+ * [key, match, exclude?] — a car has the concept when SOME option string
+ * matches `match` and that same string doesn't match `exclude`.
+ *
+ * Matching per string rather than against the joined blob is what makes
+ * `exclude` meaningful, and it isn't fussiness: matching the blob had
+ * "sport leather steering wheel" reading as leather SEATS on half of MINI
+ * stock. Where the two must name different cars (a panoramic roof is not
+ * what someone picturing a small sunroof means), the narrower concept
+ * excludes the wider one.
+ */
+export const FEATURE_CONCEPTS = [
+  // The strongest discriminator found — 17% (BMW) / 36% (MINI) of stock, and
+  // it splits the pool at ~every retailer.
+  ['panoRoof', /panoram/],
+  ['sunroof', /sunroof|electric glass roof/, /panoram/],
+  // MINI's contrast roof — the one *aesthetic* choice this feed states, and
+  // a signature MINI one. Stated either way (contrast colour or "in body
+  // colour") for 88% of MINI stock, and it splits the pool at every single
+  // retailer measured. Absent from BMW stock, which doesn't offer it — so
+  // like every concept here it earns its question from variance, not from
+  // being authored per brand. The nearest thing available to the "I want the
+  // blue one" want that the feed otherwise can't answer; see the colour blind
+  // spot in docs/refinement-audit.md.
+  ['contrastRoof',
+    /(roof|mirror caps?).*\b(black|white|silver|chili red|red|yellow|blue|grey)\b|^(black|white|red|silver|yellow) roof/,
+    /body colour|rail|lining|aerial|antenna|spoiler|panoram|sunroof|skyroof/],
+  ['heatedSeats', /heated.*seat|seat heating/],
+  ['heatedWheel', /heated steering/],
+  // Named for what the feed actually states. Seat upholstery grade (Vernasca,
+  // Dakota, MINI Yours Lounge) appears on <1% of either brand's stock, so
+  // "leather seats" is NOT answerable from this data — see the known blind
+  // spots in docs/refinement-audit.md. A leather WHEEL is stated, and often.
+  ['leatherWheel', /leather steering/],
+  ['sportsSeats', /sports? seats/],
+  ['electricSeats', /electric(al)?.*seat.*adjust|seat adjustment.*electric/],
+  ['parkingCamera', /camera/],
+  // "park assist" alone missed BMW's own name for the pack, "Parking
+  // Assistant" (59% of its stock), understating the concept ~4x — which is
+  // exactly what the audit's `vocab` pass exists to catch.
+  ['parkingSensors', /park distance|parking sensor|\bpdc\b|park(ing)? assist/],
+  ['navigation', /navigation|sat ?nav/],
+  ['smartphoneIntegration', /carplay|android auto|smartphone integration/],
+  ['premiumAudio', /harman|kardon|\bhi-?fi\b|sound system|bang & olufsen|bowers/],
+  ['headUpDisplay', /head-?up/],
+  ['cruiseControl', /cruise/],
+  ['adaptiveLights', /adaptive led|laser ?light|matrix/],
+  ['keylessEntry', /comfort access|keyless/],
+  ['climateControl', /automatic air conditioning|climate control|zone air/],
+  ['ambientLighting', /ambient light|additional interior lighting/],
+  // Rare (~5% BMW, ~1% MINI) so it seldom clears the variance bar — but it's
+  // an absolute dealbreaker for the buyer who tows, and parsing it is free.
+  ['towbar', /tow ?bar|towing/],
+  ['tintedGlass', /sun protection|privacy glass|tinted/],
+];
+
+/*
+ * Every option string on one feed vehicle, lowercased.
+ *
+ * The feed nests them three ways at once — per-category standard/additional
+ * arrays (`features.interior.standard`), a flat `additional` list of
+ * `{ category, description }` objects, and occasional bare string arrays — so
+ * this walks all three shapes rather than trusting one. Unknown shapes are
+ * skipped, not thrown on: a feed that grows a fourth nesting should cost us
+ * concepts, never a whole car.
+ */
+export function featureStrings(features) {
+  if (!features || typeof features !== 'object') return [];
+  const out = [];
+  for (const val of Object.values(features)) {
+    if (Array.isArray(val)) {
+      for (const item of val) {
+        if (typeof item === 'string') out.push(item);
+        else if (typeof item?.description === 'string') out.push(item.description);
+      }
+    } else if (val && typeof val === 'object') {
+      for (const arr of Object.values(val)) {
+        if (Array.isArray(arr)) {
+          for (const s of arr) if (typeof s === 'string') out.push(s);
+        }
+      }
+    }
+  }
+  return out.map((s) => s.toLowerCase().trim());
+}
+
+/** The equipment concepts this car carries, as sorted concept keys. */
+function featuresFor(features) {
+  const strings = featureStrings(features);
+  if (!strings.length) return [];
+  return FEATURE_CONCEPTS
+    .filter(([, match, exclude]) => strings.some((s) => match.test(s) && !exclude?.test(s)))
+    .map(([key]) => key)
+    .sort();
+}
+
+/*
+ * Gearbox, normalised to 'auto' | 'manual' (undefined if the feed omits it).
+ *
+ * A clean top-level feed field, unlike the concepts above — and one of the
+ * most common genuine used-car dealbreakers, which the quiz never asks about.
+ * Nearly dead for BMW (automatic on ~97% of stock) but a live split for MINI
+ * (~12% manual), so like the concepts it earns its question from variance
+ * rather than from being authored into a brand's set.
+ */
+function transmissionFor(raw = '') {
+  const t = String(raw).toLowerCase();
+  if (t.includes('manual')) return 'manual';
+  if (t.includes('auto') || t.includes('dct') || t.includes('steptronic')) return 'auto';
+  return undefined;
+}
+
 /* ------------------------------ projection ----------------------------- */
 
 /**
@@ -528,6 +664,12 @@ export function mapVehicle(v, brand = 'bmw') {
     // they produce are what reaches the card.
     styleLine: m.styleLine(derivative),
     doors: m.doors(body, derivative),
+    // Granular equipment facts for the results-side refinement step (see
+    // FEATURE_CONCEPTS and docs/refinement-plan.md). Internal for now, like
+    // styleLine/doors — nothing scores or renders them yet, so publicCar
+    // withholds them until phase 2 has a consumer.
+    features: featuresFor(v.features),
+    transmission: transmissionFor(v.transmission),
     mpg: num(v?.consumption?.fuel?.values?.combined),
     evRange: num(v?.consumption?.range?.values?.total),
     tags: m.tags(line, body, fuel, derivative),

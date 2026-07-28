@@ -149,11 +149,32 @@ function scoreBody(car, answers, tuning) {
 
 const FUEL_LABELS = { petrol: 'petrol', diesel: 'diesel', phev: 'plug-in hybrid', ev: 'fully electric' };
 
+/*
+ * How acceptable each fuel is as a substitute for the one asked for, read as
+ * rows of "wanted → offered".
+ *
+ * The substitute scores used to sit around 0.5–0.7, which read as "a diesel is
+ * 70% as good as the petrol you asked for". Combined with fuelStrictBoost that
+ * still left a wrong-fuel car only ~8 points behind, so a car that was strong
+ * on economy and character routinely beat one that actually matched: measured
+ * at 15% of BMW cases and 8% of MINI's where a matching car was available and
+ * lost anyway (`npm run audit fuel`). That directly contradicted the promise
+ * made just below at fuelStrictBoost.
+ *
+ * Body style had the same flaw and was fixed the same way in July (miss → 0,
+ * honesty 53% → 67%, diversity rose). Fuel can't go to zero — the degrees of
+ * similarity are real, a plug-in genuinely is the closest thing to an EV — so
+ * the ordering is kept and the scale compressed: a substitute now has to be
+ * overwhelmingly better elsewhere to win, rather than merely better.
+ *
+ * "Help me decide" (`open`) never reads this table; it's scored by
+ * circumstance in scoreOneFuel, and is unaffected.
+ */
 const FUEL_TABLE = {
-  petrol: { petrol: 1, diesel: 0.7, phev: 0.6, ev: 0.15 },
-  diesel: { diesel: 1, petrol: 0.6, phev: 0.5, ev: 0.15 },
-  phev: { phev: 1, ev: 0.55, petrol: 0.5, diesel: 0.4 },
-  ev: { ev: 1, phev: 0.5, petrol: 0.1, diesel: 0.1 },
+  petrol: { petrol: 1, diesel: 0.25, phev: 0.3, ev: 0.1 },
+  diesel: { diesel: 1, petrol: 0.25, phev: 0.25, ev: 0.1 },
+  phev: { phev: 1, ev: 0.35, petrol: 0.25, diesel: 0.2 },
+  ev: { ev: 1, phev: 0.3, petrol: 0.05, diesel: 0.05 },
 };
 
 /** Score one car against a single fuel preference. Returns { score, reason? }. */
@@ -297,7 +318,7 @@ function scoreEconomy(car, answers, tuning) {
     score = canCharge ? 1 : clamp(0.5 + 0.2 * miles);
     if (canCharge) {
       reason = miles >= 0.66
-        ? 'Pennies per mile charging at home or work — ideal for your big annual mileage'
+        ? 'Pennies per mile charging at home or work, ideal for your big annual mileage'
         : 'Pennies per mile charging at home or work';
     }
   } else if (car.fuel === 'phev') {
@@ -312,7 +333,7 @@ function scoreEconomy(car, answers, tuning) {
     score = clamp(base + (base - 0.5) * miles);
     if (score >= 0.8) {
       reason = miles >= 0.66
-        ? `Frugal at around ${car.mpg}mpg — kind on a big annual mileage`
+        ? `Frugal at around ${car.mpg}mpg, kind on a big annual mileage`
         : `Frugal for what it is, around ${car.mpg}mpg`;
     }
   }
@@ -596,10 +617,49 @@ export function tradeOffs(answers, car) {
 /** How many cars the results screen shows as headline matches. */
 export const TOP_MATCHES = 3;
 
+/*
+ * When the engine can't actually separate the top cars.
+ *
+ * Measured over both national dumps (docs/refinement-audit.md): the #1 and #2
+ * scores land within 3 points in 52-67% of rankings and are EXACTLY equal in
+ * 19-35% — where the winner is whatever the tie-break in rankCars preferred,
+ * not a judgement. Naming one of those "your perfect BMW" states a preference
+ * the model doesn't hold, and at the same time hides the rest of the tie
+ * behind a 3-car cap (the tie runs deeper than 3 in up to 32% of cases).
+ *
+ * So the results are described by what the engine can honestly claim:
+ *   cluster    every car within CLUSTER_PTS of the top score — the set it is
+ *              treating as interchangeable.
+ *   decisive   true only when nothing else is within reach of #1, i.e. the
+ *              "your perfect X is…" headline is earned.
+ *
+ * A decisive result shows TOP_MATCHES as before. A tied one shows the cluster
+ * (capped at MAX_SHOWN, floored at TOP_MATCHES so the page never gets thinner
+ * than it is today) and lets the page say so. CLUSTER_PTS is the one judgement
+ * call here — 3 points out of 100, chosen because it's the median gap; the
+ * dead-tie half of the finding needs no threshold at all.
+ */
+export const CLUSTER_PTS = 3;
+export const MAX_SHOWN = 6;
+
 /**
- * The user's top matches from a pool of cars.
- * @returns {{ matches: Match[] }}
+ * The user's top matches from a pool of cars, plus whether picking a single
+ * winner out of them is honest.
+ *
+ * @returns {{ matches: Match[], decisive: boolean, clusterSize: number }}
+ *   `clusterSize` is the true size of the tie, which can exceed matches.length
+ *   when it runs past MAX_SHOWN — the page can say "six of these fit" while
+ *   showing what fits on screen.
  */
 export function matchCars(answers, cars, tuning = DEFAULT_TUNING) {
-  return { matches: rankCars(answers, cars, tuning).slice(0, TOP_MATCHES) };
+  const ranked = rankCars(answers, cars, tuning);
+  if (!ranked.length) return { matches: [], decisive: true, clusterSize: 0 };
+
+  const top = ranked[0].score;
+  const clusterSize = ranked.filter((m) => top - m.score <= CLUSTER_PTS).length;
+  const decisive = clusterSize === 1;
+  const shown = decisive
+    ? TOP_MATCHES
+    : Math.min(Math.max(clusterSize, TOP_MATCHES), MAX_SHOWN);
+  return { matches: ranked.slice(0, shown), decisive, clusterSize };
 }
