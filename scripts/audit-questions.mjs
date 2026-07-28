@@ -18,19 +18,23 @@
  *          wrong-fuel car shouldn't top a matching-fuel one.
  *   stick  Does the winner ever change? Perturbs REAL persona answers one at
  *          a time — the "it always recommends the same car" test.
+ *   taste  Inside a fit tie, how far ahead is #1 on taste? The distribution
+ *          TASTE_PTS is a threshold on, and what each candidate value does.
  *
  * Findings + the adapt-to-which-pool decision framework are written up in
  * docs/question-stock-audit.md — re-run this after a fixture refresh to see
  * whether they still hold. Zero-dep; seeded PRNG so runs are reproducible.
  *
- * Run:  node scripts/audit-questions.mjs [dead|sens|size|all]
+ * Run:  node scripts/audit-questions.mjs [dead|sens|size|fuel|stick|taste|all]
  */
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { rankCars, matchCars, TOP_MATCHES } from '../server/engine.js';
+import {
+  rankCars, matchCars, TOP_MATCHES, TASTE_PTS,
+} from '../server/engine.js';
 import { questionsForBrand, applyBespokeAnswers } from '../server/questions.js';
 import { brandTuning, brandConfig } from '../server/brands.js';
 
@@ -447,6 +451,56 @@ function auditStickiness(brand) {
     });
 }
 
+
+/*
+ * Taste pass — is TASTE_PTS set anywhere useful?
+ *
+ * TASTE_PTS is consulted in exactly one situation: a fit tie, deciding whether
+ * #1 is far enough ahead on TASTE to be named ("We'd go for the Countryman C")
+ * rather than handing the choice to the refine chips. So the only measurement
+ * that means anything is the distribution of that gap across real ties, which
+ * is what this prints, plus what each candidate threshold would do to it.
+ *
+ * It exists because the post-grouping review predicted the gaps would collapse
+ * to 1–2 points and suppress the state. They don't — the prediction came from
+ * one unrepresentative pair. Re-run this after a fixture refresh rather than
+ * reasoning about it from a sample of one.
+ */
+function auditTaste(brand) {
+  const { byRetailer, tuning: t, budgetCfg, questions: qs } = loadBrand(brand);
+  const gaps = [];
+  let decisive = 0;
+  let ties = 0;
+  for (const stock of sampleRetailers(byRetailer, N_RETAILERS)) {
+    if (stock.length < 15) continue; // too thin to produce a meaningful tie
+    for (let i = 0; i < 40; i += 1) {
+      const answers = applyBespokeAnswers(brand, randomAnswers(qs, budgetCfg));
+      const r = matchCars(answers, stock, t);
+      if (!r.matches.length) continue;
+      if (r.decisive) { decisive += 1; continue; }
+      ties += 1;
+      if (r.matches.length >= 2) gaps.push(r.matches[0].taste - r.matches[1].taste);
+    }
+  }
+  gaps.sort((a, b) => a - b);
+  const share = (n) => pct(n, gaps.length);
+  console.log(`\n${brand.toUpperCase()} — ${decisive} decisive, ${ties} ties`);
+  console.log(`  taste gap in a tie: median ${median(gaps).toFixed(1)}`
+    + `  p75 ${quantile(gaps, 0.75).toFixed(1)}  p90 ${quantile(gaps, 0.9).toFixed(1)}`);
+  console.log('  distribution:');
+  for (const [lo, hi] of [[0, 1], [1, 2], [2, 3], [3, 4], [4, 6], [6, 8], [8, 12], [12, 20], [20, Infinity]]) {
+    const n = gaps.filter((g) => g >= lo && g < hi).length;
+    const label = `${String(lo).padStart(2)}–${hi === Infinity ? ' ∞' : String(hi).padStart(2)}`;
+    console.log(`    ${label}  ${'█'.repeat(Math.round((n / gaps.length) * 60)).padEnd(30)} ${share(n)}`);
+  }
+  console.log(`  threshold → share of ties given a named pick (TASTE_PTS is ${TASTE_PTS}):`);
+  for (const th of [1, 2, 3, 4, 5, 6, 8, 10, 12]) {
+    const n = gaps.filter((g) => g >= th).length;
+    console.log(`    ${String(th).padStart(2)}${th === TASTE_PTS ? ' ←' : '  '} `
+      + `${'█'.repeat(Math.round((n / gaps.length) * 30)).padEnd(30)} ${share(n)}`);
+  }
+}
+
 // ----------------------------------------------------------------- run ----
 
 const PASSES = {
@@ -455,11 +509,12 @@ const PASSES = {
   size: [auditBySize],
   fuel: [auditFuel],
   stick: [auditStickiness],
-  all: [auditDead, auditSensitivity, auditBySize, auditFuel, auditStickiness],
+  taste: [auditTaste],
+  all: [auditDead, auditSensitivity, auditBySize, auditFuel, auditStickiness, auditTaste],
 };
 const passes = PASSES[MODE];
 if (!passes) {
-  console.error('Usage: node scripts/audit-questions.mjs [dead|sens|size|fuel|stick|all]');
+  console.error('Usage: node scripts/audit-questions.mjs [dead|sens|size|fuel|stick|taste|all]');
   process.exit(1);
 }
 for (const pass of passes) {

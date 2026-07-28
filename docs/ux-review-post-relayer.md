@@ -69,6 +69,10 @@ before we knew the comparison would usually be between clones. Post-grouping
 the real gaps look more like 1–2 points (iX2 86 vs X1 87), so 6 would still
 suppress the state. Re-measure rather than guess.
 
+> **Measured, and this was wrong.** See the taste pass below. The 1–2 point
+> figure came from one pair; across ~2,000 real ties the median gap is 2 for
+> BMW and 7 for MINI, and 6 fires in 42% / 55% of ties. No change needed.
+
 **Tyler slipped from a decree to a tie.** He's the zero-friction persona; on
 live stock he now lands on a 3-way tie where he used to get a single confident
 answer. Worth checking after grouping — if his three are duplicates, grouping
@@ -194,3 +198,33 @@ Two smaller defects fixed alongside:
   photographs, and the feed had them all along — the listing payload just never
   carried `photo`. Both the picker and the chips now repaint: spec line
   (paint, swatch, price), plate and mileage, link, and image.
+
+
+## Follow-up 3: TASTE_PTS measured, and the prediction above was wrong
+
+The secondary finding claimed the post-grouping taste gaps would collapse to
+1–2 points and suppress the state, so 6 needed lowering. That came from a
+single pair (iX2 86 vs X1 87). Measured properly, over ~2,000 real ties across
+131 BMW and 112 MINI retailers, it doesn't hold. Added as `npm run audit taste`
+so it can be re-checked after a fixture refresh instead of argued about.
+
+| | median gap | p75 | p90 | fires at 6 |
+|---|---|---|---|---|
+| BMW | 2.0 | 10.0 | 20.0 | 42% of ties |
+| MINI | 7.0 | 13.0 | 20.0 | 55% of ties |
+
+Two things the distribution shows:
+
+**There is no cliff.** Moving the threshold 6 → 3 buys BMW 42% → 50% and MINI
+55% → 66%. It's a smooth curve, so no value is "correct" and 6 sits in a flat
+region. Any change would be a taste judgement about how often the tool should
+volunteer an opinion, not a fix.
+
+**BMW and MINI genuinely differ.** BMW's ties are bimodal: 17% sit under a
+single point (real dead heats, correctly left as ties) with a long tail past
+20. MINI's are shifted right, most gaps landing 8+. That's the brands' stock,
+not a bug: MINI trims separate hard on character and style line, BMW's tie on
+them more often. If anything ever justifies a per-brand TASTE_PTS in
+`brands.js`, it's this shape, but nothing currently demands it.
+
+**Action: none.** The item is closed.

@@ -75,6 +75,7 @@ Per-brand weights and thresholds live in `server/brands.js`.
 npm run audit stick    # do the questions change the answer?
 npm run audit fuel     # does a named fuel actually bind?
 npm run audit sens     # diversity and body-style honesty
+npm run audit taste    # is TASTE_PTS set anywhere useful?
 npm run personas       # all seven personas end to end
 cd server && npm test  # 61 unit tests
 ```
