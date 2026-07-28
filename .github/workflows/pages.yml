@@ -1,23 +1,15 @@
 name: Deploy to GitHub Pages
 
-# Publishes the static block + harness to GitHub Pages.
-#
-# A repo gets exactly ONE Pages site, which is why two branches can't each have
-# their own deployment. They don't need one: a Pages site is just a directory
-# tree, so this workflow assembles both versions into a single upload —
-#
-#   /        → main            (the current published version)
-#   /v2/     → V2_BRANCH       (the work in progress, side by side with it)
-#
-# Both are rebuilt on a push to either branch, so the pair never drifts. Every
-# path in the harness is relative (`./blocks/…`), so the same files work
-# unchanged at either depth — no rewriting, no separate build.
+# Publishes the static block + harness (index.html, index-mini.html, blocks/)
+# to GitHub Pages on every push to main. No build step — the EDS block's paths
+# are relative, so the files serve as-is. The backend URL is baked into the
+# harness at deploy time, so a shared link needs no ?api= query string.
 #
 # One-time setup: repo Settings → Pages → Source: "GitHub Actions".
 
 on:
   push:
-    branches: [main, main-v2]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -31,21 +23,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # The branch published at /v2/. Change this to point the preview slot at
-  # different work; delete the branch and the site still deploys with just main
-  # (the checkout below is allowed to fail).
-  V2_BRANCH: main-v2
-
-  # Backend each version talks to, baked into its copy of the harness at deploy
-  # time so a shared link needs no query string. The two versions run different
-  # engines and must not share a backend: /v2/ expects an API that sends
-  # `decisive`/`clusterSize` and per-car colour, which main's does not.
-  #
-  # Leave either blank to skip the substitution — that version then keeps the
-  # localhost default and needs the usual ?api=<url> override. `?api=` keeps
-  # working regardless, so a deployed page can always be pointed elsewhere.
-  API_URL_MAIN: https://bmw-matcher-api.onrender.com
-  API_URL_V2: https://bmw-matcher-api-sagd.onrender.com
+  # The deployed backend the published harness talks to, baked into its
+  # data-api attribute at publish time. Must run the current server code (it
+  # sends decisive/clusterSize and per-car colour). Leave blank to keep the
+  # localhost default, in which case a page needs the ?api=<url> override.
+  API_URL: https://bmw-matcher-api.onrender.com
 
 jobs:
   deploy:
@@ -54,48 +36,22 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Check out main
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          path: src-main
+      - uses: actions/checkout@v4
 
-      - name: Check out the preview branch
-        id: v2
-        uses: actions/checkout@v4
-        continue-on-error: true # merged or deleted → publish main alone
-        with:
-          ref: ${{ env.V2_BRANCH }}
-          path: src-v2
-
-      # Only the files the browser actually asks for. The repo root also holds
+      # Only the files a browser actually asks for. The repo root also holds
       # server/, scripts/ and ~16MB of stock fixtures, none of which a static
-      # page needs — the old `path: '.'` shipped the lot on every deploy.
+      # page needs — publishing `.` would ship the lot on every deploy.
       - name: Assemble the site
         run: |
           set -euo pipefail
-
-          stage() {
-            local src="$1" dest="$2" api="$3"
-            mkdir -p "$dest"
-            cp -R "$src/index.html" "$src/index-mini.html" "$src/blocks" "$dest/"
-            if [ -n "$api" ]; then
-              # The harness hardcodes the local default; point it at the
-              # deployed backend for this slot. Exact match, so it can only
-              # ever rewrite that one attribute.
-              find "$dest" -maxdepth 1 -name '*.html' -exec \
-                sed -i "s|data-api=\"http://localhost:8787\"|data-api=\"$api\"|g" {} +
-            fi
-          }
-
-          stage src-main _site "${API_URL_MAIN}"
-
-          if [ -d src-v2 ]; then
-            stage src-v2 _site/v2 "${API_URL_V2}"
-          else
-            echo "::notice::${V2_BRANCH} not found — publishing main only."
+          mkdir -p _site
+          cp -R index.html index-mini.html blocks _site/
+          if [ -n "${API_URL}" ]; then
+            # The harness hardcodes the local default; point it at the deployed
+            # backend. Exact match, so only that one attribute is ever rewritten.
+            find _site -maxdepth 1 -name '*.html' -exec \
+              sed -i "s|data-api=\"http://localhost:8787\"|data-api=\"${API_URL}\"|g" {} +
           fi
-
           echo "Published tree:"
           find _site -maxdepth 2 -name '*.html' | sort
           du -sh _site
