@@ -450,9 +450,11 @@ const colourInflight = new Map(); // advert_id -> Promise, single-flight
 const COLOUR_CONCURRENCY = 4;
 
 // Total wall-clock a single request will spend colouring before giving up on
-// the stragglers. Generous enough for a cold cluster on a warm connection,
+// the stragglers. Raised from 2.5s once grouped cards started naming their
+// listings by colour: running out mid-queue left a picker offering "Colour
+// n/a". The cache is permanent, so this cost is paid once per car, ever. Generous enough for a cold cluster on a warm connection,
 // short enough that the hero never feels stalled behind it.
-const COLOUR_BUDGET_MS = Number(process.env.COLOUR_BUDGET_MS) || 2500;
+const COLOUR_BUDGET_MS = Number(process.env.COLOUR_BUDGET_MS) || 4500;
 
 /**
  * Pull the vehicle object out of a PDP's inline `UVL.AD = {…}` and return its

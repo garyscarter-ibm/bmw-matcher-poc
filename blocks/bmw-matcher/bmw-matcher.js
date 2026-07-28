@@ -465,7 +465,7 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
   // The cards on screen are the head of a longer ranked pool. Chips describe
   // what's visible; rejections draw the next car up from behind it.
   const lead = pool.slice(0, showCount);
-  const axes = refinementAxes(lead.map((m) => m.car));
+  const axes = refinementAxes(lead.map(listingsOf));
   const active = new Map(); // axis id -> axis
 
   // Everything narrowing the set, positive or negative, in one place: a
@@ -473,7 +473,7 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
   // render as removable chips, because a filter the user can't see is one they
   // can't argue with — and at this stock depth two constraints can empty a
   // tie, which must be explainable rather than mysterious.
-  const constraints = new Map(); // id -> { label, keep(car) }
+  const constraints = new Map(); // id -> { label, test(listing) }
   const hidden = new Set(); // cars waved away with no reason given
 
   const host = el('div', 'bmwm-refine');
@@ -496,11 +496,31 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
   }
   host.append(grid);
 
-  // Survivors of everything the buyer has said, drawn from the WHOLE pool so a
-  // rejection promotes the next-best car instead of leaving a hole.
-  const surviving = () => pool.filter((m) => !hidden.has(m.car.id)
-    && [...active.values()].every((a) => a.test(m.car))
-    && [...constraints.values()].every((c) => c.keep(m.car)));
+  /*
+   * Survivors of everything the buyer has said, drawn from the WHOLE pool so a
+   * rejection promotes the next-best car instead of leaving a hole.
+   *
+   * Every filter is applied to LISTINGS, not to cards. That distinction is the
+   * whole of this function and it matters: grouping made a card "a model the
+   * retailer has four of", so judging it by whichever listing happened to rank
+   * first is judging three cars by a fourth. "Not the Chili Red" on a card
+   * that's also available in Midnight Black used to delete both — the colour
+   * she'd have taken went with the one she turned down.
+   *
+   * So: narrow each card's listings, drop the card only when nothing is left,
+   * and rebuild what the card claims (count, price range, colours) from what
+   * actually survived.
+   */
+  function narrow(m) {
+    if (hidden.has(m.car.id)) return null;
+    const tests = [...active.values(), ...constraints.values()];
+    const all = listingsOf(m);
+    const kept = all.filter((l) => tests.every((t) => t.test(l)));
+    if (!kept.length) return null;
+    if (kept.length === all.length) return m;
+    return { ...m, car: regroup(m.car, kept), listings: kept };
+  }
+  const surviving = () => pool.map(narrow).filter(Boolean);
   const matching = () => surviving().slice(0, showCount);
 
   /*
@@ -519,34 +539,54 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
    * answer, and forcing a reason produces invented ones, which are worse than
    * no signal at all.
    */
-  function rejectOptions(car) {
-    // Judge "would this reason change anything?" against everything still
-    // available, not just the cards on screen — otherwise rejecting the only
-    // visible car looks like it has nowhere to go when it does.
-    const pooled = surviving().map((m) => m.car);
-    const others = pooled.filter((c) => c.id !== car.id);
+  function rejectOptions(match) {
+    const { car } = match;
+    // Judge "would this reason change anything?" against every listing still
+    // reachable — not just the cards on screen, and not just other cards.
+    // Siblings count: on a two-colour card, turning down the red is answered
+    // by the black one standing behind it, and the card stays.
+    const alive = surviving().flatMap(listingsOf);
+    const survives = (test) => alive.some(test);
     const opts = [];
-    const add = (id, label, keep) => opts.push({
+    const add = (id, label, test) => opts.push({
       label,
-      apply: () => { constraints.set(id, { label, keep }); redraw(); },
+      apply: () => { constraints.set(id, { label, test }); redraw(); },
     });
 
-    const shade = car.colour?.colour;
-    if (shade && others.some((c) => c.colour?.colour && c.colour.colour !== shade)) {
-      add(`!c:${shade}`, `Not the ${shade.toLowerCase()}`, (c) => c.colour?.colour !== shade);
+    // Price and mileage are rejected against the card's BEST listing, so the
+    // reason means "better than anything this card can offer" and the card
+    // honestly disappears. Rejecting against the shown listing instead would
+    // let a card claim it had been ruled out on price while still holding a
+    // cheaper copy.
+    const mine = listingsOf(match);
+    const least = (pick) => {
+      const vals = mine.map(pick).filter((v) => Number.isFinite(v));
+      return vals.length ? Math.min(...vals) : null;
+    };
+
+    // A listing with no known paint is never "the red one" — we can't claim it
+    // is, so a colour rejection keeps it rather than guessing it away.
+    const shadeOf = (l) => l.shade || l.colour;
+    const shade = car.colour?.colour || car.colour?.manufacturerColour;
+    if (shade && survives((l) => shadeOf(l) !== shade)) {
+      add(`!c:${shade}`, `Not the ${shade.toLowerCase()}`, (l) => shadeOf(l) !== shade);
     }
-    if (others.some((c) => c.priceMin < car.priceMin)) {
-      add(`!p:${car.priceMin}`, `Under ${gbp(car.priceMin)}`, (c) => c.priceMin < car.priceMin);
+    const floor = least((l) => l.priceMin);
+    if (floor != null && survives((l) => l.priceMin < floor)) {
+      add(`!p:${floor}`, `Under ${gbp(floor)}`, (l) => l.priceMin < floor);
     }
-    if (car.mileage != null && others.some((c) => c.mileage != null && c.mileage < car.mileage)) {
-      add(`!m:${car.mileage}`, `Fewer than ${car.mileage.toLocaleString('en-GB')} miles`,
-        (c) => c.mileage != null && c.mileage < car.mileage);
+    const fewest = least((l) => l.mileage);
+    if (fewest != null && survives((l) => l.mileage != null && l.mileage < fewest)) {
+      add(`!m:${fewest}`, `Fewer than ${fewest.toLocaleString('en-GB')} miles`,
+        (l) => l.mileage != null && l.mileage < fewest);
     }
     const gear = car.transmission;
-    if (gear && others.some((c) => c.transmission && c.transmission !== gear)) {
+    if (gear && survives((l) => l.transmission && l.transmission !== gear)) {
       const want = gear === 'auto' ? 'manual' : 'automatic';
-      add(`!g:${gear}`, `Only ${want}`, (c) => c.transmission !== gear);
+      add(`!g:${gear}`, `Only ${want}`, (l) => l.transmission !== gear);
     }
+    // The shrug stays whole-card: "just not this one" is about the model in
+    // front of them, not about one of its copies.
     opts.push({
       label: copy.rejectJust,
       apply: () => { hidden.add(car.id); redraw(); },
@@ -575,7 +615,7 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
     for (const [id, c] of constraints) applied(c.label, () => constraints.delete(id));
     if (hidden.size) applied(copy.hiddenChip({ count: hidden.size }), () => hidden.clear());
 
-    const live = refinementAxes(shown.map((m) => m.car)).map((a) => a.id);
+    const live = refinementAxes(shown.map(listingsOf)).map((a) => a.id);
     for (const axis of axes) {
       if (active.has(axis.id) || !live.includes(axis.id)) continue;
       const chip = el('button', 'bmwm-chip', axis.label);
@@ -954,46 +994,97 @@ const CONCEPT_LABELS = {
  *
  * @returns {Array<{ id, label, test(car), have }>}
  */
-function refinementAxes(cars) {
+/**
+ * The individual cars behind a card. The API sends this for every match, one
+ * entry for an ungrouped car and N for a grouped one, so nothing downstream
+ * has to care which it is holding.
+ */
+const listingsOf = (m) => m.listings || [];
+
+/** A listing's normalised shade ("Blue"), falling back to its marketing name. */
+const shadeOf = (l) => l.shade || l.colour;
+
+/**
+ * Rebuild a grouped card from the listings that survived filtering.
+ *
+ * Everything the card claims about stock depth — "4 available, £31,498 to
+ * £36,890, in Portimao Blue, Brooklyn Grey or Alpine White" — is derived, so
+ * once a filter removes two of those four the card must stop saying it has
+ * them. The representative fields (paint, price, mileage, link) follow the
+ * best-ranked survivor; `id` deliberately does not move, because it is what
+ * "just not this one" remembers the card by.
+ */
+function regroup(car, kept) {
+  const head = kept[0];
+  const prices = kept.map((l) => l.priceMin).filter(Number.isFinite);
+  return {
+    ...car,
+    colour: head.colour ? { manufacturerColour: head.colour, colour: head.shade } : car.colour,
+    priceMin: head.priceMin ?? car.priceMin,
+    mileage: head.mileage ?? car.mileage,
+    transmission: head.transmission ?? car.transmission,
+    link: head.link || car.link,
+    listingCount: kept.length,
+    priceFrom: prices.length ? Math.min(...prices) : car.priceFrom,
+    priceTo: prices.length ? Math.max(...prices) : car.priceTo,
+    colours: [...new Set(kept.map((l) => l.colour).filter(Boolean))],
+    features: [...new Set(kept.flatMap((l) => l.features || []))],
+  };
+}
+
+/**
+ * The ways this set of cards can still be split, as chips.
+ *
+ * Takes one listing array per card, and tests LISTINGS rather than cards, for
+ * the same reason the reject menu does: a card is a model the retailer has
+ * several of, and "Blue" should leave the blue ones rather than keep or kill
+ * all four on the strength of whichever ranked first.
+ *
+ * An axis earns its place when applying it would change something — some
+ * listing has the thing and some listing doesn't. That's a weaker bar than
+ * "it splits the cards", deliberately: on a single four-colour card, "Blue"
+ * changes nothing about which cards show but everything about what the buyer
+ * is being offered.
+ */
+// How many chips the page will offer at once. Six is about what reads as
+// "here are some ways to split these" rather than as a search form.
+const MAX_AXES = 6;
+
+function refinementAxes(groups) {
+  const all = groups.flat();
   const axes = [];
+  const offer = (id, label, test) => {
+    if (!all.some(test) || all.every(test)) return; // changes nothing
+    axes.push({ id, label, have: groups.filter((ls) => ls.some(test)).length, test });
+  };
 
   for (const [key, label] of Object.entries(CONCEPT_LABELS)) {
-    const have = cars.filter((c) => (c.features || []).includes(key)).length;
-    if (have > 0 && have < cars.length) {
-      axes.push({ id: `f:${key}`, label, have, test: (c) => (c.features || []).includes(key) });
-    }
+    offer(`f:${key}`, label, (l) => (l.features || []).includes(key));
   }
 
   // Gearbox: a genuine dealbreaker, and a live split for MINI (~12% manual).
   for (const [value, label] of [['auto', 'Automatic'], ['manual', 'Manual']]) {
-    const have = cars.filter((c) => c.transmission === value).length;
-    if (have > 0 && have < cars.length) {
-      axes.push({ id: `g:${value}`, label, have, test: (c) => c.transmission === value });
-    }
+    offer(`g:${value}`, label, (l) => l.transmission === value);
   }
 
   // Colour, by its normalised name ("Grey"), each shade its own axis. Only
-  // present on cars the detail lookup reached — a car with no colour simply
+  // present on listings the detail lookup reached — one with no colour simply
   // never matches a colour axis, which is the honest behaviour: we can't
   // claim it's the blue one.
-  // A grouped card counts as having every colour its listings come in, so
-  // "Blue" keeps a model that offers blue rather than only the one listing
-  // that happened to rank first.
-  const shadesOf = (c) => (c.colours?.length
-    ? c.colours
-    : [c.colour?.manufacturerColour || c.colour?.colour].filter(Boolean));
-  const shades = new Set(cars.flatMap(shadesOf));
-  for (const shade of shades) {
-    const have = cars.filter((c) => shadesOf(c).includes(shade)).length;
-    if (have > 0 && have < cars.length) {
-      axes.push({
-        id: `c:${shade}`, label: shade, have, test: (c) => shadesOf(c).includes(shade),
-      });
-    }
+  for (const shade of new Set(all.map(shadeOf).filter(Boolean))) {
+    offer(`c:${shade}`, shade, (l) => shadeOf(l) === shade);
   }
 
-  const balance = (a) => Math.abs(a.have / cars.length - 0.5);
-  return axes.sort((a, b) => balance(a) - balance(b) || a.label.localeCompare(b.label));
+  // Best-balanced first: an axis that halves the set is worth more than one
+  // that shaves a single car off it.
+  const balance = (a) => Math.abs(a.have / groups.length - 0.5);
+  axes.sort((a, b) => balance(a) - balance(b) || a.label.localeCompare(b.label));
+  // Capped, because testing listings rather than cards removed the bound that
+  // used to be implicit. An axis only qualified while it split the CARDS, so a
+  // single card could never offer one; now that one card is several listings,
+  // an equipment-rich cluster will happily produce eleven chips, and a wall of
+  // chips is a filter panel, which is the thing this was built not to be.
+  return axes.slice(0, MAX_AXES);
 }
 
 /* ------------------------------ screens ------------------------------ */
@@ -1485,29 +1576,44 @@ function matchCard(match, {
   // one. It reads as a spec, but it's carrying more weight than that: when the
   // engine can't separate the cars, colour is very often the actual difference
   // between them — so it belongs on the card, not buried on the retailer's PDP.
-  const paint = car.colour?.manufacturerColour || car.colour?.colour;
   const lead = [SPEC_LABELS[car.body], FUEL_SPEC[car.fuel]].filter(Boolean);
-  // Compact tiles are narrow — the headline specs only, no 0–62/economy.
-  const tail = (compact ? [price] : [
-    price,
-    `0–62 ${car.zeroTo62}s`,
-    car.fuel === 'ev' ? `${car.evRange} mi range` : `${car.mpg} mpg`,
-  ]).filter(Boolean);
-  if (paint && !compact) {
+  /*
+   * The spec line, rebuilt rather than written once, because the listing
+   * picker below can change what this card is describing. It used to be built
+   * inline, so choosing a listing updated the mileage and the link but left
+   * the paint saying "Chili Red" next to the black car's mileage — a card
+   * describing two different cars at once, which is worse than not offering
+   * the choice at all.
+   */
+  function renderSpecs(paint, shade, priceText) {
+    specs.replaceChildren();
+    // Compact tiles are narrow — the headline specs only, no 0–62/economy.
+    const tail = (compact ? [priceText] : [
+      priceText,
+      `0–62 ${car.zeroTo62}s`,
+      car.fuel === 'ev' ? `${car.evRange} mi range` : `${car.mpg} mpg`,
+    ]).filter(Boolean);
+    if (!paint || compact) {
+      specs.textContent = [...lead, ...tail].join('  ·  ');
+      return;
+    }
     // Paint gets a swatch as well as its name: in a tie the colour is very
     // often the actual difference between the cars, and a dot you can see
     // beats a name you have to read. No hex for the name → name alone.
     specs.append(`${lead.join('  ·  ')}  ·  `);
-    const hex = SWATCH_HEX[(car.colour?.colour || '').toLowerCase()];
+    const hex = SWATCH_HEX[(shade || '').toLowerCase()];
     if (hex) {
       const dot = el('span', 'bmwm-swatch');
       dot.style.background = hex;
       specs.append(dot);
     }
     specs.append(`${paint}  ·  ${tail.join('  ·  ')}`);
-  } else {
-    specs.textContent = [...lead, ...tail].join('  ·  ');
   }
+  renderSpecs(
+    car.colour?.manufacturerColour || car.colour?.colour,
+    car.colour?.colour,
+    price,
+  );
   body.append(specs);
 
   // The whole point of the carousel: how far away is it, and whose is it?
@@ -1573,7 +1679,7 @@ function matchCard(match, {
   // into something actionable (see rejectOptions). Only offered where a
   // caller supplies the options, so it appears in a tie and nowhere else.
   if (rejectOptions) {
-    const options = rejectOptions(car);
+    const options = rejectOptions(match);
     if (options.length) {
       const rejectWrap = el('div', 'bmwm-reject');
       const open = el('button', 'bmwm-reject-open', rejectLabel || 'Not this one');
@@ -1629,9 +1735,17 @@ function matchCard(match, {
         dot.style.background = hex;
         opt.append(dot);
       }
-      opt.append(el('span', 'bmwm-pick-colour', listing.colour || 'Colour n/a'));
+      // Paint is fetched per car and can be missing (an unreachable page, or
+      // the request's colour budget running out). Naming the row "Colour n/a"
+      // told the buyer nothing; mileage is the next thing that actually
+      // separates two otherwise identical cars.
+      const label = listing.colour
+        || (listing.mileage != null ? `${listing.mileage.toLocaleString('en-GB')} miles` : `Option ${i + 1}`);
+      opt.append(el('span', 'bmwm-pick-colour', label));
       const bits = [gbp(listing.priceMin)];
-      if (listing.mileage != null) bits.push(`${listing.mileage.toLocaleString('en-GB')} mi`);
+      if (listing.colour && listing.mileage != null) {
+        bits.push(`${listing.mileage.toLocaleString('en-GB')} mi`);
+      }
       opt.append(el('span', 'bmwm-pick-meta', bits.join(' · ')));
       opt.addEventListener('click', () => {
         picker.querySelectorAll('.bmwm-pick-opt').forEach((b) => {
@@ -1640,9 +1754,17 @@ function matchCard(match, {
         });
         opt.classList.add('is-on');
         opt.setAttribute('aria-pressed', 'true');
-        // Re-describe the card as the chosen car.
-        if (usedMeta && listing.mileage != null) {
-          usedMeta.textContent = `${listing.mileage.toLocaleString('en-GB')} miles`;
+        // Re-describe the card as the chosen car: paint, swatch, price,
+        // mileage and where the link goes. Anything left showing the previous
+        // listing's values is a card describing two cars at once.
+        renderSpecs(listing.colour, listing.shade, gbp(listing.priceMin));
+        if (usedMeta) {
+          const bits = [];
+          if (car.plate) bits.push(`’${car.plate} reg`);
+          if (listing.mileage != null) {
+            bits.push(`${listing.mileage.toLocaleString('en-GB')} miles`);
+          }
+          usedMeta.textContent = bits.join('  ·  ');
         }
         const cta = card.querySelector('.bmwm-card-link');
         if (cta && listing.link) cta.href = listing.link;

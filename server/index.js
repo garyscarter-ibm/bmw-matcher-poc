@@ -140,17 +140,27 @@ function publicMatch({
     stretch,
     reasons,
     tradeOffs,
-    // The individual cars behind a grouped card — enough to let the page offer
-    // "this one in Chili Red" without shipping the internal scoring fields.
-    listings: listings && listings.length > 1
-      ? listings.map((c) => ({
-        id: c.id,
-        colour: c.colour?.manufacturerColour || c.colour?.colour,
-        priceMin: c.priceMin,
-        mileage: c.mileage,
-        link: c.link,
-      }))
-      : undefined,
+    // The individual cars behind a grouped card. Sent for EVERY match, not
+    // just multi-listing ones, because the page's refine/reject layer filters
+    // listings and rebuilds the card from the survivors — a one-listing group
+    // is just the degenerate case of that, and special-casing it in the client
+    // is how the two paths drift apart.
+    //
+    // The field list is "whatever a filter can test": colour and shade for the
+    // colour chips, price and mileage for the reject reasons, transmission and
+    // features for the gearbox and equipment chips. `shade` is the normalised
+    // name ("Blue") the chips group by; `colour` is the marketing one
+    // ("Portimao Blue") the buyer reads.
+    listings: (listings?.length ? listings : [car]).map((c) => ({
+      id: c.id,
+      colour: c.colour?.manufacturerColour || c.colour?.colour,
+      shade: c.colour?.colour,
+      priceMin: c.priceMin,
+      mileage: c.mileage,
+      transmission: c.transmission,
+      features: c.features,
+      link: c.link,
+    })),
   };
 }
 
@@ -251,13 +261,25 @@ async function handleMatch(req, res) {
   // Shown cards get their listings enriched too (the picker needs every
   // colour); the held-back alternatives only need their own paint, since they
   // aren't on screen yet.
+  // Order matters: paint is fetched one page at a time against a wall-clock
+  // budget, so whatever is queued last may not get done. Cards on screen come
+  // first, then the listings behind them (the picker names cars by colour),
+  // then the held-back alternatives, which nobody can see yet.
+  // Grouping copies the representative into a fresh `car` object and keeps the
+  // originals in `listings`, so enriching one does NOT enrich the other. Both
+  // have to be in this list, or a grouped card gets paint on its headline and
+  // none on the listings behind it.
   await enrichColours(brand, [
-    ...matches.flatMap((m) => [m.car, ...(m.listings || [])]),
+    ...matches.map((m) => m.car),
+    ...matches.flatMap((m) => m.listings || []),
     ...alternatives.map((m) => m.car),
+    ...alternatives.flatMap((m) => m.listings || []),
   ]);
   // Paint is only known after that call, so the group's colour list is filled
-  // in here rather than at grouping time.
-  for (const m of matches) {
+  // in here rather than at grouping time. Alternatives get the same treatment:
+  // a rejection promotes one into view, and it should arrive able to say what
+  // colours it comes in rather than repairing itself on the next request.
+  for (const m of [...matches, ...alternatives]) {
     if (m.listings?.length > 1) {
       m.car.colours = [...new Set(m.listings
         .map((c) => c.colour?.manufacturerColour || c.colour?.colour)

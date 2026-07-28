@@ -144,3 +144,48 @@ miles or Midnight Black II at 15,024, both £17,500.
 
 The funnel is now complete end to end: constraints eliminate → fit ranks →
 taste chooses the model → the buyer chooses the car.
+
+
+## Follow-up 2: the refine layer was still judging cards by one listing
+
+Grouping changed what a card *is* — a model the retailer has several of — but
+the refine and reject layer still tested `m.car`, the representative listing.
+Three things were wrong as a result:
+
+- **"Not the Chili Red" deleted the black one too.** Meg's card is *2
+  available, Chili Red or Midnight Black II*. Rejecting the red removed the
+  whole card, taking with it the exact car she'd have said yes to.
+- **The chips and the reject menu disagreed about the same card.** Chips used
+  `shadesOf()`, which knew a group has several colours; reject used
+  `car.colour`, which knew only the first. So "Blue" kept a card that "Not the
+  blue" would kill.
+- **"Under £31,498"** on a card spanning £31,498 to £36,890 could not be
+  answered by that card's own cheaper copies, because the test never saw them.
+
+Fixed by moving every filter down a level: **filters test listings, a card
+survives while any of its listings do, and the card is rebuilt from the
+survivors** (count, price range, colour list, representative paint and link).
+The API now sends `listings` for every match rather than only grouped ones, so
+there is one code path instead of two.
+
+What this buys, beyond correctness: chips now narrow *within* a card. Clicking
+"Green" on "MINI Countryman C, 3 available in British Racing Green IV or Legend
+Grey" leaves the green one. Previously that chip could not even appear, because
+an axis only qualified while it split the *cards* — a single card offered
+nothing. That implicit bound is gone, so chips are now capped at six
+(`MAX_AXES`); an equipment-rich cluster otherwise produced eleven, and a wall
+of chips is a filter panel, which is the thing this was built not to be.
+
+Two smaller defects fixed alongside:
+
+- **"Colour n/a" in the picker.** Grouping copies the representative into a new
+  `car` object and leaves the originals in `listings`, so enriching one did not
+  enrich the other — and alternatives' listings were never enriched at all.
+  Both are now in the enrichment list, ordered visible-first, with the budget
+  raised to 4.5s (the cache is permanent, so it is paid once per car ever).
+  Where paint is genuinely unknown the row falls back to mileage, which is the
+  next thing that actually separates two identical cars.
+- **The picker only half-updated the card.** Choosing a listing changed the
+  mileage and the link but left the spec line naming the previous car's paint,
+  so the card described two cars at once. The spec line is now rebuilt on
+  selection: paint, swatch, price, plate and mileage.
