@@ -201,6 +201,7 @@ const BRAND_COPY = {
     rejectOpen: 'Not this one',
     rejectPrompt: 'What put you off?',
     rejectJust: 'Just not this one',
+    pickLabel: 'Choose yours',
     hiddenChip: ({ count }) => `${count} ruled out`,
     // The "closest here" frame (docs/results-page-states.md): the local cars
     // miss something the buyer asked for, so no headline may crown one. First
@@ -268,6 +269,7 @@ const BRAND_COPY = {
     rejectOpen: 'Not this one',
     rejectPrompt: 'Go on then, what’s wrong with it?',
     rejectJust: 'Just not feeling it',
+    pickLabel: 'Which one, then?',
     hiddenChip: ({ count }) => `${count} ruled out`,
     // The "closest here" frame, MINI register: honest shrug, no apology.
     closestTitle: ({ retailer }) => `The closest we’ve got at ${retailer}.`,
@@ -1368,6 +1370,7 @@ function matchCard(match, {
   rejectOptions, rejectLabel, rejectPrompt,
 } = {}) {
   const { car, score, reasons } = match;
+  const copy = BRAND_COPY[brandKey] || BRAND_COPY.bmw;
   const card = el('article', `bmwm-card${big ? ' bmwm-card-big' : ''}${compact ? ' bmwm-card-compact' : ''}`);
 
   const media = el('div', 'bmwm-card-media');
@@ -1471,9 +1474,8 @@ function matchCard(match, {
   const detailBits = [];
   if (car.plate) detailBits.push(`’${car.plate} reg`);
   if (car.mileage != null) detailBits.push(`${car.mileage.toLocaleString('en-GB')} miles`);
-  if (detailBits.length) {
-    body.append(el('p', 'bmwm-usedmeta', detailBits.join('  ·  ')));
-  }
+  const usedMeta = detailBits.length ? el('p', 'bmwm-usedmeta', detailBits.join('  ·  ')) : null;
+  if (usedMeta) body.append(usedMeta);
 
   if (!compact) body.append(el('p', 'bmwm-blurb', car.blurb));
 
@@ -1529,6 +1531,61 @@ function matchCard(match, {
       rejectWrap.append(open, menu);
       body.append(rejectWrap);
     }
+  }
+
+  /*
+   * Which one, though?
+   *
+   * Grouping repeat listings fixed the page reading as a stutter, but it also
+   * ended the journey a step early: it narrowed to a model and trim, then
+   * quietly handed over whichever listing happened to rank first. That's the
+   * step Chloe and Meg actually care about — the same Cooper C in Ocean Wave
+   * Green or Melting Silver is the whole decision for them.
+   *
+   * So a card that speaks for several cars lets the buyer pick the actual one.
+   * Choosing swaps the photo, price, mileage and the link out, so the card
+   * always describes the car they'd be going to see. Hero cards only: the
+   * compact tiles are a glance, not a decision.
+   */
+  if (big && match.listings?.length > 1) {
+    body.append(el('p', 'bmwm-why-label', copy.pickLabel));
+    const picker = el('div', 'bmwm-pick');
+    match.listings.forEach((listing, i) => {
+      const opt = el('button', `bmwm-pick-opt${i === 0 ? ' is-on' : ''}`);
+      opt.type = 'button';
+      opt.setAttribute('aria-pressed', String(i === 0));
+      // Marketing names bury the basic colour anywhere in the string, and not
+      // always last ("Midnight Black II", "Chili Red"), so try every word.
+      const hex = (listing.colour || '')
+        .toLowerCase().split(/[^a-z]+/)
+        .map((word) => SWATCH_HEX[word])
+        .find(Boolean);
+      if (hex) {
+        const dot = el('span', 'bmwm-swatch');
+        dot.style.background = hex;
+        opt.append(dot);
+      }
+      opt.append(el('span', 'bmwm-pick-colour', listing.colour || 'Colour n/a'));
+      const bits = [gbp(listing.priceMin)];
+      if (listing.mileage != null) bits.push(`${listing.mileage.toLocaleString('en-GB')} mi`);
+      opt.append(el('span', 'bmwm-pick-meta', bits.join(' · ')));
+      opt.addEventListener('click', () => {
+        picker.querySelectorAll('.bmwm-pick-opt').forEach((b) => {
+          b.classList.remove('is-on');
+          b.setAttribute('aria-pressed', 'false');
+        });
+        opt.classList.add('is-on');
+        opt.setAttribute('aria-pressed', 'true');
+        // Re-describe the card as the chosen car.
+        if (usedMeta && listing.mileage != null) {
+          usedMeta.textContent = `${listing.mileage.toLocaleString('en-GB')} miles`;
+        }
+        const cta = card.querySelector('.bmwm-card-link');
+        if (cta && listing.link) cta.href = listing.link;
+      });
+      picker.append(opt);
+    });
+    body.append(picker);
   }
 
   // Link out to the retailer's live stock, when the feed gave us one.

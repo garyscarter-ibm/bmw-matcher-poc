@@ -126,3 +126,21 @@ and the iX2 is still genuinely the best car for them, returning it is correct,
 not deaf. The metric can't tell a stable right answer from an unresponsive one.
 What did improve is what the page *says* and whether the preference questions
 have any influence at all (BMW `priorities` 0% → 20%, MINI `miniVibe` 50%).
+
+
+## Follow-up: grouping ended the journey a step early
+
+Caught immediately after shipping the grouping: narrowing now stopped at
+**model and trim**. A card saying "4 available" linked only to whichever
+listing ranked first, so the buyer never chose the actual car — and the choice
+being skipped was colour, which is precisely what Chloe and Meg decide on. The
+API was already sending the individual listings; the UI ignored them.
+
+Fixed with a "Choose yours" / "Which one, then?" picker on hero cards: each
+listing as a row with its colour swatch, price and mileage, and selecting one
+re-describes the card and repoints the link. Meg's answer now ends where it
+should — one MINI Hatch Electric Level 3, and she picks Chili Red at 11,340
+miles or Midnight Black II at 15,024, both £17,500.
+
+The funnel is now complete end to end: constraints eliminate → fit ranks →
+taste chooses the model → the buyer chooses the car.

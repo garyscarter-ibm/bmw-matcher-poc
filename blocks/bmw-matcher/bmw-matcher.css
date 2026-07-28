@@ -1278,3 +1278,42 @@ a.bmwm-ptile:focus-visible { outline: 2px solid var(--bmwm-accent); outline-offs
   font-weight: 700;
   color: var(--bmwm-accent-spot);
 }
+
+/* --- "Choose yours": the last step, picking the actual car ---
+   A grouped card speaks for several listings of one model. These are those
+   listings: colour, price, mileage. Selecting one re-describes the card, so
+   the buyer leaves with a specific car rather than whichever advert ranked
+   first. Laid out as a column, because it's a decision, not a filter row. */
+.bmwm-pick { display: flex; flex-direction: column; gap: var(--bmwm-space-2); }
+
+.bmwm-pick-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--bmwm-space-3);
+  width: 100%;
+  text-align: left;
+  padding: var(--bmwm-space-3) var(--bmwm-space-4);
+  background: var(--bmwm-surface);
+  border: var(--bmwm-border-width) solid var(--bmwm-line);
+  border-radius: var(--bmwm-radius);
+  cursor: pointer;
+  font-family: var(--bmwm-font-body);
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.bmwm-pick-opt:hover {
+  border-color: var(--bmwm-ink-muted);
+  background: var(--bmwm-surface-alt);
+}
+.bmwm-pick-opt:focus-visible {
+  outline: 2px solid var(--bmwm-accent-spot);
+  outline-offset: 2px;
+}
+.bmwm-pick-opt.is-on {
+  border-color: var(--bmwm-accent);
+  background: var(--bmwm-accent-soft);
+}
+.bmwm-pick-colour { font-family: var(--bmwm-font-bold); font-weight: 700; }
+/* Price and mileage sit right, so the colours read as a column on the left. */
+.bmwm-pick-meta { margin-left: auto; color: var(--bmwm-ink-muted); }
