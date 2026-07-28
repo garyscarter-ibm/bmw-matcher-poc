@@ -629,8 +629,13 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
    * answer, and forcing a reason produces invented ones, which are worse than
    * no signal at all.
    */
-  function rejectOptions(match) {
+  function rejectOptions(match, chosen) {
     const { car } = match;
+    // What the card is showing right now. Colour and gearbox are properties of
+    // ONE car, so a reason about them has to come from the listing on screen,
+    // not from whichever one happened to represent the group. Price and
+    // mileage stay group-based below, deliberately.
+    const shown = chosen || listingsOf(match)[0] || {};
     // Judge "would this reason change anything?" against every listing still
     // reachable — not just the cards on screen, and not just other cards.
     // Siblings count: on a two-colour card, turning down the red is answered
@@ -657,7 +662,7 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
     // A listing with no known paint is never "the red one" — we can't claim it
     // is, so a colour rejection keeps it rather than guessing it away.
     const shadeOf = (l) => l.shade || l.colour;
-    const shade = car.colour?.colour || car.colour?.manufacturerColour;
+    const shade = shadeOf(shown) || car.colour?.colour || car.colour?.manufacturerColour;
     if (shade && survives((l) => shadeOf(l) !== shade)) {
       add(`!c:${shade}`, `Not the ${shade.toLowerCase()}`, (l) => shadeOf(l) !== shade);
     }
@@ -670,7 +675,7 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
       add(`!m:${fewest}`, `Fewer than ${fewest.toLocaleString('en-GB')} miles`,
         (l) => l.mileage != null && l.mileage < fewest);
     }
-    const gear = car.transmission;
+    const gear = shown.transmission || car.transmission;
     if (gear && survives((l) => l.transmission && l.transmission !== gear)) {
       const want = gear === 'auto' ? 'manual' : 'automatic';
       add(`!g:${gear}`, `Only ${want}`, (l) => l.transmission !== gear);
@@ -1854,39 +1859,58 @@ function matchCard(match, {
     );
   }
 
+  // Set by the reject block below, called by the listing picker further down:
+  // the two are built in DOM order but have to stay in step, because a reason
+  // for turning a car down is only usable if it is about the car on screen.
+  let onPick = null;
+
   // "Not this one" — the other half of choosing. Rejecting a car is the
   // highest-signal thing a buyer does, because it's a reaction to a real car
   // rather than an answer about a hypothetical one; the menu is what turns it
   // into something actionable (see rejectOptions). Only offered where a
   // caller supplies the options, so it appears in a tie and nowhere else.
   if (rejectOptions) {
-    const options = rejectOptions(match);
-    if (options.length) {
-      const rejectWrap = el('div', 'bmwm-reject');
-      const open = el('button', 'bmwm-reject-open', rejectLabel || 'Not this one');
-      open.type = 'button';
-      open.setAttribute('aria-expanded', 'false');
-      // Says what the control DOES. It was a small underlined link that looked
-      // like a disclaimer, and nothing on the page suggested that turning a
-      // car down would bring another one in — so the most conversational thing
-      // the tool can do read as the least important.
-      if (copy.rejectHint) open.append(el('span', 'bmwm-reject-hint', copy.rejectHint));
-      const menu = el('div', 'bmwm-reject-menu');
-      menu.hidden = true;
-      menu.append(el('p', 'bmwm-reject-prompt', rejectPrompt || 'What put you off?'));
+    const rejectWrap = el('div', 'bmwm-reject');
+    const open = el('button', 'bmwm-reject-open', rejectLabel || 'Not this one');
+    open.type = 'button';
+    open.setAttribute('aria-expanded', 'false');
+    // Says what the control DOES. It was a small underlined link that looked
+    // like a disclaimer, and nothing on the page suggested that turning a
+    // car down would bring another one in — so the most conversational thing
+    // the tool can do read as the least important.
+    if (copy.rejectHint) open.append(el('span', 'bmwm-reject-hint', copy.rejectHint));
+    const menu = el('div', 'bmwm-reject-menu');
+    menu.hidden = true;
+    open.addEventListener('click', () => {
+      menu.hidden = !menu.hidden;
+      open.setAttribute('aria-expanded', String(!menu.hidden));
+    });
+
+    /*
+     * Rebuilt whenever the card changes which car it is describing.
+     *
+     * The menu used to be built once, from the group's representative, and the
+     * listing picker only repainted the DOM — so switching a four-colour card
+     * from red to green left "Not the red" on offer, and taking it removed the
+     * green car the buyer was actually looking at. The reason has to be about
+     * the car in front of them, or it is worse than no reason at all.
+     */
+    function renderRejectMenu(chosen) {
+      const options = rejectOptions(match, chosen);
+      rejectWrap.hidden = !options.length;
+      menu.replaceChildren(el('p', 'bmwm-reject-prompt', rejectPrompt || 'What put you off?'));
       options.forEach((o) => {
         const b = el('button', 'bmwm-reject-option', o.label);
         b.type = 'button';
         b.addEventListener('click', o.apply);
         menu.append(b);
       });
-      open.addEventListener('click', () => {
-        menu.hidden = !menu.hidden;
-        open.setAttribute('aria-expanded', String(!menu.hidden));
-      });
-      rejectWrap.append(open, menu);
-      body.append(rejectWrap);
     }
+    renderRejectMenu(listingsOf(match)[0]);
+    onPick = renderRejectMenu;
+
+    rejectWrap.append(open, menu);
+    body.append(rejectWrap);
   }
 
   /*
@@ -1959,6 +1983,8 @@ function matchCard(match, {
         }
         const cta = card.querySelector('.bmwm-card-link');
         if (cta && listing.link) cta.href = listing.link;
+        // Re-offer reasons about the car now being shown.
+        onPick?.(listing);
       });
       picker.append(opt);
     });
