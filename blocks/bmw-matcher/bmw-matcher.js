@@ -777,16 +777,24 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
       apply: () => { constraints.set(id, { label, test }); redraw(); },
     });
 
-    // Price and mileage are rejected against the card's BEST listing, so the
-    // reason means "better than anything this card can offer" and the card
-    // honestly disappears. Rejecting against the shown listing instead would
-    // let a card claim it had been ruled out on price while still holding a
-    // cheaper copy.
-    const mine = listingsOf(match);
-    const least = (pick) => {
-      const vals = mine.map(pick).filter((v) => Number.isFinite(v));
-      return vals.length ? Math.min(...vals) : null;
-    };
+    /*
+     * EVERY reason is about the listing on screen, price and mileage included.
+     *
+     * They used to be judged against the group's cheapest and lowest-mileage
+     * copy, on the theory that a reason should make the whole card disappear
+     * rather than let it survive on a copy the buyer had just ruled out. That
+     * was wrong twice over. A card surviving with a CHEAPER listing is exactly
+     * what was asked for, which is what the colour reason already does. And
+     * the arithmetic was worse than the theory: on a card holding 1,000,
+     * 2,000 and 3,000-mile copies the only option ever offered was "Fewer than
+     * 1,000 miles", which excluded all three including the one being looked
+     * at. So a card could offer "Not the green", correctly leaving the blue,
+     * beside a mileage reason that could only ever leave nothing.
+     *
+     * Direction needs no thought here: nobody turns a car down for being too
+     * cheap or having too few miles, so "than the one I'm looking at" is the
+     * only sensible reading of both.
+     */
 
     // A listing with no known paint is never "the red one" — we can't claim it
     // is, so a colour rejection keeps it rather than guessing it away.
@@ -795,14 +803,14 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
     if (shade && survives((l) => shadeOf(l) !== shade)) {
       add(`!c:${shade}`, `Not the ${shade.toLowerCase()}`, (l) => shadeOf(l) !== shade);
     }
-    const floor = least((l) => l.priceMin);
-    if (floor != null && survives((l) => l.priceMin < floor)) {
-      add(`!p:${floor}`, `Under ${gbp(floor)}`, (l) => l.priceMin < floor);
+    const dearer = Number.isFinite(shown.priceMin) ? shown.priceMin : car.priceMin;
+    if (Number.isFinite(dearer) && survives((l) => l.priceMin < dearer)) {
+      add(`!p:${dearer}`, `Under ${gbp(dearer)}`, (l) => l.priceMin < dearer);
     }
-    const fewest = least((l) => l.mileage);
-    if (fewest != null && survives((l) => l.mileage != null && l.mileage < fewest)) {
-      add(`!m:${fewest}`, `Fewer than ${fewest.toLocaleString('en-GB')} miles`,
-        (l) => l.mileage != null && l.mileage < fewest);
+    const higher = Number.isFinite(shown.mileage) ? shown.mileage : car.mileage;
+    if (Number.isFinite(higher) && survives((l) => l.mileage != null && l.mileage < higher)) {
+      add(`!m:${higher}`, `Fewer than ${higher.toLocaleString('en-GB')} miles`,
+        (l) => l.mileage != null && l.mileage < higher);
     }
     const gear = shown.transmission || car.transmission;
     if (gear && survives((l) => l.transmission && l.transmission !== gear)) {
