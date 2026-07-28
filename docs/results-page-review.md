@@ -202,6 +202,64 @@ we just removed.
 **c. Leave it.** The page is truthful and the buyer is better served. Accept
 that the decree is now rare.
 
-My recommendation is (a): it is the only one that keeps the page honest, keeps
-the decree, and keeps one list. It is also the only one that requires a
-scoring change, so it is the user's call, not mine.
+### Decision (2026-07-28): (c) for now, (a) rejected, (b) open
+
+**(a) is rejected, and the reason kills it properly.** Distance was never an
+input. The buyer is never asked how far they will travel, so scoring a car down
+for where it is parked invents a preference they did not state — and a 97% car
+does not become less suitable by being in Bedford. Its suitability is
+unchanged; what changed is the buyer's cost of getting to it, which only they
+can price. That is precisely what `rejectOptions` refuses to do when it will
+not guess which of three properties someone objected to. A distance penalty
+would be the same guess, applied globally and presented as a score.
+
+So the match % keeps meaning one thing: how well this car suits what you told
+us. Nothing else may be folded into it.
+
+**Left as (c) for now.** (b) remains open — see below for what it would have
+to look like to avoid regressing to the design this replaced.
+
+
+## What (b) would have to be, if we take it
+
+The stated risk with (b) was that a retailer-scoped headline names a car that
+is not first in the list. That is real, and the naive version of (b) slides
+straight back into the old design: scope the headline, then order the list
+local-first to match it, and you have rebuilt the bands with softer captions.
+
+The version that works separates the two things the old page conflated.
+**Bands are allowed to describe PLACE. They are not allowed to make claims
+about QUALITY.** The old page failed because "Close, but not level with the
+cars above" and "two of these fit you equally well" were both quality claims,
+made by different sections, about the same scale — so one could contradict the
+other. Labels like "At Sytner Luton" and "Also within reach" cannot contradict
+anything, because they assert nothing about fit.
+
+That gives:
+
+- Headline scoped: *"Your perfect MINI at Sytner Luton is the Hatch Electric
+  Level 3."*
+- The retailer's cars, then the nearby ones, each card carrying its own
+  provenance as it does now.
+- No caption anywhere ranks one group against the other.
+
+A 99% in the second group then contradicts nothing, because the headline only
+ever claimed to be about Sytner Luton.
+
+### The refinement worth having
+
+Qualify the headline only when the qualification is doing work:
+
+| Situation | Headline |
+|---|---|
+| The local leader is also the best anywhere in reach | "Your perfect MINI is the Hatch Electric Level 3." |
+| Something nearby genuinely outranks it | "Your perfect MINI at Sytner Luton is the Hatch Electric Level 3." — plus the existing notice naming the better one and where it is |
+
+The unqualified decree survives wherever it is true, which is most of the time.
+The scope appears exactly when it is load-bearing, and the notice turns it from
+a limitation into the tool visibly having looked further. The commercial frame
+comes back: the retailer's page leads with the retailer's car, and the
+competitor's car is offered as a fact rather than as the answer.
+
+**Cost to weigh:** "at Sytner Luton" is a slightly deflating headline, and the
+buyer has to notice the scope for it to be honest rather than merely narrower.
