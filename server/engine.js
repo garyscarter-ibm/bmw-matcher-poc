@@ -769,6 +769,9 @@ export const MAX_SHOWN = 6;
  */
 export const TASTE_PTS = 6;
 
+/** How many next-best cars to hold back so a rejection has somewhere to go. */
+export const ALTERNATIVES = 6;
+
 /*
  * Collapse repeat listings of the same car into one match.
  *
@@ -850,6 +853,14 @@ export function matchCars(answers, cars, tuning = DEFAULT_TUNING) {
     ? TOP_MATCHES
     : Math.min(Math.max(clusterSize, TOP_MATCHES), MAX_SHOWN);
   return {
-    matches: ranked.slice(0, shown), decisive, clusterSize, tasteLead,
+    matches: ranked.slice(0, shown),
+    // The next-best cars, held back rather than shown. "Not this one" needs
+    // somewhere to go: without these, rejecting the cars on screen empties the
+    // page instead of offering the next one down, which makes the whole
+    // gesture a dead end.
+    alternatives: ranked.slice(shown, shown + ALTERNATIVES),
+    decisive,
+    clusterSize,
+    tasteLead,
   };
 }

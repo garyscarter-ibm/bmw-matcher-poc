@@ -238,7 +238,7 @@ async function handleMatch(req, res) {
   // engine scores (see applyBespokeAnswers) before ranking.
   const scored = applyBespokeAnswers(brand, answers);
   const {
-    matches, decisive, clusterSize, tasteLead,
+    matches, alternatives, decisive, clusterSize, tasteLead,
   } = matchCars(scored, cars, brandTuning(brand));
 
   // Paint only exists on the vehicle detail page, so it's fetched for the
@@ -248,7 +248,13 @@ async function handleMatch(req, res) {
   // Enrich the grouped card AND the listings behind it: a card that says "4
   // available in Portimao Blue, Brooklyn Grey or Alpine White" needs every
   // listing's paint, not just the one that ranked first.
-  await enrichColours(brand, matches.flatMap((m) => [m.car, ...(m.listings || [])]));
+  // Shown cards get their listings enriched too (the picker needs every
+  // colour); the held-back alternatives only need their own paint, since they
+  // aren't on screen yet.
+  await enrichColours(brand, [
+    ...matches.flatMap((m) => [m.car, ...(m.listings || [])]),
+    ...alternatives.map((m) => m.car),
+  ]);
   // Paint is only known after that call, so the group's colour list is filled
   // in here rather than at grouping time.
   for (const m of matches) {
@@ -265,6 +271,8 @@ async function handleMatch(req, res) {
   // a want is genuinely unavailable.
   return sendJson(res, 200, {
     matches: matches.map(publicMatch),
+    // Held back for "not this one" to fall through to (see matchCars).
+    alternatives: alternatives.map(publicMatch),
     // Whether naming a single winner is honest, and how big the tie really is
     // (it can exceed matches.length — see matchCars). The page decides between
     // "your perfect BMW is…" and "any of these would suit you" on this.

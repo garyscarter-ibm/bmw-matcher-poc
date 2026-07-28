@@ -430,10 +430,12 @@ function agreedUnmet(retailerUnmet, nearbyUnmet) {
  *   ("Your perfect BMW is…"); the closest-here frame must not — its survivor
  *   still misses the brief, so it settles to "Your closest match here is…".
  */
-function renderRefine(ctx, lead, title, lede, frame) {
+function renderRefine(ctx, pool, showCount, title, lede, frame) {
   const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
-  const cars = lead.map((m) => m.car);
-  const axes = refinementAxes(cars);
+  // The cards on screen are the head of a longer ranked pool. Chips describe
+  // what's visible; rejections draw the next car up from behind it.
+  const lead = pool.slice(0, showCount);
+  const axes = refinementAxes(lead.map((m) => m.car));
   const active = new Map(); // axis id -> axis
 
   // Everything narrowing the set, positive or negative, in one place: a
@@ -457,9 +459,12 @@ function renderRefine(ctx, lead, title, lede, frame) {
   }
   host.append(grid);
 
-  const matching = () => lead.filter((m) => !hidden.has(m.car.id)
+  // Survivors of everything the buyer has said, drawn from the WHOLE pool so a
+  // rejection promotes the next-best car instead of leaving a hole.
+  const surviving = () => pool.filter((m) => !hidden.has(m.car.id)
     && [...active.values()].every((a) => a.test(m.car))
     && [...constraints.values()].every((c) => c.keep(m.car)));
+  const matching = () => surviving().slice(0, showCount);
 
   /*
    * What this car could be rejected FOR, given what's still on screen.
@@ -478,8 +483,11 @@ function renderRefine(ctx, lead, title, lede, frame) {
    * no signal at all.
    */
   function rejectOptions(car) {
-    const shown = matching().map((m) => m.car);
-    const others = shown.filter((c) => c.id !== car.id);
+    // Judge "would this reason change anything?" against everything still
+    // available, not just the cards on screen — otherwise rejecting the only
+    // visible car looks like it has nowhere to go when it does.
+    const pooled = surviving().map((m) => m.car);
+    const others = pooled.filter((c) => c.id !== car.id);
     const opts = [];
     const add = (id, label, keep) => opts.push({
       label,
@@ -556,16 +564,19 @@ function renderRefine(ctx, lead, title, lede, frame) {
     } else {
       title.textContent = frame.tied({ count: shown.length });
     }
-    // "We can't split them" only holds while there are several to split.
-    lede.hidden = shown.length <= 1;
+    // "We can't split them" only holds while there are several to split — but a
+    // lede about the single named car (the taste pick) survives narrowing.
+    lede.hidden = !frame.lede || (shown.length <= 1 && !frame.ledeSurvivesNarrowing);
     // A car waved away with no reason narrows the count but adds no words —
     // there's nothing to report about "just not that one".
     if (wants.length) {
       status.textContent = copy.refineStatus({
-        shown: shown.length, total: lead.length, wants: andList(wants),
+        shown: surviving().length, total: pool.length, wants: andList(wants),
       });
     } else if (hidden.size) {
-      status.textContent = copy.refineStatusPlain({ shown: shown.length, total: lead.length });
+      status.textContent = copy.refineStatusPlain({
+        shown: surviving().length, total: pool.length,
+      });
     } else {
       status.textContent = '';
     }
@@ -1808,6 +1819,8 @@ async function renderResults(root, ctx, answers) {
   let clusterSize = 1;
   // Fit tied, but their stated priorities picked a winner (see matchCars).
   let tasteLead = false;
+  // Held back by the API so a rejection has a next-best car to promote.
+  let alternatives = [];
   // What the retailer's own stock couldn't offer. Half the picture: nothing is
   // said to the user until /api/nearby agrees (see agreedUnmet). An older API
   // that doesn't send the field leaves this empty, so it simply never fires.
@@ -1815,7 +1828,7 @@ async function renderResults(root, ctx, answers) {
   try {
     ({
       matches, decisive = true, clusterSize = 1, tasteLead = false,
-      unmet: retailerUnmet = {},
+      alternatives = [], unmet: retailerUnmet = {},
     } = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand));
   } catch {
     renderStatus(root, {
@@ -1864,45 +1877,54 @@ async function renderResults(root, ctx, answers) {
     const lead = matches.slice(0, leadCount);
     const rest = matches.slice(leadCount);
 
-    if (fit && heroLed) {
-      // A single full-width hero, matching the "Your perfect <brand> is the …"
-      // headline (co-equal heroes contradicted that claim). The car's name
-      // already leads with the brand, so strip it.
-      const model = lead[0].car.name.replace(new RegExp(`^${brandName} `), '');
-      if (decisive) {
-        // Nothing else came close: the decree is earned.
-        screen.append(el('h2', 'bmwm-title', `Your perfect ${brandName} is the ${model}.`));
-      } else {
-        // Several suit them equally; their stated priorities picked this one.
-        // Deliberately NOT "your perfect X" — that would overclaim, and the
-        // lede has to say the others fit too.
-        screen.append(
-          el('h2', 'bmwm-title', copy.tasteTitle({ model })),
-          el('p', 'bmwm-lede', copy.tasteLede()),
-        );
-      }
-      const grid = el('div', 'bmwm-grid');
-      grid.append(matchCard(lead[0], { big: true, brand: ctx.brand }));
-      screen.append(grid);
-    } else {
-      // Several co-equal cards plus the refine/reject machinery, under one of
-      // two frames. Fit-tie: the engine couldn't separate genuinely good
-      // matches, so narrowing to one CROWNS it. Closest-here: the cards miss
-      // the brief (a decisive-but-unfit winner lands here too), so narrowing
-      // settles to "closest match", never "perfect" — the trade-off line on
-      // the card says why.
-      const frame = fit ? {
-        tied: copy.tiedTitle,
-        settled: ({ model }) => `Your perfect ${brandName} is the ${model}.`,
-      } : {
-        tied: () => copy.closestTitle({ retailer: ctx.retailerLabel }),
-        settled: copy.closestSettled,
-      };
-      const title = el('h2', 'bmwm-title', frame.tied({ count: leadCount }));
-      const lede = el('p', 'bmwm-lede', fit ? copy.tiedLede() : copy.closestLede());
-      screen.append(title, lede);
-      screen.append(renderRefine(ctx, lead, title, lede, frame));
-    }
+    /*
+     * Every state renders through renderRefine, so "not this one" is on every
+     * card — not just in a tie. That asymmetry was backwards: the escape hatch
+     * matters MOST when we've confidently named one car and the buyer
+     * disagrees, because that is exactly when they're stuck. Routing all
+     * states through it also means a rejection promotes the next-best car
+     * from the pool instead of emptying the page.
+     *
+     * Only the words differ per state. Each frame supplies how to say "here is
+     * one car" and "here are several", and renderRefine picks as the set
+     * narrows under the buyer's chips and rejections.
+     */
+    const strip = (name) => name.replace(new RegExp(`^${brandName} `), '');
+    const perfect = ({ model }) => `Your perfect ${brandName} is the ${model}.`;
+    const frame = !fit ? {
+      // The cards miss something asked for: never "perfect", always "closest".
+      tied: () => copy.closestTitle({ retailer: ctx.retailerLabel }),
+      settled: copy.closestSettled,
+      lede: copy.closestLede(),
+    } : decisive ? {
+      // Nothing else came close: the decree is earned.
+      tied: () => perfect({ model: strip(lead[0].car.name) }),
+      settled: perfect,
+      lede: null,
+    } : tasteLead ? {
+      // Several suit them equally; their priorities picked this one. NOT
+      // "your perfect X" — that would overclaim over cars that also fit.
+      tied: () => copy.tasteTitle({ model: strip(lead[0].car.name) }),
+      settled: copy.tasteTitle,
+      lede: copy.tasteLede(),
+      // This lede is about the named car, so it survives narrowing to one.
+      ledeSurvivesNarrowing: true,
+    } : {
+      // A genuine tie: say so, and hand over the chips.
+      tied: copy.tiedTitle,
+      settled: perfect,
+      lede: copy.tiedLede(),
+    };
+
+    const title = el('h2', 'bmwm-title', frame.tied({ count: leadCount }));
+    const lede = el('p', 'bmwm-lede', frame.lede || '');
+    lede.hidden = !frame.lede;
+    screen.append(title, lede);
+    // The pool: what's shown, what didn't make the lead, then the held-back
+    // alternatives a rejection can promote.
+    screen.append(renderRefine(
+      ctx, [...lead, ...rest, ...alternatives], leadCount, title, lede, frame,
+    ));
 
     // Whatever the lead didn't claim: smaller compact tiles in a static 2-up
     // row (distinct from the horizontal "Worth the drive" carousel of OTHER
@@ -1912,7 +1934,10 @@ async function renderResults(root, ctx, answers) {
     // near-miss below a tie, or further-from-the-brief stock in the closest
     // frame. Only the fit+decisive hero's runners-up ever half-deserved the
     // old "also fit your answers", and even they can carry a trade-off.
-    if (rest.length) {
+    // Only when the lead is a group of equals: behind a single hero the
+    // runners-up are already reachable by rejecting it, so a "More at" band
+    // would just repeat what the pool already holds.
+    if (rest.length && leadCount > 1) {
       const moreFrame = !fit ? 'closest' : decisive ? 'decree' : (tasteLead ? 'taste' : 'tie');
       const more = el('section', 'bmwm-more-band');
       more.append(
