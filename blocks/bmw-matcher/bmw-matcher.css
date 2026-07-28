@@ -737,18 +737,40 @@
    red X. Rejecting is normal browsing behaviour, not an error state. */
 .bmwm-reject { margin-top: var(--bmwm-space-4); }
 
+/* Promoted from a small underlined link to a real control. It was styled like
+   a disclaimer while being the second most important thing on the page: it is
+   what makes this a conversation rather than a search result. Still quiet
+   (bordered, not filled — turning a car down is normal browsing, not an
+   error), but now clearly a button, and carrying a hint that says what it
+   does, because nothing previously suggested another car would come up. */
 .bmwm-reject-open {
-  padding: 0;
-  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: var(--bmwm-space-3) var(--bmwm-space-4);
+  border: 1px solid var(--bmwm-line);
+  border-radius: var(--bmwm-radius, 0);
   background: none;
   cursor: pointer;
-  font-family: var(--bmwm-font-body);
+  text-align: left;
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
   font-size: var(--bmwm-text-label);
-  color: var(--bmwm-ink-muted);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  color: var(--bmwm-ink);
 }
-.bmwm-reject-open:hover { color: var(--bmwm-ink); }
+
+.bmwm-reject-hint {
+  font-family: var(--bmwm-font-body);
+  font-weight: 400;
+  font-size: var(--bmwm-text-eyebrow);
+  color: var(--bmwm-ink-muted);
+}
+
+.bmwm-reject-open:hover {
+  border-color: var(--bmwm-accent);
+  background: var(--bmwm-accent-soft);
+}
 .bmwm-reject-open:focus-visible {
   outline: 2px solid var(--bmwm-accent-spot);
   outline-offset: 2px;
@@ -860,7 +882,7 @@
 }
 
 /* --- results skeleton (shown while /api/match is in flight) ---
-   Reuses the real .bmwm-card / .bmwm-grid / .bmwm-more structure so the
+   Reuses the real .bmwm-card / .bmwm-grid / .bmwm-tail structure so the
    placeholder occupies the same footprint the results will, avoiding a layout
    jump. Each grey block shimmers via a sweeping gradient. */
 .bmwm-skel {
@@ -972,11 +994,20 @@
 
 .bmwm-card-media.has-photo .bmwm-card-soon { display: none; }
 
-.bmwm-card-body { padding: var(--bmwm-space-6); }
+/* Column so the CTA can pin to the bottom (margin-top: auto below). Cards in
+   a tie now sit side by side at full size, where they used to be a single
+   full-width hero, so their heights vary with the picker and the reasons —
+   without this the link floated wherever the content stopped and the row read
+   as broken rather than as equal-weight options. */
+.bmwm-card-body {
+  display: flex;
+  flex-direction: column;
+  padding: var(--bmwm-space-6);
+}
 
 .bmwm-card-head {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--bmwm-space-3);
 }
@@ -987,10 +1018,18 @@
   font-size: var(--bmwm-text-h3);
   line-height: 1.33;
   margin: 0;
+  /* Take the space the badge doesn't, and wrap between words rather than
+     orphaning the trim level onto its own line ("MINI Hatch Electric Level"
+     / "3"), which is what a shared baseline row produced once the cards
+     halved in width. */
+  flex: 1 1 auto;
+  min-width: 0;
+  text-wrap: balance;
 }
 
 .bmwm-score {
   flex: none;
+  margin-top: 2px; /* optically centres on the name's first line */
   font-family: var(--bmwm-font-bold);
   font-weight: 700;
   color: var(--bmwm-accent-ink);
@@ -1013,7 +1052,10 @@
 
 .bmwm-card-link {
   display: inline-block;
-  margin-top: var(--bmwm-space-4);
+  /* Pinned to the foot of the card so side-by-side cards line their CTAs up. */
+  margin-top: auto;
+  padding-top: var(--bmwm-space-4);
+  align-self: flex-start;
   font-family: var(--bmwm-font-bold);
   font-weight: 700;
   font-size: var(--bmwm-text-label);
@@ -1061,32 +1103,74 @@
    servicing"-style module: grey field, uppercase heading, even 3-up
    spacing) rather than sitting directly on the white results page. */
 
-/* --- "more at <retailer>": runner-up matches (#2/#3) ---
-   The other local matches, a tier quieter than the hero but louder than the
-   grey "worth the drive" band below. Sits on the white page (no grey fill,
-   no full-bleed) so the weight order reads hero → more → worth-the-drive. */
-.bmwm-more-band { margin-top: var(--bmwm-space-8); }
+/* --- the rest of the list ---
+   The "More at <retailer>" band that used to live here is gone: it was a
+   second ranked list with its own caption, and its caption ended up
+   contradicting the headline whenever it outscored the lead. */
 
-/* Static 2-up row of compact tiles (not the scrolling .bmwm-nearby track).
-   Collapses to a single column on mobile. The compact card's flex-basis is a
-   no-op here — grid items size to the tracks, so the tiles fill the columns. */
-.bmwm-more {
+/* The rest of the one ranked list, smaller. Three up so it reads as a
+   continuation of the same list rather than as a second, competing one — the
+   old two-up "More at <retailer>" band looked like a fresh section with its
+   own claim, which is exactly what it turned out to be doing.
+   Sized down and set on the white page so the weight order reads
+   lead → next best, i.e. the same order as the scores. */
+.bmwm-tail { margin-top: var(--bmwm-space-8); }
+
+.bmwm-tail .bmwm-subhead {
+  margin-bottom: var(--bmwm-space-4);
+  color: var(--bmwm-ink-muted);
+}
+
+.bmwm-tail-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--bmwm-space-4);
   align-items: start;
 }
 
-@media (max-width: 767px) {
-  .bmwm-more { grid-template-columns: 1fr; }
-}
-
-/* Compact tiles are borderless-on-grey by default (tuned for the nearby band).
-   On the white "more" section restore the hairline so they read as cards. */
-.bmwm-more .bmwm-card-compact {
+.bmwm-tail-grid .bmwm-card-compact {
   border-color: var(--bmwm-line);
   box-shadow: none;
 }
+
+@media (max-width: 1023px) {
+  .bmwm-tail-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 639px) {
+  .bmwm-tail-grid { grid-template-columns: 1fr; }
+}
+
+/* Where the car is, on every card. Muted, because it's a fact about the car
+   rather than a claim about the match. */
+.bmwm-distance-here {
+  font-family: var(--bmwm-font-body);
+  color: var(--bmwm-ink-muted);
+}
+
+/* The refine tools now sit BELOW the cars (answer first, then argue with it),
+   so they need a rule above them to read as a new movement rather than as an
+   afterthought hanging off the last card. */
+/* The "we kept looking" line. Accent-edged like the unmet/rescue notes it sits
+   alongside, because it is the same kind of statement: the tool telling you
+   something about its own search rather than about a car. */
+.bmwm-notice {
+  margin-bottom: var(--bmwm-space-5);
+  padding: var(--bmwm-space-3) var(--bmwm-space-4);
+  border-left: 3px solid var(--bmwm-accent);
+  background: var(--bmwm-surface-alt);
+  font-family: var(--bmwm-font-body);
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink);
+}
+
+.bmwm-refine-tools {
+  margin-top: var(--bmwm-space-7);
+  padding-top: var(--bmwm-space-5);
+  border-top: 1px solid var(--bmwm-line);
+}
+
+.bmwm-refine-tools:empty { display: none; }
 
 /* Bleeds out to the block's own edges by cancelling .bmwm's side padding,
    so the band reads as a distinct section rather than an inset panel. */
@@ -1281,10 +1365,10 @@ a.bmwm-ptile:focus-visible { outline: 2px solid var(--bmwm-accent); outline-offs
 /* Skeleton tiles drop the hairline everywhere — a borderless shimmer reads
    cleaner. Only the border-COLOR goes (not the border itself) so the real
    bordered card swaps in without a 1px layout shift. Lives down here so it
-   outranks the earlier same-specificity .bmwm-more .bmwm-card-compact and
+   outranks the earlier same-specificity .bmwm-tail-grid .bmwm-card-compact and
    .bmwm-ptile border rules. */
 .bmwm-card.bmwm-skel-card,
-.bmwm-more .bmwm-skel-card,
+.bmwm-tail-grid .bmwm-skel-card,
 .bmwm-skel-ptile { border-color: transparent; }
 
 /* Mobile: hero steps 40px → 32px (the one confirmed breakpoint data point);

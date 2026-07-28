@@ -216,31 +216,25 @@ const BRAND_COPY = {
     // The rescue note: the want is missing HERE but met nearby — by owner
     // decision (2026-07-22) the local cards keep the lead and this note
     // carries the fact, so the buyer weighs proximity against fit themselves.
+    // The rescue note points at the list, not at a section: nearby cars are
+    // IN the list now, wherever their score puts them.
     rescueNote: ({ list, retailer, miles, where }) => `No ${list} at ${retailer} right now. `
-      + `The nearest is ${miles} away at ${where}, under “Worth the drive” below.`,
-    // The "Worth the drive" lede, per frame. `default` follows a page that
-    // had something to show; `rescue` leads with the cars that meet the want
-    // the retailer couldn't; `empty` is state 5, where nearby is the only
-    // road left and the band is the opposite of an afterthought.
+      + `The nearest is ${miles} away at ${where}, and it’s in the list below.`,
+    // Only `empty` survives: state 5, where the retailer had nothing and the
+    // nearby cars are the results rather than a band beneath them.
     driveLede: {
-      default: ({ retailer }) => `Not quite it? These are the closest matches at other retailers near ${retailer}.`,
-      rescue: ({ list }) => `Starting with the ${list} you asked for, then the closest `
-        + 'matches at other retailers.',
       empty: ({ retailer }) => `Nothing at ${retailer} fits those answers, so these are the `
         + 'closest matches at other retailers instead.',
     },
-    // The "More at <retailer>" lede, per result frame. One sentence used to
-    // cover all three ("that also fit your answers"), which was false in two
-    // of them: the band holds cars ranked BELOW the lead group, and in the
-    // closest-here frame nothing on the page fits the whole brief. Compact
-    // tiles carry no trade-off line, so this sentence is the band's only
-    // honesty layer. Rank claims, never fit claims.
-    moreLede: {
-      decree: ({ retailer }) => `The next closest matches in ${retailer}’s stock.`,
-      tie: () => 'Close, but not level with the cars above.',
-      taste: () => 'These suit you just as well, they just match your priorities less closely.',
-      closest: () => 'Also here, a step further from your brief.',
-    },
+    // Heads the rest of the same ranked list. Deliberately claims nothing:
+    // the old per-frame ledes ("Close, but not level with the cars above")
+    // were separate honesty layers for a separate band, and they ended up
+    // contradicting the headline once a lower band outscored the lead.
+    tailHeading: 'NEXT BEST',
+    rejectHint: 'Turned down? We’ll bring the next one up.',
+    // Shown only when widening the search actually changed the answer.
+    searchedWider: ({ miles, where }) => `We carried on looking. The best match for you `
+      + `is ${miles}, at ${where}.`,
   },
   mini: {
     name: 'MINI',
@@ -282,19 +276,14 @@ const BRAND_COPY = {
     closestSettled: ({ model }) => `Closest to your brief: the ${model}.`,
     rescueLabel: 'NOT HERE, BUT NOT FAR.',
     rescueNote: ({ list, miles, where }) => `No ${list} at ours right now. `
-      + `The nearest is ${miles} away at ${where}. Scroll down to “Worth the drive”.`,
+      + `The nearest is ${miles} away at ${where}, and it’s in the list below.`,
     driveLede: {
-      default: () => 'Nothing jumping out? These are the closest at other retailers nearby.',
-      rescue: ({ list }) => `First up: the ${list} you asked for. `
-        + 'Then the rest of the closest matches.',
       empty: () => 'Nothing at ours fits that brief. These nearby MINIs get closest.',
     },
-    moreLede: {
-      decree: ({ retailer }) => `The next nearest things to it at ${retailer}.`,
-      tie: () => 'So nearly in the tie.',
-      taste: () => 'Every bit as good a fit, just less your sort of thing.',
-      closest: () => 'Also at ours, a bit further from the wish list.',
-    },
+    tailHeading: 'NEXT BEST',
+    rejectHint: 'Not feeling it? We’ll bring the next one up.',
+    searchedWider: ({ miles, where }) => `We kept looking. Your best match is ${miles}, `
+      + `at ${where}.`,
   },
 };
 
@@ -438,34 +427,82 @@ function briefFromAnswers(ctx) {
   return bits;
 }
 
-/**
- * The tie, plus the means to break it.
- *
- * Renders the tied cars at equal weight and, above them, one tappable chip per
- * axis that actually separates them (see refinementAxes). Tapping requires
- * that thing; tapping again drops it. Everything happens here in the page —
- * the cars, their equipment, gearbox and paint all arrived with the match, so
- * narrowing six cars to one costs no round trip and no waiting.
- *
- * Two rules the plan insists on, both visible in the code below: an applied
- * refinement is always shown and always revocable (a chip you can't see is a
- * filter you can't argue with), and narrowing to nothing is a legitimate
- * outcome that must be explained rather than rendered as an empty grid.
- *
- * @param {HTMLElement} title the results headline, re-worded as the set narrows
- * @param {HTMLElement} lede the framing line, dropped once one car remains
- * @param {Object} frame how this group may be described (docs/
- *   results-page-states.md): `tied({count})` while several remain,
- *   `settled({model})` once one does. The fit-tie frame crowns the survivor
- *   ("Your perfect BMW is…"); the closest-here frame must not — its survivor
- *   still misses the brief, so it settles to "Your closest match here is…".
+/*
+ * How far apart two scores may be and still count as a tie. Mirrors the
+ * engine's CLUSTER_PTS: the page re-derives which result state it is in after
+ * every narrowing, so it needs the same threshold the server used.
  */
-function renderRefine(ctx, pool, showCount, title, lede, frame) {
+const CLUSTER_PTS = 3;
+
+/** Cars beyond the lead cluster, shown as compact tiles under one heading. */
+const TAIL_SHOWN = 6;
+
+/** Cap on cards given the full lead treatment. Mirrors the engine's own. */
+const MAX_SHOWN = 6;
+
+/**
+ * The results list, plus every means of arguing with it.
+ *
+ * ONE ranked list. That is the whole design and it is worth stating plainly,
+ * because it replaced three: the retailer's matches, a quieter "More at
+ * <retailer>" band, and a "Worth the drive" carousel of other retailers, each
+ * ranked internally and captioned honestly on its own terms. Stacked
+ * vertically they read as one list that isn't sorted — Priya's page ran 96,
+ * 95 → 78 → 99, 97, so it claimed two cars fit best and then showed a 99% one
+ * scroll down. Nobody reads three lists. See docs/results-page-review.md.
+ *
+ * So: everything goes in one pool, sorted by score, and each card says where
+ * it is instead of which band it came from. Nearby stock arrives late (a slow
+ * national search) and joins the same pool through `addToPool`, which is why
+ * the pool is mutable and the headline is derived rather than fixed.
+ *
+ * The headline is re-derived on every redraw from the scores actually on
+ * screen, never from the card count. That fixes a class of lie rather than one
+ * instance: "TWO OF THESE FIT YOU EQUALLY WELL" was rendered over a 96% and a
+ * 73% because narrowing back-filled the set to keep its size and nothing
+ * re-tested the claim. Back-filling is right; not re-checking was not.
+ *
+ * Two rules the plan insists on, both still here: an applied refinement is
+ * always shown and always revocable (a chip you can't see is a filter you
+ * can't argue with), and narrowing to nothing is a legitimate outcome that
+ * must be explained rather than rendered as an empty grid.
+ *
+ * @param {HTMLElement} title the results headline, rewritten on every redraw
+ * @param {HTMLElement} lede the framing line, dropped once one car remains
+ * @param {Object} frames how each situation may be described (docs/
+ *   results-page-states.md), keyed by state. Chosen per redraw, because
+ *   narrowing can move the page from one state to another.
+ * @returns {{ host: HTMLElement, addToPool: (matches) => void }}
+ */
+function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) {
   const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
-  // The cards on screen are the head of a longer ranked pool. Chips describe
-  // what's visible; rejections draw the next car up from behind it.
-  const lead = pool.slice(0, showCount);
-  const axes = refinementAxes(lead.map(listingsOf));
+  // Mutable: nearby stock joins after first paint. Always kept in score order
+  // so "the list" and "ranked by fit" mean the same thing.
+  /*
+   * Score first, then the configured retailer ahead of a distant one.
+   *
+   * The tie-break matters more than it looks. Merging nearby stock into the
+   * list means local and distant cars can land on identical scores, and
+   * without a rule the order is whatever the arrays happened to be in. Owner
+   * decision (2026-07-22) stands: proximity is the buyer's trade to make, so
+   * when two cars fit equally well the one they can walk to leads. A nearby
+   * car that genuinely scores HIGHER still leads — that is the whole point of
+   * merging the list — it just has to earn it rather than win a coin toss.
+   */
+  const rank = (a, b) => b.score - a.score
+    || (a.car.distance == null ? 0 : 1) - (b.car.distance == null ? 0 : 1)
+    || (a.car.distance ?? 0) - (b.car.distance ?? 0);
+  let pool = [...initialPool].sort(rank);
+  /*
+   * The taste lead is a server judgement about one specific car: "of the cars
+   * that fit you equally well, this is the one your priorities point at". It
+   * therefore only stands while that car is still the one leading. Narrow it
+   * away, reject it, or let a nearby car outrank it, and the claim is about a
+   * car that is no longer being recommended.
+   */
+  const tasteLeader = tasteLead ? pool[0]?.car.id : null;
+  const tasteLed = (alive) => Boolean(tasteLeader) && alive[0]?.car.id === tasteLeader;
+  const axes = refinementAxes(pool.slice(0, MAX_SHOWN).map(listingsOf));
   const active = new Map(); // axis id -> axis
 
   // Everything narrowing the set, positive or negative, in one place: a
@@ -488,13 +525,33 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
   const status = el('div', 'bmwm-brief');
   const grid = el('div', 'bmwm-grid bmwm-grid-tied');
 
-  // Only worth offering when there's something to offer. A cluster of
-  // identical-spec cars in identical paint has no axes, and the page simply
-  // stays as it was.
-  if (axes.length) {
-    host.append(el('p', 'bmwm-refine-label', copy.refineLabel), chipRow, status);
-  }
-  host.append(grid);
+  // The rest of the ranked list, smaller. Same list, same order, no claim.
+  const tail = el('section', 'bmwm-tail');
+
+  /*
+   * Answer first, then the means to argue with it.
+   *
+   * The page used to run headline → chips → brief → cars, so Meg was told
+   * "Your perfect MINI is the Hatch Electric Level 3", then asked "So, what do
+   * you fancy?", then shown a summary of her own answers, and only then shown
+   * the car. Two interruptions between the promise and the payoff. Chips are
+   * for editing an answer you have already seen; above it they invert the
+   * transaction and read as another question in a quiz that just ended.
+   */
+  const refineBlock = el('div', 'bmwm-refine-tools');
+  /*
+   * Said once, if late-arriving nearby stock changes who is leading.
+   *
+   * Merging nearby into the one list is what stops the page contradicting
+   * itself, but on a cold national search it means the page can repaint a
+   * while after it first settled, with a different car on top. Silently
+   * swapping the answer under someone reads as a glitch. Saying "we kept
+   * looking, and the best one is 23 miles away" reads as the tool doing its
+   * job, which is also what actually happened.
+   */
+  const notice = el('p', 'bmwm-notice');
+  notice.hidden = true;
+  host.append(notice, grid, refineBlock, tail);
 
   /*
    * Survivors of everything the buyer has said, drawn from the WHOLE pool so a
@@ -521,7 +578,40 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
     return { ...m, car: regroup(m.car, kept), listings: kept };
   }
   const surviving = () => pool.map(narrow).filter(Boolean);
-  const matching = () => surviving().slice(0, showCount);
+
+  /*
+   * Which result state the page is in, RIGHT NOW, from the scores on screen.
+   *
+   * Previously this was decided once by the server and then never revisited,
+   * while the card count was allowed to drift under narrowing. That is how a
+   * 96% and a 73% ended up under "two of these fit you equally well", and how
+   * a diesel carrying "Diesel, where you asked for fully electric" got
+   * promoted into a set defined as fitting equally well.
+   *
+   * Deriving it each time means every state transition the buyer can cause is
+   * handled by construction: narrow a tie to one car and it becomes a decree;
+   * reject the leader and whatever it promotes is re-judged on its own merits;
+   * a nearby car joining the pool can win outright and the page says so.
+   */
+  function situation() {
+    const alive = surviving();
+    if (!alive.length) return { alive, lead: [], state: 'empty' };
+    // A lead is the top car plus anything tied with it. Nothing else may be
+    // described as fitting equally well, whatever the count used to be.
+    const top = alive[0].score;
+    const cluster = alive.filter((m) => top - m.score <= CLUSTER_PTS);
+    // The leader misses something asked for: the page must not say "perfect"
+    // in any state, so this outranks the rest.
+    if ((alive[0].tradeOffs || []).length) {
+      return { alive, lead: cluster.slice(0, MAX_SHOWN), state: 'closest' };
+    }
+    if (cluster.length === 1) return { alive, lead: [alive[0]], state: 'decree' };
+    // Fit-tied. Their priorities may still pick one (the taste lead is a
+    // server judgement about the original cluster, so it only stands while
+    // that cluster's leader is still the leader).
+    const state = tasteLed(alive) ? 'taste' : 'tie';
+    return { alive, lead: cluster.slice(0, MAX_SHOWN), state };
+  }
 
   /*
    * What this car could be rejected FOR, given what's still on screen.
@@ -595,12 +685,14 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
   }
 
   function redraw() {
-    const shown = matching();
+    const { alive, lead: shown, state } = situation();
+    const frame = frames[state] || frames.tie;
 
     // Chips: every axis that still splits what's on screen, plus the ones
     // already applied (which by definition no longer split anything). Offering
     // an axis that can't change the result is noise, so they're recomputed
     // against the current set rather than the original one.
+    refineBlock.replaceChildren();
     chipRow.replaceChildren();
     const applied = (label, undo) => {
       const chip = el('button', 'bmwm-chip is-on', label);
@@ -625,25 +717,31 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
       chipRow.append(chip);
     }
 
-    // The headline follows the set: a narrowing tie is still a tie until it
-    // isn't, and the moment it lands on one car is the answer the whole tool
-    // exists to give. The tie lede goes with it — "we can't split them" is
-    // false once the user has split them.
+    // Mounted only when there is something to offer. A cluster of
+    // identical-spec cars in identical paint has no axes, and the page simply
+    // shows the cars and stops.
+    if (chipRow.children.length) {
+      refineBlock.append(el('p', 'bmwm-refine-label', copy.refineLabel), chipRow);
+    }
+
+    // The headline says whatever is true of the cars now on screen. `state`
+    // already accounts for narrowing, rejection and late-arriving nearby
+    // stock, so there is nothing to special-case here beyond the empty set.
     const wants = [...active.values(), ...constraints.values()].map((a) => a.label.toLowerCase());
-    const settled = shown.length === 1;
     if (!shown.length) {
       // Nothing left to be a tie between — "a one-way tie" is the nonsense a
       // count-driven headline produces if it isn't stopped here.
       title.textContent = copy.tiedEmptyTitle;
-    } else if (settled) {
+    } else if (shown.length === 1) {
       const model = shown[0].car.name.replace(new RegExp(`^${copy.name} `), '');
       title.textContent = frame.settled({ model });
     } else {
-      title.textContent = frame.tied({ count: shown.length });
+      title.textContent = frame.tied({ count: shown.length, model: shown[0].car.name.replace(new RegExp(`^${copy.name} `), '') });
     }
     // "We can't split them" only holds while there are several to split — but a
     // lede about the single named car (the taste pick) survives narrowing.
     lede.hidden = !frame.lede || (shown.length <= 1 && !frame.ledeSurvivesNarrowing);
+    lede.textContent = frame.lede || '';
     // A car waved away with no reason narrows the count but adds no words —
     // there's nothing to report about "just not that one".
     // Rebuild the running brief.
@@ -656,6 +754,7 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
     if (hidden.size) learned.push({ kind: 'rule', text: copy.hiddenChip({ count: hidden.size }) });
 
     if (said.length || learned.length) {
+      refineBlock.append(status);
       status.append(el('p', 'bmwm-brief-label', copy.briefLabel));
       if (said.length) status.append(el('p', 'bmwm-brief-said', said.join('  ·  ')));
       learned.forEach((item) => {
@@ -668,8 +767,11 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
       // it read "Showing 9 of 9" beside two visible cards, which is both
       // confusing and not what the number meant.
       if (learned.length) {
+        // Counts what the buyer can actually see. It used to report
+        // `surviving().length` while the grid was capped at a fixed lead
+        // count, so the page said "3 of 9 still match" over two cards.
         status.append(el('p', 'bmwm-brief-count', copy.briefCount({
-          shown: surviving().length, total: pool.length,
+          shown: alive.length, total: pool.length,
         })));
       }
     }
@@ -712,10 +814,57 @@ function renderRefine(ctx, pool, showCount, title, lede, frame) {
       rejectLabel: copy.rejectOpen,
       rejectPrompt: copy.rejectPrompt,
     })));
+
+    /*
+     * The rest of the same list, smaller.
+     *
+     * Not a second ranked list with its own claim — that was the old "More at
+     * <retailer>" and "Worth the drive" bands, and their captions ended up
+     * contradicting the headline because each was honest only about itself.
+     * These are simply the cars that came next, in the same order, under a
+     * heading that claims nothing. Scores read downward without inverting,
+     * which is the whole point.
+     */
+    tail.replaceChildren();
+    const rest = alive.slice(shown.length, shown.length + TAIL_SHOWN);
+    if (rest.length) {
+      tail.append(el('h3', 'bmwm-subhead', copy.tailHeading));
+      const row = el('div', 'bmwm-tail-grid');
+      rest.forEach((m) => row.append(matchCard(m, { compact: true, brand: ctx.brand })));
+      tail.append(row);
+    }
   }
 
   redraw();
-  return host;
+
+  return {
+    host,
+    /*
+     * Nearby stock, arriving after first paint from the slow national search.
+     * It joins the SAME pool and is re-sorted with everything else, so a car
+     * 23 miles away that genuinely suits the buyer better than anything local
+     * is presented as the better answer rather than as a footnote below a
+     * headline claiming otherwise. Each card carries where it is (see
+     * matchCard's provenance line), which is what makes that honest rather
+     * than merely tidy.
+     */
+    addToPool(extra) {
+      if (!extra?.length) return;
+      const known = new Set(pool.map((m) => m.car.id));
+      const fresh = extra.filter((m) => !known.has(m.car.id));
+      if (!fresh.length) return;
+      const before = situation().lead[0]?.car.id;
+      pool = [...pool, ...fresh].sort(rank);
+      redraw();
+      const now = situation().lead[0];
+      if (now && now.car.id !== before && now.car.distance != null) {
+        notice.textContent = copy.searchedWider({
+          miles: distanceLabel(now.car.distance), where: now.car.retailerName,
+        });
+        notice.hidden = false;
+      }
+    },
+  };
 }
 
 /** The unmet wants as brand-voiced plural phrases — fuel first, then shape:
@@ -1638,10 +1787,23 @@ function matchCard(match, {
   // The whole point of the carousel: how far away is it, and whose is it?
   // Distance comes from the live feed, so omit the line rather than invent
   // one if the feed didn't supply it.
-  if (compact && car.distance != null) {
-    const where = el('p', 'bmwm-distance');
+  /*
+   * Where this car is, on every card rather than only the compact ones.
+   *
+   * This is what lets the page be one ranked list instead of three. When
+   * "at the retailer" and "23 miles away" were separate SECTIONS, each needed
+   * its own caption, and those captions contradicted each other as soon as a
+   * distant car outscored a local one. Make it a property of the card and the
+   * sections stop being necessary: the list is just sorted, and each row says
+   * where you'd go.
+   */
+  const where = el('p', 'bmwm-distance');
+  if (car.distance != null) {
     where.append(el('span', 'bmwm-distance-miles', distanceLabel(car.distance)));
     if (car.retailerName) where.append(el('span', null, ` · ${car.retailerName}`));
+    body.append(where);
+  } else if (car.retailerName) {
+    where.append(el('span', 'bmwm-distance-here', `At ${car.retailerName}`));
     body.append(where);
   }
 
@@ -1704,6 +1866,11 @@ function matchCard(match, {
       const open = el('button', 'bmwm-reject-open', rejectLabel || 'Not this one');
       open.type = 'button';
       open.setAttribute('aria-expanded', 'false');
+      // Says what the control DOES. It was a small underlined link that looked
+      // like a disclaimer, and nothing on the page suggested that turning a
+      // car down would bring another one in — so the most conversational thing
+      // the tool can do read as the least important.
+      if (copy.rejectHint) open.append(el('span', 'bmwm-reject-hint', copy.rejectHint));
       const menu = el('div', 'bmwm-reject-menu');
       menu.hidden = true;
       menu.append(el('p', 'bmwm-reject-prompt', rejectPrompt || 'What put you off?'));
@@ -1736,7 +1903,11 @@ function matchCard(match, {
    * always describes the car they'd be going to see. Hero cards only: the
    * compact tiles are a glance, not a decision.
    */
-  if (big && match.listings?.length > 1) {
+  // Every card that speaks for several cars, not just the hero. The picker
+  // was `big`-only, so a tie — where grouped cards are commonest — showed
+  // "4 available … Portimao Blue, Brooklyn Grey or Alpine White" with no way
+  // to choose between them. Compact tiles stay out: they're a glance.
+  if (!compact && match.listings?.length > 1) {
     body.append(el('p', 'bmwm-why-label', copy.pickLabel));
     const picker = el('div', 'bmwm-pick');
     match.listings.forEach((listing, i) => {
@@ -1921,9 +2092,9 @@ function renderResultsSkeleton(root) {
   hero.append(heroCard);
   screen.append(hero);
 
-  // Two compact-tile skeletons, matching the "More at <retailer>" 2-up row.
-  const more = el('div', 'bmwm-more');
-  for (let i = 0; i < 2; i += 1) {
+  // Compact-tile skeletons, matching the "NEXT BEST" row the real page paints.
+  const more = el('div', 'bmwm-tail-grid');
+  for (let i = 0; i < 3; i += 1) {
     const tile = el('article', 'bmwm-card bmwm-card-compact bmwm-skel-card');
     tile.append(el('div', 'bmwm-skel bmwm-skel-media'));
     const body = el('div', 'bmwm-card-body');
@@ -2003,6 +2174,9 @@ async function renderResults(root, ctx, answers) {
   let tasteLead = false;
   // Held back by the API so a rejection has a next-best car to promote.
   let alternatives = [];
+  // The one ranked list, once it exists. Nearby stock is merged into it when
+  // the national search resolves (see addToPool below).
+  let refine = null;
   // What the retailer's own stock couldn't offer. Half the picture: nothing is
   // said to the user until /api/nearby agrees (see agreedUnmet). An older API
   // that doesn't send the field leaves this empty, so it simply never fires.
@@ -2042,114 +2216,73 @@ async function renderResults(root, ctx, answers) {
     // over a third car that's four points back. Anything beyond this leads a
     // quieter "More at <retailer>" tier, so a near-miss is demoted rather than
     // dropped.
-    // Fit: does the best local car meet every stated stock-fact want? The
-    // decree and the tie copy both presuppose it ("your perfect BMW", "fit
-    // you equally well") — said over a card carrying a trade-off line, either
-    // is contradicted two inches down. When the leads miss the brief the page
-    // drops into the "closest here" frame (docs/results-page-states.md): the
-    // configured retailer's cars still lead — owner decision: proximity is
-    // the buyer's trade to make, not ours — but the words stop pretending.
-    const fit = (matches[0].tradeOffs || []).length === 0;
-
-    // A taste-led pick leads alone, like a decisive winner — the difference is
-    // in the words, not the layout: we're naming the best of several equally
-    // suitable cars, not claiming the others don't fit.
-    const heroLed = decisive || (fit && tasteLead);
-    const leadCount = heroLed ? 1 : Math.min(clusterSize, matches.length);
-    const lead = matches.slice(0, leadCount);
-    const rest = matches.slice(leadCount);
-
     /*
-     * Every state renders through renderRefine, so "not this one" is on every
-     * card — not just in a tie. That asymmetry was backwards: the escape hatch
-     * matters MOST when we've confidently named one car and the buyer
-     * disagrees, because that is exactly when they're stuck. Routing all
-     * states through it also means a rejection promotes the next-best car
-     * from the pool instead of emptying the page.
+     * The frames, one per situation (docs/results-page-states.md).
      *
-     * Only the words differ per state. Each frame supplies how to say "here is
-     * one car" and "here are several", and renderRefine picks as the set
-     * narrows under the buyer's chips and rejections.
+     * These used to be chosen ONCE, from the server's verdict about the
+     * original result set, and then reused however far the buyer narrowed.
+     * That is how "TWO OF THESE FIT YOU EQUALLY WELL" survived being applied
+     * to a 96% and a 73%. Now renderRefine picks between them on every
+     * redraw, from the scores actually on screen, so all this has to supply
+     * is the words for each case.
      */
     const strip = (name) => name.replace(new RegExp(`^${brandName} `), '');
     const perfect = ({ model }) => `Your perfect ${brandName} is the ${model}.`;
-    const frame = !fit ? {
-      // The cards miss something asked for: never "perfect", always "closest".
-      tied: () => copy.closestTitle({ retailer: ctx.retailerLabel }),
-      settled: copy.closestSettled,
-      lede: copy.closestLede(),
-    } : decisive ? {
-      // Nothing else came close: the decree is earned.
-      tied: () => perfect({ model: strip(lead[0].car.name) }),
-      settled: perfect,
-      lede: null,
-    } : tasteLead ? {
+    const frames = {
+      // The leader misses something asked for: never "perfect", always
+      // "closest". Its own card carries the trade-off line saying what.
+      closest: {
+        tied: () => copy.closestTitle({ retailer: ctx.retailerLabel }),
+        settled: copy.closestSettled,
+        lede: copy.closestLede(),
+      },
+      // Nothing else came within CLUSTER_PTS: the decree is earned.
+      decree: { tied: perfect, settled: perfect, lede: null },
       // Several suit them equally; their priorities picked this one. NOT
       // "your perfect X" — that would overclaim over cars that also fit.
-      tied: () => copy.tasteTitle({ model: strip(lead[0].car.name) }),
-      settled: copy.tasteTitle,
-      lede: copy.tasteLede(),
-      // This lede is about the named car, so it survives narrowing to one.
-      ledeSurvivesNarrowing: true,
-    } : {
+      taste: {
+        tied: copy.tasteTitle,
+        settled: copy.tasteTitle,
+        lede: copy.tasteLede(),
+        // This lede is about the named car, so it survives narrowing to one.
+        ledeSurvivesNarrowing: true,
+      },
       // A genuine tie: say so, and hand over the chips.
-      tied: copy.tiedTitle,
-      settled: perfect,
-      lede: copy.tiedLede(),
+      tie: { tied: copy.tiedTitle, settled: perfect, lede: copy.tiedLede() },
     };
 
-    const title = el('h2', 'bmwm-title', frame.tied({ count: leadCount }));
-    const lede = el('p', 'bmwm-lede', frame.lede || '');
-    lede.hidden = !frame.lede;
+    const title = el('h2', 'bmwm-title', '');
+    const lede = el('p', 'bmwm-lede', '');
     screen.append(title, lede);
-    // The pool: what's shown, what didn't make the lead, then the held-back
-    // alternatives a rejection can promote.
-    screen.append(renderRefine(
-      ctx, [...lead, ...rest, ...alternatives], leadCount, title, lede, frame,
-    ));
 
-    // Whatever the lead didn't claim: smaller compact tiles in a static 2-up
-    // row (distinct from the horizontal "Worth the drive" carousel of OTHER
-    // retailers below). Same retailer as the lead, so "More at" — the heading
-    // is just a location; the lede changes with the frame, because what these
-    // cards ARE changes with it: runners-up behind a real winner, the
-    // near-miss below a tie, or further-from-the-brief stock in the closest
-    // frame. Only the fit+decisive hero's runners-up ever half-deserved the
-    // old "also fit your answers", and even they can carry a trade-off.
-    // Only when the lead is a group of equals: behind a single hero the
-    // runners-up are already reachable by rejecting it, so a "More at" band
-    // would just repeat what the pool already holds.
-    if (rest.length && leadCount > 1) {
-      const moreFrame = !fit ? 'closest' : decisive ? 'decree' : (tasteLead ? 'taste' : 'tie');
-      const more = el('section', 'bmwm-more-band');
-      more.append(
-        el('h3', 'bmwm-subhead bmwm-nearby-heading', `MORE AT ${ctx.retailerLabel.toUpperCase()}`),
-        el('p', 'bmwm-lede bmwm-nearby-lede',
-          copy.moreLede[moreFrame]({ retailer: ctx.retailerLabel })),
-      );
-      const moreGrid = el('div', 'bmwm-more');
-      rest.forEach((m) => moreGrid.append(matchCard(m, { compact: true })));
-      more.append(moreGrid);
-      screen.append(more);
-    }
+    /*
+     * One pool, one list. Everything the API returned goes in: the matches,
+     * the held-back alternatives a rejection can promote, and — later, when
+     * the national search resolves — the nearby retailers' stock too.
+     *
+     * The old page split these across three sections with three captions and
+     * three internal rankings, which is what made it possible for it to claim
+     * two cars fit best above a card scoring higher. See
+     * docs/results-page-review.md.
+     */
+    refine = renderRefine(
+      ctx, [...matches, ...alternatives], title, lede, frames, tasteLead,
+    );
+    screen.append(refine.host);
   }
 
-  // Cars at other nearby retailers — worth a drive if the local matches didn't
-  // land. Fetched separately (the slow national search) so the hero above is
-  // already on screen; a slim skeleton band holds the space until it resolves.
-  // When it does: fill the carousel, or drop the band entirely if nothing came
-  // back (empty result or a failed lookup — the section is a bonus, never an
-  // error).
-  //
-  // Rendered in EVERY state, including no-matches: when nothing local
-  // survives, nearby is not a bonus but the only road left, and gating the
-  // band on local matches dead-ended exactly the buyer who needed it most.
-  // The hard filters apply to the nearby pool too, so when nothing anywhere
-  // fits, the band comes back empty and removes itself.
-  const nearbyBand = renderNearbySkeleton(ctx, matches.length
-    ? copy.driveLede.default({ retailer: ctx.retailerLabel })
-    : copy.driveLede.empty({ retailer: ctx.retailerLabel }));
-  screen.append(nearbyBand);
+  /*
+   * Nearby stock used to get its own "Worth the drive" carousel below
+   * everything else. It doesn't any more: it joins the one ranked list (see
+   * addToPool). What remains here is the empty case — when the retailer had
+   * nothing at all, there is no list to join, so the nearby cars ARE the
+   * results and get rendered as such.
+   */
+  const emptyLocal = !matches.length;
+  const nearbyBand = emptyLocal
+    ? renderNearbySkeleton(ctx, copy.driveLede.empty({ retailer: ctx.retailerLabel }))
+    : null;
+  if (nearbyBand) screen.append(nearbyBand);
 
   const actions = el('div', 'bmwm-actions');
   const share = el('button', 'bmwm-btn bmwm-btn-primary', 'Copy share link');
@@ -2200,11 +2333,11 @@ async function renderResults(root, ctx, answers) {
   // is genuinely unavailable, so the unmet note goes in here rather than with
   // the hero — we'd otherwise be claiming "no electric cars near you" while
   // still waiting to hear from the retailers that might have one.
-  if (nearbyBand) {
+  {
     apiNearby(ctx.api, answers, ctx.retailer, ctx.brand).then(({ nearby, unmet }) => {
       // The user may have navigated away (retake/tweak) before this resolves;
       // only touch the page if it's still in the document.
-      if (!nearbyBand.isConnected) return;
+      if (!screen.isConnected) return;
 
       // One insertion slot, two polarities (docs/results-page-states.md).
       // State 4: both halves lack the want → "not anywhere nearby" (rare).
@@ -2236,28 +2369,31 @@ async function renderResults(root, ctx, answers) {
         if (Object.keys(rescued).length && nearest) {
           note = rescueNote(ctx, rescued, nearest);
           ordered = [...fits, ...nearby.filter((m) => !fits.includes(m))];
-          const bandLede = nearbyBand.querySelector('.bmwm-nearby-lede');
-          if (bandLede) {
-            bandLede.textContent = copy.driveLede.rescue({
-              list: orList(unmetPhrases(ctx.brand, rescued)),
-            });
-          }
         }
       }
       if (note) {
-        // Above the cards, whatever frame they're in. The grid is a direct
-        // child of the screen on the hero page but lives inside the refine
-        // host on tie/closest pages — walk up to the screen-level ancestor,
-        // or insertBefore throws on a non-child reference node.
+        // Above the cards, whatever frame they're in. The grid lives inside
+        // the refine host — walk up to the screen-level ancestor, or
+        // insertBefore throws on a non-child reference node.
         let anchor = screen.querySelector('.bmwm-refine, .bmwm-grid');
         while (anchor && anchor.parentElement !== screen) anchor = anchor.parentElement;
         // No cards at all (state 5): the note still belongs with the results,
-        // directly above the band it points at, not appended after the
-        // disclaimer, which is where a null anchor would land it.
+        // directly above whatever IS there.
         screen.insertBefore(note, anchor || nearbyBand);
       }
-      if (ordered.length) fillNearbyBand(nearbyBand, ctx, ordered);
-      else nearbyBand.remove();
+      /*
+       * The merge. Nearby cars join the one ranked list rather than forming a
+       * band beneath it, so the page never claims a local car fits best above
+       * a more distant one that scores higher. Each card says where it is, so
+       * "23 miles away · Arnold Clark Kirkcaldy" is the buyer's call to make
+       * with the facts in front of them.
+       *
+       * When the retailer had nothing at all there is no list to join, and
+       * the nearby cars are the results — they keep the standalone band.
+       */
+      if (refine) refine.addToPool(ordered);
+      else if (nearbyBand && ordered.length) fillNearbyBand(nearbyBand, ctx, ordered);
+      else nearbyBand?.remove();
     });
   }
 }
