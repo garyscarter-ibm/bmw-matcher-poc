@@ -1517,6 +1517,49 @@ function distanceLabel(distance) {
 }
 
 /**
+ * The photo band every card surface shares: the retailer's picture when the
+ * feed supplied one, the "Images coming soon" placeholder when it didn't, and
+ * the line label pinned in the corner. Mirrors usedcars.bmw.co.uk's own PDP
+ * for a photo-less listing — a white bold caption centred on the dark field.
+ *
+ * Returns the element and a `showPhoto` to change it later. The swap exists
+ * because a hero card's listing picker can change which car the card is
+ * describing, and colour is usually the entire reason that choice exists: a
+ * card that renames the paint over a picture of the old one has argued against
+ * itself. Tiles never call it a second time, but they get it from here anyway
+ * — this was two near-identical copies, and the copy the picker didn't use was
+ * the copy that quietly stopped matching.
+ */
+function mediaWell(car, extraClass = '') {
+  const media = el('div', `bmwm-card-media${extraClass ? ` ${extraClass}` : ''}`);
+  media.append(
+    el('span', 'bmwm-card-soon', 'Images coming soon'),
+    el('span', 'bmwm-card-line', car.line),
+  );
+
+  function showPhoto(src) {
+    media.querySelector('.bmwm-card-photo')?.remove();
+    media.classList.toggle('has-photo', Boolean(src));
+    if (!src) return;
+    const img = el('img', 'bmwm-card-photo');
+    img.src = src;
+    img.alt = car.name;
+    img.loading = 'lazy';
+    // A broken image URL shouldn't leave a half-rendered card — drop back to
+    // the placeholder, exactly as a photo-less car shows.
+    img.addEventListener('error', () => {
+      media.classList.remove('has-photo');
+      img.remove();
+    });
+    // Ahead of the caption and the line label, both of which sit over it.
+    media.prepend(img);
+  }
+  showPhoto(car.photo);
+
+  return { media, showPhoto };
+}
+
+/**
  * One result card.
  * `big` adds the "why it suits you" reasons; `compact` is the carousel tile —
  * same anatomy, but trades the blurb and reasons for a distance line.
@@ -1529,42 +1572,7 @@ function matchCard(match, {
   const copy = BRAND_COPY[brandKey] || BRAND_COPY.bmw;
   const card = el('article', `bmwm-card${big ? ' bmwm-card-big' : ''}${compact ? ' bmwm-card-compact' : ''}`);
 
-  const media = el('div', 'bmwm-card-media');
-  // "Images coming soon" placeholder, mirroring usedcars.bmw.co.uk's own PDP
-  // for a photo-less listing: a white bold caption centred on the dark media
-  // field. Every card surface (hero, "More at" tiles, "Worth the drive"
-  // carousel) goes through matchCard, so this covers all image viewers. The
-  // placeholder is hidden (CSS) once a real photo loads, and re-shown if one
-  // fails to.
-  const soon = el('span', 'bmwm-card-soon', 'Images coming soon');
-  /*
-   * Real retailer photo when the live feed supplied one; the line label sits
-   * over it. Falls back to the "Images coming soon" placeholder above when
-   * absent — same as the live site.
-   *
-   * Written as a swap rather than a one-off because the listing picker can
-   * change which car this card is describing, and colour is usually the whole
-   * reason that choice exists — a card that renames the paint while still
-   * showing a picture of the old one has argued against itself.
-   */
-  function showPhoto(src) {
-    media.querySelector('.bmwm-card-photo')?.remove();
-    media.classList.toggle('has-photo', Boolean(src));
-    if (!src) return;
-    const img = el('img', 'bmwm-card-photo');
-    img.src = src;
-    img.alt = car.name;
-    img.loading = 'lazy';
-    // A broken image URL shouldn't leave a half-rendered card — drop back to
-    // the "Images coming soon" placeholder, exactly as a photo-less car shows.
-    img.addEventListener('error', () => {
-      media.classList.remove('has-photo');
-      img.remove();
-    });
-    media.prepend(img);
-  }
-  media.append(soon, el('span', 'bmwm-card-line', car.line));
-  showPhoto(car.photo);
+  const { media, showPhoto } = mediaWell(car);
   card.append(media);
 
   const body = el('div', 'bmwm-card-body');
@@ -1825,20 +1833,7 @@ function previewTile(match) {
     tile.setAttribute('aria-label', `${car.name}, ${price}, ${score}% match. View at ${car.retailerName || 'the retailer'}`);
   }
 
-  // Photo band (or the shared "Images coming soon" placeholder), with the line
-  // label pinned in its corner — same treatment as matchCard's media.
-  const media = el('div', 'bmwm-card-media bmwm-ptile-media');
-  const soon = el('span', 'bmwm-card-soon', 'Images coming soon');
-  if (car.photo) {
-    media.classList.add('has-photo');
-    const img = el('img', 'bmwm-card-photo');
-    img.src = car.photo;
-    img.alt = car.name;
-    img.loading = 'lazy';
-    img.addEventListener('error', () => { media.classList.remove('has-photo'); img.remove(); });
-    media.append(img);
-  }
-  media.append(soon, el('span', 'bmwm-card-line', car.line));
+  const { media } = mediaWell(car, 'bmwm-ptile-media');
 
   const body = el('div', 'bmwm-ptile-body');
   const head = el('div', 'bmwm-ptile-head');
