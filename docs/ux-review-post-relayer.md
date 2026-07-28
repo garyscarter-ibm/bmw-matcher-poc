@@ -185,7 +185,12 @@ Two smaller defects fixed alongside:
   raised to 4.5s (the cache is permanent, so it is paid once per car ever).
   Where paint is genuinely unknown the row falls back to mileage, which is the
   next thing that actually separates two identical cars.
-- **The picker only half-updated the card.** Choosing a listing changed the
-  mileage and the link but left the spec line naming the previous car's paint,
-  so the card described two cars at once. The spec line is now rebuilt on
-  selection: paint, swatch, price, plate and mileage.
+- **The picker only part-updated the card.** Choosing a listing changed the
+  mileage and the link but left the spec line naming the previous car's paint
+  and the media well showing its photograph, so the card described two cars at
+  once. The photo was the worse half: colour is usually the entire reason the
+  choice exists, so a card that renames the paint over a picture of the old one
+  has argued against itself. Each listing is a real car with its own
+  photographs, and the feed had them all along — the listing payload just never
+  carried `photo`. Both the picker and the chips now repaint: spec line
+  (paint, swatch, price), plate and mileage, link, and image.

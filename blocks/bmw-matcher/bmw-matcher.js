@@ -1019,6 +1019,7 @@ function regroup(car, kept) {
   const prices = kept.map((l) => l.priceMin).filter(Number.isFinite);
   return {
     ...car,
+    photo: head.photo || car.photo,
     colour: head.colour ? { manufacturerColour: head.colour, colour: head.shade } : car.colour,
     priceMin: head.priceMin ?? car.priceMin,
     mileage: head.mileage ?? car.mileage,
@@ -1536,13 +1537,22 @@ function matchCard(match, {
   // placeholder is hidden (CSS) once a real photo loads, and re-shown if one
   // fails to.
   const soon = el('span', 'bmwm-card-soon', 'Images coming soon');
-  // Real retailer photo when the live feed supplied one; the line label sits
-  // over it. Falls back to the "Images coming soon" placeholder above when
-  // absent — same as the live site.
-  if (car.photo) {
-    media.classList.add('has-photo');
+  /*
+   * Real retailer photo when the live feed supplied one; the line label sits
+   * over it. Falls back to the "Images coming soon" placeholder above when
+   * absent — same as the live site.
+   *
+   * Written as a swap rather than a one-off because the listing picker can
+   * change which car this card is describing, and colour is usually the whole
+   * reason that choice exists — a card that renames the paint while still
+   * showing a picture of the old one has argued against itself.
+   */
+  function showPhoto(src) {
+    media.querySelector('.bmwm-card-photo')?.remove();
+    media.classList.toggle('has-photo', Boolean(src));
+    if (!src) return;
     const img = el('img', 'bmwm-card-photo');
-    img.src = car.photo;
+    img.src = src;
     img.alt = car.name;
     img.loading = 'lazy';
     // A broken image URL shouldn't leave a half-rendered card — drop back to
@@ -1551,9 +1561,10 @@ function matchCard(match, {
       media.classList.remove('has-photo');
       img.remove();
     });
-    media.append(img);
+    media.prepend(img);
   }
   media.append(soon, el('span', 'bmwm-card-line', car.line));
+  showPhoto(car.photo);
   card.append(media);
 
   const body = el('div', 'bmwm-card-body');
@@ -1757,6 +1768,7 @@ function matchCard(match, {
         // Re-describe the card as the chosen car: paint, swatch, price,
         // mileage and where the link goes. Anything left showing the previous
         // listing's values is a card describing two cars at once.
+        showPhoto(listing.photo);
         renderSpecs(listing.colour, listing.shade, gbp(listing.priceMin));
         if (usedMeta) {
           const bits = [];

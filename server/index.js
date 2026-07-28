@@ -153,6 +153,11 @@ function publicMatch({
     // ("Portimao Blue") the buyer reads.
     listings: (listings?.length ? listings : [car]).map((c) => ({
       id: c.id,
+      // Each listing is a real car with its own photographs, so the card can
+      // show the one the buyer picked rather than the one that ranked first.
+      // Colour is the reason this choice exists; a picture of a different
+      // colour undoes it.
+      photo: c.photo,
       colour: c.colour?.manufacturerColour || c.colour?.colour,
       shade: c.colour?.colour,
       priceMin: c.priceMin,
