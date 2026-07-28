@@ -1155,16 +1155,25 @@
   color: var(--bmwm-ink);
 }
 
-/* The refine tools sit BELOW the cars (answer first, then argue with it), so
-   they need a rule above them to read as a new movement rather than as an
-   afterthought hanging off the last card. */
-.bmwm-refine-tools {
+/* The chips sit ABOVE the cards again: they're a control, and a control has to
+   be visible next to the thing it controls. Below the fold they read, in the
+   owner's words, as "unclear what clicking them affects". Kept to one light
+   strip so it's a control and not a second question between the headline and
+   the car. Deliberately not sticky — that fights the EDS host page's header. */
+.bmwm-refine-tools { margin: var(--bmwm-space-6) 0 var(--bmwm-space-5); }
+
+.bmwm-refine-tools:empty { display: none; }
+
+/* The brief is a SUMMARY, so it stays below the cars, and it keeps the rule the
+   tools block used to carry: it's a new movement, not an afterthought hanging
+   off the last card. */
+.bmwm-brief-block {
   margin-top: var(--bmwm-space-7);
   padding-top: var(--bmwm-space-5);
   border-top: 1px solid var(--bmwm-line);
 }
 
-.bmwm-refine-tools:empty { display: none; }
+.bmwm-brief-block:empty { display: none; }
 
 /* --- the two groups: the retailer's cars, then everyone else's ---
    The heading names a PLACE and nothing else. It is not allowed to rank, which

@@ -202,9 +202,21 @@ const BRAND_COPY = {
     // MINI MINIs", which is why neither brand's copy builds one.
     tiedLede: () => 'On your answers we can’t split them: each suits you as well as the next. '
       + 'The difference now is which you prefer the look of.',
-    // The refine panel: BMW states the instruction, no exclamation, no
-    // cheerleading (docs/tone-style-guide.md).
-    refineLabel: 'Narrow it down',
+    /*
+     * The refine panel: BMW states the instruction, no exclamation, no
+     * cheerleading (docs/tone-style-guide.md).
+     *
+     * The label names the effect AND the set it acts on. "So, what do you
+     * fancy?" / "Narrow it down" were invitations that never said what a tap
+     * would change, and the owner's report of the chips was exactly that: it's
+     * "unclear what clicking them affects". That is a labelling problem as much
+     * as a positioning one, so both were fixed.
+     */
+    refineLabel: ({ count }) => (count > 1 ? `Narrow these ${count} down` : 'Narrow this one down'),
+    // Feedback at the control itself, the moment a chip goes on. The running
+    // brief below the cars says the same thing at more length, but it is below
+    // the cars — by the time you reach it you have already stopped wondering
+    // whether the tap did anything.
     refineStatus: ({ shown, total, wants }) => `${shown} of ${total}, with ${wants}.`,
     refineStatusPlain: ({ shown, total }) => `${shown} of ${total}.`,
     refineEmpty: ({ wants }) => `Nothing here has ${wants} together. `
@@ -282,8 +294,11 @@ const BRAND_COPY = {
     tasteLede: () => 'A few of these fit your brief just as well. This one’s the most you.',
     tiedLede: () => 'They all fit what you told us, just as well as each other. '
       + 'So it comes down to taste now. Which is the fun bit.',
-    // MINI asks rather than instructs, and treats a dead end as a shrug.
-    refineLabel: 'So, what do you fancy?',
+    // MINI asks rather than instructs, and treats a dead end as a shrug. Same
+    // change as BMW's: the label now names what a tap does and to how many.
+    refineLabel: ({ count }) => (count > 1
+      ? `Fancy narrowing these ${count} down?`
+      : 'Fancy narrowing this one down?'),
     refineStatus: ({ shown, total, wants }) => `${shown} of ${total} left, with ${wants}.`,
     refineStatusPlain: ({ shown, total }) => `${shown} of ${total} left.`,
     refineEmpty: ({ wants }) => `Ah. Nothing here has ${wants} all at once. `
@@ -597,16 +612,20 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
   const awayRestGrid = el('div', 'bmwm-tail-grid');
 
   /*
-   * Answer first, then the means to argue with it.
+   * Two things were moved below the cards together in the rebuild, and only
+   * one of them belonged there.
    *
-   * The page used to run headline → chips → brief → cars, so Meg was told
-   * "Your perfect MINI is the Hatch Electric Level 3", then asked "So, what do
-   * you fancy?", then shown a summary of her own answers, and only then shown
-   * the car. Two interruptions between the promise and the payoff. Chips are
-   * for editing an answer you have already seen; above it they invert the
-   * transaction and read as another question in a quiz that just ended.
+   * The chips are a CONTROL, so they sit directly above what they control. Put
+   * below the fold they became, in the owner's words, "a bit confusing to use
+   * and it's unclear what clicking them affects" — you cannot see the thing
+   * being narrowed while you narrow it. The brief is a SUMMARY, and summaries
+   * belong after. So the chips came back up and the brief stayed down.
+   *
+   * Deliberately NOT sticky: that was considered and rejected, because it
+   * fights the EDS host page's own header.
    */
   const refineBlock = el('div', 'bmwm-refine-tools');
+  const briefBlock = el('div', 'bmwm-brief-block');
   /*
    * The other half of a scoped headline: the car elsewhere that beat the best
    * one here, named, with where it is.
@@ -625,7 +644,7 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
   let notedCarId = null;
   hereGroup.append(hereLabel, grid, hereRestGrid);
   awayGroup.append(awayLabel, awayGrid, awayRestGrid);
-  host.append(notice, hereGroup, awayGroup, refineBlock);
+  host.append(notice, refineBlock, hereGroup, awayGroup, briefBlock);
 
   /*
    * Survivors of everything the buyer has said, drawn from the WHOLE pool so a
@@ -839,7 +858,24 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
     // identical-spec cars in identical paint has no axes, and the page simply
     // shows the cars and stops.
     if (chipRow.children.length) {
-      refineBlock.append(el('p', 'bmwm-refine-label', copy.refineLabel), chipRow);
+      refineBlock.append(
+        el('p', 'bmwm-refine-label', copy.refineLabel({ count: shown.length })),
+        chipRow,
+      );
+      // What the last tap actually did, said where the tap happened. `total` is
+      // the same lead measured with nothing applied, so "1 of 2" is a real
+      // before-and-after rather than a count floating free of a baseline.
+      // Only the positive chips are named: "with not the red" is not a sentence,
+      // and a rejection has already shown its work by removing a card.
+      const picked = [...active.values()].map((a) => a.label.toLowerCase());
+      if (active.size || constraints.size || hidden.size) {
+        const args = { shown: shown.length, total: leadHere(pool).length };
+        const line = el('p', 'bmwm-refine-status', picked.length
+          ? copy.refineStatus({ ...args, wants: andList(picked) })
+          : copy.refineStatusPlain(args));
+        line.setAttribute('aria-live', 'polite');
+        refineBlock.append(line);
+      }
     }
 
     // The headline says whatever is true of the cars now on screen. `state`
@@ -882,7 +918,9 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
     lede.textContent = frame.lede || '';
     // A car waved away with no reason narrows the count but adds no words —
     // there's nothing to report about "just not that one".
-    // Rebuild the running brief.
+    // Rebuild the running brief. It stays BELOW the cars: it summarises, and a
+    // summary of what you just said belongs after the thing it summarises.
+    briefBlock.replaceChildren();
     status.replaceChildren();
     const said = briefFromAnswers(ctx);
     const learned = [
@@ -892,7 +930,7 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
     if (hidden.size) learned.push({ kind: 'rule', text: copy.hiddenChip({ count: hidden.size }) });
 
     if (said.length || learned.length) {
-      refineBlock.append(status);
+      briefBlock.append(status);
       status.append(el('p', 'bmwm-brief-label', copy.briefLabel));
       if (said.length) status.append(el('p', 'bmwm-brief-said', said.join('  ·  ')));
       learned.forEach((item) => {
