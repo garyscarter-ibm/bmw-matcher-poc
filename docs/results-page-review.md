@@ -263,3 +263,84 @@ competitor's car is offered as a fact rather than as the answer.
 
 **Cost to weigh:** "at Sytner Luton" is a slightly deflating headline, and the
 buyer has to notice the scope for it to be honest rather than merely narrower.
+
+
+---
+
+# BUILT: (b), and the chips moved back (2026-07-28)
+
+Commits `14d7c73` (grouping + scope) and `41f12f8` (chips). Owner took (b);
+(a) stays rejected. Screenshots: `06`/`07` before, `08`/`09` after.
+
+## What the page does now
+
+One pool, two groups, sorted by score inside each:
+
+| | Group | Heading |
+|---|---|---|
+| 1 | The configured retailer's cars | `AT GRASSICKS BMW` / `AT SYTNER LUTON MINI.` |
+| 2 | Everyone else's | `AT OTHER RETAILERS` / `ALSO WITHIN REACH.` |
+
+Both headings name a **place** and nothing else. `NEXT BEST` is gone with the
+rest: it ranked, and a ranking caption is the thing that let two sections
+contradict each other. Every card still carries its own provenance line.
+
+The headline's state (decree / taste / tie / closest) is derived from the
+**retailer's** cars, re-derived on every redraw as before. It qualifies with
+"at *retailer*" only when a car elsewhere **strictly** outranks the best one
+here; a tie does not qualify it, because ties already break local-first. When
+it does qualify, `.bmwm-notice` names the car that beat it and where it is, so
+the two lines read as one statement.
+
+## The six states, before and after
+
+| | Before (merged list) | After |
+|---|---|---|
+| Meg (MINI) | "It's a four-way tie." over 97, 97, 97, 97 | **"Your perfect MINI is the Hatch Electric Level 3."** Unqualified: the nearby 97s tie, they don't beat it |
+| Priya (BMW) | "five of these fit you equally well." over 99, 97, 97, 97, 96 | "At Grassicks BMW, two of these fit you equally well." (96, 95) + the iX at Arnold Clark |
+| Tyler (BMW) | "three of these fit you equally well." over three 84s, none local | "Your best match at Grassicks BMW is the 320i M Sport Saloon." (taste pick restored) |
+| Reyes (MINI) | "It's a four-way tie." over 95, 95, 95, 93 | "At Sytner Luton MINI, we'd go for the Countryman C." |
+| Chloe (MINI) | "It's a four-way tie." over 93, 93, 93, 90 | "At Sytner Luton MINI, it's a three-way tie." (90, 89, 87) |
+| Martin (BMW) | "three of these fit you equally well." over three nearby convertibles | "Your closest match at Grassicks BMW is the M2 Coupe." + rescue note, unchanged |
+
+**The decree came back for Meg only.** The doc predicted the unqualified decree
+would survive "most of the time"; it doesn't. Five of six pages still scope,
+because at this stock depth somebody within reach usually has something a point
+or two better. What (b) actually bought is smaller and still worth having: the
+page is now about the retailer it is authored onto, the decree is reachable
+again, and **all seven page states agree with what `npm run personas` reads off
+the API**, which they did not before (the page said "tie" where the engine said
+decree or taste pick).
+
+## Two decisions taken while building it
+
+**Full cards in group 2 are exactly the cars that outrank the best one here**,
+clustered by the same `CLUSTER_PTS` rule so the cut lands on a score gap rather
+than an arbitrary cap. Everything else there is a tile. This preserves what the
+merge was for: a genuinely better car is a card you can reject and read the
+trade-off line on, not a tile you have to notice. It is a treatment, not a
+caption. No heading says one group beats the other.
+
+**The notice stands down only for the car a rescue note already names.** Martin
+would otherwise read "no convertibles here, the nearest is 18.1 miles away at
+John Clark Tayside" and then "the 420i Convertible at John Clark Tayside scores
+higher". Reyes keeps both lines, because there the note is about a plug-in
+hybrid 29.5 miles away and the notice about a Countryman 10.8 miles away.
+
+## What is still weak
+
+- **Meg's page shows three 97% cars under an unqualified "your perfect MINI".**
+  Equal scores don't trigger the scope by design (the doc's rule), and the
+  tie-break gives the local car the lead, so nothing on the page is false. It
+  is still the place a careful reader could push back.
+- **Meg now has no chips at all.** Her lead is one card and the offered axes
+  are fixed at first paint from the local top six, so none of them still splits
+  a single card's two listings. Defensible (the picker covers the colours), but
+  it is a capability the four-way tie had.
+- **The chip label counts the lead, not every card the chips touch.** A chip
+  narrows the whole pool, including group 2. "Narrow these 2 down" points at
+  the two cards below it, which is what the chips are offered for (an axis only
+  appears while it splits the lead), but it undercounts the visible effect.
+- **Scoped headlines are longer.** "At Sytner Luton MINI, it's a three-way tie."
+  is a heavier line than "It's a four-way tie.", and on MINI it sets in
+  uppercase display serif.

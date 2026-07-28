@@ -36,10 +36,19 @@ squeezed out when a constraint is made to bind harder.
 has four of, not four choices. They become one card carrying the spread:
 "4 available · £31,498–£36,890 · Portimao Blue, Brooklyn Grey or Alpine White".
 
-**5. Say which situation this is.** One ranked list, every car in it, each
-card saying where it is ("At Grassicks Garage", "23 miles away · Arnold Clark
-Kirkcaldy"). The page has one honest thing to say per situation, re-derived
-from the scores on screen every time the buyer narrows:
+**5. Say which situation this is.** One ranked list, in two groups: the
+retailer's own cars, then everyone else's, sorted by score inside each. Each
+card also says where it is ("At Grassicks Garage", "23 miles away · Arnold
+Clark Kirkcaldy").
+
+The groups are labelled by **place** and never by quality — "AT GRASSICKS BMW",
+"AT OTHER RETAILERS". That rule is what keeps the page honest: a place label
+can't contradict a score, so a 99% in the second group contradicts nothing in
+the first. A caption that ranked ("Close, but not level with the cars above")
+could, and did.
+
+The page has one honest thing to say per situation, derived from the
+**retailer's** cars, re-derived every time the buyer narrows:
 
 | Situation | What the page says |
 |---|---|
@@ -49,6 +58,16 @@ from the scores on screen every time the buyer narrows:
 | The best car misses something they asked for | "The closest matches at Grassicks." — and each card says what it misses |
 | That thing exists, but not here | "No convertibles at Grassicks. The nearest is 18 miles away." |
 | Nothing fits at all | "No matches found." — plus what's nearby |
+
+The headline names the retailer **only when a car elsewhere actually beats the
+best one here** ("Your perfect MINI at Sytner Luton is…"), and then a line
+above the cards names that car and how far away it is. A tie doesn't trigger
+it: ties break local-first, so an equal car hasn't earned the qualification.
+Distance is not, and never will be, in the score — see
+`results-page-review.md`.
+
+The chips sit **above** the cards (a control belongs next to what it controls)
+and the running brief sits **below** them (a summary belongs after).
 
 **6. Pick the actual car.** Once it's down to one model, the buyer chooses
 which of the retailer's copies — colour, price, mileage.
