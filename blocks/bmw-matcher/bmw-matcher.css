@@ -882,7 +882,7 @@
 }
 
 /* --- results skeleton (shown while /api/match is in flight) ---
-   Reuses the real .bmwm-card / .bmwm-grid / .bmwm-tail structure so the
+   Reuses the real .bmwm-card / .bmwm-grid / .bmwm-tail-grid structure so the
    placeholder occupies the same footprint the results will, avoiding a layout
    jump. Each grey block shimmers via a sweeping gradient. */
 .bmwm-skel {
@@ -1108,19 +1108,13 @@
    second ranked list with its own caption, and its caption ended up
    contradicting the headline whenever it outscored the lead. */
 
-/* The rest of the one ranked list, smaller. Three up so it reads as a
-   continuation of the same list rather than as a second, competing one — the
-   old two-up "More at <retailer>" band looked like a fresh section with its
-   own claim, which is exactly what it turned out to be doing.
-   Sized down and set on the white page so the weight order reads
-   lead → next best, i.e. the same order as the scores. */
-.bmwm-tail { margin-top: var(--bmwm-space-8); }
-
-.bmwm-tail .bmwm-subhead {
-  margin-bottom: var(--bmwm-space-4);
-  color: var(--bmwm-ink-muted);
-}
-
+/* The rest of a group's list, smaller. Three up so it reads as a continuation
+   of the same list rather than as a second, competing one — the old two-up
+   "More at <retailer>" band looked like a fresh section with its own claim,
+   which is exactly what it turned out to be doing. No heading of its own any
+   more: it sits under its group's place label, and the weight step from cards
+   to tiles is the only thing marking it, which is right because the step is a
+   fact about rank inside one sorted list, not a claim about a different one. */
 .bmwm-tail-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1148,12 +1142,9 @@
   color: var(--bmwm-ink-muted);
 }
 
-/* The refine tools now sit BELOW the cars (answer first, then argue with it),
-   so they need a rule above them to read as a new movement rather than as an
-   afterthought hanging off the last card. */
-/* The "we kept looking" line. Accent-edged like the unmet/rescue notes it sits
-   alongside, because it is the same kind of statement: the tool telling you
-   something about its own search rather than about a car. */
+/* The "we looked further afield" line. Accent-edged like the unmet/rescue notes
+   it sits alongside, because it is the same kind of statement: the tool telling
+   you something about its own search rather than about a car. */
 .bmwm-notice {
   margin-bottom: var(--bmwm-space-5);
   padding: var(--bmwm-space-3) var(--bmwm-space-4);
@@ -1164,6 +1155,9 @@
   color: var(--bmwm-ink);
 }
 
+/* The refine tools sit BELOW the cars (answer first, then argue with it), so
+   they need a rule above them to read as a new movement rather than as an
+   afterthought hanging off the last card. */
 .bmwm-refine-tools {
   margin-top: var(--bmwm-space-7);
   padding-top: var(--bmwm-space-5);
@@ -1171,6 +1165,31 @@
 }
 
 .bmwm-refine-tools:empty { display: none; }
+
+/* --- the two groups: the retailer's cars, then everyone else's ---
+   The heading names a PLACE and nothing else. It is not allowed to rank, which
+   is why "NEXT BEST" and "Close, but not level with the cars above" are gone:
+   two sections making claims on one scale is how the old page ended up
+   contradicting itself. A place label can't contradict a score. */
+.bmwm-group + .bmwm-group { margin-top: var(--bmwm-space-8); }
+
+/* Full ink, not the muted grey the old "NEXT BEST" heading used. That one was
+   marking a demotion so it whispered; this one is the signpost that makes a
+   99% below a 96% read as a fact about geography rather than an error, and it
+   has to be seen for the page to be honest. The gap between groups comes from
+   the rule above, so the label itself sits tight to its cards. */
+.bmwm-group-label { margin-top: 0; }
+
+/* The group's own grids butt up under its label, so the lead grid drops the top
+   margin .bmwm-grid carries for the standalone case. Either grid can come back
+   empty — a group with no car outranking the retailer's best has tiles only,
+   and one with fewer than TAIL_SHOWN spare cars has lead cards only. */
+.bmwm-group > .bmwm-grid { margin-top: 0; }
+
+.bmwm-group > .bmwm-tail-grid { margin-top: var(--bmwm-space-4); }
+
+.bmwm-group > .bmwm-grid:empty,
+.bmwm-group > .bmwm-tail-grid:empty { display: none; }
 
 /* Bleeds out to the block's own edges by cancelling .bmwm's side padding,
    so the band reads as a distinct section rather than an inset panel. */
