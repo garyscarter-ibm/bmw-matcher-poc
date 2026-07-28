@@ -16,6 +16,8 @@
  *          large), which is the test for stock-*level*-dependent questions.
  *   fuel   Does a named fuel bind? Tests engine.js's own claim that a
  *          wrong-fuel car shouldn't top a matching-fuel one.
+ *   stick  Does the winner ever change? Perturbs REAL persona answers one at
+ *          a time — the "it always recommends the same car" test.
  *
  * Findings + the adapt-to-which-pool decision framework are written up in
  * docs/question-stock-audit.md — re-run this after a fixture refresh to see
@@ -28,7 +30,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { rankCars, TOP_MATCHES } from '../server/engine.js';
+import { rankCars, matchCars, TOP_MATCHES } from '../server/engine.js';
 import { questionsForBrand, applyBespokeAnswers } from '../server/questions.js';
 import { brandTuning, brandConfig } from '../server/brands.js';
 
@@ -368,6 +370,83 @@ function auditFuel(brand) {
     .forEach(([k, n]) => console.log(`    ${k.padEnd(26)} ${String(n).padStart(4)}  ${pct(n, violations)}`));
 }
 
+
+// --------------------------------------------------------------- stick ----
+
+/*
+ * "It always recommends the same car."
+ *
+ * The other passes sample answer sets UNIFORMLY AT RANDOM, which is the wrong
+ * model of a human: a real person answers as themselves, then tweaks one thing
+ * and looks again. Uniform sampling pairs extreme combinations nobody actually
+ * picks, and it flatters the question set — `style` measures 63% sensitive
+ * under random answers and 0% under realistic ones.
+ *
+ * So this pass starts from the personas (fixtures/personas.json — real-shaped
+ * answer sets), changes exactly ONE answer at a time to every other value it
+ * could take, and asks: did the WINNER change? Two numbers come out:
+ *
+ *   stickiness   how often the same car wins anyway. High = the tool looks
+ *                deaf to the user's input, which is what the stakeholder
+ *                complaint actually describes.
+ *   per question how often changing THAT question moves the winner. A question
+ *                at 0% cannot change the recommendation for these buyers, no
+ *                matter what they pick.
+ */
+function auditStickiness(brand) {
+  const { byRetailer, tuning, questions: qs } = loadBrand(brand);
+  const personasPath = join(FIXTURES, 'personas.json');
+  const { personas } = JSON.parse(readFileSync(personasPath, 'utf8'));
+  const people = personas.filter((p) => p.brand === brand);
+
+  const perQuestion = new Map(qs.map((q) => [q.id, { moved: 0, tried: 0 }]));
+  let same = 0;
+  let total = 0;
+  const lines = [];
+
+  for (const p of people) {
+    const stock = byRetailer.get(Number(p.retailer)) || byRetailer.get(p.retailer);
+    if (!stock?.length) continue;
+    const winner = (answers) => {
+      const { matches } = matchCars(applyBespokeAnswers(brand, answers), stock, tuning);
+      return matches.length ? matches[0].car.name : '(none)';
+    };
+    const base = winner(p.answers);
+    let pSame = 0;
+    let pTotal = 0;
+
+    for (const q of qs) {
+      let values = [];
+      if (q.id === 'budget') values = [[10000, 25000], [15000, 35000], [25000, 50000], [40000, 80000]];
+      else if (q.id === 'mileage') values = [4000, 9000, 15000, 25000];
+      else if (q.options) values = q.multi ? q.options.map((o) => [o.value]) : q.options.map((o) => o.value);
+      for (const v of values) {
+        const answers = { ...p.answers, [q.id]: v };
+        if (JSON.stringify(answers) === JSON.stringify(p.answers)) continue;
+        const stat = perQuestion.get(q.id);
+        stat.tried += 1;
+        pTotal += 1;
+        if (winner(answers) === base) { pSame += 1; } else { stat.moved += 1; }
+      }
+    }
+    same += pSame;
+    total += pTotal;
+    lines.push(`    ${p.key.padEnd(8)} ${pct(pSame, pTotal).padStart(4)} unchanged over ${String(pTotal).padStart(3)} tweaks  (${base.slice(0, 34)})`);
+  }
+
+  console.log(`\n${'='.repeat(72)}\n${brand.toUpperCase()} — winner stickiness under realistic answers`);
+  console.log(`\n  Change ONE answer, same car still wins: ${pct(same, total)} of ${total} tweaks`);
+  lines.forEach((l) => console.log(l));
+  console.log('\n  How often changing a question moves the WINNER:');
+  [...perQuestion.entries()]
+    .map(([id, s]) => [id, s.tried ? s.moved / s.tried : 0])
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([id, rate]) => {
+      const bar = '█'.repeat(Math.round(rate * 26)).padEnd(26, '·');
+      console.log(`    ${id.padEnd(12)} ${bar} ${(rate * 100).toFixed(0)}%`);
+    });
+}
+
 // ----------------------------------------------------------------- run ----
 
 const PASSES = {
@@ -375,11 +454,12 @@ const PASSES = {
   sens: [auditSensitivity],
   size: [auditBySize],
   fuel: [auditFuel],
-  all: [auditDead, auditSensitivity, auditBySize, auditFuel],
+  stick: [auditStickiness],
+  all: [auditDead, auditSensitivity, auditBySize, auditFuel, auditStickiness],
 };
 const passes = PASSES[MODE];
 if (!passes) {
-  console.error('Usage: node scripts/audit-questions.mjs [dead|sens|size|fuel|all]');
+  console.error('Usage: node scripts/audit-questions.mjs [dead|sens|size|fuel|stick|all]');
   process.exit(1);
 }
 for (const pass of passes) {
