@@ -1,0 +1,115 @@
+name: Sync bmw-matcher block to the EDS site
+
+# Copies blocks/bmw-matcher/ from THIS repo into the repo your Adobe Edge
+# Delivery (EDS) site is connected to. EDS auto-loads a block when its files
+# land in /blocks/<name>/, so a push to the target repo is the whole deploy —
+# no build step.
+#
+# ── The one thing that isn't automatic: the credential ──────────────────────
+# A workflow's built-in GITHUB_TOKEN can only write to its OWN repo, so pushing
+# into the EDS repo needs an explicit token, stored here as the EDS_SYNC_TOKEN
+# secret. Least-privilege option: a fine-grained Personal Access Token scoped
+# to the ONE target repo, with Contents: Read and write. Create it at
+# github.com/settings/tokens, then add it under this repo's
+# Settings → Secrets and variables → Actions → New repository secret,
+# named EDS_SYNC_TOKEN. (A deploy key on the target repo is an even more
+# scoped alternative if you prefer SSH.)
+#
+# ── Before the synced block will actually work on EDS ───────────────────────
+# 1. The block reads its backend URL from an authored "API" row, NOT from a
+#    data-api attribute (authored EDS content can't set attributes). If that
+#    wiring isn't in apiBase yet, the deployed block falls back to localhost.
+# 2. The MINI .woff fonts under fonts/ are marked "never publicly hosted" in
+#    the CSS. Decide per licensing whether to sync them; set SYNC_FONTS below.
+# See docs / the block's CSS header for both.
+
+on:
+  # Manual: Actions tab → this workflow → Run workflow. The Run button appears
+  # because this file lives on the default branch (main). source_ref lets you
+  # sync the block from a different branch if you ever need to.
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch here to copy the block FROM
+        default: main
+      target_ref:
+        description: Branch in the EDS repo to push TO (use a preview branch first)
+        default: main
+  # Automatic: also re-sync whenever the block changes on main.
+  push:
+    branches: [main]
+    paths:
+      - 'blocks/bmw-matcher/**'
+
+# Least privilege for the built-in token; the cross-repo write uses the secret.
+permissions:
+  contents: read
+
+env:
+  # The repo your EDS instance is connected to. owner/name.
+  TARGET_REPO: garyscarter-ibm/poc-ret-eds-sites
+  BLOCK_DIR: blocks/bmw-matcher
+  # 'false' skips the MINI font files (see the licensing note above).
+  SYNC_FONTS: 'true'
+
+# Never let two syncs race a push to the same target branch.
+concurrency:
+  group: sync-block-${{ github.event.inputs.target_ref || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out this repo (source) at the chosen ref
+        uses: actions/checkout@v4
+        with:
+          # dispatch → the input; push → the branch that triggered it.
+          ref: ${{ github.event.inputs.source_ref || github.ref_name }}
+          path: source
+
+      - name: Check out the EDS repo (target)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TARGET_REPO }}
+          ref: ${{ github.event.inputs.target_ref || 'main' }}
+          token: ${{ secrets.EDS_SYNC_TOKEN }}
+          path: target
+
+      - name: Mirror the block into the target
+        run: |
+          set -euo pipefail
+          src="source/${BLOCK_DIR}"
+          dest="target/${BLOCK_DIR}"
+
+          # Full mirror: wipe and recopy so files DELETED from the source also
+          # disappear from the target, not just added/changed ones.
+          rm -rf "$dest"
+          mkdir -p "$dest"
+          cp -R "$src/." "$dest/"
+
+          if [ "${SYNC_FONTS}" != "true" ]; then
+            rm -rf "$dest/fonts"
+            echo "Skipped fonts/ (SYNC_FONTS=${SYNC_FONTS})."
+          fi
+
+          echo "Synced files:"
+          find "$dest" -type f | sort
+
+      - name: Commit and push, only if something changed
+        working-directory: target
+        run: |
+          set -euo pipefail
+          git config user.name  "bmw-matcher block-sync"
+          git config user.email "block-sync@users.noreply.github.com"
+
+          # Stages adds, edits AND deletions under the block path.
+          git add "${BLOCK_DIR}"
+          if git diff --cached --quiet; then
+            echo "Target already matches source — nothing to push."
+            exit 0
+          fi
+
+          git commit -m "Sync bmw-matcher block from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
+          git push origin "HEAD:${{ github.event.inputs.target_ref || 'main' }}"
+          echo "Pushed to ${TARGET_REPO}@${{ github.event.inputs.target_ref || 'main' }}."
