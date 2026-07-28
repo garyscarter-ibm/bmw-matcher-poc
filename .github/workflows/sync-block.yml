@@ -19,9 +19,9 @@ name: Sync bmw-matcher block to the EDS site
 # 1. The block reads its backend URL from an authored "API" row, NOT from a
 #    data-api attribute (authored EDS content can't set attributes). If that
 #    wiring isn't in apiBase yet, the deployed block falls back to localhost.
-# 2. The MINI .woff fonts under fonts/ are marked "never publicly hosted" in
-#    the CSS. Decide per licensing whether to sync them; set SYNC_FONTS below.
-# See docs / the block's CSS header for both.
+# 2. The block ships NO font files: it names the host site's own licensed
+#    families (verified resolving on the live BMW and MINI pages), so there is
+#    nothing font-related to copy or license here.
 
 on:
   # Manual: Actions tab → this workflow → Run workflow. The Run button appears
@@ -49,8 +49,6 @@ env:
   # The repo your EDS instance is connected to. owner/name.
   TARGET_REPO: garyscarter-ibm/poc-ret-eds-sites
   BLOCK_DIR: blocks/bmw-matcher
-  # 'false' skips the MINI font files (see the licensing note above).
-  SYNC_FONTS: 'true'
 
 # Never let two syncs race a push to the same target branch.
 concurrency:
@@ -87,11 +85,6 @@ jobs:
           rm -rf "$dest"
           mkdir -p "$dest"
           cp -R "$src/." "$dest/"
-
-          if [ "${SYNC_FONTS}" != "true" ]; then
-            rm -rf "$dest/fonts"
-            echo "Skipped fonts/ (SYNC_FONTS=${SYNC_FONTS})."
-          fi
 
           echo "Synced files:"
           find "$dest" -type f | sort

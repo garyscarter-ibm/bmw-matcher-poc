@@ -138,6 +138,12 @@ after the block, self-contained folder), so porting is a copy-paste:
      (falling back to a `data-api` attribute for the local harness, then
      `http://localhost:8787`). Without it, a published block would try to reach
      localhost.
+   - **Title**, **Kicker**, **Disclaimer** — optional copy overrides. Author a
+     value to replace the default; leave the value cell **blank** (or write
+     `none`) to remove that line entirely. Blanking **Title** is how you place
+     the block under the page's own section heading without repeating it;
+     blanking **Kicker** and **Disclaimer** drops the "unofficial matchmaker"
+     framing, which suits a demo but not a retailer's own site.
 4. Publish. EDS auto-loads `bmw-matcher.css` and calls the block's
    `decorate()` — no other wiring needed.
 
@@ -149,6 +155,15 @@ Example authored table:
 | Retailer ID | 92 |
 | Retailer Name | Sytner Luton MINI |
 | API | https://your-backend.onrender.com |
+| Title |  |
+
+(The blank **Title** row above suppresses the block's own headline, for when it
+sits under the page's own "FIND YOUR MINI." section heading.)
+
+The block ships **no font files**: it names the host site's licensed families
+first (`--heading-font-family` / `--body-font-family` on BMW, MINI's own faces
+on MINI), so it inherits the site's typeface and falls back to a neutral stack
+when run standalone.
 
 The standalone `index.html` harness uses a `data-api` attribute + `?api=`
 override instead (no DA needed); `?retailer=<id>` tries a different retailer

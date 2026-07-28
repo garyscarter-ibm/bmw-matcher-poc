@@ -18,7 +18,13 @@
       box-sizing: border-box;
       font-family: 'Helvetica Neue', helvetica, arial, sans-serif;
     }
-    main { width: 100%; max-width: 880px; margin: 0 auto; box-sizing: border-box; }
+    /* The harness stands in for a host page, so IT owns the page surface.
+       The block itself is transparent (the host section decides its
+       background), which is why this white lives here and not there. */
+    main {
+      width: 100%; max-width: 880px; margin: 0 auto; box-sizing: border-box;
+      background: #fff;
+    }
   </style>
 </head>
 <body>

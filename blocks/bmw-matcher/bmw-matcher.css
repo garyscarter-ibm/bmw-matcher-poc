@@ -10,10 +10,19 @@
  */
 
 .bmwm {
-  /* --- font --- */
-  --bmwm-font-heading: 'BMWTypeNextLatin-Light', 'Helvetica Neue', arial, sans-serif;
-  --bmwm-font-body: 'BMWTypeNextLatin-Regular', 'Helvetica Neue', arial, sans-serif;
-  --bmwm-font-bold: 'BMWTypeNextLatin-Bold', 'Helvetica Neue', arial, sans-serif;
+  /* --- font ---
+     Host-first. An EDS site declares its own typography in
+     --heading-font-family / --body-font-family, so the block adopts the page's
+     typeface rather than naming families the host has never heard of.
+     That mattered: these used to ask for 'BMWTypeNextLatin-Light/-Regular/
+     -Bold', three families that don't exist on the live dealer site — it
+     declares ONE family, BMWTypeNextLatin, with weights 300/400/700. Every
+     rule silently fell through, so the whole block rendered in Helvetica next
+     to real BMWTypeNext. The literal names are kept as fallbacks for the
+     standalone harness; weight is carried by font-weight, as it should be. */
+  --bmwm-font-heading: var(--heading-font-family, 'BMWTypeNextLatin', 'BMWTypeNextLatin-Light', 'Helvetica Neue', arial, sans-serif);
+  --bmwm-font-body: var(--body-font-family, 'BMWTypeNextLatin', 'BMWTypeNextLatin-Regular', 'Helvetica Neue', arial, sans-serif);
+  --bmwm-font-bold: var(--body-font-family, 'BMWTypeNextLatin', 'BMWTypeNextLatin-Bold', 'Helvetica Neue', arial, sans-serif);
 
   /* --- colour (light theme) --- */
   --bmwm-ink: #262626;          /* primary text */
@@ -69,7 +78,11 @@
   --bmwm-text-label: 13px;
   --bmwm-text-eyebrow: 10px;
 
-  background: var(--bmwm-surface);
+  /* Transparent, not white: the host section owns the background. Painting
+     our own white is invisible on a white page but becomes a white slab the
+     moment an author drops the block into a light-grey section. Card surfaces
+     still paint --bmwm-surface explicitly. */
+  background: transparent;
   color: var(--bmwm-ink);
   font-family: var(--bmwm-font-body);
   font-size: var(--bmwm-text-body);
@@ -88,6 +101,39 @@
 
 .bmwm * { box-sizing: border-box; }
 
+/*
+ * Inside an EDS page the section already provides the content column, so the
+ * block fills it and lines up with its neighbours instead of nesting a second
+ * width limit inside the first. Measured on the live dealer site before this:
+ * the block's content started at 304px while every host section started at
+ * 160–270px, because an 880px centred box sat inside EDS's 1200px column — it
+ * read as inset and bolted-on. Standalone (the local harness / Pages demo)
+ * there's no wrapper, so the block keeps its own 880px reading measure.
+ */
+.bmw-matcher-wrapper .bmwm {
+  max-width: none;
+  margin: 0;
+}
+
+@media (min-width: 900px) {
+  /* Matches the gutter the host's own sections use, so the left edges align. */
+  .bmw-matcher-wrapper .bmwm {
+    padding-left: 48px;
+    padding-right: 48px;
+  }
+}
+
+/*
+ * Host pages style their own p / h2 / a / button, and a rule that matches an
+ * element directly beats a font inherited from an ancestor — so host
+ * typography can leak into the block. Re-assert inheritance for the elements
+ * the block renders. :where() keeps this at zero specificity, so every
+ * block rule below still wins.
+ */
+.bmwm :where(p, h1, h2, h3, h4, li, a, button, input, select, label, span) {
+  font-family: inherit;
+}
+
 /* ------------------------------ MINI theme ---------------------------- *
  * Applied when the block is configured Brand: MINI (the .bmwm-mini class,
  * added in decorate). MINI's real identity (per sytnerlutonmini.co.uk): a
@@ -97,34 +143,28 @@
  * button colour. Serif UPPERCASE headlines with tight leading. Everything is a
  * token override + a few MINI-scoped rules — no structural change to the base.
  *
- * Fonts are MINI's real web faces, self-hosted from ./fonts for this private
- * demo (never publicly hosted). Fallbacks stay in each stack so a missing file
- * degrades gracefully rather than breaking the layout.
+ * Fonts are the HOST SITE'S. A MINI dealer site already declares and licenses
+ * MINI's web faces (the live one declares MINISerif-Regular), so the block
+ * asks for those by name instead of shipping its own. The four .woff files
+ * that used to live in ./fonts were removed with this change: self-hosting
+ * them was fine for a private demo but they were publicly served the moment
+ * the block was deployed to a real site, which the licence doesn't cover.
+ *
+ * Consequence to know about: on a host that provides no MINI sans face, body
+ * copy falls back to the neutral sans below rather than MINI Sans. Headings,
+ * which carry most of the brand character, still resolve from the host.
  * -------------------------------------------------------------------- */
-@font-face {
-  font-family: 'MINISerif-Bold';
-  src: url('./fonts/mini_serif-bold-web.woff') format('woff');
-  font-weight: 700;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'MINISansSerif-Regular';
-  src: url('./fonts/mini_sans_serif-regular-web.woff') format('woff');
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'MINISansSerif-Bold';
-  src: url('./fonts/mini_sans_serif-bold-web.woff') format('woff');
-  font-weight: 700;
-  font-display: swap;
-}
 
 .bmwm.bmwm-mini {
-  /* fonts: serif headings, sans body — MINI's real faces + fallbacks */
-  --bmwm-font-heading: 'MINISerif-Bold', Georgia, 'Times New Roman', serif;
-  --bmwm-font-bold: 'MINISansSerif-Bold', 'Helvetica Neue', arial, sans-serif;
-  --bmwm-font-body: 'MINISansSerif-Regular', 'Helvetica Neue', arial, sans-serif;
+  /* fonts: serif headings, sans body. Named host-first; weight comes from
+     font-weight (MINI titles set 700 below), not from a per-weight family. */
+  --bmwm-font-heading: 'MINISerif-Regular', 'MINISerif-Bold', Georgia, 'Times New Roman', serif;
+  /* Bold names the SAME family as body and lets font-weight: 700 do the work.
+     Naming a separate '-Bold' family is what broke BMW: if the host doesn't
+     declare that exact name the whole stack falls through to Helvetica, which
+     is measurably what happened to MINI's buttons and eyebrow labels. */
+  --bmwm-font-body: 'MINISans', 'MINISansSerif-Regular', 'MINISansSerif-Bold', 'Helvetica Neue', arial, sans-serif;
+  --bmwm-font-bold: var(--bmwm-font-body);
 
   /* colour: black-on-white. The "accent" (primary button fill, selected-state
      border) is near-black — that's MINI's primary. British Racing Green + teal
@@ -155,8 +195,23 @@
 .bmwm.bmwm-mini .bmwm-nearby-heading {
   text-transform: uppercase;
   font-family: var(--bmwm-font-heading);
+  /* The serif is now a multi-weight family, so the weight has to be asked for.
+     BMW's titles are 300 (light); MINI's are heavy, matching the host's own
+     headings, which set 700 on the same face. */
+  font-weight: 700;
   line-height: 1.02;
   letter-spacing: 0.01em;
+}
+
+/*
+ * MINI's lede is body copy, not a headline. The base rule sets the lede in the
+ * HEADING font, which is right for BMW (a light grotesque reads well large)
+ * and wrong for MINI, whose heading face is a heavy display serif — it made
+ * every intro paragraph on the live site render in MINI Serif Black.
+ */
+.bmwm.bmwm-mini .bmwm-lede {
+  font-family: var(--bmwm-font-body);
+  font-weight: 400;
 }
 
 /* --- MINI buttons: black primary, outline-pill secondary --- */
@@ -233,9 +288,11 @@
 /* --- buttons --- */
 
 .bmwm-btn {
-  font-family: var(--bmwm-font-body);
+  /* Bold, matching the host sites' own CTAs — a regular-weight button read as
+     lighter than everything around it on the live pages. */
+  font-family: var(--bmwm-font-bold);
   font-size: var(--bmwm-text-label);
-  font-weight: 400;
+  font-weight: 700;
   line-height: 1;
   min-height: var(--bmwm-btn-height);
   padding: var(--bmwm-btn-padding);

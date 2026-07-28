@@ -21,7 +21,13 @@
     /* Normal flow + auto side margins centre the column without a grid track
        that would size to the block's 880px max-content and overflow narrow
        viewports (the grid centring did exactly that on mobile). */
-    main { width: 100%; max-width: 880px; margin: 0 auto; box-sizing: border-box; }
+    /* The harness stands in for a host page, so IT owns the page surface.
+       The block itself is transparent (the host section decides its
+       background), which is why this white lives here and not there. */
+    main {
+      width: 100%; max-width: 880px; margin: 0 auto; box-sizing: border-box;
+      background: #fff;
+    }
   </style>
 </head>
 <body>

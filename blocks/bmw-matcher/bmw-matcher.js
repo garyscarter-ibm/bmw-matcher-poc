@@ -85,6 +85,34 @@ function retailerSite(block) {
   return config['retailer-id'] || config['retailer-site'] || undefined;
 }
 
+/**
+ * An authored copy override, with three distinct states:
+ *   undefined — no row authored, so the block's own default is used;
+ *   null      — row authored but blank (or "none"), so the line is SUPPRESSED;
+ *   string    — the authored replacement.
+ *
+ * Suppression is the point: on a real retailer's page the block is usually
+ * placed under the site's own section heading, and repeating a title inside
+ * the block reads as a stutter. The same mechanism lets a dealer drop the
+ * "unofficial" framing, which is right for a public demo and wrong on their
+ * own site.
+ */
+function copyRow(config, key) {
+  if (!(key in config)) return undefined;
+  const value = config[key].trim();
+  return (!value || value.toLowerCase() === 'none') ? null : value;
+}
+
+/** The authored copy overrides: `title`, `kicker`, `disclaimer`. */
+function copyOverrides(block) {
+  const config = readBlockConfig(block);
+  return {
+    title: copyRow(config, 'title'),
+    kicker: copyRow(config, 'kicker'),
+    disclaimer: copyRow(config, 'disclaimer'),
+  };
+}
+
 const DEFAULT_RETAILER_NAME = 'our retailer network';
 
 /** Retailer display name for this block instance: authored "Retailer Name"
@@ -133,7 +161,7 @@ const cardinal = (n) => CARDINALS[n] ?? String(n);
 const BRAND_COPY = {
   bmw: {
     name: 'BMW',
-    title: 'Find your perfect BMW',
+    title: 'Find your perfect BMW.',
     cta: 'Find my BMW',
     // No promised count: results now show one clear winner or the whole tie
     // (up to MAX_SHOWN), so naming a number here would be wrong half the time.
@@ -148,7 +176,7 @@ const BRAND_COPY = {
     // Shown instead of the "your perfect BMW is…" headline when the engine
     // can't separate the top cars (see matchCars: decisive/clusterSize).
     // Stated plainly, as a fact about the stock rather than an apology.
-    tiedTitle: ({ count }) => `${cardinal(count)} of these fit you equally well`,
+    tiedTitle: ({ count }) => `${cardinal(count)} of these fit you equally well.`,
     // The retailer is named on every card, so the lede doesn't repeat it —
     // and a brand plural appended to a retailer label reads "Sytner Luton
     // MINI MINIs", which is why neither brand's copy builds one.
@@ -162,7 +190,7 @@ const BRAND_COPY = {
     refineEmpty: ({ wants }) => `Nothing here has ${wants} together. `
       + 'Drop one of those and we’ll show you what does.',
     refineEmptyHidden: 'That’s all of them ruled out. Bring one back, or start over.',
-    tiedEmptyTitle: 'Nothing left to show',
+    tiedEmptyTitle: 'Nothing left to show.',
     // Rejection, in the retailer's plain register — a question, not a plea.
     rejectOpen: 'Not this one',
     rejectPrompt: 'What put you off?',
@@ -172,10 +200,10 @@ const BRAND_COPY = {
     // miss something the buyer asked for, so no headline may crown one. First
     // paint must be true whether or not the nearby tier later finds the real
     // thing — this claims nothing beyond this retailer's stock.
-    closestTitle: ({ retailer }) => `The closest matches at ${retailer}`,
+    closestTitle: ({ retailer }) => `The closest matches at ${retailer}.`,
     closestLede: () => 'Nothing here ticks every box you gave us. Each card says what it '
       + 'gets right, and what it doesn’t.',
-    closestSettled: ({ model }) => `Your closest match here is the ${model}`,
+    closestSettled: ({ model }) => `Your closest match here is the ${model}.`,
     // The rescue note: the want is missing HERE but met nearby — by owner
     // decision (2026-07-22) the local cards keep the lead and this note
     // carries the fact, so the buyer weighs proximity against fit themselves.
@@ -206,7 +234,7 @@ const BRAND_COPY = {
   },
   mini: {
     name: 'MINI',
-    title: 'Find your perfect MINI',
+    title: 'Find your perfect MINI.',
     cta: 'Let’s find your MINI',
     lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
       + `your miles and your money. We’ll find the MINIs at ${retailer} `
@@ -217,7 +245,7 @@ const BRAND_COPY = {
     unmet: ({ list, retailer }) => `No ${list} at ${retailer} or anywhere nearby right now. `
       + 'Here’s the closest we’ve got to the rest of your brief.',
     // Same fact in MINI's register: a tie is a nice problem, not a shortfall.
-    tiedTitle: ({ count }) => `It’s a ${cardinal(count)}-way tie`,
+    tiedTitle: ({ count }) => `It’s a ${cardinal(count)}-way tie.`,
     tiedLede: () => 'They all fit what you told us, just as well as each other. '
       + 'So it comes down to taste now. Which is the fun bit.',
     // MINI asks rather than instructs, and treats a dead end as a shrug.
@@ -227,16 +255,16 @@ const BRAND_COPY = {
     refineEmpty: ({ wants }) => `Ah. Nothing here has ${wants} all at once. `
       + 'Let one of them go and we’ll show you what’s left.',
     refineEmptyHidden: 'Well, that’s the lot ruled out. Bring one back, or start over.',
-    tiedEmptyTitle: 'That’s the lot, then',
+    tiedEmptyTitle: 'That’s the lot, then.',
     rejectOpen: 'Not this one',
     rejectPrompt: 'Go on then, what’s wrong with it?',
     rejectJust: 'Just not feeling it',
     hiddenChip: ({ count }) => `${count} ruled out`,
     // The "closest here" frame, MINI register: honest shrug, no apology.
-    closestTitle: ({ retailer }) => `The closest we’ve got at ${retailer}`,
+    closestTitle: ({ retailer }) => `The closest we’ve got at ${retailer}.`,
     closestLede: () => 'None of these is the whole wish list, but they’re close. '
       + 'And each one owns up to what’s missing.',
-    closestSettled: ({ model }) => `Closest to your brief: the ${model}`,
+    closestSettled: ({ model }) => `Closest to your brief: the ${model}.`,
     rescueLabel: 'NOT HERE, BUT NOT FAR.',
     rescueNote: ({ list, miles, where }) => `No ${list} at ours right now. `
       + `The nearest is ${miles} away at ${where}. Scroll down to “Worth the drive”.`,
@@ -894,13 +922,17 @@ function renderIntro(root, ctx) {
   // multi-select now, so pass it as an array.
   const count = visibleQuestions(ctx.questions, { fuel: ['open'] }).length;
   const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
-  intro.append(
-    el('p', 'bmwm-kicker', 'The unofficial UK matchmaker'),
-    el('h1', 'bmwm-title', copy.title),
-    el('p', 'bmwm-lede', copy.lede({
-      questions: count, retailer: ctx.retailerLabel,
-    })),
-  );
+  // Authored overrides win; a blank row suppresses the line entirely, which is
+  // how the block sits under a host page's own "FIND YOUR MINI." heading
+  // without repeating it (see copyRow).
+  const { title: titleOverride, kicker: kickerOverride } = ctx.overrides;
+  const kicker = kickerOverride === undefined ? 'The unofficial UK matchmaker' : kickerOverride;
+  const title = titleOverride === undefined ? copy.title : titleOverride;
+  if (kicker) intro.append(el('p', 'bmwm-kicker', kicker));
+  if (title) intro.append(el('h1', 'bmwm-title', title));
+  intro.append(el('p', 'bmwm-lede', copy.lede({
+    questions: count, retailer: ctx.retailerLabel,
+  })));
   const start = el('button', 'bmwm-btn bmwm-btn-primary', copy.cta);
   start.addEventListener('click', () => ctx.showQuestion(0));
   intro.append(start);
@@ -1690,7 +1722,7 @@ async function renderResults(root, ctx, answers) {
   } catch {
     renderStatus(root, {
       kicker: 'Sorry',
-      title: 'We couldn’t reach the matcher',
+      title: 'We couldn’t reach the matcher.',
       message: 'The matching service didn’t respond. Check your connection and try again.',
       retryLabel: 'Try again',
       onRetry: () => renderResults(root, ctx, answers),
@@ -1707,7 +1739,7 @@ async function renderResults(root, ctx, answers) {
 
   if (matches.length === 0) {
     screen.append(
-      el('h2', 'bmwm-title', 'No matches found'),
+      el('h2', 'bmwm-title', 'No matches found.'),
       el('p', 'bmwm-lede', `Nothing in ${ctx.retailerLabel}'s current stock fits those answers. Try loosening the budget or seating needs.`),
     );
   } else {
@@ -1735,7 +1767,7 @@ async function renderResults(root, ctx, answers) {
       // headline (co-equal heroes contradicted that claim). The car's name
       // already leads with the brand, so strip it.
       const model = lead[0].car.name.replace(new RegExp(`^${brandName} `), '');
-      screen.append(el('h2', 'bmwm-title', `Your perfect ${brandName} is the ${model}`));
+      screen.append(el('h2', 'bmwm-title', `Your perfect ${brandName} is the ${model}.`));
       const grid = el('div', 'bmwm-grid');
       grid.append(matchCard(lead[0], { big: true, brand: ctx.brand }));
       screen.append(grid);
@@ -1748,7 +1780,7 @@ async function renderResults(root, ctx, answers) {
       // the card says why.
       const frame = fit ? {
         tied: copy.tiedTitle,
-        settled: ({ model }) => `Your perfect ${brandName} is the ${model}`,
+        settled: ({ model }) => `Your perfect ${brandName} is the ${model}.`,
       } : {
         tied: () => copy.closestTitle({ retailer: ctx.retailerLabel }),
         settled: copy.closestSettled,
@@ -1831,8 +1863,13 @@ async function renderResults(root, ctx, answers) {
   actions.append(share, tweak, retake);
   screen.append(actions);
 
-  screen.append(el('p', 'bmwm-disclaimer',
-    `An unofficial tool, not affiliated with or endorsed by ${(BRAND_COPY[ctx.brand] || BRAND_COPY.bmw).name}. Prices and specs are indicative, always check with a retailer.`));
+  // Authorable: right for a public demo, wrong on a retailer's own site (see
+  // copyRow). A blank "Disclaimer" row removes it; an authored one replaces it.
+  const defaultDisclaimer = `An unofficial tool, not affiliated with or endorsed by ${(BRAND_COPY[ctx.brand] || BRAND_COPY.bmw).name}. Prices and specs are indicative, always check with a retailer.`;
+  const disclaimer = ctx.overrides.disclaimer === undefined
+    ? defaultDisclaimer
+    : ctx.overrides.disclaimer;
+  if (disclaimer) screen.append(el('p', 'bmwm-disclaimer', disclaimer));
 
   root.append(screen);
 
@@ -1914,6 +1951,7 @@ export default async function decorate(block) {
   const retailerLabel = retailerName(block);
   const api = apiBase(block);
   const brandKey = brand(block);
+  const overrides = copyOverrides(block);
 
   block.replaceChildren();
   // Base class + brand theme class ('bmwm-bmw' | 'bmwm-mini'). The MINI theme
@@ -1926,6 +1964,8 @@ export default async function decorate(block) {
     retailer,
     retailerLabel,
     brand: brandKey,
+    // Authored copy overrides (title / kicker / disclaimer) — see copyRow.
+    overrides,
     questions: [],
     // Live "best guess" strip state, kept on ctx so it survives the
     // per-question re-render (see renderPreviewSection / schedulePreviewRefresh).
