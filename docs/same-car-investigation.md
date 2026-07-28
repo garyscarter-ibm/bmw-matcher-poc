@@ -119,3 +119,8 @@ Recommendation: **2 + 4**. Option 2 uses machinery that already exists and
 matches the product's own model of the world (constraints filter, taste
 decides); option 4 is honest about the cases where nothing moved. Option 3
 should follow only for questions still inert after 2.
+
+**Designed as option 2**, with acceptance criteria and a staged build order:
+[engine-relayer-design.md](engine-relayer-design.md). The conclusion there is
+that this is a re-layering rather than a rewrite — every scorer, filter and
+result state survives; what changes is which questions feed which stage.
