@@ -36,7 +36,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Only the files a browser actually asks for. The repo root also holds
       # server/, scripts/ and ~16MB of stock fixtures, none of which a static

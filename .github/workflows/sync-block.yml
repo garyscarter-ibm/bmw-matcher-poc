@@ -62,14 +62,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out this repo (source) at the chosen ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # dispatch → the input; push → the branch that triggered it.
           ref: ${{ github.event.inputs.source_ref || github.ref_name }}
           path: source
 
       - name: Check out the EDS repo (target)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ env.TARGET_REPO }}
           ref: ${{ github.event.inputs.target_ref || 'main' }}
