@@ -1174,6 +1174,34 @@
 /* The "we looked further afield" line. Accent-edged like the unmet/rescue notes
    it sits alongside, because it is the same kind of statement: the tool telling
    you something about its own search rather than about a car. */
+/* The working: what was searched, what survived, how far clear the winner is.
+   Last on the page and quiet with it, because it is evidence for the verdict
+   above rather than a claim of its own. Ruled off so it reads as a footnote to
+   the whole list rather than a note attached to the last card. */
+.bmwm-working {
+  margin-top: var(--bmwm-space-7);
+  padding-top: var(--bmwm-space-4);
+  border-top: 1px solid var(--bmwm-line);
+}
+
+.bmwm-working[hidden] { display: none; }
+
+.bmwm-working-label {
+  margin: 0 0 var(--bmwm-space-1);
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  font-size: var(--bmwm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--bmwm-ink-muted);
+}
+
+.bmwm-working-text {
+  margin: 0;
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+}
+
 .bmwm-notice {
   margin-bottom: var(--bmwm-space-5);
   padding: var(--bmwm-space-3) var(--bmwm-space-4);

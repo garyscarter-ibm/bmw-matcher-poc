@@ -835,9 +835,28 @@ function groupListings(ranked) {
 export function matchCars(answers, cars, tuning = DEFAULT_TUNING) {
   // Group first, so everything downstream — the cluster count, the headline,
   // the taste comparison — is about CARS rather than listings.
-  const ranked = groupListings(rankCars(answers, cars, tuning));
+  const scored = rankCars(answers, cars, tuning);
+  const ranked = groupListings(scored);
+  /*
+   * The working, so the page can show it.
+   *
+   * `total` is everything in this retailer's feed, `eligible` what survived
+   * the hard filters (over budget, too few seats, too small a boot). The
+   * difference between them is the elimination step, which the page otherwise
+   * has no way to mention: it can show the answer but not the search, so a
+   * result with one card looks like thin stock rather than like a clear
+   * winner. `margin` is how far ahead the leader is of the next DIFFERENT car
+   * — grouped, so four copies of one model do not make it look close.
+   */
+  const searched = {
+    total: cars.length,
+    eligible: scored.length,
+    margin: ranked.length > 1 ? Math.round(ranked[0].score - ranked[1].score) : null,
+  };
   if (!ranked.length) {
-    return { matches: [], decisive: true, clusterSize: 0, tasteLead: false };
+    return {
+      matches: [], decisive: true, clusterSize: 0, tasteLead: false, searched,
+    };
   }
 
   const top = ranked[0].score;
@@ -862,5 +881,6 @@ export function matchCars(answers, cars, tuning = DEFAULT_TUNING) {
     decisive,
     clusterSize,
     tasteLead,
+    searched,
   };
 }

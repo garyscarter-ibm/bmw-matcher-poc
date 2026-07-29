@@ -467,3 +467,51 @@ nothing about a total.
 Meg's page is now a single card. That is correct (nothing else is within 30
 points) and it is the decree working as designed, but a results page holding
 one car and nothing else may read as thin rather than as decisive.
+
+
+## Showing the working (2026-07-29)
+
+Meg's page can hold a single card. That is correct, and it still reads as thin
+stock rather than as a clear winner, because **the reader cannot tell whether
+we searched three cars or three hundred.**
+
+Two ways out were considered.
+
+**Rejected: put weaker cars back.** Her next car is 67 against 97, thirty
+points down, which the relevance work above had just established is a change
+of subject rather than an alternative. It would reintroduce exactly the noise
+that work removed, it would not prove thoroughness (a seven-card page is
+equally silent about how many were rejected), and a card is an *invitation*:
+offering a car thirty points off the pace to prove it isn't worth having
+undermines the claim it was meant to defend.
+
+**Built: say what we did.** The gap was never missing cars, it was missing
+evidence of the search. `matchCars` now returns `searched: { total, eligible,
+margin }`, and the page closes with it:
+
+> **HOW WE GOT THERE**
+> We looked at all 26 MINIs in stock here. 20 were in budget and roomy enough.
+> Nothing else here got within 30 points.
+
+This is also the first time the page shows its reasoning at all. `how-it-works`
+describes the engine as *constraints eliminate, fit ranks, taste chooses*, and
+until now the page showed only the last step's output.
+
+Two things it took two attempts to get right:
+
+- **The margin is measured over the RETAILER's cars, not everything.** Measured
+  over everything it never fired once: nearby stock ties at the top on every
+  persona (Meg's 97 against three nearby 97s), so the claim was true,
+  unclaimable and effectively dead code. Scoped to this retailer it says the
+  useful thing, and it matches what the headline is scoped to after (b).
+- **It is recomputed per redraw, not taken from the API.** So it re-states as
+  the buyer rejects: Priya earns no claim at first (96 against 95) and a
+  17-point one after turning her leader down; Martin's goes 10, then 3.
+
+Claimed only at `CLUSTER_PTS` or more. "Nothing else came within 1 point" is
+not a boast.
+
+**Honest scope note.** The claim covers the configured retailer's own feed,
+which we hold in full. It deliberately says nothing about nearby stock: the
+national search is capped at four pages, so any "we looked everywhere" claim
+would be false.

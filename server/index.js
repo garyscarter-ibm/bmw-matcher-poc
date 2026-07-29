@@ -253,7 +253,7 @@ async function handleMatch(req, res) {
   // engine scores (see applyBespokeAnswers) before ranking.
   const scored = applyBespokeAnswers(brand, answers);
   const {
-    matches, alternatives, decisive, clusterSize, tasteLead,
+    matches, alternatives, decisive, clusterSize, tasteLead, searched,
   } = matchCars(scored, cars, brandTuning(brand));
 
   // Paint only exists on the vehicle detail page, so it's fetched for the
@@ -308,6 +308,11 @@ async function handleMatch(req, res) {
     // Fit couldn't separate the leaders but the buyer's stated preferences
     // could, so the page may name one honestly (see matchCars).
     tasteLead,
+    // How much stock was searched, how much survived the hard filters, and how
+    // far clear the winner is. The page uses it to show its working (see the
+    // working note in the block) rather than presenting a verdict with no
+    // evidence behind it.
+    searched,
     unmet: unmetWants(scored, cars),
   });
 }

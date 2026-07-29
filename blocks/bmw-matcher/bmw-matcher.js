@@ -269,6 +269,12 @@ const BRAND_COPY = {
     hereHeading: ({ retailer }) => `AT ${retailer.toUpperCase()}`,
     awayHeading: 'AT OTHER RETAILERS',
     rejectHint: 'Turned down? We’ll bring the next one up.',
+    // The working. A verdict with no evidence behind it reads as thin stock
+    // rather than as a clear winner, especially on a page holding one card.
+    workingLabel: 'HOW WE GOT HERE',
+    working: ({ total, eligible }) => `We went through all ${total} BMWs in stock here. `
+      + `${eligible} were in budget and big enough for you.`,
+    workingMargin: ({ margin }) => ` Nothing else here came within ${margin} points.`,
     // The other half of a scoped headline: which car beat the one here, and
     // where it is. Shown exactly when the headline scopes, so the two read as
     // one statement rather than repeating each other.
@@ -336,6 +342,10 @@ const BRAND_COPY = {
     hereHeading: ({ retailer }) => `AT ${retailer.toUpperCase()}.`,
     awayHeading: 'ALSO WITHIN REACH.',
     rejectHint: 'Not feeling it? We’ll bring the next one up.',
+    workingLabel: 'HOW WE GOT THERE',
+    working: ({ total, eligible }) => `We looked at all ${total} MINIs in stock here. `
+      + `${eligible} were in budget and roomy enough.`,
+    workingMargin: ({ margin }) => ` Nothing else here got within ${margin} points.`,
     searchedWider: ({ model, miles, where }) => 'We had a look further afield, too. '
       + `The ${model} at ${where} comes out ahead, and it’s ${miles}.`,
   },
@@ -571,7 +581,9 @@ const isHere = (m) => m.car.distance == null;
  *   narrowing can move the page from one state to another.
  * @returns {{ host: HTMLElement, addToPool: (matches) => void }}
  */
-function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) {
+function renderRefine(
+  ctx, initialPool, title, lede, frames, tasteLead = false, searched = null,
+) {
   const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
   // Mutable: nearby stock joins after first paint. Always kept in score order
   // so "the list" and "ranked by fit" mean the same thing.
@@ -669,7 +681,22 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
   let notedCarId = null;
   hereGroup.append(hereLabel, grid, hereRestGrid);
   awayGroup.append(awayLabel, awayGrid, awayRestGrid);
-  host.append(notice, briefBlock, refineBlock, hereGroup, awayGroup);
+  /*
+   * The working, under the cars.
+   *
+   * A page holding one card is correct when nothing else is close, and it
+   * still reads as thin stock rather than as a clear winner, because the
+   * reader cannot tell whether we searched three cars or three hundred.
+   * Adding weaker cars back would not fix that: a page of seven is equally
+   * silent about how many were rejected, and a card is an invitation, so
+   * offering a car thirty points off the pace to prove it is not worth having
+   * undermines the claim it was meant to defend. What was missing is evidence
+   * of the search, so this says it.
+   */
+  const working = el('aside', 'bmwm-working');
+  working.hidden = true;
+
+  host.append(notice, briefBlock, refineBlock, hereGroup, awayGroup, working);
 
   /*
    * Survivors of everything the buyer has said, drawn from the WHOLE pool so a
@@ -1129,6 +1156,34 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
     awayLead.forEach((m) => awayGrid.append(full(m, leadIsHere ? false : single)));
     drop(away, awayLead).forEach((m) => awayRestGrid.append(tile(m)));
     awayGroup.hidden = !away.length;
+
+    /*
+     * The working, last. It is evidence for the verdict above it, so it reads
+     * as the tool signing off rather than as a preamble, and on the one-card
+     * page it lands directly under the single card where it is unmissable.
+     *
+     * The margin is measured off the cars on screen, not off the API's figure,
+     * so rejecting the leader re-states it about whoever leads now. It is only
+     * claimed when there IS a gap: below CLUSTER_PTS the cars are tied, and
+     * "nothing else came within 1 point" is not a boast.
+     */
+    working.replaceChildren();
+    working.hidden = !searched || !alive.length;
+    if (searched && alive.length) {
+      working.append(el('p', 'bmwm-working-label', copy.workingLabel));
+      /*
+       * The margin is measured over the RETAILER's own cars, matching what the
+       * headline is scoped to. Measured over everything it never fired: nearby
+       * stock ties at the top on every persona (Meg's 97 against three nearby
+       * 97s), so the claim was true, unclaimable, and effectively dead code.
+       * Against this retailer it says the useful thing, which is that nothing
+       * else HERE is close, and Meg's one-card page gets its evidence.
+       */
+      const margin = here.length > 1 ? Math.round(here[0].score - here[1].score) : null;
+      const text = copy.working(searched)
+        + (margin != null && margin >= CLUSTER_PTS ? copy.workingMargin({ margin }) : '');
+      working.append(el('p', 'bmwm-working-text', text));
+    }
   }
 
   redraw();
@@ -2496,6 +2551,10 @@ async function renderResults(root, ctx, answers) {
   let tasteLead = false;
   // Held back by the API so a rejection has a next-best car to promote.
   let alternatives = [];
+  // How much stock was searched and how much survived the hard filters, so the
+  // page can show its working. Absent from an older API, in which case the
+  // working note simply never renders.
+  let searched = null;
   // The one ranked list, once it exists. Nearby stock is merged into it when
   // the national search resolves (see addToPool below).
   let refine = null;
@@ -2506,7 +2565,7 @@ async function renderResults(root, ctx, answers) {
   try {
     ({
       matches, decisive = true, clusterSize = 1, tasteLead = false,
-      alternatives = [], unmet: retailerUnmet = {},
+      alternatives = [], unmet: retailerUnmet = {}, searched = null,
     } = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand));
   } catch {
     renderStatus(root, {
@@ -2612,7 +2671,7 @@ async function renderResults(root, ctx, answers) {
      * docs/results-page-review.md.
      */
     refine = renderRefine(
-      ctx, [...matches, ...alternatives], title, lede, frames, tasteLead,
+      ctx, [...matches, ...alternatives], title, lede, frames, tasteLead, searched,
     );
     screen.append(refine.host);
   }

@@ -226,8 +226,16 @@ test('a tie wider than MAX_SHOWN is capped for display but counted in full', () 
 });
 
 test('an empty pool is decisive by vacuum, not by claim', () => {
-  assert.deepEqual(matchCars(base, []),
-    { matches: [], decisive: true, clusterSize: 0, tasteLead: false });
+  // `searched` reports the funnel the page shows its working with. On an empty
+  // pool it must still be present and still be honest: nothing searched,
+  // nothing eligible, and no margin to claim over a car that isn't there.
+  assert.deepEqual(matchCars(base, []), {
+    matches: [],
+    decisive: true,
+    clusterSize: 0,
+    tasteLead: false,
+    searched: { total: 0, eligible: 0, margin: null },
+  });
 });
 
 test('every dataset entry has the fields the engine needs', () => {
