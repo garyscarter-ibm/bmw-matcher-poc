@@ -834,17 +834,59 @@
 /* What they told us in the quiz — the starting brief, and now the whole of
    what this panel says on its own account. */
 .bmwm-brief-said {
-  margin: 0;
+  margin: 0 0 var(--bmwm-space-2);
   font-size: var(--bmwm-text-label);
   color: var(--bmwm-ink-muted);
 }
-/* The "+ Blue" / "− Not the red" rows that used to live here are gone. They
-   restated the applied chips, which sit just below and can be undone; saying
-   the same constraint twice, once undoable and once not, invited the buyer to
-   try clearing it in the place that could not. */
-/* .bmwm-brief-count is gone: see the comment where it used to be appended. The
-   chip row's own status line carries the count now, next to the control that
-   moves it. */
+/* Everything learned since the quiz, one statement at a time, each with its
+   own undo. These are deliberately NOT chips: "+ Blue / − Not the red" reads
+   as a model of a person, a row of pills reads as a filter bar, and the model
+   is what this tool has that a stock search does not. The chip row below
+   carries only what could be added next, so each constraint is stated exactly
+   once, in the register that suits it, next to the control that clears it. */
+.bmwm-brief-item {
+  display: flex;
+  gap: var(--bmwm-space-2);
+  align-items: baseline;
+  justify-content: flex-start;
+  margin: 0 0 2px;
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink);
+}
+.bmwm-brief-mark {
+  font-family: var(--bmwm-font-bold);
+  font-weight: 700;
+  width: 0.9em;
+  flex: none;
+  color: var(--bmwm-accent-spot);
+}
+.bmwm-brief-item.is-rule .bmwm-brief-mark { color: var(--bmwm-ink-muted); }
+/* Not flex-grow: the panel is full width, and stretching the text pinned the
+   undo to the far right where it read as unrelated to the statement it
+   clears. It sits immediately after the words instead. */
+.bmwm-brief-text { flex: 0 1 auto; min-width: 0; }
+/* Quiet until wanted: the statement is the point, the undo is the escape. */
+.bmwm-brief-undo {
+  flex: none;
+  padding: 0 var(--bmwm-space-1);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: var(--bmwm-text-eyebrow);
+  line-height: 1;
+  color: var(--bmwm-ink-muted);
+}
+.bmwm-brief-undo:hover { color: var(--bmwm-ink); }
+.bmwm-brief-undo:focus-visible {
+  outline: 2px solid var(--bmwm-accent-spot);
+  outline-offset: 2px;
+}
+/* The single count, in the same panel as the statements that caused it. */
+.bmwm-brief-count {
+  margin: var(--bmwm-space-2) 0 0;
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+}
 
 .bmwm-refine-status {
   margin: var(--bmwm-space-3) 0 0;

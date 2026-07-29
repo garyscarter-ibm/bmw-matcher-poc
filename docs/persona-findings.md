@@ -166,3 +166,37 @@ live stock on one day; ties and rescues are stock-dependent facts. Harness:
 a scratchpad one-off (compare.mjs) pairing `fixtures/personas.json` against
 two ports; scores are not comparable across stock refreshes without re-running
 both sides together.
+
+## Addendum: external review of the pack (2026-07-29)
+
+An external review scored the pack 7/10. Its two structural criticisms
+(geography incoherent; personas never checked against stock) were both
+packaging artefacts: the shareable pack said "anchored to one retailer"
+without naming either instance, and carried none of this document's replay
+results. Pack v2 fixes both (names Grassick's and Sytner Luton, adds one
+stock-reality line per persona sourced from the replay table above).
+Substantive changes that came out of it:
+
+12. **Used-EV battery health is a new gap.** Priya and Meg now decide on
+    state of health, degradation and battery-warranty transfer
+    (personas.md updated); the feed almost certainly carries none of it.
+    Joins insurance group, winter range and ISOFIX on the
+    investigate-before-promising list.
+13. **Rob Jennings (the rejector, new persona 8) is Gap 7's test case.**
+    His keep-condition is the tool admitting a miss. State 3 and the
+    rescue notes already do this when a want is absent locally, but Gap 7
+    (a stronger nearby match invisible in fit states) is exactly the
+    silence he reads as sales-instrument behaviour. When the owner's call
+    on Gap 7 is revisited, judge it through Rob. His answer set is in
+    `fixtures/personas.json` (key `rob`, retailer 96); he has not been
+    replayed yet.
+14. **Triggers and money are now persona facts, not tool gaps.** Every
+    persona carries a trigger, a money picture (deposit, part exchange,
+    contract end where relevant) and a walks-away condition. The tool
+    hears none of them yet; the finance/monthly layer (Gap 6) and any
+    future part-exchange or contract-date question should be designed
+    against those lines.
+15. **Weighting assumptions added** to personas.md: estimated share of
+    enquiries and units per persona per instance, all confidence Low,
+    to be replaced with DMS and enquiry-log data. The build-order risk
+    they guard against: over-serving Martin, under-serving Tyler/Chloe.

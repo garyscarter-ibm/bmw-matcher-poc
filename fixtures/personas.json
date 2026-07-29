@@ -74,6 +74,24 @@
       }
     },
     {
+      "key": "rob",
+      "name": "Rob Jennings, 41",
+      "tagline": "The Whole-Market Shopper",
+      "brand": "bmw",
+      "retailer": "96",
+      "answers": {
+        "budget": [15000, 25000],
+        "bodyStyles": ["estate"],
+        "fuel": ["petrol", "diesel"],
+        "charging": "none",
+        "primaryUse": "commute",
+        "people": "family",
+        "mileage": 14000,
+        "style": "2",
+        "priorities": ["economy", "comfort"]
+      }
+    },
+    {
       "key": "chloe",
       "name": "Chloe Bennett, 29",
       "tagline": "The Statement Buyer",

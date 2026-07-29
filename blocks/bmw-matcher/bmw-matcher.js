@@ -837,18 +837,37 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
     // against the current set rather than the original one.
     refineBlock.replaceChildren();
     chipRow.replaceChildren();
-    const applied = (label, undo) => {
-      const chip = el('button', 'bmwm-chip is-on', label);
-      chip.type = 'button';
-      chip.setAttribute('aria-pressed', 'true');
-      chip.append(el('span', 'bmwm-chip-x', '✕'));
-      chip.addEventListener('click', () => { undo(); redraw(); });
-      chipRow.append(chip);
-    };
-    // Applied first — what's been decided leads what's still on offer.
-    for (const [id, axis] of active) applied(axis.label, () => active.delete(id));
-    for (const [id, c] of constraints) applied(c.label, () => constraints.delete(id));
-    if (hidden.size) applied(copy.hiddenChip({ count: hidden.size }), () => hidden.clear());
+
+    /*
+     * Everything the buyer has told us since the quiz, as statements rather
+     * than as controls. It renders in the brief below; the chip row carries
+     * only what they could ADD next.
+     *
+     * The two were briefly both: applied filters showed as "+ Blue" here and
+     * as a removable [Blue ✕] chip an inch away, which is one constraint in
+     * two places with only one of them undoable. Collapsing them into the
+     * chip row was the obvious fix and the wrong one, because a chip and a
+     * sentence are not the same register. "+ Blue, − Not the red" reads as a
+     * model of a person; a row of pills reads as a filter bar, and the model
+     * is the thing this tool has that a stock search does not. The +/- mark
+     * carries meaning the pills flatten, too: a want and a rule are different
+     * kinds of statement.
+     *
+     * So the statements keep the state, and they keep the undo with it.
+     */
+    const learned = [
+      ...[...active.entries()].map(([id, a]) => ({
+        kind: 'want', text: a.label, undo: () => active.delete(id),
+      })),
+      ...[...constraints.entries()].map(([id, c]) => ({
+        kind: 'rule', text: c.label, undo: () => constraints.delete(id),
+      })),
+    ];
+    if (hidden.size) {
+      learned.push({
+        kind: 'rule', text: copy.hiddenChip({ count: hidden.size }), undo: () => hidden.clear(),
+      });
+    }
 
     const live = refinementAxes(shown.map(listingsOf)).map((a) => a.id);
     for (const axis of axes) {
@@ -868,20 +887,6 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
         el('p', 'bmwm-refine-label', copy.refineLabel({ count: shown.length })),
         chipRow,
       );
-      // What the last tap actually did, said where the tap happened. `total` is
-      // the same lead measured with nothing applied, so "1 of 2" is a real
-      // before-and-after rather than a count floating free of a baseline.
-      // Only the positive chips are named: "with not the red" is not a sentence,
-      // and a rejection has already shown its work by removing a card.
-      const picked = [...active.values()].map((a) => a.label.toLowerCase());
-      if (active.size || constraints.size || hidden.size) {
-        const args = { shown: shown.length, total: leadHere(pool).length };
-        const line = el('p', 'bmwm-refine-status', picked.length
-          ? copy.refineStatus({ ...args, wants: andList(picked) })
-          : copy.refineStatusPlain(args));
-        line.setAttribute('aria-live', 'polite');
-        refineBlock.append(line);
-      }
     }
 
     // The headline says whatever is true of the cars now on screen. `state`
@@ -943,16 +948,49 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
     briefBlock.replaceChildren();
     status.replaceChildren();
     const said = briefFromAnswers(ctx);
-    if (said.length) {
+    if (said.length || learned.length) {
       briefBlock.append(status);
       status.append(el('p', 'bmwm-brief-label', copy.briefLabel));
-      status.append(el('p', 'bmwm-brief-said', said.join('  ·  ')));
-      // No count here. Moving this panel above the cards put its "3 of 13
-      // still match" two lines above the chip row's "1 of 2, with blue." —
-      // two numbers, adjacent, counting different things (the whole pool
-      // against the lead). Whichever is right, a reader has to work out that
-      // they are not the same measurement, and the chip row's is the one worth
-      // keeping because it is attached to the control that changed it.
+      if (said.length) status.append(el('p', 'bmwm-brief-said', said.join('  ·  ')));
+
+      // Then everything since, each with the means to take it back. The undo
+      // lives here because this is now the only place the constraint is
+      // stated, and a filter you can see but not clear is worse than one you
+      // cannot see at all.
+      learned.forEach((item) => {
+        const row = el('p', `bmwm-brief-item is-${item.kind}`);
+        row.append(el('span', 'bmwm-brief-mark', item.kind === 'want' ? '+' : '−'));
+        row.append(el('span', 'bmwm-brief-text', item.text));
+        const undo = el('button', 'bmwm-brief-undo', '✕');
+        undo.type = 'button';
+        undo.setAttribute('aria-label', `Remove ${item.text}`);
+        undo.addEventListener('click', () => { item.undo(); redraw(); });
+        row.append(undo);
+        status.append(row);
+      });
+
+      /*
+       * One count, and it lives here rather than under the chips.
+       *
+       * There were briefly two, two lines apart: "3 of 13 still match" (the
+       * whole pool) over "1 of 2, with blue." (the lead). Both accurate,
+       * measuring different things, leaving the reader to work that out. This
+       * one wins because it belongs to the same panel as the statements that
+       * caused it: `total` is the lead measured with nothing applied, so
+       * "1 of 2" is a real before-and-after rather than a number floating free
+       * of a baseline. Only the positive wants are named, because "with not
+       * the red" is not a sentence and a rejection has already shown its work
+       * by removing a card.
+       */
+      if (learned.length) {
+        const picked = [...active.values()].map((a) => a.label.toLowerCase());
+        const args = { shown: shown.length, total: leadHere(pool).length };
+        const line = el('p', 'bmwm-brief-count', picked.length
+          ? copy.refineStatus({ ...args, wants: andList(picked) })
+          : copy.refineStatusPlain(args));
+        line.setAttribute('aria-live', 'polite');
+        status.append(line);
+      }
     }
 
     grid.replaceChildren();

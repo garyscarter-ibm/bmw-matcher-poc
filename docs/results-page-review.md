@@ -374,4 +374,16 @@ were invisible while they were apart:
    brief's count is gone and `briefCount` deleted from both brands; the chip
    row's own status line keeps it, next to the control that moves it.
 
-The brief is now exactly what only it can say: the brief the buyer gave.
+**Then corrected again, the same day.** Deleting the "+ Blue / − Not the red"
+rows was an over-correction. A chip and a statement are not the same register:
+"+ Blue, − Not the red" reads as a model of a person, a row of pills reads as
+a filter bar, and the model is the thing this tool has that a stock search
+does not. The +/- mark also carries meaning the pills flatten, since a want
+and a rule are different kinds of statement.
+
+The duplication objection was still right, so the fix is which one goes, not
+whether the list survives. **Applied state now lives only in the list**, with
+its own undo; the chip row carries only what could be added NEXT. Each
+constraint is stated exactly once, in the register that suits it, next to the
+control that clears it. The single count moved into the same panel, because it
+belongs with the statements that caused it.
