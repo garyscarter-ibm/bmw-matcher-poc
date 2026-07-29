@@ -99,6 +99,7 @@ Six, all in `server/engine.js`:
 | `TASTE_PTS` | 6 | How far ahead on taste before we'll name a winner inside a tie |
 | `TOP_MATCHES` | 3 | Cards shown when one car clearly wins |
 | `MAX_SHOWN` | 6 | Cap on cards shown in a tie |
+| `GRACE_MS` | 1500 | How long the first paint waits for the nearby search (block-side) |
 
 The page holds its own copy of `CLUSTER_PTS` (blocks/bmw-matcher), because it
 re-decides which situation it is in after every chip and rejection rather than

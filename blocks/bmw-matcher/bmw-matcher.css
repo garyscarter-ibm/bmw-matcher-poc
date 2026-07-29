@@ -1189,6 +1189,40 @@
    Last on the page and quiet with it, because it is evidence for the verdict
    above rather than a claim of its own. Ruled off so it reads as a footnote to
    the whole list rather than a note attached to the last card. */
+/* "Still checking other retailers" while the national search is outstanding.
+   Holds the group's space so its cars do not appear out of nothing several
+   seconds after the page settled. Quiet: it is a status, not a result. */
+.bmwm-pending {
+  display: flex;
+  align-items: center;
+  gap: var(--bmwm-space-2);
+  margin: 0 0 var(--bmwm-space-4);
+  font-size: var(--bmwm-text-label);
+  color: var(--bmwm-ink-muted);
+}
+
+.bmwm-pending[hidden] { display: none; }
+
+.bmwm-pending-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--bmwm-accent);
+  animation: bmwm-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes bmwm-pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+/* Respect a stated preference for less motion: the dot still marks the spot,
+   it just stops pulsing. */
+@media (prefers-reduced-motion: reduce) {
+  .bmwm-pending-dot { animation: none; opacity: 0.6; }
+}
+
 .bmwm-working {
   margin-top: var(--bmwm-space-7);
   padding-top: var(--bmwm-space-4);

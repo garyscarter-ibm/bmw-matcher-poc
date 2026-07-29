@@ -283,6 +283,7 @@ const BRAND_COPY = {
     rejectHint: 'Turned down? We’ll bring the next one up.',
     // The working. A verdict with no evidence behind it reads as thin stock
     // rather than as a clear winner, especially on a page holding one card.
+    searchingNearby: 'Still checking other retailers within reach',
     workingLabel: 'HOW WE GOT HERE',
     working: ({ total, eligible }) => `We went through all ${total} BMWs in stock here. `
       + `${eligible} were in budget and big enough for you.`,
@@ -370,6 +371,7 @@ const BRAND_COPY = {
     hereHeading: ({ retailer }) => `AT ${retailer.toUpperCase()}.`,
     awayHeading: 'ALSO WITHIN REACH.',
     rejectHint: 'Not feeling it? We’ll bring the next one up.',
+    searchingNearby: 'Still having a look further afield',
     workingLabel: 'HOW WE GOT THERE',
     working: ({ total, eligible }) => `We looked at all ${total} MINIs in stock here. `
       + `${eligible} were in budget and roomy enough.`,
@@ -551,6 +553,20 @@ const TAIL_SHOWN = 6;
  */
 const RELEVANT_PTS = 10;
 
+/*
+ * How long the first paint will wait for the national search before going
+ * ahead without it.
+ *
+ * The two searches now leave together (see renderResults), and measured warm
+ * against the live API they are the same speed: 0.33s local, 0.26s national.
+ * So in the common case the second one is already back and the page paints
+ * once, complete. This budget only covers the gap between them.
+ *
+ * It is deliberately shorter than the local call usually takes, so it cannot
+ * make a fast page slow. It only ever waits on a race that is nearly won.
+ */
+const GRACE_MS = 1500;
+
 /** Cap on cards given the full lead treatment. Mirrors the engine's own. */
 const MAX_SHOWN = 6;
 
@@ -663,6 +679,7 @@ const isHere = (m) => m.car.distance == null;
  */
 function renderRefine(
   ctx, initialPool, title, lede, frames, tasteLead = false, searched = null,
+  searching = false,
 ) {
   const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
   // Mutable: nearby stock joins after first paint. Always kept in score order
@@ -723,6 +740,21 @@ function renderRefine(
   const hereLabel = el('h3', 'bmwm-subhead bmwm-group-label', '');
   const hereRestGrid = el('div', 'bmwm-tail-grid');
   const awayGroup = el('section', 'bmwm-group');
+  /*
+   * "Still looking" placeholder for the other-retailers group.
+   *
+   * Only shown when the national search lost the grace race, which is now the
+   * exception. It exists because the alternative is worse: a whole group of
+   * cars appearing out of nothing several seconds after the page settled,
+   * re-sorting the list and sometimes changing which car leads, while the
+   * buyer is reading. Reserving the space and saying what is happening turns
+   * an ambush into an expectation.
+   */
+  // Flipped by searchDone() when the national search finally lands or fails.
+  let stillSearching = searching;
+  const awayPending = el('p', 'bmwm-pending');
+  awayPending.hidden = true;
+  awayPending.append(el('span', 'bmwm-pending-dot'), copy.searchingNearby);
   const awayLabel = el('h3', 'bmwm-subhead bmwm-group-label', copy.awayHeading);
   const awayGrid = el('div', 'bmwm-grid bmwm-grid-tied');
   const awayRestGrid = el('div', 'bmwm-tail-grid');
@@ -759,7 +791,7 @@ function renderRefine(
   // Set by renderResults; see `noteShown` below for why it matters.
   let notedCarId = null;
   hereGroup.append(hereLabel, grid, hereRestGrid);
-  awayGroup.append(awayLabel, awayGrid, awayRestGrid);
+  awayGroup.append(awayLabel, awayPending, awayGrid, awayRestGrid);
   /*
    * The working, under the cars.
    *
@@ -1275,7 +1307,14 @@ function renderRefine(
 
     awayLead.forEach((m) => awayGrid.append(full(m, leadIsHere ? false : single)));
     drop(away, awayLead).forEach((m) => awayRestGrid.append(tile(m)));
-    awayGroup.hidden = !away.length;
+    /*
+     * While the national search is outstanding the group stays on screen with
+     * its heading and the pending line, holding the space its cars will take.
+     * Once it lands, normal rules: shown only if it has something in it.
+     */
+    awayPending.hidden = !stillSearching;
+    awayLabel.hidden = !away.length && !stillSearching;
+    awayGroup.hidden = !away.length && !stillSearching;
 
     /*
      * The working, last. It is evidence for the verdict above it, so it reads
@@ -1328,8 +1367,18 @@ function renderRefine(
      * matchCard's provenance line), which is what makes that honest rather
      * than merely tidy.
      */
+    /*
+     * The national search is done, whatever it found. Drops the pending line,
+     * and lets an empty away group hide itself again.
+     */
+    searchDone() {
+      if (!stillSearching) return;
+      stillSearching = false;
+      redraw();
+    },
     addToPool(extra) {
-      if (!extra?.length) return;
+      stillSearching = false;
+      if (!extra?.length) { redraw(); return; }
       const known = new Set(pool.map((m) => m.car.id));
       const fresh = extra.filter((m) => !known.has(m.car.id));
       if (!fresh.length) return;
@@ -2793,6 +2842,23 @@ async function renderResults(root, ctx, answers) {
   // said to the user until /api/nearby agrees (see agreedUnmet). An older API
   // that doesn't send the field leaves this empty, so it simply never fires.
   let retailerUnmet = {};
+
+  /*
+   * Both searches leave together.
+   *
+   * They used to be serialised: await the local match, paint, and only then
+   * start the national search. That was right when nearby was a bonus
+   * carousel at the foot of the page. It stopped being right when nearby
+   * stock joined the one ranked list, because a late arrival now changes the
+   * ANSWER rather than adding a section, and starting it second guaranteed
+   * the change would land after the buyer had begun reading.
+   */
+  const nearbyPromise = apiNearby(ctx.api, answers, ctx.retailer, ctx.brand);
+  // Swallow rejections at the source: this promise is now created before
+  // anything awaits it, and an unhandled rejection here would surface as a
+  // console error on a page that recovers perfectly well without nearby.
+  nearbyPromise.catch(() => {});
+
   try {
     ({
       matches, decisive = true, clusterSize = 1, tasteLead = false,
@@ -2808,6 +2874,22 @@ async function renderResults(root, ctx, answers) {
     });
     return;
   }
+
+  /*
+   * Give the national search a moment to catch up before painting.
+   *
+   * If it is already back, or arrives within GRACE_MS, its cars go into the
+   * FIRST paint and nothing moves afterwards. That is the common case now the
+   * two run in parallel. If it is genuinely slow we paint without it and
+   * stream it in, which is the old behaviour, now the exception.
+   *
+   * Resolves to null on timeout or failure, and `early === null` is what the
+   * code below reads as "still searching, show the placeholder".
+   */
+  const early = await Promise.race([
+    nearbyPromise.catch(() => null),
+    new Promise((resolve) => { setTimeout(() => resolve(null), GRACE_MS); }),
+  ]);
 
   root.replaceChildren();
   const screen = el('div', 'bmwm-screen bmwm-results');
@@ -2918,8 +3000,18 @@ async function renderResults(root, ctx, answers) {
      * two cars fit best above a card scoring higher. See
      * docs/results-page-review.md.
      */
+    /*
+     * `early` is the national search when it beat the grace period. Its cars
+     * go into the FIRST paint, so the page arrives complete and nothing
+     * reshuffles under the buyer. When it lost the race this is empty and the
+     * list carries a placeholder instead, filled by applyNearby later.
+     */
     refine = renderRefine(
-      ctx, [...matches, ...alternatives], title, lede, frames, tasteLead, searched,
+      ctx,
+      [...matches, ...alternatives, ...(early?.nearby || [])],
+      title, lede, frames, tasteLead, searched,
+      // Tell the list whether it is still waiting on anything.
+      !early,
     );
     screen.append(refine.host);
   }
@@ -2979,15 +3071,20 @@ async function renderResults(root, ctx, answers) {
 
   root.append(screen);
 
-  // Phase two: now the page is painted, load the nearby carousel in the
-  // background and swap it into the placeholder band (or drop the band).
-  //
-  // This is also the moment we learn whether a want the retailer couldn't meet
-  // is genuinely unavailable, so the unmet note goes in here rather than with
-  // the hero — we'd otherwise be claiming "no electric cars near you" while
-  // still waiting to hear from the retailers that might have one.
-  {
-    apiNearby(ctx.api, answers, ctx.retailer, ctx.brand).then(({ nearby, unmet }) => {
+  /*
+   * What to do with the national search, whenever it lands.
+   *
+   * Extracted so it can run either way: immediately, when the grace period
+   * caught it and its cars are already in the first paint, or later from the
+   * promise when it was too slow. The body is identical, which is the point.
+   *
+   * This is also where we learn whether a want the retailer couldn't meet is
+   * genuinely unavailable, so the unmet note goes here rather than with the
+   * hero. Claiming "no electric cars near you" while still waiting to hear
+   * from the retailers that might have one is exactly the mistake.
+   */
+  function applyNearby({ nearby, unmet }) {
+    {
       // The user may have navigated away (retake/tweak) before this resolves;
       // only touch the page if it's still in the document.
       if (!screen.isConnected) return;
@@ -3055,7 +3152,17 @@ async function renderResults(root, ctx, answers) {
       if (refine) refine.addToPool(ordered);
       else if (nearbyBand && ordered.length) fillNearbyBand(nearbyBand, ctx, ordered);
       else nearbyBand?.remove();
-    });
+    }
+  }
+
+  /*
+   * Either the grace period caught it, in which case its cars are already in
+   * the first paint and this only adds the note, or it did not, in which case
+   * the placeholder is on screen and this replaces it.
+   */
+  if (early) applyNearby(early);
+  else {
+    nearbyPromise.then(applyNearby).catch(() => { refine?.searchDone(); });
   }
 }
 
