@@ -217,8 +217,12 @@ const BRAND_COPY = {
     // brief below the cars says the same thing at more length, but it is below
     // the cars — by the time you reach it you have already stopped wondering
     // whether the tap did anything.
-    refineStatus: ({ shown, total, wants }) => `${shown} of ${total} still match, with ${wants}.`,
-    refineStatusPlain: ({ shown, total }) => `${shown} of ${total} still match.`,
+    refineStatus: ({ shown, wants }) => (shown === 1
+      ? `One car still matches, with ${wants}.`
+      : `${shown} cars still match, with ${wants}.`),
+    refineStatusPlain: ({ shown }) => (shown === 1
+      ? 'One car still matches.'
+      : `${shown} cars still match.`),
     refineEmpty: ({ wants }) => `Nothing here has ${wants} together. `
       + 'Drop one of those and we’ll show you what does.',
     refineEmptyHidden: 'That’s all of them ruled out. Bring one back, or start over.',
@@ -298,8 +302,12 @@ const BRAND_COPY = {
     refineLabel: ({ count }) => (count > 1
       ? `Fancy narrowing these ${count} down?`
       : 'Fancy narrowing this one down?'),
-    refineStatus: ({ shown, total, wants }) => `${shown} of ${total} still in, with ${wants}.`,
-    refineStatusPlain: ({ shown, total }) => `${shown} of ${total} still in.`,
+    refineStatus: ({ shown, wants }) => (shown === 1
+      ? `One left in the running, with ${wants}.`
+      : `${shown} left in the running, with ${wants}.`),
+    refineStatusPlain: ({ shown }) => (shown === 1
+      ? 'One left in the running.'
+      : `${shown} left in the running.`),
     refineEmpty: ({ wants }) => `Ah. Nothing here has ${wants} all at once. `
       + 'Let one of them go and we’ll show you what’s left.',
     refineEmptyHidden: 'Well, that’s the lot ruled out. Bring one back, or start over.',
@@ -480,8 +488,27 @@ function briefFromAnswers(ctx) {
  */
 const CLUSTER_PTS = 3;
 
-/** Cars beyond a group's lead, shown as compact tiles under the same heading. */
+/** Cars beyond a group's lead, shown as compact tiles under the same heading.
+ *  A backstop, not the main control: RELEVANT_PTS below usually cuts first. */
 const TAIL_SHOWN = 6;
+
+/*
+ * How far behind the best car on the page a car may be and still be worth
+ * showing at all.
+ *
+ * The tail used to be a flat six per group, blind to score. Priya's page ran
+ * 96, 95 and then 78, 75, 74, 73, 73, 72: two genuine matches followed by six
+ * cars answering a different question, under a headline about how well the
+ * first two fit. A car eighteen points back is not an alternative, it is a
+ * change of subject.
+ *
+ * Ten, measured against the eight personas' live distributions. It lands on
+ * the natural cliff in six of the eight (Priya's 17pt drop, Meg's 30, Reyes'
+ * 19, Tyler's 29, Daniel's 9, Chloe's 7) and gives a sensible answer in the
+ * other two. It has to be relative: an absolute floor of 70 would show Priya
+ * all nine of hers and Rob Jennings none at all, his best being 67.
+ */
+const RELEVANT_PTS = 10;
 
 /** Cap on cards given the full lead treatment. Mirrors the engine's own. */
 const MAX_SHOWN = 6;
@@ -705,6 +732,12 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
    * names what beat it. Strictly outranks, not ties — ties already break
    * local-first, so an equal car has not earned the qualification.
    */
+  /** Score below which a car is a change of subject rather than an option. */
+  function relevanceFloor() {
+    const alive = surviving();
+    return alive.length ? Math.max(...alive.map((m) => m.score)) - RELEVANT_PTS : 0;
+  }
+
   function situation() {
     const alive = surviving();
     if (!alive.length) {
@@ -974,18 +1007,25 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
       if (learned.length) {
         const picked = [...active.values()].map((a) => a.label.toLowerCase());
         /*
-         * Counted across EVERYTHING the constraints touch, which is both
-         * groups and the tail tiles, not just the lead.
+         * No denominator. It has been wrong three ways and the third is what
+         * killed the idea:
          *
-         * It used to count the local lead cluster: "1 of 2" while a chip had
-         * also cut three of the four cars at other retailers sitting directly
-         * below. Naming the scope ("1 of 2 at Grassicks") would have made that
-         * accurate and still silent about the rest, on a page where the rest
-         * is visible. Widening the count to match the filter is the honest
-         * version, and it needs no qualifier: one number, one scope, the same
-         * scope the chips and rejections act on.
+         *   "1 of 2"   counted the local lead, while the same chip was also
+         *              cutting cars at other retailers shown directly below.
+         *   "9 of 13"  counted the whole pool, which fixed the scope but put
+         *              an invisible number in the denominator: nobody can see
+         *              thirteen cars to check it against.
+         *   and now the relevance bar means the pool holds cars the page has
+         *              deliberately decided are not worth showing, so counting
+         *              them is measuring against a set that does not exist for
+         *              the buyer.
+         *
+         * What they actually want to know is whether the last tap did
+         * anything and whether there is still a choice. A bare count answers
+         * both, is checkable against the cards, and cannot be mis-scoped
+         * because it claims nothing about a total.
          */
-        const args = { shown: alive.length, total: pool.length };
+        const args = { shown: alive.filter((m) => m.score >= relevanceFloor()).length };
         const line = el('p', 'bmwm-brief-count', picked.length
           ? copy.refineStatus({ ...args, wants: andList(picked) })
           : copy.refineStatusPlain(args));
@@ -1052,7 +1092,15 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
     const beats = leadIsHere ? away.filter((m) => m.score > here[0].score) : away;
     const awayLead = beats.length ? leadOf(beats) : [];
     const hereLead = leadIsHere ? shown : [];
-    const drop = (list, taken) => list.slice(taken.length, taken.length + TAIL_SHOWN);
+    /*
+     * The tail: what else is worth a look, cut by relevance first and by
+     * length second. The floor is measured against the best car anywhere on
+     * the page rather than each group's own best, so both groups are judged by
+     * one standard: within ten points of the best we found.
+     */
+    const drop = (list, taken) => list
+      .slice(taken.length, taken.length + TAIL_SHOWN)
+      .filter((m) => m.score >= relevanceFloor());
 
     // One car left is a recommendation again, so it gets the hero treatment
     // (photo, reasons, its trade-off) rather than staying a tile in a grid.

@@ -407,8 +407,63 @@ with three cards on screen; a mileage rejection to "1 of 13" with one card;
 undoing the chip to "4 of 13" with four. The number and the cards now agree,
 which is what makes it checkable rather than merely stated.
 
-**Caveat worth knowing.** Each group's tail is capped at `TAIL_SHOWN`, so on a
-wide result the total can exceed what is rendered (Priya opens at 13 in the
-pool, 12 on screen). The count is honest about the filter and slightly ahead
-of the page. The alternative, counting rendered cards, is capped at both ends
-and would report "no change" when a filter halved a long list, which is worse.
+**Superseded the same day: the denominator is gone.** See below.
+
+
+## Relevance, and the death of the denominator (2026-07-29)
+
+Gary asked why Priya's page carried "a load of ~70% matches" under two cars in
+the high nineties. The scores answer it:
+
+    96 95 | 78 75 74 73 73 72 71
+           ^ a 17-point cliff
+
+Two genuine matches, then six cars answering a different question, under a
+headline about how well the first two fit. **A car eighteen points back is not
+an alternative, it is a change of subject.** The tail was a flat six per group
+and blind to score.
+
+### RELEVANT_PTS = 10
+
+Measured against all eight personas' live distributions. It lands on the
+natural cliff in six of the eight and gives a sensible answer in the other two:
+
+| Persona | Scores | Cliff | Within 10 |
+|---|---|---|---|
+| Priya | 96 95 · 78 75 74 73 73 72 71 | 17pt after #2 | 2 |
+| Meg | 97 · 67 65 65 62 62 62 42 41 | 30pt after #1 | 1 |
+| Reyes | 93 90 90 90 90 85 · 66 59 59 57 56 | 19pt after #6 | 6 |
+| Tyler | 79 76 70 · 60 31 29 | 29pt after #4 | 3 |
+| Daniel | 89 83 82 · 73 68 63 62 62 61 | 9pt after #3 | 3 |
+| Chloe | 90 89 87 83 83 · 76 69 66 64 | 7pt after #5 | 5 |
+
+It has to be RELATIVE. An absolute floor of 70 shows Priya all nine of hers
+and Rob Jennings none at all, his best being 67. The floor is taken from the
+best car anywhere on the page rather than each group's own best, so both
+groups are judged by one standard.
+
+Priya's page goes from twelve cards to six. `TAIL_SHOWN` stays as a backstop
+but rarely binds now.
+
+### The count loses its denominator
+
+Three scopes were tried and all three were wrong:
+
+1. **"1 of 2"** counted the local lead, while the same chip was also cutting
+   cars at other retailers shown directly below.
+2. **"9 of 13"** fixed the scope but put an invisible number in the
+   denominator. Nobody can see thirteen cars to check it against.
+3. The relevance bar then made the pool hold cars the page has *deliberately
+   decided not to show*, so counting them measures against a set that does not
+   exist for the buyer.
+
+What the buyer wants to know is whether the last tap did anything and whether
+there is still a choice. **"One car still matches, with blue."** answers both,
+is checkable against the cards, and cannot be mis-scoped because it claims
+nothing about a total.
+
+### Open question
+
+Meg's page is now a single card. That is correct (nothing else is within 30
+points) and it is the decree working as designed, but a results page holding
+one car and nothing else may read as thin rather than as decisive.
