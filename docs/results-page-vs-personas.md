@@ -117,5 +117,13 @@ only has words for the first.
 5. **Monthly and insurance group** are the biggest content gap and the biggest
    lift; Tyler cannot be satisfied without them.
 
+   **Correction (2026-07-29, from Gary):** the monthly figure IS obtainable.
+   The usedcars sites let you toggle price display to monthly cost, so the
+   number exists on the same platform we already read stock from, rather than
+   needing a finance API. My "not in the feed" was true of `cash_price` on the
+   list endpoint and wrong as a conclusion about the source. Deferred to a
+   separate feature, not written off. Insurance group is still genuinely
+   external and remains out of scope.
+
 Items 2 and 3 are small. Item 1 is the one that changes what the tool is
 willing to say, which is the thing Rob was added to test.
