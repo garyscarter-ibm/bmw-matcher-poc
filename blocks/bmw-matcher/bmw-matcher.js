@@ -232,6 +232,8 @@ const BRAND_COPY = {
     rejectPrompt: 'What put you off?',
     rejectJust: 'Just not this one',
     pickLabel: 'Choose yours',
+    kitLabel: 'What’s fitted',
+    kitMore: ({ count }) => `, and ${count} more`,
     briefLabel: 'What I’ve picked up',
     hiddenChip: ({ count }) => `${count} ruled out`,
     // The "closest here" frame (docs/results-page-states.md): the local cars
@@ -243,6 +245,16 @@ const BRAND_COPY = {
       + 'gets right, and what it doesn’t.',
     closestSettled: ({ model }) => `Your closest match here is the ${model}.`,
     closestSettledHere: ({ model, retailer }) => `Your closest match at ${retailer} is the ${model}.`,
+    /*
+     * One step below `closest`: not "here is the nearest we have" but "we have
+     * not got it" (see WEAK_SCORE). Approved Used's register does this well
+     * without help — state the fact, name the retailer, don't soften it and
+     * don't apologise for it. No `Here` variant: the sentence names the
+     * retailer already, exactly as the closest frame's does.
+     */
+    weakTitle: ({ retailer }) => `Nothing at ${retailer} is close to what you asked for.`,
+    weakLede: () => 'These are the nearest we hold, and each one misses something you '
+      + 'said mattered. If none of them works, nothing here does.',
     // The rescue note: the want is missing HERE but met nearby — by owner
     // decision (2026-07-22) the local cards keep the lead and this note
     // carries the fact, so the buyer weighs proximity against fit themselves.
@@ -275,6 +287,14 @@ const BRAND_COPY = {
     working: ({ total, eligible }) => `We went through all ${total} BMWs in stock here. `
       + `${eligible} were in budget and big enough for you.`,
     workingMargin: ({ margin }) => ` Nothing else here came within ${margin} points.`,
+    // The evidence for the weak headline, and the one number on the page a
+    // reader can check against the badges on the cards.
+    workingWeak: ({ top }) => ` The best of them reached ${top}%.`,
+    // What the badge means, said once. It has been unexplained since fit and
+    // taste were split, and several cards can carry the same number, which
+    // reads as a bug rather than as a claim about how alike they are.
+    workingScore: ' A match score is how well a car fits your answers, nothing else, '
+      + 'so cars that suit you equally share one.',
     // The other half of a scoped headline: which car beat the one here, and
     // where it is. Shown exactly when the headline scopes, so the two read as
     // one statement rather than repeating each other.
@@ -322,6 +342,8 @@ const BRAND_COPY = {
     rejectPrompt: 'Go on then, what’s wrong with it?',
     rejectJust: 'Just not feeling it',
     pickLabel: 'Which one, then?',
+    kitLabel: 'What’s on it',
+    kitMore: ({ count }) => `, and ${count} more`,
     briefLabel: 'So, what I know so far',
     hiddenChip: ({ count }) => `${count} ruled out`,
     // The "closest here" frame, MINI register: honest shrug, no apology.
@@ -331,6 +353,12 @@ const BRAND_COPY = {
     closestSettled: ({ model }) => `Closest to your brief: the ${model}.`,
     closestSettledHere: ({ model, retailer }) => `Closest to your brief at ${retailer}: `
       + `the ${model}.`,
+    // The same "we have not got it" as BMW's, in MINI's register: a shrug that
+    // still gives a straight answer, and a reason to come back rather than an
+    // apology. See WEAK_SCORE for when it fires.
+    weakTitle: ({ retailer }) => `We haven’t got your MINI at ${retailer} right now.`,
+    weakLede: () => 'Here’s the nearest we’ve got anyway, but none of them is it. '
+      + 'Stock turns over quickly, so it’s worth another look soon.',
     rescueLabel: 'NOT HERE, BUT NOT FAR.',
     rescueNote: ({ list, miles, where }) => `No ${list} at ours right now. `
       + `The nearest is ${miles} away at ${where}, and it’s in the list below.`,
@@ -346,6 +374,9 @@ const BRAND_COPY = {
     working: ({ total, eligible }) => `We looked at all ${total} MINIs in stock here. `
       + `${eligible} were in budget and roomy enough.`,
     workingMargin: ({ margin }) => ` Nothing else here got within ${margin} points.`,
+    workingWeak: ({ top }) => ` The best of the lot got to ${top}%.`,
+    workingScore: ' A match score is how well a MINI fits your answers, nothing else, '
+      + 'so ones that suit you equally share a number.',
     searchedWider: ({ model, miles, where }) => 'We had a look further afield, too. '
       + `The ${model} at ${where} comes out ahead, and it’s ${miles}.`,
   },
@@ -523,6 +554,55 @@ const RELEVANT_PTS = 10;
 /** Cap on cards given the full lead treatment. Mirrors the engine's own. */
 const MAX_SHOWN = 6;
 
+/*
+ * Below this, and missing something they asked for, the page stops presenting
+ * the leader as an answer at all.
+ *
+ * The page could already say *the closest here misses your brief* and had no
+ * words for *nothing here is close*, so a 67% leader was announced in exactly
+ * the same voice as an 85% one. Rob Jennings is in the persona set to test
+ * that: he walks away when "the tool recommends rather than filters", and
+ * winning him looks like the tool saying "we do not have the right car for you
+ * this week" when that is true.
+ *
+ * TWO CONDITIONS, and the first is what makes the sentence true. The state only
+ * fires over a leader that already carries a trade-off, i.e. it is `closest`
+ * escalated rather than a new population. A car that meets every stated want
+ * and scores 63 is a car we DO have in the shape and fuel asked for; telling
+ * that buyer "nothing here matches your brief" would be false on its face, and
+ * the low score is coming from budget position or practicality, which the
+ * cards already show.
+ *
+ * SIXTY-EIGHT, measured. Replayed matchCars over fixtures/*-cars.json two ways
+ * — 40 retailers × 25 uniform answer sets per brand, and every persona's answers
+ * perturbed one question at a time (the `stick` model, because uniform sampling
+ * pairs combinations nobody picks) — and took the score distribution of the
+ * population this splits, the `closest` pages:
+ *
+ *   BMW uniform     513 closest pages   median 69   p25 60  p75 78
+ *   BMW personas     91 closest pages   median 67   p25 66  p75 71
+ *   MINI uniform    590 closest pages   median 68   p25 59  p75 78
+ *   MINI personas     8 closest pages   (too few to read)
+ *
+ * There is NO cliff in that distribution — it is unimodal and wide — so the
+ * threshold is a policy choice about how often the tool is willing to say no,
+ * and the only defensible place to put it is the middle of the population it
+ * divides. Three independent samples put that at 67, 68 and 69. The state
+ * therefore covers roughly the worse half of `closest` pages, which is ~24% of
+ * realistic pages on BMW and ~2% on MINI (Sytner Luton's stock simply fits the
+ * MINI personas well).
+ *
+ * Rob lands at 67 and fires; Martin at 71 does not, and that is a consequence
+ * of the median rather than the target — worth saying plainly, because Rob's
+ * page turns out to be an ordinary `closest` page rather than an outlier.
+ * Martin belongs in `closest`: his page already tells him straight (the rescue
+ * note names the convertible and where it is), his ask IS met 18 miles away,
+ * and his clause is about being handled, not about being told no.
+ *
+ * Re-measure with `npm run audit confidence` after a fixture refresh.
+ */
+const WEAK_SCORE = 68;
+
 /**
  * A car with no `distance` came from the configured retailer's own feed; the
  * national search sets one on everything it returns. That single fact is what
@@ -611,7 +691,6 @@ function renderRefine(
    */
   const tasteLeader = tasteLead ? pool[0]?.car.id : null;
   const tasteLed = (alive) => Boolean(tasteLeader) && alive[0]?.car.id === tasteLeader;
-  const axes = refinementAxes(pool.slice(0, MAX_SHOWN).map(listingsOf));
   const active = new Map(); // axis id -> axis
 
   // Everything narrowing the set, positive or negative, in one place: a
@@ -780,8 +859,13 @@ function renderRefine(
     const scoped = here.length > 0 && away.length > 0 && away[0].score > here[0].score;
     const common = { alive, here, away, scoped };
     // The leader misses something asked for: the page must not say "perfect"
-    // in any state, so this outranks the rest.
-    if ((from[0].tradeOffs || []).length) return { ...common, lead: cluster, state: 'closest' };
+    // in any state, so this outranks the rest. Below WEAK_SCORE it stops being
+    // "the closest here" and becomes "nothing here is close", which is a
+    // different sentence rather than a softer one.
+    if ((from[0].tradeOffs || []).length) {
+      const state = cluster[0].score < WEAK_SCORE ? 'weak' : 'closest';
+      return { ...common, lead: cluster, state };
+    }
     if (cluster.length === 1) return { ...common, lead: cluster, state: 'decree' };
     // Fit-tied. Their priorities may still pick one (the taste lead is a
     // server judgement about the original cluster, so it only stands while
@@ -918,9 +1002,24 @@ function renderRefine(
       });
     }
 
-    const live = refinementAxes(shown.map(listingsOf)).map((a) => a.id);
-    for (const axis of axes) {
-      if (active.has(axis.id) || !live.includes(axis.id)) continue;
+    /*
+     * Computed against what is ON SCREEN, on every redraw.
+     *
+     * It used to be an intersection: a fixed set taken once from the pool's top
+     * six, filtered each redraw by what still split the lead. Both halves were
+     * capped at MAX_AXES, so the two sixes could be six different axes and the
+     * intersection could be empty — which is how Meg's page, narrowed to one
+     * card, lost her chips entirely while that card's two listings still
+     * differed on colour and equipment. Offering a fixed menu was the mistake:
+     * an axis exists only where it splits the cars actually being shown, and
+     * that set changes every time she taps something.
+     *
+     * MAX_AXES still applies, inside refinementAxes, and now applies to the set
+     * that is offered rather than to a snapshot taken before it (see the note
+     * there for why the cap exists at all).
+     */
+    for (const axis of refinementAxes(shown.map(listingsOf))) {
+      if (active.has(axis.id)) continue;
       const chip = el('button', 'bmwm-chip', axis.label);
       chip.type = 'button';
       chip.setAttribute('aria-pressed', 'false');
@@ -1116,9 +1215,30 @@ function renderRefine(
      * It is a treatment, not a caption. No heading anywhere says one group
      * beats the other.
      */
-    const beats = leadIsHere ? away.filter((m) => m.score > here[0].score) : away;
-    const awayLead = beats.length ? leadOf(beats) : [];
     const hereLead = leadIsHere ? shown : [];
+    const beats = leadIsHere ? away.filter((m) => m.score > here[0].score) : away;
+    /*
+     * Capped to the retailer's own lead, and this is the one place a treatment
+     * decision is also a commercial one.
+     *
+     * Uncapped, the rule above put a full card on every car that outranks the
+     * best one here, and on Priya's page that was four full cards under AT
+     * OTHER RETAILERS against two under AT GRASSICKS BMW. On a retailer's own
+     * website the competitors' section then outweighs the host, which is the
+     * exact problem grouping by place was built to solve.
+     *
+     * The cap is a count, never a caption: no heading anywhere says one group
+     * beats the other, and the cars that lose their card stay in the list as
+     * tiles rather than disappearing. At least one full card always survives,
+     * so the promise the merge was built on holds — a genuinely better car is
+     * something you can reject, refine and read the trade-off line on.
+     *
+     * It does not apply when every local car has been ruled out, because then
+     * the group beyond IS the answer rather than context beside one.
+     */
+    const awayLead = beats.length
+      ? leadOf(beats).slice(0, leadIsHere ? Math.max(1, hereLead.length) : undefined)
+      : [];
     /*
      * The tail: what else is worth a look, cut by relevance first and by
      * length second. The floor is measured against the best car anywhere on
@@ -1180,9 +1300,18 @@ function renderRefine(
        * else HERE is close, and Meg's one-card page gets its evidence.
        */
       const margin = here.length > 1 ? Math.round(here[0].score - here[1].score) : null;
-      const text = copy.working(searched)
-        + (margin != null && margin >= CLUSTER_PTS ? copy.workingMargin({ margin }) : '');
-      working.append(el('p', 'bmwm-working-text', text));
+      /*
+       * In the weak state the margin says nothing worth saying. How far clear
+       * the leader is of the next car is the wrong question when the answer is
+       * that neither is close; the useful number is the one that put the page
+       * in this state. Stating it here rather than in the headline is what
+       * keeps the two from repeating each other: the headline is the verdict,
+       * this is the arithmetic behind it, checkable against the badges.
+       */
+      const closing = state === 'weak'
+        ? copy.workingWeak({ top: shown[0].score })
+        : (margin != null && margin >= CLUSTER_PTS ? copy.workingMargin({ margin }) : '');
+      working.append(el('p', 'bmwm-working-text', copy.working(searched) + closing + copy.workingScore));
     }
   }
 
@@ -1417,6 +1546,15 @@ const SPEC_LABELS = {
   coupe: 'Coupé', convertible: 'Convertible', mpv: 'Family carrier',
 };
 const FUEL_SPEC = { petrol: 'Petrol', diesel: 'Diesel', phev: 'Plug-in hybrid', ev: 'Electric' };
+/*
+ * Gearbox, stated rather than implied. It was already on the wire and already
+ * a reject reason and a refine chip, and it was never printed anywhere — so a
+ * buyer whose dealbreaker it is (Meg's clause is explicit that implied is not
+ * good enough) had to infer it from a control that only appears when the stock
+ * happens to be mixed. Same closed set as transmissionFor in server/mapping.js;
+ * a car the feed gave no gearbox for simply says nothing.
+ */
+const GEARBOX_SPEC = { auto: 'Automatic', manual: 'Manual' };
 
 /*
  * Representative hex per basic colour, for the little swatch beside the paint
@@ -1457,6 +1595,11 @@ const CONCEPT_LABELS = {
   sunroof: 'Sunroof',
   heatedSeats: 'Heated seats',
   heatedWheel: 'Heated steering wheel',
+  // "Points", not "rear ISOFIX": the concept folds BMW's rear ISOFIX system
+  // and both brands' front i-Size attachment, which are different fitments
+  // (see FEATURE_CONCEPTS in server/mapping.js). Claiming the rear one would
+  // be claiming more than the feed says.
+  isofix: 'ISOFIX child seat points',
   sportsSeats: 'Sports seats',
   electricSeats: 'Electric seats',
   leatherWheel: 'Leather steering wheel',
@@ -1474,6 +1617,16 @@ const CONCEPT_LABELS = {
   tintedGlass: 'Privacy glass',
   towbar: 'Tow bar',
 };
+
+/*
+ * How many of those a card names before it starts counting. The order above is
+ * the order they print in, which puts the distinctive kit (roof, seats, child
+ * seats) ahead of the near-ubiquitous (cruise control, climate), so the six
+ * that show are the six worth reading. The remainder is counted rather than
+ * dropped, because a card that quietly truncates is a card making a claim
+ * about what a car does not have.
+ */
+const KIT_SHOWN = 6;
 
 /*
  * What actually separates a set of cars the engine scored the same.
@@ -2083,7 +2236,12 @@ function matchCard(match, {
   const head = el('div', 'bmwm-card-head');
   head.append(el('h3', 'bmwm-card-name', car.name));
   const badge = el('span', 'bmwm-score', `${score}%`);
-  badge.title = 'Match score';
+  // The number has been unexplained since fit and taste were split, and two
+  // cards sharing one reads as a bug unless you know it is a claim that they
+  // suit you equally. Said properly in the working note under the cards; this
+  // is the affordance for the reader who points at the badge itself.
+  badge.title = 'Match score: how well this car fits the answers you gave. Cars that '
+    + 'suit you equally get the same score.';
   head.append(badge);
   body.append(head);
 
@@ -2108,22 +2266,38 @@ function matchCard(match, {
    * describing two different cars at once, which is worse than not offering
    * the choice at all.
    */
-  function renderSpecs(paint, shade, priceText) {
+  /*
+   * `gearbox` is passed in rather than read off `car` because it is a property
+   * of one listing: a card speaking for four cars can hold three autos and a
+   * manual, so the gearbox has to follow the picker exactly as the paint does.
+   * Seats and boot are per-model and constant across a group, so they are read
+   * straight off the car.
+   *
+   * Boot is qualified with "seats up". It comes from MODEL_SPECS, not from the
+   * feed, and an unqualified litre figure is precisely the kind of claim Priya
+   * says she cannot picture: the number people distrust is the one that might
+   * quietly be the seats-down figure.
+   */
+  function renderSpecs(paint, shade, priceText, gearbox) {
     specs.replaceChildren();
-    // Compact tiles are narrow — the headline specs only, no 0–62/economy.
+    const head = [...lead, GEARBOX_SPEC[gearbox]].filter(Boolean);
+    // Compact tiles are narrow — the headline specs only, no practicality,
+    // 0–62 or economy.
     const tail = (compact ? [priceText] : [
       priceText,
+      car.seats ? `${car.seats} seats` : null,
+      car.boot ? `${car.boot}-litre boot, seats up` : null,
       `0–62 ${car.zeroTo62}s`,
       car.fuel === 'ev' ? `${car.evRange} mi range` : `${car.mpg} mpg`,
     ]).filter(Boolean);
     if (!paint || compact) {
-      specs.textContent = [...lead, ...tail].join('  ·  ');
+      specs.textContent = [...head, ...tail].join('  ·  ');
       return;
     }
     // Paint gets a swatch as well as its name: in a tie the colour is very
     // often the actual difference between the cars, and a dot you can see
     // beats a name you have to read. No hex for the name → name alone.
-    specs.append(`${lead.join('  ·  ')}  ·  `);
+    specs.append(`${head.join('  ·  ')}  ·  `);
     const hex = SWATCH_HEX[(shade || '').toLowerCase()];
     if (hex) {
       const dot = el('span', 'bmwm-swatch');
@@ -2136,6 +2310,7 @@ function matchCard(match, {
     car.colour?.manufacturerColour || car.colour?.colour,
     car.colour?.colour,
     price,
+    car.transmission,
   );
   body.append(specs);
 
@@ -2185,9 +2360,61 @@ function matchCard(match, {
 
   if (!compact) body.append(el('p', 'bmwm-blurb', car.blurb));
 
-  if (big && reasons.length) {
+  /*
+   * What is actually on this car, from the feed's factory options list.
+   *
+   * The equipment concepts have been parsed since the refinement work and had
+   * exactly one surface: a chip, offered only where the stock happens to split
+   * on them. That is the wrong surface for confirming a fact. Priya walks away
+   * from "ISOFIX she cannot confirm", and on her page every lead car has it,
+   * so the chip is correctly suppressed and she learns nothing. Meg's clause
+   * wants the comfort equipment "stated where she can see it", not inferred
+   * from which filters are on offer.
+   *
+   * It claims PRESENCE and never absence. The feed lists factory options, so a
+   * car can carry standard kit this never mentions — which is why the label is
+   * "what's fitted" rather than a spec sheet, and why nothing anywhere says a
+   * car lacks something. Capped, with the remainder counted rather than
+   * silently dropped, and rebuilt by the picker because equipment belongs to a
+   * listing rather than to the model.
+   */
+  const kit = el('p', 'bmwm-kit');
+  const kitLabel = el('p', 'bmwm-why-label bmwm-kit-label', copy.kitLabel);
+  function renderKit(chosen) {
+    const have = new Set(chosen?.features || car.features || []);
+    const named = Object.entries(CONCEPT_LABELS)
+      .filter(([key]) => have.has(key))
+      .map(([, label]) => label);
+    kit.hidden = !named.length;
+    kitLabel.hidden = !named.length;
+    if (!named.length) return;
+    const shown = named.slice(0, KIT_SHOWN);
+    const rest = named.length - shown.length;
+    kit.textContent = shown.join(', ')
+      + (rest > 0 ? copy.kitMore({ count: rest }) : '');
+  }
+  if (!compact) {
+    renderKit(listingsOf(match)[0]);
+    body.append(kitLabel, kit);
+  }
+
+  /*
+   * The reasons, on every card that leads the page rather than only on a hero.
+   *
+   * Same argument the trade-off line was widened on: a tie renders several
+   * lead cards and none of them is "big", so the page's entire case for the
+   * cars it is recommending vanished in exactly the state where the buyer has
+   * most to choose between. Sam & Jordan Reyes walk away when the practicality
+   * claims read like brochure copy, and their page is a five-card taste pick,
+   * so until now their clause could not even be tested.
+   *
+   * Trimmed to two on a multi-card page. Four bullets across five cards is a
+   * wall, and the reasons are sorted by how much they contributed, so the top
+   * two are the case and the rest are corroboration.
+   */
+  if (!compact && reasons.length) {
     const why = el('ul', 'bmwm-reasons');
-    reasons.forEach((r) => why.append(el('li', null, r)));
+    reasons.slice(0, big ? reasons.length : 2).forEach((r) => why.append(el('li', null, r)));
     body.append(el('p', 'bmwm-why-label', 'Why it suits you'), why);
   }
 
@@ -2319,10 +2546,14 @@ function matchCard(match, {
         opt.classList.add('is-on');
         opt.setAttribute('aria-pressed', 'true');
         // Re-describe the card as the chosen car: paint, swatch, price,
-        // mileage and where the link goes. Anything left showing the previous
-        // listing's values is a card describing two cars at once.
+        // gearbox, mileage and where the link goes. Anything left showing the
+        // previous listing's values is a card describing two cars at once.
         showPhoto(listing.photo);
-        renderSpecs(listing.colour, listing.shade, gbp(listing.priceMin));
+        renderSpecs(
+          listing.colour, listing.shade, gbp(listing.priceMin),
+          listing.transmission ?? car.transmission,
+        );
+        renderKit(listing);
         if (usedMeta) {
           const bits = [];
           if (car.plate) bits.push(`’${car.plate} reg`);
@@ -2630,6 +2861,23 @@ async function renderResults(root, ctx, answers) {
         settled: copy.closestSettled,
         settledHere: copy.closestSettledHere,
         lede: copy.closestLede(),
+      },
+      /*
+       * The leader misses the brief AND is below WEAK_SCORE: the page stops
+       * offering an answer and says so. It keeps the cards, because "here is
+       * how far off the nearest one is" is the evidence for the claim and
+       * withholding it would just be a shorter page — but nothing above them
+       * describes any of them as a match.
+       *
+       * Both keys are the same sentence: narrowing to one card must not turn
+       * this into a settled verdict about that card. The lede survives
+       * narrowing for the same reason.
+       */
+      weak: {
+        tied: () => copy.weakTitle({ retailer: ctx.retailerLabel }),
+        settled: () => copy.weakTitle({ retailer: ctx.retailerLabel }),
+        lede: copy.weakLede(),
+        ledeSurvivesNarrowing: true,
       },
       // Nothing else came within CLUSTER_PTS: the decree is earned.
       decree: {

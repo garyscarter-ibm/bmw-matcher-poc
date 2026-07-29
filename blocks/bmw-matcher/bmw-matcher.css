@@ -1106,6 +1106,17 @@
 .bmwm-reasons { margin: 0; padding: 0 0 0 var(--bmwm-space-5); font-size: var(--bmwm-text-body); }
 .bmwm-reasons li { margin-bottom: var(--bmwm-space-1); }
 
+/* What's fitted, from the feed's factory options. A flat comma list rather
+   than a bulleted one: these are facts to scan for a word ("ISOFIX"), not an
+   argument to read, and bullets would give them the weight of the reasons
+   below. Muted like the spec line, which is the register they belong to. */
+.bmwm-kit {
+  margin: 0;
+  font-size: var(--bmwm-text-label);
+  line-height: 1.5;
+  color: var(--bmwm-ink-muted);
+}
+
 /* The hero card owning a want it doesn't meet ("Petrol, where you asked for
    all-electric.") — the per-car sibling of the .bmwm-unmet note, so its
    eyebrow takes the same spot colour as that note's edge: one colour for

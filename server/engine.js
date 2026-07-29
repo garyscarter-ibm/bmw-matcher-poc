@@ -267,6 +267,16 @@ function bootNeedKey(answers) {
   return SPACE_KEYS[Math.min(level, SPACE_KEYS.length - 1)];
 }
 
+/*
+ * A reason phrase in the brand's own register (see `reasons` in brands.js).
+ * Falls back to BMW's, which is the base every brand merges onto, so a brand
+ * that overrides nothing still says something.
+ */
+function phrase(tuning, key, car) {
+  const say = tuning.reasons?.[key] ?? DEFAULT_TUNING.reasons[key];
+  return say(car);
+}
+
 function scorePracticality(car, answers, tuning) {
   const { bootNeed, seatsFloor, crewBonusSeats } = tuning.practicality;
   // Boot targets are per-brand (a MINI's "big" is smaller than a BMW's), so
@@ -280,13 +290,20 @@ function scorePracticality(car, answers, tuning) {
   // rankCars (crewSeatShortfall), not here — practicality alone is too small a
   // lever to overcome a 7-seater's budget/economy headwind.
   if (answers.people === 'crew' && car.seats >= crewBonusSeats) {
-    return { score: 1, reason: `${car.seats} proper seats for the full crew` };
+    return { score: 1, reason: phrase(tuning, 'crew', car) };
   }
+  /*
+   * Both variants state the litres AND that the figure is seats-up, because
+   * that qualifier is what makes a boot number believable — an unqualified one
+   * might quietly be the seats-down figure, which is exactly the sort of claim
+   * Priya says she cannot picture. The card prints the same number in its spec
+   * line, so the reason and the spec can be checked against each other.
+   */
   let reason;
   if (need > 0 && car.boot >= need) {
-    reason = `${car.boot}-litre boot swallows the dogs, the tip runs, the lot`;
+    reason = phrase(tuning, 'boot', car);
   } else if (need > 0 && car.boot >= need * 0.9) {
-    reason = `Big ${car.boot}-litre boot for buggies and the weekly shop`;
+    reason = phrase(tuning, 'bootTight', car);
   }
   return { score, reason };
 }
@@ -360,15 +377,15 @@ function scoreSize(car, answers, tuning) {
     const score = (cityDivisor + 1 - car.sizeClass) / cityDivisor;
     return {
       score: clamp(score),
-      reason: car.sizeClass <= 2 ? 'Compact enough for city streets and tight parking' : undefined,
+      reason: car.sizeClass <= 2 ? phrase(tuning, 'city', car) : undefined,
     };
   }
   if (answers.primaryUse === 'roadtrips') {
     const big = car.sizeClass >= roadtripMinClass;
-    return {
-      score: big ? 1 : 0.6,
-      reason: big ? 'Big-car refinement for long motorway days' : undefined,
-    };
+    // Was "Big-car refinement for long motorway days", which asserts a quality
+    // nothing in the data supports. Size is all we actually know here, so size
+    // is all the reason claims.
+    return { score: big ? 1 : 0.6, reason: big ? phrase(tuning, 'roadtrip', car) : undefined };
   }
   return { score: 0.7 };
 }
@@ -381,16 +398,15 @@ const USE_TAGS = {
   roadtrips: ['cruiser'],
 };
 
-const TAG_REASONS = {
-  'drivers-car': 'One of the sharpest-handling cars in the range',
-  family: 'Built around family life',
-  cruiser: 'A relaxed, refined long-distance companion',
-  urban: 'Right-sized for urban life',
-  efficient: 'Easy on running costs day to day',
-  tech: 'Packed with the latest cabin tech',
-  image: 'Serious kerb appeal',
-  practical: 'Genuinely practical day to day',
-};
+/**
+ * The character phrases, brand by brand. Merged key-by-key onto BMW's rather
+ * than taken wholesale, so a brand overriding three tags keeps BMW's wording
+ * for the other five instead of silently losing them — mergeTuning's shallow
+ * merge would do the latter.
+ */
+function tagReasons(tuning) {
+  return { ...DEFAULT_TUNING.reasons.tags, ...(tuning.reasons?.tags || {}) };
+}
 
 function scoreCharacter(car, answers, tuning) {
   const wanted = new Set(USE_TAGS[answers.primaryUse] || []);
@@ -406,7 +422,7 @@ function scoreCharacter(car, answers, tuning) {
   }
   const hits = car.tags.filter((t) => wanted.has(t));
   const score = clamp(hits.length / 2);
-  return { score, reason: hits.length ? TAG_REASONS[hits[0]] : undefined };
+  return { score, reason: hits.length ? tagReasons(tuning)[hits[0]] : undefined };
 }
 
 const STYLE_LINE_LABEL = {
@@ -632,7 +648,10 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
         .sort((a, b) => b.rank - a.rank)
         .slice(0, 4)
         .map((c) => c.reason);
-      if (stretch) reasons.push(`A stretch at ${gbp(car.priceMin)}+, but maybe worth it`);
+      // "…but maybe worth it" was a nudge, and a nudge is the thing a buyer
+      // who assumes the tool ranks on margin is watching for. State the fact
+      // and let them price it.
+      if (stretch) reasons.push(`A stretch at ${gbp(car.priceMin)}+, over the budget you set`);
       let ratio = fitWeighted / fitTotal;
       // Whole-score penalty for a "crew" buyer's sub-7-seat car: strong enough
       // that genuine 7-seaters top when in stock, but 5-seaters still rank (and

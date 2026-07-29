@@ -33,6 +33,13 @@ const post = async (path, body) => {
   return res.json();
 };
 
+/*
+ * Below this the page stops calling the leader a match at all. Mirrors
+ * WEAK_SCORE in blocks/bmw-matcher/bmw-matcher.js, which carries the
+ * measurement behind the number; re-measure with `npm run audit conf`.
+ */
+const WEAK_SCORE = 68;
+
 /** Mirror of the block's state test (docs/results-page-states.md). */
 function stateOf(match, nearby) {
   if (!match.matches?.length) return '5 EMPTY';
@@ -44,7 +51,10 @@ function stateOf(match, nearby) {
   }
   const agreed = Object.entries(match.unmet || {}).some(([k, v]) =>
     v.some((x) => (nearby.unmet?.[k] || []).includes(x)));
-  return agreed ? '4 UNMET ANYWHERE' : '3 CLOSEST HERE';
+  if (agreed) return '4 UNMET ANYWHERE';
+  // The leader misses the brief AND is nowhere near it, so the page says so
+  // rather than offering it as the closest thing.
+  return match.matches[0].score < WEAK_SCORE ? '3b NOTHING HERE IS CLOSE' : '3 CLOSEST HERE';
 }
 
 for (const p of selected) {

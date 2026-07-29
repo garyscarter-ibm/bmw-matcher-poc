@@ -56,8 +56,16 @@ The page has one honest thing to say per situation, derived from the
 | Several tie, their priorities favour one | "We'd go for the Countryman C. A few of these fit just as well." |
 | Several genuinely tie | "It's a six-way tie." — then chips to narrow by colour, kit, gearbox |
 | The best car misses something they asked for | "The closest matches at Grassicks." — and each card says what it misses |
+| **…and isn't close either** | **"Nothing at Grassicks BMW is close to what you asked for."** — the cards stay, nothing above them calls one a match |
 | That thing exists, but not here | "No convertibles at Grassicks. The nearest is 18 miles away." |
 | Nothing fits at all | "No matches found." — plus what's nearby |
+
+The low-confidence state is the one that decides what kind of tool this is. It
+fires only over a leader that already misses a stated want (saying "nothing
+matches your brief" about a car that meets every stated want would be false) and
+only below `WEAK_SCORE`. The working note then carries the arithmetic — "the
+best of them reached 67%" — so the headline is the verdict and the note is the
+evidence, rather than the two saying the same thing twice.
 
 The headline names the retailer **only when a car elsewhere actually beats the
 best one here** ("Your perfect MINI at Sytner Luton is…"), and then a line
@@ -70,7 +78,11 @@ The chips sit **above** the cards (a control belongs next to what it controls)
 and the running brief sits **below** them (a summary belongs after).
 
 **6. Pick the actual car.** Once it's down to one model, the buyer chooses
-which of the retailer's copies — colour, price, mileage.
+which of the retailer's copies — colour, price, mileage. The spec line follows
+that choice, because gearbox and paint are properties of one car rather than of
+the model: it states body, fuel, **gearbox**, paint, price, **seats**, **boot
+in litres with the seats up**, 0-62 and economy. The boot qualifier is
+deliberate — an unqualified litre figure is the kind of claim buyers discount.
 
 That's it. Constraints eliminate, fit ranks, taste chooses the model, the buyer
 chooses the car.
@@ -92,6 +104,16 @@ The page holds its own copy of `CLUSTER_PTS` (blocks/bmw-matcher), because it
 re-decides which situation it is in after every chip and rejection rather than
 trusting the server's first verdict. Keep the two in step.
 
+Three more live only in the page, because they are about what it is willing to
+show and say rather than about scoring. Each is measured, and each carries its
+measurement in a comment above it:
+
+| Constant | Now | What it does |
+|---|---|---|
+| `RELEVANT_PTS` | 10 | How far behind the best car on the page a car may be and still be worth showing |
+| `WEAK_SCORE` | 68 | Below this, and missing something asked for, the page says nothing here is close (`npm run audit conf`) |
+| `KIT_SHOWN` | 6 | Equipment named on a card before the rest is counted |
+
 Per-brand weights and thresholds live in `server/brands.js`.
 
 ## How to check you haven't broken it
@@ -101,7 +123,8 @@ npm run audit stick    # do the questions change the answer?
 npm run audit fuel     # does a named fuel actually bind?
 npm run audit sens     # diversity and body-style honesty
 npm run audit taste    # is TASTE_PTS set anywhere useful?
-npm run personas       # all seven personas end to end
+npm run audit conf     # where does "nothing here is close" begin?
+npm run personas       # all eight personas end to end
 cd server && npm test  # 61 unit tests
 ```
 

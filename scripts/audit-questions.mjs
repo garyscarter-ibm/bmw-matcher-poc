@@ -20,12 +20,15 @@
  *          a time — the "it always recommends the same car" test.
  *   taste  Inside a fit tie, how far ahead is #1 on taste? The distribution
  *          TASTE_PTS is a threshold on, and what each candidate value does.
+ *   conf   Where does "nothing here is close" start? The top-score distribution
+ *          of the pages the low-confidence state divides, which is what
+ *          WEAK_SCORE (the block) is a threshold on.
  *
  * Findings + the adapt-to-which-pool decision framework are written up in
  * docs/question-stock-audit.md — re-run this after a fixture refresh to see
  * whether they still hold. Zero-dep; seeded PRNG so runs are reproducible.
  *
- * Run:  node scripts/audit-questions.mjs [dead|sens|size|fuel|stick|taste|all]
+ * Run:  node scripts/audit-questions.mjs [dead|sens|size|fuel|stick|taste|conf|all]
  */
 
 import { readFileSync } from 'node:fs';
@@ -501,6 +504,90 @@ function auditTaste(brand) {
   }
 }
 
+/*
+ * Confidence pass — where does "nothing here is close" begin?
+ *
+ * The results page has a state below `closest` that stops presenting the
+ * leader as an answer at all (see WEAK_SCORE in blocks/bmw-matcher). It fires
+ * on the top score, and only over a leader that already carries a trade-off,
+ * because "nothing here matches your brief" is plainly false about a car that
+ * meets every stated want.
+ *
+ * So the only population that matters is the CLOSEST pages, and the only
+ * measurement that means anything is their top-score distribution — which is
+ * what this prints, both ways the harness knows how to sample:
+ *
+ *   uniform   random answer sets over sampled retailers. Broad, and (per the
+ *             `stick` pass's argument) not how anyone actually answers.
+ *   personas  each persona's real answers with ONE question changed at a time.
+ *             Realistic in shape, and the sample the threshold was set on.
+ *
+ * Findings, 2026-07-29: the distribution has no cliff, so the threshold is a
+ * policy choice and the defensible place for it is the middle of the
+ * population it divides. Three samples put that median at 67, 68 and 69.
+ */
+const WEAK_SCORE = 68; // mirrors blocks/bmw-matcher/bmw-matcher.js
+
+function auditConfidence(brand) {
+  const {
+    byRetailer, tuning: t, budgetCfg, questions: qs,
+  } = loadBrand(brand);
+  const { personas } = JSON.parse(readFileSync(join(FIXTURES, 'personas.json'), 'utf8'));
+  const pages = { uniform: [], personas: [] };
+
+  const record = (bucket, stock, answers, tag) => {
+    const r = matchCars(applyBespokeAnswers(brand, answers), stock, t);
+    if (!r.matches.length) return;
+    pages[bucket].push({
+      score: r.matches[0].score,
+      closest: (r.matches[0].tradeOffs || []).length > 0,
+      tag,
+    });
+  };
+
+  for (const stock of sampleRetailers(byRetailer, N_RETAILERS)) {
+    for (let i = 0; i < 25; i += 1) record('uniform', stock, randomAnswers(qs, budgetCfg));
+  }
+  for (const p of personas.filter((x) => x.brand === brand)) {
+    const stock = byRetailer.get(Number(p.retailer)) || byRetailer.get(p.retailer);
+    if (!stock?.length) continue;
+    record('personas', stock, p.answers, p.key);
+    for (const q of qs) {
+      let values = [];
+      if (q.id === 'budget') values = [[10000, 25000], [15000, 35000], [25000, 50000], [40000, 80000]];
+      else if (q.id === 'mileage') values = [4000, 9000, 15000, 25000];
+      else if (q.options) values = q.multi ? q.options.map((o) => [o.value]) : q.options.map((o) => o.value);
+      for (const v of values) record('personas', stock, { ...p.answers, [q.id]: v });
+    }
+  }
+
+  console.log(`\n${'='.repeat(72)}\n${brand.toUpperCase()}`);
+  for (const [bucket, rows] of Object.entries(pages)) {
+    const closest = rows.filter((r) => r.closest);
+    const scores = closest.map((r) => r.score);
+    if (!scores.length) { console.log(`\n  ${bucket}: no closest pages`); continue; }
+    console.log(`\n  ${bucket}: ${rows.length} pages, ${closest.length} of them CLOSEST (${pct(closest.length, rows.length)})`);
+    console.log(`    closest-page top score: p25 ${quantile(scores, 0.25)}`
+      + `  MEDIAN ${median(scores)}  p75 ${quantile(scores, 0.75)}`);
+    for (let lo = 35; lo < 100; lo += 5) {
+      const n = scores.filter((s) => s >= lo && s < lo + 5).length;
+      console.log(`      ${String(lo).padStart(2)}–${lo + 4}  ${'█'.repeat(Math.round((n / scores.length) * 60)).padEnd(30)} ${pct(n, scores.length)}`);
+    }
+    console.log(`    threshold → share of ALL pages that say "nothing here is close" (WEAK_SCORE is ${WEAK_SCORE}):`);
+    for (const th of [60, 62, 64, 66, 68, 70, 72, 75]) {
+      const n = closest.filter((r) => r.score < th).length;
+      console.log(`      ${th}${th === WEAK_SCORE ? ' ←' : '  '} `
+        + `${'█'.repeat(Math.round((n / rows.length) * 60)).padEnd(30)} ${pct(n, rows.length)}`
+        + `   (${pct(n, closest.length)} of closest pages)`);
+    }
+  }
+  const named = pages.personas.filter((r) => r.tag);
+  console.log('\n  personas as answered:');
+  named.forEach((r) => console.log(`    ${r.tag.padEnd(8)} ${String(r.score).padStart(3)}%  `
+    + `${r.closest ? 'misses a stated want' : 'meets the brief'}  →  `
+    + `${r.closest && r.score < WEAK_SCORE ? 'NOTHING HERE IS CLOSE' : (r.closest ? 'closest here' : '—')}`));
+}
+
 // ----------------------------------------------------------------- run ----
 
 const PASSES = {
@@ -510,11 +597,15 @@ const PASSES = {
   fuel: [auditFuel],
   stick: [auditStickiness],
   taste: [auditTaste],
-  all: [auditDead, auditSensitivity, auditBySize, auditFuel, auditStickiness, auditTaste],
+  conf: [auditConfidence],
+  all: [
+    auditDead, auditSensitivity, auditBySize, auditFuel,
+    auditStickiness, auditTaste, auditConfidence,
+  ],
 };
 const passes = PASSES[MODE];
 if (!passes) {
-  console.error('Usage: node scripts/audit-questions.mjs [dead|sens|size|fuel|stick|taste|all]');
+  console.error('Usage: node scripts/audit-questions.mjs [dead|sens|size|fuel|stick|taste|conf|all]');
   process.exit(1);
 }
 for (const pass of passes) {

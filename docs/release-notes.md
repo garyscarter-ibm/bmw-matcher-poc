@@ -5,6 +5,58 @@ to 2026-07-29. Non-technical; the workings behind each claim are in `docs/`.
 
 ---
 
+## At a glance: the feature list
+
+### Matching
+
+| | What it does |
+|---|---|
+| **Split scoring** | 80% "does this suit you", 20% "would you like it", with the taste half protected so it cannot be squeezed out. The preference questions now change the answer; BMW's went from 0% influence to about 20%. |
+| **Grouped listings** | Four identical cars are one result carrying the spread, not four results. Fixes the page looking like it was repeating itself. |
+| **Relevance cut** | Nothing appears more than ten points behind the best match. One page dropped six results in the low seventies from underneath two in the high nineties. |
+
+### The results page
+
+| | What it does |
+|---|---|
+| **One ranked list** | Replaces three separate lists that contradicted each other. One page used to run 96, 95, then 78, then 99. |
+| **Grouped by place** | The retailer's own stock first, then cars within reach elsewhere. Each card says where it is. |
+| **Live headline** | Re-checked on every interaction rather than decided once, so it is always true of what is on screen. Narrowing a tie to one car turns it into a straight recommendation by itself. |
+| **Retailer-scoped headline** | Names the retailer only when a car elsewhere genuinely beats the local one, with a line saying which and where. |
+| **Smarter filters** | Chips appear only when they would change something. One page went from sixteen to two. |
+
+### Choosing a car
+
+| | What it does |
+|---|---|
+| **Pick the actual car** | Once it is down to one model, choose which of the retailer's copies: colour, price, mileage. Photo, paint, price and link all follow the choice. |
+| **"Not this one"** | Turning a car down offers a reason ("not the red", "under £31,498"), applies it, and brings the next car up. |
+| **Filters work inside a card** | "Green" on a card with three colours leaves the green one, rather than keeping or discarding all three. |
+
+### Showing its thinking
+
+| | What it does |
+|---|---|
+| **Running summary** | What the buyer said at the start plus everything added since, each item removable. |
+| **Shows its working** | "We looked at all 26 MINIs in stock here. 20 were in budget and roomy enough. Nothing else here got within 30 points." |
+| **Trade-off line** | Each card admits what it misses: "A coupé, where you asked for a convertible." |
+| **Rescue note** | "No convertibles at Grassicks right now. The nearest is 18.1 miles away at John Clark Tayside." |
+
+### In flight, landing before release
+
+| | What it does |
+|---|---|
+| **"Not this week"** | A way for the tool to say it does not have the right car, when that is true. Built for the buyer profile added specifically to break it: someone who assumes a retailer's matcher ranks on margin, and is persuaded only by a tool willing to admit a miss. |
+| **Gearbox on the card** | Stated, not implied. A stated dealbreaker for one of our buyer profiles. |
+| **Boot and seats on the card** | So a practicality claim can be checked rather than taken on trust. |
+| **ISOFIX** | Shown as equipment and available as a filter. |
+| **Match % explained** | The number is currently unexplained on the page. |
+| **Competitor weighting capped** | Stops the "other retailers" section outweighing the host retailer's own stock. |
+| **Filters kept when narrowed to one** | Today a page that narrows to a single car loses its filters entirely. |
+| **Sharper reasons** | Concrete and specific rather than reading like brochure copy. |
+
+---
+
 ## The headline: "it always recommends the same car" was true, and it's better
 
 A stakeholder told us the tool kept recommending the same MINI. We tested it by

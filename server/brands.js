@@ -100,6 +100,47 @@ const BMW_TUNING = {
   hardFilter: { crewBoot: 430, crewSeats: 5, familySeats: 4 },
   // Annual-mileage ramp: miles at/under lowMiles → 0, at/over highMiles → 1.
   mileage: { lowMiles: 4000, highMiles: 20000 },
+  /*
+   * The handful of reason strings whose REGISTER differs between brands, not
+   * just their numbers. Everything else the engine says is built from live
+   * figures (mpg, 0-62, litres, £) and reads the same in either voice, so it
+   * stays in engine.js; only these carry a marque's temperature.
+   *
+   * BMW's are the base and MINI overrides individual keys (see MINI_TUNING).
+   * `tags` is merged key-by-key in engine.js rather than by mergeTuning, whose
+   * shallow merge would let a brand silently blank the tags it didn't restate.
+   */
+  reasons: {
+    boot: (car) => `${car.boot} litres of boot with all ${car.seats} seats up`,
+    // Fires between 90% and 100% of the space the answers imply. Saying so is
+    // the point: Sam & Jordan Reyes walk away when practicality claims read
+    // like brochure copy, and a reason that admits it is only just enough is
+    // the opposite of a brochure.
+    bootTight: (car) => `${car.boot} litres of boot with the seats up, which is `
+      + 'enough for what you described rather than generous',
+    crew: (car) => `${car.seats} seats, and ${car.boot} litres behind them`,
+    roadtrip: () => 'Big enough to be comfortable on a long motorway run',
+    city: () => 'Compact enough for city streets and tight parking',
+    /*
+     * Character, the taste dimension. These were the page's purest brochure
+     * copy ("Serious kerb appeal", "Packed with the latest cabin tech",
+     * "Genuinely practical day to day") — unfalsifiable adjectives asserting a
+     * verdict rather than giving a reason. Rewritten to state the basis, and
+     * the two practicality ones now point at the seats and boot figures the
+     * card prints, so the buyer can check the claim instead of believing it.
+     * Only one of these ever reaches a card (scoreCharacter takes hits[0]).
+     */
+    tags: {
+      'drivers-car': 'Tuned for the driving rather than the ride',
+      family: 'A family shape, and the seats and boot above are the size of it',
+      cruiser: 'A big car, and quiet with it at motorway speed',
+      urban: 'Short enough to park without thinking about it',
+      efficient: 'Cheap per mile next to the rest of the range',
+      tech: 'The current cabin, not the outgoing one',
+      image: 'A car people look at twice',
+      practical: 'A load-carrier first, as the boot figure above says',
+    },
+  },
 };
 
 // MINI overrides. Recalibrated so a well-matched MINI reaches the same 85–95%
@@ -160,6 +201,27 @@ const MINI_TUNING = {
   // Don't hard-exclude MINIs for family/crew: a 5-seat Countryman (460L) should
   // survive, and 4-seat MINIs shouldn't be filtered out of a "family" search.
   hardFilter: { crewBoot: 350, crewSeats: 5, familySeats: 4 },
+  /*
+   * Only the lines whose TEMPERATURE differs (docs/tone-style-guide.md): MINI
+   * smiles, and "go-kart" is its sanctioned way of being emotional the way
+   * "driving pleasure" is BMW's. The numbers and the honesty are identical —
+   * `bootTight` still owns up to being only just enough — because those are
+   * the brand-neutral part. `tags` is merged key-by-key in engine.js, so the
+   * three MINI leaves alone keep BMW's wording.
+   */
+  reasons: {
+    boot: (car) => `${car.boot} litres in the back with all ${car.seats} seats up`,
+    crew: (car) => `All ${car.seats} seats, and ${car.boot} litres behind them`,
+    roadtrip: () => 'One of the bigger MINIs, which is what a long run wants',
+    city: () => 'Small enough for town streets and awkward parking spaces',
+    tags: {
+      'drivers-car': 'The go-kart end of the range, and it drives like it',
+      family: 'A family MINI, and the seats and boot above are the size of it',
+      cruiser: 'The comfortable end of the range rather than the firm one',
+      urban: 'Short enough to park anywhere in town',
+      image: 'A MINI people look at twice, which is rather the point',
+    },
+  },
 };
 
 /** Deep-merge a brand's overrides onto the BMW base so partial tuning works. */

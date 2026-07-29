@@ -81,9 +81,14 @@ function publicQuestions(brand) {
 /**
  * Project a car down to only the fields the result cards render (see
  * matchCard() in bmw-matcher.js). Internal scoring fields — tags, sizeClass,
- * seats, boot, id — are omitted so responses can't be used to reconstruct the
- * dataset. The real display fields (mileage, plate, photo, retailerName, link)
- * come from the live feed and are passed through where present.
+ * id — are omitted so responses can't be used to reconstruct the dataset. The
+ * real display fields (mileage, plate, photo, retailerName, link) come from the
+ * live feed and are passed through where present.
+ *
+ * `seats` and `boot` used to be withheld with the rest of the scoring fields.
+ * They are printed on the card now (Priya walks away from "a boot claim she
+ * cannot picture", and we were not even giving her the number), and a field the
+ * card prints is public by definition.
  *
  * `retailerId` is deliberately absent: it exists only so fetchNearbyStock can
  * drop the anchor retailer's own cars, and the block has no use for it.
@@ -104,6 +109,12 @@ function publicCar(car) {
     zeroTo62: car.zeroTo62,
     mpg: car.mpg,
     evRange: car.evRange,
+    // The two practicality facts the engine hard-filters on. Both come from
+    // MODEL_SPECS (mapping.js), so they describe the model rather than the
+    // individual listing, and the card says so ("seats up") rather than
+    // implying a measured figure for this exact car.
+    seats: car.seats,
+    boot: car.boot,
     blurb: car.blurb,
     // Live retailer detail (present when sourced from the live feed).
     mileage: car.mileage,

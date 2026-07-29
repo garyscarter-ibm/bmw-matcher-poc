@@ -517,6 +517,23 @@ export const FEATURE_CONCEPTS = [
     /body colour|rail|lining|aerial|antenna|spoiler|panoram|sunroof|skyroof/],
   ['heatedSeats', /heated.*seat|seat heating/],
   ['heatedWheel', /heated steering/],
+  /*
+   * Child-seat mounting. Priya walks away from "ISOFIX she cannot confirm",
+   * and until now the feed's answer to that question was parsed by nothing.
+   *
+   * The two brands state it as two different options and they are not the same
+   * fitment: BMW writes "ISOFIX Child Seat System" (2,736 cars) and both brands
+   * write "Child seat i-Size attachment for front p[assenger]" (5,908 BMW,
+   * 3,460 MINI), which is the front seat rather than the rear. They are folded
+   * into one concept because the honest claim is the one they share — the feed
+   * states child-seat mounting on this car — and because MINI's feed never
+   * states the rear system separately, so splitting them would leave MINI with
+   * no answer at all. The label says "points", not "rear ISOFIX", for the same
+   * reason. Measured at 33% of BMW stock and 40% of MINI's, and it splits the
+   * pool at every retailer holding 10+ cars (131/131 and 119/119), which makes
+   * it one of the strongest axes in the table.
+   */
+  ['isofix', /isofix|child seat/],
   // Named for what the feed actually states. Seat upholstery grade (Vernasca,
   // Dakota, MINI Yours Lounge) appears on <1% of either brand's stock, so
   // "leather seats" is NOT answerable from this data — see the known blind
