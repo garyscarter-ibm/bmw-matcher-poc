@@ -344,3 +344,34 @@ hybrid 29.5 miles away and the notice about a Countryman 10.8 miles away.
 - **Scoped headlines are longer.** "At Sytner Luton MINI, it's a three-way tie."
   is a heavier line than "It's a four-way tie.", and on MINI it sets in
   uppercase display serif.
+
+
+## Correction (2026-07-29): the brief goes back above the cards
+
+"Answer first, then argue with it" moved two things below the grid. It was
+right about one of them and wrong about the other, and the difference is what
+each thing IS:
+
+- **The chips are a control.** Controls must be visible and next to what they
+  control. Fixed earlier: they are back above the grid with a label naming the
+  effect and a live count.
+- **The brief is a signal, not a summary.** This is where the original
+  reasoning failed. It was filed as "a summary belongs after the thing it
+  summarises", which is true of summaries and false of this one. Nobody scrolls
+  past fourteen cars to read what they themselves typed, so the one element
+  whose whole job is to say *the tool holds a model of you* became the one
+  element never seen.
+
+Both now sit above the grid, and moving them surfaced two duplications that
+were invisible while they were apart:
+
+1. **The applied filters were said twice** — as `+ Blue` in the brief and as a
+   removable `[Blue ✕]` chip. Only one of them could be undone. The brief's
+   copy is gone; the chip stays.
+2. **Two different counts landed two lines apart** — "3 of 13 still match"
+   (the whole pool) above "1 of 2, with blue." (the lead). Whichever is more
+   useful, a reader has to work out they are not the same measurement. The
+   brief's count is gone and `briefCount` deleted from both brands; the chip
+   row's own status line keeps it, next to the control that moves it.
+
+The brief is now exactly what only it can say: the brief the buyer gave.

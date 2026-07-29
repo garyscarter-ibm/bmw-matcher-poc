@@ -229,7 +229,6 @@ const BRAND_COPY = {
     rejectJust: 'Just not this one',
     pickLabel: 'Choose yours',
     briefLabel: 'What I’ve picked up',
-    briefCount: ({ shown, total }) => `${shown} of ${total} still match.`,
     hiddenChip: ({ count }) => `${count} ruled out`,
     // The "closest here" frame (docs/results-page-states.md): the local cars
     // miss something the buyer asked for, so no headline may crown one. First
@@ -310,7 +309,6 @@ const BRAND_COPY = {
     rejectJust: 'Just not feeling it',
     pickLabel: 'Which one, then?',
     briefLabel: 'So, what I know so far',
-    briefCount: ({ shown, total }) => `${shown} of ${total} still in the running.`,
     hiddenChip: ({ count }) => `${count} ruled out`,
     // The "closest here" frame, MINI register: honest shrug, no apology.
     closestTitle: ({ retailer }) => `The closest we’ve got at ${retailer}.`,
@@ -644,7 +642,7 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
   let notedCarId = null;
   hereGroup.append(hereLabel, grid, hereRestGrid);
   awayGroup.append(awayLabel, awayGrid, awayRestGrid);
-  host.append(notice, refineBlock, hereGroup, awayGroup, briefBlock);
+  host.append(notice, briefBlock, refineBlock, hereGroup, awayGroup);
 
   /*
    * Survivors of everything the buyer has said, drawn from the WHOLE pool so a
@@ -926,38 +924,35 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
     lede.textContent = frame.lede || '';
     // A car waved away with no reason narrows the count but adds no words —
     // there's nothing to report about "just not that one".
-    // Rebuild the running brief. It stays BELOW the cars: it summarises, and a
-    // summary of what you just said belongs after the thing it summarises.
+    /*
+     * The running brief, ABOVE the cars.
+     *
+     * It was moved below on the argument that a summary belongs after the
+     * thing it summarises. True of a summary; false of this. Nobody scrolls
+     * past fourteen cards to read what they themselves typed, so the one
+     * signal that says the tool holds a model of you was the one thing
+     * guaranteed not to be seen.
+     *
+     * What it does NOT carry any more is the list of applied filters. Those
+     * were being said twice: once here as "+ Blue", and once as a removable
+     * [Blue ✕] chip a couple of inches above. The chip is the better of the
+     * two because you can undo it, so the duplicate is gone and the brief is
+     * back to the thing only it says, which is what the buyer originally
+     * asked for.
+     */
     briefBlock.replaceChildren();
     status.replaceChildren();
     const said = briefFromAnswers(ctx);
-    const learned = [
-      ...[...active.values()].map((a) => ({ kind: 'want', text: a.label })),
-      ...[...constraints.values()].map((c) => ({ kind: 'rule', text: c.label })),
-    ];
-    if (hidden.size) learned.push({ kind: 'rule', text: copy.hiddenChip({ count: hidden.size }) });
-
-    if (said.length || learned.length) {
+    if (said.length) {
       briefBlock.append(status);
       status.append(el('p', 'bmwm-brief-label', copy.briefLabel));
-      if (said.length) status.append(el('p', 'bmwm-brief-said', said.join('  ·  ')));
-      learned.forEach((item) => {
-        const row = el('p', `bmwm-brief-item is-${item.kind}`);
-        row.append(el('span', 'bmwm-brief-mark', item.kind === 'want' ? '+' : '−'));
-        row.append(el('span', null, item.text));
-        status.append(row);
-      });
-      // Only once they've told us something. Before that the count is noise:
-      // it read "Showing 9 of 9" beside two visible cards, which is both
-      // confusing and not what the number meant.
-      if (learned.length) {
-        // Counts what the buyer can actually see. It used to report
-        // `surviving().length` while the grid was capped at a fixed lead
-        // count, so the page said "3 of 9 still match" over two cards.
-        status.append(el('p', 'bmwm-brief-count', copy.briefCount({
-          shown: alive.length, total: pool.length,
-        })));
-      }
+      status.append(el('p', 'bmwm-brief-said', said.join('  ·  ')));
+      // No count here. Moving this panel above the cards put its "3 of 13
+      // still match" two lines above the chip row's "1 of 2, with blue." —
+      // two numbers, adjacent, counting different things (the whole pool
+      // against the lead). Whichever is right, a reader has to work out that
+      // they are not the same measurement, and the chip row's is the one worth
+      // keeping because it is attached to the control that changed it.
     }
 
     grid.replaceChildren();

@@ -831,33 +831,20 @@
   color: var(--bmwm-accent-spot);
   margin: 0 0 var(--bmwm-space-2);
 }
-/* What they told us in the quiz — the starting brief. */
+/* What they told us in the quiz — the starting brief, and now the whole of
+   what this panel says on its own account. */
 .bmwm-brief-said {
-  margin: 0 0 var(--bmwm-space-2);
+  margin: 0;
   font-size: var(--bmwm-text-label);
   color: var(--bmwm-ink-muted);
 }
-/* Everything learned since, one line at a time. */
-.bmwm-brief-item {
-  margin: 0 0 2px;
-  font-size: var(--bmwm-text-label);
-  color: var(--bmwm-ink);
-  display: flex;
-  gap: var(--bmwm-space-2);
-  align-items: baseline;
-}
-.bmwm-brief-mark {
-  font-family: var(--bmwm-font-bold);
-  font-weight: 700;
-  width: 0.9em;
-  color: var(--bmwm-accent-spot);
-}
-.bmwm-brief-item.is-rule .bmwm-brief-mark { color: var(--bmwm-ink-muted); }
-.bmwm-brief-count {
-  margin: var(--bmwm-space-2) 0 0;
-  font-size: var(--bmwm-text-label);
-  color: var(--bmwm-ink-muted);
-}
+/* The "+ Blue" / "− Not the red" rows that used to live here are gone. They
+   restated the applied chips, which sit just below and can be undone; saying
+   the same constraint twice, once undoable and once not, invited the buyer to
+   try clearing it in the place that could not. */
+/* .bmwm-brief-count is gone: see the comment where it used to be appended. The
+   chip row's own status line carries the count now, next to the control that
+   moves it. */
 
 .bmwm-refine-status {
   margin: var(--bmwm-space-3) 0 0;
@@ -1164,14 +1151,13 @@
 
 .bmwm-refine-tools:empty { display: none; }
 
-/* The brief is a SUMMARY, so it stays below the cars, and it keeps the rule the
-   tools block used to carry: it's a new movement, not an afterthought hanging
-   off the last card. */
-.bmwm-brief-block {
-  margin-top: var(--bmwm-space-7);
-  padding-top: var(--bmwm-space-5);
-  border-top: 1px solid var(--bmwm-line);
-}
+/* The brief sits ABOVE the cards, immediately over the chips, so the two read
+   as one statement: here is what I understand about you, and here is how to
+   change it. Below the cards it was unreachable — nobody scrolls past fourteen
+   cars to read what they typed themselves — which made the one signal that
+   says the tool holds a model of you the one thing never seen. No rule above
+   it: it opens the block rather than starting a new movement inside it. */
+.bmwm-brief-block { margin-bottom: var(--bmwm-space-4); }
 
 .bmwm-brief-block:empty { display: none; }
 
