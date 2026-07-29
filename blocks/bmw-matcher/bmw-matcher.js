@@ -217,8 +217,8 @@ const BRAND_COPY = {
     // brief below the cars says the same thing at more length, but it is below
     // the cars — by the time you reach it you have already stopped wondering
     // whether the tap did anything.
-    refineStatus: ({ shown, total, wants }) => `${shown} of ${total}, with ${wants}.`,
-    refineStatusPlain: ({ shown, total }) => `${shown} of ${total}.`,
+    refineStatus: ({ shown, total, wants }) => `${shown} of ${total} still match, with ${wants}.`,
+    refineStatusPlain: ({ shown, total }) => `${shown} of ${total} still match.`,
     refineEmpty: ({ wants }) => `Nothing here has ${wants} together. `
       + 'Drop one of those and we’ll show you what does.',
     refineEmptyHidden: 'That’s all of them ruled out. Bring one back, or start over.',
@@ -298,8 +298,8 @@ const BRAND_COPY = {
     refineLabel: ({ count }) => (count > 1
       ? `Fancy narrowing these ${count} down?`
       : 'Fancy narrowing this one down?'),
-    refineStatus: ({ shown, total, wants }) => `${shown} of ${total} left, with ${wants}.`,
-    refineStatusPlain: ({ shown, total }) => `${shown} of ${total} left.`,
+    refineStatus: ({ shown, total, wants }) => `${shown} of ${total} still in, with ${wants}.`,
+    refineStatusPlain: ({ shown, total }) => `${shown} of ${total} still in.`,
     refineEmpty: ({ wants }) => `Ah. Nothing here has ${wants} all at once. `
       + 'Let one of them go and we’ll show you what’s left.',
     refineEmptyHidden: 'Well, that’s the lot ruled out. Bring one back, or start over.',
@@ -680,17 +680,6 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
     return list.filter((m) => top - m.score <= CLUSTER_PTS).slice(0, MAX_SHOWN);
   };
 
-  /**
-   * The lead the page would show for a list, i.e. leadOf applied to the
-   * retailer's own cars within it. Shared by `situation` and by the refine
-   * status line, which measures the same thing with nothing narrowed so its
-   * "1 of 2" is a real before-and-after rather than two different counts.
-   */
-  const leadHere = (list) => {
-    const local = list.filter(isHere);
-    return leadOf(local.length ? local : list);
-  };
-
   /*
    * Which result state the page is in, RIGHT NOW, from the scores on screen.
    *
@@ -984,7 +973,19 @@ function renderRefine(ctx, initialPool, title, lede, frames, tasteLead = false) 
        */
       if (learned.length) {
         const picked = [...active.values()].map((a) => a.label.toLowerCase());
-        const args = { shown: shown.length, total: leadHere(pool).length };
+        /*
+         * Counted across EVERYTHING the constraints touch, which is both
+         * groups and the tail tiles, not just the lead.
+         *
+         * It used to count the local lead cluster: "1 of 2" while a chip had
+         * also cut three of the four cars at other retailers sitting directly
+         * below. Naming the scope ("1 of 2 at Grassicks") would have made that
+         * accurate and still silent about the rest, on a page where the rest
+         * is visible. Widening the count to match the filter is the honest
+         * version, and it needs no qualifier: one number, one scope, the same
+         * scope the chips and rejections act on.
+         */
+        const args = { shown: alive.length, total: pool.length };
         const line = el('p', 'bmwm-brief-count', picked.length
           ? copy.refineStatus({ ...args, wants: andList(picked) })
           : copy.refineStatusPlain(args));

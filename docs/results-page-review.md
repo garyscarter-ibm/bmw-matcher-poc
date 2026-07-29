@@ -387,3 +387,28 @@ its own undo; the chip row carries only what could be added NEXT. Each
 constraint is stated exactly once, in the register that suits it, next to the
 control that clears it. The single count moved into the same panel, because it
 belongs with the statements that caused it.
+
+
+## The count's scope (2026-07-29)
+
+Gary asked whether "1 of 2" only covered the configured retailer's stock, and
+whether it needed qualifying per state ("1 of 2 at Grassicks"). It did, and it
+was narrower still: `shown` was the local LEAD CLUSTER, so the number ignored
+the local tail tiles as well as the entire other-retailers group, while the
+chips and rejections cut all three.
+
+Qualifying it would have made it accurate and left it silent about a group
+visible on the same screen, which invites "so what happened to those?". The
+count is now taken across everything the constraints act on, which removes the
+need for a qualifier: one number, one scope, the scope the controls have.
+
+Measured on Priya: the Blue chip takes it to "3 of 13 still match, with blue."
+with three cards on screen; a mileage rejection to "1 of 13" with one card;
+undoing the chip to "4 of 13" with four. The number and the cards now agree,
+which is what makes it checkable rather than merely stated.
+
+**Caveat worth knowing.** Each group's tail is capped at `TAIL_SHOWN`, so on a
+wide result the total can exceed what is rendered (Priya opens at 13 in the
+pool, 12 on screen). The count is honest about the filter and slightly ahead
+of the page. The alternative, counting rendered cards, is capped at both ends
+and would report "no change" when a filter halved a long list, which is worse.
