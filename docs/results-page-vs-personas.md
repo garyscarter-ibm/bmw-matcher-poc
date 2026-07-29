@@ -50,14 +50,18 @@ The listing picker and the working note do not exist on main at all.
 
 | Persona | Walks away when | main | now |
 |---|---|---|---|
-| Daniel | gap in service history; warranty behind a lead form | no lead form ✓, service history absent ✗ | same |
-| Priya | a boot claim she cannot picture; ISOFIX she cannot confirm | both absent ✗ | same |
+The `now` column is as at `66f0a94`, after the eight enhancements below.
+
+| Persona | Walks away when | main | now |
+|---|---|---|---|
+| Daniel | gap in service history; warranty behind a lead form | no lead form ✓, service history absent ✗ | unchanged, the data does not exist |
+| Priya | a boot claim she cannot picture; ISOFIX she cannot confirm | both absent ✗ | boot and seats stated, ISOFIX shown and filterable ✓ |
 | Martin | he is handled; a result that ignores what he asked for | admits the miss ✓ | admits it and says where ✓✓ |
-| Tyler | total monthly crosses the line; details asked before numbers | no monthly, no insurance ✗ | same |
+| Tyler | total monthly crosses the line; details asked before numbers | no monthly, no insurance ✗ | unchanged, deferred to its own feature |
 | Chloe | told which car is "best"; a wall of grey | 16 chips, no colour choice ✗ | 2 chips, picker, colour named ✓ |
-| Reyes | practicality reads like brochure copy | reasons are generic ~ | same ~ |
-| Meg | gearbox implied not stated; battery condition left unasked | both absent ✗ | same |
-| Rob | the tool recommends rather than filters | admits the miss ✓ | admits it, and shows the filter ✓ |
+| Reyes | practicality reads like brochure copy | reasons are generic ~ | reasons rewritten against real numbers ✓ |
+| Meg | gearbox implied not stated; battery condition left unasked | both absent ✗ | gearbox stated ✓, battery still absent ✗ |
+| Rob | the tool recommends rather than filters | admits the miss ✓ | **says "nothing here is close" outright** ✓✓ |
 
 ## The finding: v3 is testing content, and the page has none of it
 
@@ -127,3 +131,55 @@ only has words for the first.
 
 Items 2 and 3 are small. Item 1 is the one that changes what the tool is
 willing to say, which is the thing Rob was added to test.
+
+
+---
+
+# BUILT (2026-07-29), commit `66f0a94`
+
+All eight recommendations. Verified in the browser across all eight personas:
+61 tests passing, 8 personas resolving, no console exceptions.
+
+Every card now reads, for example:
+
+    Estate · Diesel · Automatic · Phytonic Blue · £29,890 · 5 seats ·
+    520-litre boot, seats up · 0–62 7.5s · 51.4 mpg
+
+Gearbox, seats and boot on all eight personas; ISOFIX on four. The competitor
+group never outweighs the host (full-size cards per group came out 2:2, 1:1,
+5:3, 1:0). Meg, whose page narrows to a single card, now keeps her refine
+chips where she previously had none.
+
+## The low-confidence state, and its threshold
+
+`WEAK_SCORE = 68`, measured rather than picked, with a new `npm run audit conf`
+pass that prints the distribution and what each candidate would do.
+
+    martin    71%  misses a stated want  →  closest here
+    rob       67%  misses a stated want  →  NOTHING HERE IS CLOSE
+
+Rob's page now says *"Nothing at Grassicks BMW is close to what you asked
+for."* Martin is correctly NOT swept into it, which was the specific risk: his
+page works well and his clause is about being told straight, not about being
+told nothing fits.
+
+## Two caveats on that threshold
+
+**The gap it sits in is four points wide.** Martin 71, threshold 68, Rob 67.
+That is stock-dependent. A change in what Grassicks holds could flip Martin
+into "nothing here is close", which would be wrong for him. Correct today, not
+robust.
+
+**It may fire more often than we want.** At 68 the state hits **24% of all BMW
+pages and 30% of MINI's** under uniform sampling, roughly half of all pages
+already in the closest frame. It only ever fires when the leader misses a
+stated want, so it is defensible, but "nothing here is close" is a strong thing
+to say on a quarter of visits. Dropping to 62 roughly halves it. Worth a
+decision before this is put in front of anyone.
+
+## Still open, and deliberately so
+
+- **Battery state of health** and **service history**: not in the feed.
+- **Monthly cost**: obtainable from the same platform, queued as its own
+  feature (see the correction above).
+- **Insurance group**: genuinely external, not planned.
