@@ -101,6 +101,19 @@
     const retailerOverride = params.get('retailer');
     if (retailerOverride) setRow('retailer id', retailerOverride);
 
+    // Retailer *Name* is a third authored row (Grassicks BMW by default). The
+    // ?brand/?retailer overrides above don't touch it, so a plain
+    // ?brand=mini&retailer=92 link would still read "Grassicks BMW". Keep the
+    // demo link honest: map the known demo retailer IDs to their real names
+    // (see README), with ?retailerName= as an escape hatch for any other ID.
+    const RETAILER_NAMES = {
+      96: 'Grassicks BMW', // Grassicks Garage, Perth
+      92: 'Sytner Luton MINI',
+    };
+    const nameOverride = params.get('retailerName')
+      || RETAILER_NAMES[retailerOverride];
+    if (nameOverride) setRow('retailer name', nameOverride);
+
     decorate(block);
   </script>
 </body>
