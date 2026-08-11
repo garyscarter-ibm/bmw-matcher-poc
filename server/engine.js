@@ -697,7 +697,7 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
  * results page that silently shows petrol heroes to someone who asked for
  * electric is quietly dishonest — the same family of sin as inventing a
  * distance. So each pool reports what it couldn't offer, and the page says so
- * (see the unmet note in bmw-matcher.js).
+ * (see the unmet note in vehicle-matcher.js).
  *
  * Scoped to the two wants that are genuine stock facts: fuel and body style.
  * "No preference" values (`any`, `open`) state no want and can never be unmet.

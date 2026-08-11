@@ -1,6 +1,6 @@
-name: Sync bmw-matcher block to the EDS site
+name: Sync vehicle-matcher block to the EDS site
 
-# Copies blocks/bmw-matcher/ from THIS repo into the repo your Adobe Edge
+# Copies blocks/vehicle-matcher/ from THIS repo into the repo your Adobe Edge
 # Delivery (EDS) site is connected to. EDS auto-loads a block when its files
 # land in /blocks/<name>/, so a push to the target repo is the whole deploy —
 # no build step.
@@ -39,7 +39,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'blocks/bmw-matcher/**'
+      - 'blocks/vehicle-matcher/**'
 
 # Least privilege for the built-in token; the cross-repo write uses the secret.
 permissions:
@@ -48,7 +48,7 @@ permissions:
 env:
   # The repo your EDS instance is connected to. owner/name.
   TARGET_REPO: garyscarter-ibm/poc-ret-eds-sites
-  BLOCK_DIR: blocks/bmw-matcher
+  BLOCK_DIR: blocks/vehicle-matcher
 
 # Never let two syncs race a push to the same target branch.
 concurrency:
@@ -93,7 +93,7 @@ jobs:
         working-directory: target
         run: |
           set -euo pipefail
-          git config user.name  "bmw-matcher block-sync"
+          git config user.name  "vehicle-matcher block-sync"
           git config user.email "block-sync@users.noreply.github.com"
 
           # Stages adds, edits AND deletions under the block path.
@@ -103,6 +103,6 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Sync bmw-matcher block from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
+          git commit -m "Sync vehicle-matcher block from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
           git push origin "HEAD:${{ github.event.inputs.target_ref || 'main' }}"
           echo "Pushed to ${TARGET_REPO}@${{ github.event.inputs.target_ref || 'main' }}."

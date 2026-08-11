@@ -35,7 +35,7 @@ const post = async (path, body) => {
 
 /*
  * Below this the page stops calling the leader a match at all. Mirrors
- * WEAK_SCORE in blocks/bmw-matcher/bmw-matcher.js, which carries the
+ * WEAK_SCORE in blocks/vehicle-matcher/vehicle-matcher.js, which carries the
  * measurement behind the number; re-measure with `npm run audit conf`.
  */
 const WEAK_SCORE = 68;
@@ -85,8 +85,10 @@ for (const p of selected) {
     console.log(`  nearby #1: ${first.score}% ${first.car.name.slice(0, 34)} (${first.car.distance ?? '?'} mi, ${first.car.retailerName || '?'})`);
   }
 
-  const page = brand === 'mini' ? 'index-mini.html' : 'index.html';
+  // One generic harness now; ?brand= picks the marque and ?retailer= the pool
+  // (index-mini.html is gone, and the page no longer hardcodes a per-brand
+  // retailer, so the persona's own retailer must ride along in the link).
   const hash = Buffer.from(JSON.stringify(answers)).toString('base64url');
-  console.log(`  view: http://localhost:3000/${page}?api=${API}#m=${hash}`);
+  console.log(`  view: http://localhost:3000/index.html?brand=${brand}&retailer=${retailer}&api=${API}#m=${hash}`);
 }
 console.log();

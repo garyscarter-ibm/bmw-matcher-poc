@@ -56,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p _site
-          cp -R index.html index-mini.html blocks _site/
+          cp -R index.html blocks _site/
           if [ -n "${API_URL}" ]; then
             find _site -maxdepth 1 -name '*.html' -exec \
               sed -i "s|data-api=\"http://localhost:8787\"|data-api=\"${API_URL}\"|g" {} +

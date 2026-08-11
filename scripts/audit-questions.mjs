@@ -508,7 +508,7 @@ function auditTaste(brand) {
  * Confidence pass — where does "nothing here is close" begin?
  *
  * The results page has a state below `closest` that stops presenting the
- * leader as an answer at all (see WEAK_SCORE in blocks/bmw-matcher). It fires
+ * leader as an answer at all (see WEAK_SCORE in blocks/vehicle-matcher). It fires
  * on the top score, and only over a leader that already carries a trade-off,
  * because "nothing here matches your brief" is plainly false about a car that
  * meets every stated want.
@@ -526,7 +526,7 @@ function auditTaste(brand) {
  * policy choice and the defensible place for it is the middle of the
  * population it divides. Three samples put that median at 67, 68 and 69.
  */
-const WEAK_SCORE = 68; // mirrors blocks/bmw-matcher/bmw-matcher.js
+const WEAK_SCORE = 68; // mirrors blocks/vehicle-matcher/vehicle-matcher.js
 
 function auditConfidence(brand) {
   const {

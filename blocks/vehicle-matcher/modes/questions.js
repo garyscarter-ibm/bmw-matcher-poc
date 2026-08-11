@@ -1,34 +1,29 @@
 /*
- * BMW Matcher — Adobe Edge Delivery Services (EDS) block.
+ * Questions mode — the original, question-by-question matcher interface.
  *
- * EDS calls `decorate(block)` with the block's DOM element; the quiz UI,
- * results rendering and share links are handled here. The scoring engine and
- * car dataset live behind an API (see server/) so they never reach the
- * browser — the block fetches the quiz definition and match results over HTTP.
+ * One of several interchangeable interface "modes" over the shared engine (see
+ * ../modes/index.js and the shell in ../vehicle-matcher.js). This is the whole
+ * quiz UI: intro, the question flow, the live "best guess" preview, the results
+ * page and refinement. The shell reads brand/retailer/config and hands this
+ * mode a `ctx` and a stage element to render into via `mount(root, ctx)`.
  *
- * The API base comes from an authored "API" config row when running on EDS
- * (authored content can set config rows but not HTML attributes), or from a
- * `data-api` attribute for the local harness and the GitHub Pages build,
- * falling back to http://localhost:8787 for local preview. See apiBase.
+ * The scoring engine and car dataset live behind an API (see server/ and
+ * ../engine.js); this mode fetches the quiz definition and match results over
+ * HTTP and never sees the dataset.
  *
  * Share links encode the quiz answers in the URL hash (#m=<base64url>); the
  * link is decoded/validated client-side (quiz-meta.js), then the results are
- * re-fetched from the API.
+ * re-fetched from the API. Deep-linking is owned here rather than by the shell
+ * because the encoded state is this mode's answer shape.
  */
 
-import { SHOW_IF, BUDGET_BANDS, pillFor } from './quiz-meta.js';
+import { SHOW_IF, BUDGET_BANDS, pillFor } from '../quiz-meta.js';
+import { apiGetQuestions, apiMatch, apiNearby, apiPreview } from '../engine.js';
+import { el, cardinal, gbp } from '../ui.js';
 
 const HASH_KEY = 'm';
-const DEFAULT_API = 'http://localhost:8787';
 
 /* ------------------------------ helpers ------------------------------ */
-
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
 
 /**
  * Is the budget answer usable? Budget drives the engine's one hard requirement.
@@ -43,106 +38,6 @@ function validBudget(value) {
   if (typeof value === 'number') return Number.isFinite(value) && value > 0;
   return !!BUDGET_BANDS[value];
 }
-
-/**
- * API base for this block, in precedence order:
- *   1. the `data-api` attribute — the local harness and the Pages build set
- *      it (the harness's ?api= override writes here too), so a query override
- *      always wins;
- *   2. an authored "API" config row — the EDS path, because authored content
- *      can produce config rows but not HTML attributes;
- *   3. the localhost default, for `npm run serve`.
- * Trailing slashes are trimmed so `${base}/api/...` never doubles up. An empty
- * or absent row is falsy and simply falls through.
- */
-function apiBase(block) {
-  const authored = readBlockConfig(block).api;
-  return (block.dataset.api || authored || DEFAULT_API).replace(/\/+$/, '');
-}
-
-/**
- * Read authored block config the standard EDS way: each row below the block
- * name becomes a child `<div>` with two nested `<div>` cells (key, value).
- * See aem-boilerplate's `readBlockConfig()` — same shape, same convention,
- * so a page author sets config in their DA table, not in code.
- */
-function readBlockConfig(block) {
-  const config = {};
-  [...block.children].forEach((row) => {
-    const cols = [...row.children];
-    if (cols.length < 2) return;
-    const key = cols[0].textContent.trim().toLowerCase().replace(/\s+/g, '-');
-    if (!key) return;
-    config[key] = cols[1].textContent.trim();
-  });
-  return config;
-}
-
-/** Retailer site ID for this block instance: authored "Retailer ID" config
- * row, else undefined (the server falls back to its own default). */
-function retailerSite(block) {
-  const config = readBlockConfig(block);
-  return config['retailer-id'] || config['retailer-site'] || undefined;
-}
-
-/**
- * An authored copy override, with three distinct states:
- *   undefined — no row authored, so the block's own default is used;
- *   null      — row authored but blank (or "none"), so the line is SUPPRESSED;
- *   string    — the authored replacement.
- *
- * Suppression is the point: on a real retailer's page the block is usually
- * placed under the site's own section heading, and repeating a title inside
- * the block reads as a stutter. The same mechanism lets a dealer drop the
- * "unofficial" framing, which is right for a public demo and wrong on their
- * own site.
- */
-function copyRow(config, key) {
-  if (!(key in config)) return undefined;
-  const value = config[key].trim();
-  return (!value || value.toLowerCase() === 'none') ? null : value;
-}
-
-/** The authored copy overrides: `title`, `kicker`, `disclaimer`. */
-function copyOverrides(block) {
-  const config = readBlockConfig(block);
-  return {
-    title: copyRow(config, 'title'),
-    kicker: copyRow(config, 'kicker'),
-    disclaimer: copyRow(config, 'disclaimer'),
-  };
-}
-
-const DEFAULT_RETAILER_NAME = 'our retailer network';
-
-/** Retailer display name for this block instance: authored "Retailer Name"
- * config row. Required alongside Retailer ID so the copy can name the
- * retailer the stock is actually sourced from; falls back to a generic
- * phrase (and warns) if the page author forgot to set it. */
-function retailerName(block) {
-  const config = readBlockConfig(block);
-  const name = config['retailer-name'];
-  if (!name) {
-    console.warn('[bmw-matcher] No "Retailer Name" config row set — add one alongside "Retailer ID". Falling back to generic copy.');
-    return DEFAULT_RETAILER_NAME;
-  }
-  return name;
-}
-
-/** Brand for this block instance: authored "Brand" config row ("BMW" | "MINI"),
- * lower-cased. Defaults to 'bmw'. Drives both the visual theme (a body class)
- * and which live feed the server queries. */
-function brand(block) {
-  const config = readBlockConfig(block);
-  const b = (config.brand || '').toLowerCase();
-  return b === 'mini' ? 'mini' : 'bmw';
-}
-
-/** Small cardinals as words, for prose where a numeral would read oddly ("the
- * three cars" beats "the 3 cars"). Anything larger falls back to the numeral,
- * which is fine — it only reads awkwardly at small counts. */
-const CARDINALS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-const cardinal = (n) => CARDINALS[n] ?? String(n);
 
 /** Brand-specific display copy, keyed by brand. `name` is the marque, `title`
  * the intro headline, `cta` the intro button. `lede({ questions, retailer })`
@@ -718,8 +613,8 @@ function renderRefine(
   const constraints = new Map(); // id -> { label, test(listing) }
   const hidden = new Set(); // cars waved away with no reason given
 
-  const host = el('div', 'bmwm-refine');
-  const chipRow = el('div', 'bmwm-chips');
+  const host = el('div', 'vm-refine');
+  const chipRow = el('div', 'vm-chips');
   /*
    * The running brief: what the buyer said at the start, plus everything
    * they've told us since by tapping a chip or turning a car down. It grows as
@@ -727,7 +622,7 @@ function renderRefine(
    * re-filtering. This replaced a flat "2 of 6 left, with X and Y" line —
    * accurate, but it read as a filter count rather than as listening.
    */
-  const status = el('div', 'bmwm-brief');
+  const status = el('div', 'vm-brief');
 
   /*
    * The two groups: the retailer's own cars, then everyone else's. Each is one
@@ -735,11 +630,11 @@ function renderRefine(
    * tiles, in score order throughout. A group that ends up with no cars is
    * never mounted, so an empty heading can't appear.
    */
-  const grid = el('div', 'bmwm-grid bmwm-grid-tied');
-  const hereGroup = el('section', 'bmwm-group');
-  const hereLabel = el('h3', 'bmwm-subhead bmwm-group-label', '');
-  const hereRestGrid = el('div', 'bmwm-tail-grid');
-  const awayGroup = el('section', 'bmwm-group');
+  const grid = el('div', 'vm-grid vm-grid-tied');
+  const hereGroup = el('section', 'vm-group');
+  const hereLabel = el('h3', 'vm-subhead vm-group-label', '');
+  const hereRestGrid = el('div', 'vm-tail-grid');
+  const awayGroup = el('section', 'vm-group');
   /*
    * "Still looking" placeholder for the other-retailers group.
    *
@@ -752,12 +647,12 @@ function renderRefine(
    */
   // Flipped by searchDone() when the national search finally lands or fails.
   let stillSearching = searching;
-  const awayPending = el('p', 'bmwm-pending');
+  const awayPending = el('p', 'vm-pending');
   awayPending.hidden = true;
-  awayPending.append(el('span', 'bmwm-pending-dot'), copy.searchingNearby);
-  const awayLabel = el('h3', 'bmwm-subhead bmwm-group-label', copy.awayHeading);
-  const awayGrid = el('div', 'bmwm-grid bmwm-grid-tied');
-  const awayRestGrid = el('div', 'bmwm-tail-grid');
+  awayPending.append(el('span', 'vm-pending-dot'), copy.searchingNearby);
+  const awayLabel = el('h3', 'vm-subhead vm-group-label', copy.awayHeading);
+  const awayGrid = el('div', 'vm-grid vm-grid-tied');
+  const awayRestGrid = el('div', 'vm-tail-grid');
 
   /*
    * Two things were moved below the cards together in the rebuild, and only
@@ -772,8 +667,8 @@ function renderRefine(
    * Deliberately NOT sticky: that was considered and rejected, because it
    * fights the EDS host page's own header.
    */
-  const refineBlock = el('div', 'bmwm-refine-tools');
-  const briefBlock = el('div', 'bmwm-brief-block');
+  const refineBlock = el('div', 'vm-refine-tools');
+  const briefBlock = el('div', 'vm-brief-block');
   /*
    * The other half of a scoped headline: the car elsewhere that beat the best
    * one here, named, with where it is.
@@ -785,7 +680,7 @@ function renderRefine(
    * this is silent. Anything else would leave "at Grassicks Garage" hanging
    * with no explanation of what it was protecting the page from.
    */
-  const notice = el('p', 'bmwm-notice');
+  const notice = el('p', 'vm-notice');
   notice.hidden = true;
   // The car a rescue note above the cards already points at, when there is one.
   // Set by renderResults; see `noteShown` below for why it matters.
@@ -804,7 +699,7 @@ function renderRefine(
    * undermines the claim it was meant to defend. What was missing is evidence
    * of the search, so this says it.
    */
-  const working = el('aside', 'bmwm-working');
+  const working = el('aside', 'vm-working');
   working.hidden = true;
 
   host.append(notice, briefBlock, refineBlock, hereGroup, awayGroup, working);
@@ -1052,7 +947,7 @@ function renderRefine(
      */
     for (const axis of refinementAxes(shown.map(listingsOf))) {
       if (active.has(axis.id)) continue;
-      const chip = el('button', 'bmwm-chip', axis.label);
+      const chip = el('button', 'vm-chip', axis.label);
       chip.type = 'button';
       chip.setAttribute('aria-pressed', 'false');
       chip.addEventListener('click', () => { active.set(axis.id, axis); redraw(); });
@@ -1064,7 +959,7 @@ function renderRefine(
     // shows the cars and stops.
     if (chipRow.children.length) {
       refineBlock.append(
-        el('p', 'bmwm-refine-label', copy.refineLabel({ count: shown.length })),
+        el('p', 'vm-refine-label', copy.refineLabel({ count: shown.length })),
         chipRow,
       );
     }
@@ -1130,18 +1025,18 @@ function renderRefine(
     const said = briefFromAnswers(ctx);
     if (said.length || learned.length) {
       briefBlock.append(status);
-      status.append(el('p', 'bmwm-brief-label', copy.briefLabel));
-      if (said.length) status.append(el('p', 'bmwm-brief-said', said.join('  ·  ')));
+      status.append(el('p', 'vm-brief-label', copy.briefLabel));
+      if (said.length) status.append(el('p', 'vm-brief-said', said.join('  ·  ')));
 
       // Then everything since, each with the means to take it back. The undo
       // lives here because this is now the only place the constraint is
       // stated, and a filter you can see but not clear is worse than one you
       // cannot see at all.
       learned.forEach((item) => {
-        const row = el('p', `bmwm-brief-item is-${item.kind}`);
-        row.append(el('span', 'bmwm-brief-mark', item.kind === 'want' ? '+' : '−'));
-        row.append(el('span', 'bmwm-brief-text', item.text));
-        const undo = el('button', 'bmwm-brief-undo', '✕');
+        const row = el('p', `vm-brief-item is-${item.kind}`);
+        row.append(el('span', 'vm-brief-mark', item.kind === 'want' ? '+' : '−'));
+        row.append(el('span', 'vm-brief-text', item.text));
+        const undo = el('button', 'vm-brief-undo', '✕');
         undo.type = 'button';
         undo.setAttribute('aria-label', `Remove ${item.text}`);
         undo.addEventListener('click', () => { item.undo(); redraw(); });
@@ -1184,7 +1079,7 @@ function renderRefine(
          * because it claims nothing about a total.
          */
         const args = { shown: alive.filter((m) => m.score >= relevanceFloor()).length };
-        const line = el('p', 'bmwm-brief-count', picked.length
+        const line = el('p', 'vm-brief-count', picked.length
           ? copy.refineStatus({ ...args, wants: andList(picked) })
           : copy.refineStatusPlain(args));
         line.setAttribute('aria-live', 'polite');
@@ -1206,11 +1101,11 @@ function renderRefine(
       // so "nothing has both" would read as a claim about the retailer's whole
       // stock, which we haven't checked. Rejection (the next step) can empty a
       // set for real, and this is what it will land on.
-      const dead = el('div', 'bmwm-refine-empty');
-      dead.append(el('p', 'bmwm-refine-empty-text', wants.length
+      const dead = el('div', 'vm-refine-empty');
+      dead.append(el('p', 'vm-refine-empty-text', wants.length
         ? copy.refineEmpty({ wants: andList(wants) })
         : copy.refineEmptyHidden));
-      const clear = el('button', 'bmwm-btn bmwm-btn-ghost', 'Start again');
+      const clear = el('button', 'vm-btn vm-btn-ghost', 'Start again');
       clear.type = 'button';
       clear.addEventListener('click', () => {
         active.clear();
@@ -1296,8 +1191,8 @@ function renderRefine(
     const tile = (m) => matchCard(m, { compact: true, brand: ctx.brand });
     // The grid holding the LEAD goes full width for a single car; the other
     // group's stays two-up whatever it holds, so it never competes for hero.
-    grid.classList.toggle('bmwm-grid-tied', !(leadIsHere && single));
-    awayGrid.classList.toggle('bmwm-grid-tied', !(!leadIsHere && single));
+    grid.classList.toggle('vm-grid-tied', !(leadIsHere && single));
+    awayGrid.classList.toggle('vm-grid-tied', !(!leadIsHere && single));
 
     hereLead.forEach((m) => grid.append(full(m, single)));
     drop(here, hereLead).forEach((m) => hereRestGrid.append(tile(m)));
@@ -1329,7 +1224,7 @@ function renderRefine(
     working.replaceChildren();
     working.hidden = !searched || !alive.length;
     if (searched && alive.length) {
-      working.append(el('p', 'bmwm-working-label', copy.workingLabel));
+      working.append(el('p', 'vm-working-label', copy.workingLabel));
       /*
        * The margin is measured over the RETAILER's own cars, matching what the
        * headline is scoped to. Measured over everything it never fired: nearby
@@ -1350,7 +1245,7 @@ function renderRefine(
       const closing = state === 'weak'
         ? copy.workingWeak({ top: shown[0].score })
         : (margin != null && margin >= CLUSTER_PTS ? copy.workingMargin({ margin }) : '');
-      working.append(el('p', 'bmwm-working-text', copy.working(searched) + closing + copy.workingScore));
+      working.append(el('p', 'vm-working-text', copy.working(searched) + closing + copy.workingScore));
     }
   }
 
@@ -1419,10 +1314,10 @@ function unmetNote(ctx, unmet) {
   const items = unmetPhrases(ctx.brand, unmet);
   if (!items.length) return null;
 
-  const note = el('aside', 'bmwm-unmet');
+  const note = el('aside', 'vm-unmet');
   note.setAttribute('role', 'note');
-  if (copy.unmetLabel) note.append(el('p', 'bmwm-unmet-label', copy.unmetLabel));
-  note.append(el('p', 'bmwm-unmet-text', copy.unmet({
+  if (copy.unmetLabel) note.append(el('p', 'vm-unmet-label', copy.unmetLabel));
+  note.append(el('p', 'vm-unmet-text', copy.unmet({
     list: orList(items), retailer: ctx.retailerLabel,
   })));
   return note;
@@ -1447,10 +1342,10 @@ function rescueNote(ctx, rescued, nearest) {
   const items = unmetPhrases(ctx.brand, rescued);
   if (!items.length) return null;
 
-  const note = el('aside', 'bmwm-unmet');
+  const note = el('aside', 'vm-unmet');
   note.setAttribute('role', 'note');
-  if (copy.rescueLabel) note.append(el('p', 'bmwm-unmet-label', copy.rescueLabel));
-  note.append(el('p', 'bmwm-unmet-text', copy.rescueNote({
+  if (copy.rescueLabel) note.append(el('p', 'vm-unmet-label', copy.rescueLabel));
+  note.append(el('p', 'vm-unmet-text', copy.rescueNote({
     list: orList(items),
     retailer: ctx.retailerLabel,
     miles: `${Math.round(nearest.car.distance * 10) / 10} miles`,
@@ -1459,85 +1354,8 @@ function rescueNote(ctx, rescued, nearest) {
   return note;
 }
 
-/**
- * The question set for a brand. Server-owned, so the intro copy can state the
- * real question count without the block hardcoding it. (The API also sends
- * `topMatches`; the block stopped reading it when results went cluster-aware —
- * how many cars appear now depends on whether the engine could pick a winner,
- * so the intro no longer promises a number.)
- */
-async function apiGetQuestions(base, retailer, brandKey) {
-  const url = new URL(`${base}/api/questions`);
-  if (retailer) url.searchParams.set('retailer', retailer);
-  if (brandKey) url.searchParams.set('brand', brandKey);
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Questions request failed (${res.status})`);
-  const data = await res.json();
-  return { questions: data.questions };
-}
-
-async function apiMatch(base, answers, retailer, brandKey) {
-  const res = await fetch(`${base}/api/match`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ answers, retailer, brand: brandKey }),
-  });
-  if (!res.ok) throw new Error(`Match request failed (${res.status})`);
-  return res.json();
-}
-
-/**
- * Cars at other nearby retailers — a separate, slower request than /api/match
- * (a national distance-sorted search) so the hero matches can render first.
- * The section is a bonus, so any failure resolves to an empty list rather than
- * throwing: the caller just omits the "Worth the drive" section.
- *
- * Returns `{ nearby, unmet }`. `unmet` is the wants this pool had nothing
- * behind (see the unmet note below) and is `null` whenever we didn't get a
- * usable answer — a failed lookup, or an older API that doesn't send the
- * field. An empty list of cars is a finding; a failed lookup is not, and the
- * two must not be confused before telling a user something doesn't exist.
- */
-async function apiNearby(base, answers, retailer, brandKey) {
-  const noAnswer = { nearby: [], unmet: null };
-  try {
-    const res = await fetch(`${base}/api/nearby`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers, retailer, brand: brandKey }),
-    });
-    if (!res.ok) return noAnswer;
-    const data = await res.json();
-    return {
-      nearby: Array.isArray(data.nearby) ? data.nearby : [],
-      unmet: (data.unmet && typeof data.unmet === 'object') ? data.unmet : null,
-    };
-  } catch {
-    return noAnswer;
-  }
-}
-
-/**
- * The configured retailer's current top matches for the quiz's live "best
- * guess" drawer — a wider slice than /api/match, refetched as answers change.
- * Like apiNearby it NEVER throws: a failed preview must never break the quiz,
- * so any error/non-ok resolves to an empty list and the drawer just keeps its
- * last state.
- */
-async function apiPreview(base, answers, retailer, brandKey) {
-  try {
-    const res = await fetch(`${base}/api/preview`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers, retailer, brand: brandKey }),
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data.matches) ? data.matches : [];
-  } catch {
-    return [];
-  }
-}
+/* The engine client (apiGetQuestions, apiMatch, apiNearby, apiPreview) is
+ * shared across modes and lives in ../engine.js — imported at the top. */
 
 /** Is question `q` shown given the current answers? Uses SHOW_IF by id. */
 function isVisible(q, answers) {
@@ -1572,8 +1390,6 @@ function answersFromHash(questions) {
 function visibleQuestions(questions, answers) {
   return questions.filter((q) => isVisible(q, answers));
 }
-
-const gbp = (n) => `£${n.toLocaleString('en-GB')}`;
 
 /**
  * Format a slider value for its readout, per the question's `format` hint:
@@ -1798,7 +1614,7 @@ function refinementAxes(groups) {
 
 function renderIntro(root, ctx) {
   root.replaceChildren();
-  const intro = el('div', 'bmwm-intro');
+  const intro = el('div', 'vm-intro');
   // Count the questions a typical run sees ("Help me decide" shows the
   // conditional charging question, matching the longest common path). fuel is
   // multi-select now, so pass it as an array.
@@ -1810,12 +1626,12 @@ function renderIntro(root, ctx) {
   const { title: titleOverride, kicker: kickerOverride } = ctx.overrides;
   const kicker = kickerOverride === undefined ? 'The unofficial UK matchmaker' : kickerOverride;
   const title = titleOverride === undefined ? copy.title : titleOverride;
-  if (kicker) intro.append(el('p', 'bmwm-kicker', kicker));
-  if (title) intro.append(el('h1', 'bmwm-title', title));
-  intro.append(el('p', 'bmwm-lede', copy.lede({
+  if (kicker) intro.append(el('p', 'vm-kicker', kicker));
+  if (title) intro.append(el('h1', 'vm-title', title));
+  intro.append(el('p', 'vm-lede', copy.lede({
     questions: count, retailer: ctx.retailerLabel,
   })));
-  const start = el('button', 'bmwm-btn bmwm-btn-primary', copy.cta);
+  const start = el('button', 'vm-btn vm-btn-primary', copy.cta);
   start.addEventListener('click', () => ctx.showQuestion(0));
   intro.append(start);
   root.append(intro);
@@ -1827,7 +1643,7 @@ function renderIntro(root, ctx) {
 // rapid taps collapse into one call; a fresh answer resets the timer.
 const PREVIEW_DEBOUNCE_MS = 250;
 // Cross-fade duration when the tile row re-ranks (kept in sync with the CSS
-// transition on .bmwm-preview-track). Disabled under prefers-reduced-motion.
+// transition on .vm-preview-track). Disabled under prefers-reduced-motion.
 const PREVIEW_FADE_MS = 150;
 
 /** Can the engine score these answers yet? It hard-requires a valid budget. */
@@ -1846,9 +1662,9 @@ const PREVIEW_SKELETON_COUNT = 5;
  * first guess lands (see paintPreview), so it never snaps open.
  */
 function renderPreviewSection(ctx) {
-  const section = el('section', 'bmwm-preview');
-  section.append(el('h3', 'bmwm-subhead bmwm-nearby-heading bmwm-preview-heading', 'SHORTLISTING FOR YOU'));
-  const track = el('div', 'bmwm-nearby bmwm-preview-track');
+  const section = el('section', 'vm-preview');
+  section.append(el('h3', 'vm-subhead vm-nearby-heading vm-preview-heading', 'SHORTLISTING FOR YOU'));
+  const track = el('div', 'vm-nearby vm-preview-track');
   track.tabIndex = 0;
   track.setAttribute('role', 'region');
   track.setAttribute('aria-label', `Your closest matches so far at ${ctx.retailerLabel}`);
@@ -1859,12 +1675,12 @@ function renderPreviewSection(ctx) {
 
 /** A shimmer placeholder shaped like a mini preview tile (media + two lines). */
 function previewSkeletonTile() {
-  const tile = el('div', 'bmwm-ptile bmwm-ptile-mini bmwm-skel-ptile');
-  tile.append(el('div', 'bmwm-skel bmwm-ptile-media'));
-  const body = el('div', 'bmwm-ptile-body');
+  const tile = el('div', 'vm-ptile vm-ptile-mini vm-skel-ptile');
+  tile.append(el('div', 'vm-skel vm-ptile-media'));
+  const body = el('div', 'vm-ptile-body');
   body.append(
-    el('div', 'bmwm-skel bmwm-skel-line bmwm-skel-name'),
-    el('div', 'bmwm-skel bmwm-skel-line bmwm-skel-specs'),
+    el('div', 'vm-skel vm-skel-line vm-skel-name'),
+    el('div', 'vm-skel vm-skel-line vm-skel-specs'),
   );
   tile.append(body);
   return tile;
@@ -1878,7 +1694,7 @@ function previewSkeletonTile() {
  * bar holds its footprint instead of popping in when the first guess arrives.
  */
 function paintPreview(section, ctx) {
-  const track = section.querySelector('.bmwm-preview-track');
+  const track = section.querySelector('.vm-preview-track');
   const hasMatches = ctx.preview.matches.length > 0;
   const swap = () => {
     track.replaceChildren();
@@ -1891,7 +1707,7 @@ function paintPreview(section, ctx) {
   };
   // Cross-fade only when swapping real tiles for real tiles (a re-rank). The
   // first skeleton→results fill is a plain swap so results appear promptly.
-  const showingReal = track.querySelector('.bmwm-ptile:not(.bmwm-skel-ptile)');
+  const showingReal = track.querySelector('.vm-ptile:not(.vm-skel-ptile)');
   if (showingReal && hasMatches) {
     track.classList.add('is-fading');
     setTimeout(swap, PREVIEW_FADE_MS);
@@ -1902,14 +1718,14 @@ function paintPreview(section, ctx) {
 
 /**
  * Mount or update the preview for the current answers. The section lives at the
- * end of ctx.preview's host (`.bmwm-screen`): it mounts as soon as a budget is
+ * end of ctx.preview's host (`.vm-screen`): it mounts as soon as a budget is
  * set (skeleton tiles until the first guess lands), repaints on later updates,
  * and is only removed if we genuinely can't preview yet (no valid budget).
  */
 function showPreview(ctx) {
-  const screen = document.querySelector('.bmwm-screen');
+  const screen = document.querySelector('.vm-screen');
   if (!screen) return;
-  let section = screen.querySelector('.bmwm-preview');
+  let section = screen.querySelector('.vm-preview');
   const { matches, loaded } = ctx.preview;
   // Hide the strip only when there's genuinely nothing to show: no budget to
   // score yet, or a guess has landed and returned zero matches. While a budget
@@ -1960,15 +1776,15 @@ function schedulePreviewRefresh(ctx) {
  * @param {number} index current question's position in the visible list
  */
 function renderAnswerPills(ctx, questions, index) {
-  const row = el('div', 'bmwm-pills');
+  const row = el('div', 'vm-pills');
   for (let i = 0; i < index; i += 1) {
     const question = questions[i];
     const label = pillFor(question, ctx.answers);
     if (!label) continue; // unanswered (shouldn't happen before `index`, but safe)
-    const pill = el('button', 'bmwm-pill');
+    const pill = el('button', 'vm-pill');
     pill.type = 'button';
-    pill.append(el('span', 'bmwm-pill-text', label));
-    pill.append(el('span', 'bmwm-pill-edit', '✎'));
+    pill.append(el('span', 'vm-pill-text', label));
+    pill.append(el('span', 'vm-pill-edit', '✎'));
     pill.setAttribute('aria-label', `${question.title.replace(/[?？]$/, '')}: ${label}. Edit`);
     pill.addEventListener('click', () => {
       // Remember where we were so advance() returns here after the edit.
@@ -1994,12 +1810,12 @@ function renderRangeSlider(list, q, ctx) {
   // Persist immediately so Next is enabled even without a drag.
   ctx.answers[q.id] = [lo, hi];
 
-  const readout = el('output', 'bmwm-slider-value', formatRange([lo, hi], q));
+  const readout = el('output', 'vm-slider-value', formatRange([lo, hi], q));
 
-  const track = el('div', 'bmwm-range');
-  const fill = el('div', 'bmwm-range-fill');
+  const track = el('div', 'vm-range');
+  const fill = el('div', 'vm-range-fill');
   const mkInput = (cls, label, value) => {
-    const input = el('input', `bmwm-slider-input ${cls}`);
+    const input = el('input', `vm-slider-input ${cls}`);
     input.type = 'range';
     input.min = String(q.min);
     input.max = String(q.max);
@@ -2009,8 +1825,8 @@ function renderRangeSlider(list, q, ctx) {
     input.setAttribute('aria-valuetext', formatSliderValue(value, q));
     return input;
   };
-  const minInput = mkInput('bmwm-range-min', 'Minimum budget', lo);
-  const maxInput = mkInput('bmwm-range-max', 'Maximum budget', hi);
+  const minInput = mkInput('vm-range-min', 'Minimum budget', lo);
+  const maxInput = mkInput('vm-range-max', 'Maximum budget', hi);
 
   const span = q.max - q.min || 1;
   const paintFill = () => {
@@ -2041,10 +1857,10 @@ function renderRangeSlider(list, q, ctx) {
   paintFill();
   track.append(fill, minInput, maxInput);
 
-  const bounds = el('div', 'bmwm-slider-bounds');
+  const bounds = el('div', 'vm-slider-bounds');
   bounds.append(
-    el('span', 'bmwm-slider-min', formatSliderValue(q.min, q)),
-    el('span', 'bmwm-slider-max', formatSliderValue(q.max, q)),
+    el('span', 'vm-slider-min', formatSliderValue(q.min, q)),
+    el('span', 'vm-slider-max', formatSliderValue(q.max, q)),
   );
 
   list.append(readout, track, bounds);
@@ -2058,13 +1874,13 @@ function renderQuestion(root, ctx, index) {
   );
 
   root.replaceChildren();
-  const screen = el('div', 'bmwm-screen');
+  const screen = el('div', 'vm-screen');
 
-  const progress = el('div', 'bmwm-progress');
-  const bar = el('div', 'bmwm-progress-bar');
+  const progress = el('div', 'vm-progress');
+  const bar = el('div', 'vm-progress-bar');
   bar.style.width = `${((index + 1) / questions.length) * 100}%`;
   progress.append(bar);
-  screen.append(progress, el('p', 'bmwm-step', `Question ${index + 1} of ${questions.length}`));
+  screen.append(progress, el('p', 'vm-step', `Question ${index + 1} of ${questions.length}`));
 
   // Summary pills for every question already answered before this one. Each is
   // a tap-to-edit button: it jumps back to that question, remembering the
@@ -2072,10 +1888,10 @@ function renderQuestion(root, ctx, index) {
   const answeredPills = renderAnswerPills(ctx, questions, index);
   if (answeredPills) screen.append(answeredPills);
 
-  screen.append(el('h2', 'bmwm-question', q.title));
-  if (q.help) screen.append(el('p', 'bmwm-help', q.help));
+  screen.append(el('h2', 'vm-question', q.title));
+  if (q.help) screen.append(el('p', 'vm-help', q.help));
 
-  const list = el('div', 'bmwm-options');
+  const list = el('div', 'vm-options');
   // A slider is a single labelled input (its own role), not a radio/checkbox
   // group — only set the group role for option lists.
   if (q.type !== 'slider') list.setAttribute('role', q.multi ? 'group' : 'radiogroup');
@@ -2100,20 +1916,20 @@ function renderQuestion(root, ctx, index) {
   const isSlider = q.type === 'slider';
   if (isSlider && q.range) {
     // Dual-thumb range (budget): two overlaid inputs writing a [min, max] pair.
-    list.classList.add('bmwm-slider');
+    list.classList.add('vm-slider');
     renderRangeSlider(list, q, ctx);
   } else if (isSlider) {
     // A range input plus a live value readout. The whole thing writes a number
     // to ctx.answers[q.id] and, unlike a single-select, never auto-advances —
     // the Next button (below) is the commit point, since any drag would fire.
-    list.classList.add('bmwm-slider');
+    list.classList.add('vm-slider');
     const stored = ctx.answers[q.id];
     const startValue = typeof stored === 'number'
       ? stored
       : (typeof q.default === 'number' ? q.default : q.min);
 
-    const readout = el('output', 'bmwm-slider-value', formatSliderValue(startValue, q));
-    const input = el('input', 'bmwm-slider-input');
+    const readout = el('output', 'vm-slider-value', formatSliderValue(startValue, q));
+    const input = el('input', 'vm-slider-input');
     input.type = 'range';
     input.min = String(q.min);
     input.max = String(q.max);
@@ -2125,10 +1941,10 @@ function renderQuestion(root, ctx, index) {
     // user accepts the default without dragging (Next is enabled from the off).
     ctx.answers[q.id] = startValue;
 
-    const bounds = el('div', 'bmwm-slider-bounds');
+    const bounds = el('div', 'vm-slider-bounds');
     bounds.append(
-      el('span', 'bmwm-slider-min', formatSliderValue(q.min, q)),
-      el('span', 'bmwm-slider-max', formatSliderValue(q.max, q)),
+      el('span', 'vm-slider-min', formatSliderValue(q.min, q)),
+      el('span', 'vm-slider-max', formatSliderValue(q.max, q)),
     );
 
     input.addEventListener('input', () => {
@@ -2143,13 +1959,13 @@ function renderQuestion(root, ctx, index) {
     list.append(readout, input, bounds);
   } else {
     q.options.forEach((opt) => {
-      const btn = el('button', 'bmwm-option');
+      const btn = el('button', 'vm-option');
       btn.type = 'button';
       btn.setAttribute('role', q.multi ? 'checkbox' : 'radio');
       btn.setAttribute('aria-checked', String(selected.has(opt.value)));
       if (selected.has(opt.value)) btn.classList.add('is-selected');
-      btn.append(el('span', 'bmwm-option-label', opt.label));
-      if (opt.sub) btn.append(el('span', 'bmwm-option-sub', opt.sub));
+      btn.append(el('span', 'vm-option-label', opt.label));
+      if (opt.sub) btn.append(el('span', 'vm-option-sub', opt.sub));
       btn.addEventListener('click', () => {
         if (q.multi) {
           if (selected.has(opt.value)) selected.delete(opt.value);
@@ -2181,14 +1997,14 @@ function renderQuestion(root, ctx, index) {
   }
   screen.append(list);
 
-  const nav = el('div', 'bmwm-nav');
-  const back = el('button', 'bmwm-btn bmwm-btn-ghost', 'Back');
+  const nav = el('div', 'vm-nav');
+  const back = el('button', 'vm-btn vm-btn-ghost', 'Back');
   back.type = 'button';
   back.disabled = index === 0;
   back.addEventListener('click', () => ctx.showQuestion(index - 1));
   nav.append(back);
 
-  const next = el('button', 'bmwm-btn bmwm-btn-primary', index + 1 === questions.length ? 'Explore my matches' : 'Next');
+  const next = el('button', 'vm-btn vm-btn-primary', index + 1 === questions.length ? 'Explore my matches' : 'Next');
   next.type = 'button';
   // Multi-select and sliders both commit via Next (a slider always has a value,
   // so it's enabled from the off); single-select auto-advances on tap.
@@ -2200,8 +2016,8 @@ function renderQuestion(root, ctx, index) {
   screen.append(nav);
 
   root.append(screen);
-  screen.querySelector('.bmwm-question').setAttribute('tabindex', '-1');
-  screen.querySelector('.bmwm-question').focus({ preventScroll: true });
+  screen.querySelector('.vm-question').setAttribute('tabindex', '-1');
+  screen.querySelector('.vm-question').focus({ preventScroll: true });
 
   // Live "best guess" strip. If we already have matches cached (navigating
   // Back/Next), mount it straight away so it doesn't flash out and back in;
@@ -2237,17 +2053,17 @@ function distanceLabel(distance) {
  * the copy that quietly stopped matching.
  */
 function mediaWell(car, extraClass = '') {
-  const media = el('div', `bmwm-card-media${extraClass ? ` ${extraClass}` : ''}`);
+  const media = el('div', `vm-card-media${extraClass ? ` ${extraClass}` : ''}`);
   media.append(
-    el('span', 'bmwm-card-soon', 'Images coming soon'),
-    el('span', 'bmwm-card-line', car.line),
+    el('span', 'vm-card-soon', 'Images coming soon'),
+    el('span', 'vm-card-line', car.line),
   );
 
   function showPhoto(src) {
-    media.querySelector('.bmwm-card-photo')?.remove();
+    media.querySelector('.vm-card-photo')?.remove();
     media.classList.toggle('has-photo', Boolean(src));
     if (!src) return;
-    const img = el('img', 'bmwm-card-photo');
+    const img = el('img', 'vm-card-photo');
     img.src = src;
     img.alt = car.name;
     img.loading = 'lazy';
@@ -2276,15 +2092,15 @@ function matchCard(match, {
 } = {}) {
   const { car, score, reasons } = match;
   const copy = BRAND_COPY[brandKey] || BRAND_COPY.bmw;
-  const card = el('article', `bmwm-card${big ? ' bmwm-card-big' : ''}${compact ? ' bmwm-card-compact' : ''}`);
+  const card = el('article', `vm-card${big ? ' vm-card-big' : ''}${compact ? ' vm-card-compact' : ''}`);
 
   const { media, showPhoto } = mediaWell(car);
   card.append(media);
 
-  const body = el('div', 'bmwm-card-body');
-  const head = el('div', 'bmwm-card-head');
-  head.append(el('h3', 'bmwm-card-name', car.name));
-  const badge = el('span', 'bmwm-score', `${score}%`);
+  const body = el('div', 'vm-card-body');
+  const head = el('div', 'vm-card-head');
+  head.append(el('h3', 'vm-card-name', car.name));
+  const badge = el('span', 'vm-score', `${score}%`);
   // The number has been unexplained since fit and taste were split, and two
   // cards sharing one reads as a bug unless you know it is a claim that they
   // suit you equally. Said properly in the working note under the cards; this
@@ -2301,7 +2117,7 @@ function matchCard(match, {
     : (car.priceMin === car.priceMax
       ? gbp(car.priceMin)
       : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`);
-  const specs = el('p', 'bmwm-specs');
+  const specs = el('p', 'vm-specs');
   // Paint, by its marketing name ("Legend Grey"), when the detail lookup got
   // one. It reads as a spec, but it's carrying more weight than that: when the
   // engine can't separate the cars, colour is very often the actual difference
@@ -2349,7 +2165,7 @@ function matchCard(match, {
     specs.append(`${head.join('  ·  ')}  ·  `);
     const hex = SWATCH_HEX[(shade || '').toLowerCase()];
     if (hex) {
-      const dot = el('span', 'bmwm-swatch');
+      const dot = el('span', 'vm-swatch');
       dot.style.background = hex;
       specs.append(dot);
     }
@@ -2376,13 +2192,13 @@ function matchCard(match, {
    * sections stop being necessary: the list is just sorted, and each row says
    * where you'd go.
    */
-  const where = el('p', 'bmwm-distance');
+  const where = el('p', 'vm-distance');
   if (car.distance != null) {
-    where.append(el('span', 'bmwm-distance-miles', distanceLabel(car.distance)));
+    where.append(el('span', 'vm-distance-miles', distanceLabel(car.distance)));
     if (car.retailerName) where.append(el('span', null, ` · ${car.retailerName}`));
     body.append(where);
   } else if (car.retailerName) {
-    where.append(el('span', 'bmwm-distance-here', `At ${car.retailerName}`));
+    where.append(el('span', 'vm-distance-here', `At ${car.retailerName}`));
     body.append(where);
   }
 
@@ -2390,11 +2206,11 @@ function matchCard(match, {
   // how many, the price spread, and the colours they come in. Without this the
   // page showed four identical iX2 cards and looked like it was stuttering.
   if (car.listingCount > 1) {
-    const avail = el('p', 'bmwm-avail');
+    const avail = el('p', 'vm-avail');
     const span = car.priceFrom === car.priceTo
       ? gbp(car.priceFrom)
       : `${gbp(car.priceFrom)}–${gbp(car.priceTo)}`;
-    avail.append(el('span', 'bmwm-avail-count', `${car.listingCount} available`));
+    avail.append(el('span', 'vm-avail-count', `${car.listingCount} available`));
     avail.append(el('span', null, ` · ${span}`));
     if (car.colours?.length) avail.append(el('span', null, ` · ${orList(car.colours)}`));
     body.append(avail);
@@ -2404,10 +2220,10 @@ function matchCard(match, {
   const detailBits = [];
   if (car.plate) detailBits.push(`’${car.plate} reg`);
   if (car.mileage != null) detailBits.push(`${car.mileage.toLocaleString('en-GB')} miles`);
-  const usedMeta = detailBits.length ? el('p', 'bmwm-usedmeta', detailBits.join('  ·  ')) : null;
+  const usedMeta = detailBits.length ? el('p', 'vm-usedmeta', detailBits.join('  ·  ')) : null;
   if (usedMeta) body.append(usedMeta);
 
-  if (!compact) body.append(el('p', 'bmwm-blurb', car.blurb));
+  if (!compact) body.append(el('p', 'vm-blurb', car.blurb));
 
   /*
    * What is actually on this car, from the feed's factory options list.
@@ -2427,8 +2243,8 @@ function matchCard(match, {
    * silently dropped, and rebuilt by the picker because equipment belongs to a
    * listing rather than to the model.
    */
-  const kit = el('p', 'bmwm-kit');
-  const kitLabel = el('p', 'bmwm-why-label bmwm-kit-label', copy.kitLabel);
+  const kit = el('p', 'vm-kit');
+  const kitLabel = el('p', 'vm-why-label vm-kit-label', copy.kitLabel);
   function renderKit(chosen) {
     const have = new Set(chosen?.features || car.features || []);
     const named = Object.entries(CONCEPT_LABELS)
@@ -2462,9 +2278,9 @@ function matchCard(match, {
    * two are the case and the rest are corroboration.
    */
   if (!compact && reasons.length) {
-    const why = el('ul', 'bmwm-reasons');
+    const why = el('ul', 'vm-reasons');
     reasons.slice(0, big ? reasons.length : 2).forEach((r) => why.append(el('li', null, r)));
-    body.append(el('p', 'bmwm-why-label', 'Why it suits you'), why);
+    body.append(el('p', 'vm-why-label', 'Why it suits you'), why);
   }
 
   // Owning the trade-off: when a recommendation misses a stated want (it's
@@ -2480,8 +2296,8 @@ function matchCard(match, {
   if (!compact && match.tradeOffs?.length) {
     const { label } = TRADE_COPY[brandKey] || TRADE_COPY.bmw;
     body.append(
-      el('p', 'bmwm-why-label bmwm-trade-label', label),
-      el('p', 'bmwm-trade-text', tradeLines(brandKey, match.tradeOffs).join(' ')),
+      el('p', 'vm-why-label vm-trade-label', label),
+      el('p', 'vm-trade-text', tradeLines(brandKey, match.tradeOffs).join(' ')),
     );
   }
 
@@ -2496,16 +2312,16 @@ function matchCard(match, {
   // into something actionable (see rejectOptions). Only offered where a
   // caller supplies the options, so it appears in a tie and nowhere else.
   if (rejectOptions) {
-    const rejectWrap = el('div', 'bmwm-reject');
-    const open = el('button', 'bmwm-reject-open', rejectLabel || 'Not this one');
+    const rejectWrap = el('div', 'vm-reject');
+    const open = el('button', 'vm-reject-open', rejectLabel || 'Not this one');
     open.type = 'button';
     open.setAttribute('aria-expanded', 'false');
     // Says what the control DOES. It was a small underlined link that looked
     // like a disclaimer, and nothing on the page suggested that turning a
     // car down would bring another one in — so the most conversational thing
     // the tool can do read as the least important.
-    if (copy.rejectHint) open.append(el('span', 'bmwm-reject-hint', copy.rejectHint));
-    const menu = el('div', 'bmwm-reject-menu');
+    if (copy.rejectHint) open.append(el('span', 'vm-reject-hint', copy.rejectHint));
+    const menu = el('div', 'vm-reject-menu');
     menu.hidden = true;
     open.addEventListener('click', () => {
       menu.hidden = !menu.hidden;
@@ -2524,9 +2340,9 @@ function matchCard(match, {
     function renderRejectMenu(chosen) {
       const options = rejectOptions(match, chosen);
       rejectWrap.hidden = !options.length;
-      menu.replaceChildren(el('p', 'bmwm-reject-prompt', rejectPrompt || 'What put you off?'));
+      menu.replaceChildren(el('p', 'vm-reject-prompt', rejectPrompt || 'What put you off?'));
       options.forEach((o) => {
-        const b = el('button', 'bmwm-reject-option', o.label);
+        const b = el('button', 'vm-reject-option', o.label);
         b.type = 'button';
         b.addEventListener('click', o.apply);
         menu.append(b);
@@ -2558,10 +2374,10 @@ function matchCard(match, {
   // "4 available … Portimao Blue, Brooklyn Grey or Alpine White" with no way
   // to choose between them. Compact tiles stay out: they're a glance.
   if (!compact && match.listings?.length > 1) {
-    body.append(el('p', 'bmwm-why-label', copy.pickLabel));
-    const picker = el('div', 'bmwm-pick');
+    body.append(el('p', 'vm-why-label', copy.pickLabel));
+    const picker = el('div', 'vm-pick');
     match.listings.forEach((listing, i) => {
-      const opt = el('button', `bmwm-pick-opt${i === 0 ? ' is-on' : ''}`);
+      const opt = el('button', `vm-pick-opt${i === 0 ? ' is-on' : ''}`);
       opt.type = 'button';
       opt.setAttribute('aria-pressed', String(i === 0));
       // Marketing names bury the basic colour anywhere in the string, and not
@@ -2571,7 +2387,7 @@ function matchCard(match, {
         .map((word) => SWATCH_HEX[word])
         .find(Boolean);
       if (hex) {
-        const dot = el('span', 'bmwm-swatch');
+        const dot = el('span', 'vm-swatch');
         dot.style.background = hex;
         opt.append(dot);
       }
@@ -2581,14 +2397,14 @@ function matchCard(match, {
       // separates two otherwise identical cars.
       const label = listing.colour
         || (listing.mileage != null ? `${listing.mileage.toLocaleString('en-GB')} miles` : `Option ${i + 1}`);
-      opt.append(el('span', 'bmwm-pick-colour', label));
+      opt.append(el('span', 'vm-pick-colour', label));
       const bits = [gbp(listing.priceMin)];
       if (listing.colour && listing.mileage != null) {
         bits.push(`${listing.mileage.toLocaleString('en-GB')} mi`);
       }
-      opt.append(el('span', 'bmwm-pick-meta', bits.join(' · ')));
+      opt.append(el('span', 'vm-pick-meta', bits.join(' · ')));
       opt.addEventListener('click', () => {
-        picker.querySelectorAll('.bmwm-pick-opt').forEach((b) => {
+        picker.querySelectorAll('.vm-pick-opt').forEach((b) => {
           b.classList.remove('is-on');
           b.setAttribute('aria-pressed', 'false');
         });
@@ -2611,7 +2427,7 @@ function matchCard(match, {
           }
           usedMeta.textContent = bits.join('  ·  ');
         }
-        const cta = card.querySelector('.bmwm-card-link');
+        const cta = card.querySelector('.vm-card-link');
         if (cta && listing.link) cta.href = listing.link;
         // Re-offer reasons about the car now being shown.
         onPick?.(listing);
@@ -2623,7 +2439,7 @@ function matchCard(match, {
 
   // Link out to the retailer's live stock, when the feed gave us one.
   if (car.link) {
-    const cta = el('a', 'bmwm-card-link', `View at ${car.retailerName || 'the retailer'} ›`);
+    const cta = el('a', 'vm-card-link', `View at ${car.retailerName || 'the retailer'} ›`);
     cta.href = car.link;
     cta.target = '_blank';
     cta.rel = 'noopener noreferrer';
@@ -2652,7 +2468,7 @@ function previewTile(match) {
   // Whole tile is the tap target — an <a> when we have a link, else a plain
   // article (still a valid tile, just not clickable).
   const tag = car.link ? 'a' : 'article';
-  const tile = el(tag, 'bmwm-ptile bmwm-ptile-mini');
+  const tile = el(tag, 'vm-ptile vm-ptile-mini');
   if (car.link) {
     tile.href = car.link;
     tile.target = '_blank';
@@ -2660,14 +2476,14 @@ function previewTile(match) {
     tile.setAttribute('aria-label', `${car.name}, ${price}, ${score}% match. View at ${car.retailerName || 'the retailer'}`);
   }
 
-  const { media } = mediaWell(car, 'bmwm-ptile-media');
+  const { media } = mediaWell(car, 'vm-ptile-media');
 
-  const body = el('div', 'bmwm-ptile-body');
-  const head = el('div', 'bmwm-ptile-head');
-  const badge = el('span', 'bmwm-score bmwm-ptile-score', `${score}%`);
+  const body = el('div', 'vm-ptile-body');
+  const head = el('div', 'vm-ptile-head');
+  const badge = el('span', 'vm-score vm-ptile-score', `${score}%`);
   badge.title = 'Match score';
-  head.append(el('span', 'bmwm-ptile-name', car.name.replace(/^BMW /, '')), badge);
-  const specs = el('span', 'bmwm-ptile-specs',
+  head.append(el('span', 'vm-ptile-name', car.name.replace(/^BMW /, '')), badge);
+  const specs = el('span', 'vm-ptile-specs',
     [SPEC_LABELS[car.body], FUEL_SPEC[car.fuel], price].filter(Boolean).join(' · '));
   body.append(head, specs);
   tile.append(media, body);
@@ -2677,12 +2493,12 @@ function previewTile(match) {
 /** Full-screen status message (loading / error), optionally with a retry button. */
 function renderStatus(root, { kicker, title, message, retryLabel, onRetry }) {
   root.replaceChildren();
-  const screen = el('div', 'bmwm-screen bmwm-status');
-  if (kicker) screen.append(el('p', 'bmwm-kicker', kicker));
-  screen.append(el('h2', 'bmwm-title', title));
-  if (message) screen.append(el('p', 'bmwm-lede', message));
+  const screen = el('div', 'vm-screen vm-status');
+  if (kicker) screen.append(el('p', 'vm-kicker', kicker));
+  screen.append(el('h2', 'vm-title', title));
+  if (message) screen.append(el('p', 'vm-lede', message));
   if (onRetry) {
-    const retry = el('button', 'bmwm-btn bmwm-btn-primary', retryLabel || 'Try again');
+    const retry = el('button', 'vm-btn vm-btn-primary', retryLabel || 'Try again');
     retry.type = 'button';
     retry.addEventListener('click', onRetry);
     screen.append(retry);
@@ -2695,21 +2511,21 @@ function renderStatus(root, { kicker, title, message, retryLabel, onRetry }) {
  * loads (GET /api/questions). Mirrors renderIntro — kicker, title, two lede
  * lines, a CTA button block — so the boot reads as "the intro, arriving"
  * rather than a "Loading" status message that then swaps out. Reuses
- * the .bmwm-skel shimmer; reduced-motion users get a static tint.
+ * the .vm-skel shimmer; reduced-motion users get a static tint.
  */
 function renderIntroSkeleton(root) {
   root.replaceChildren();
-  const intro = el('div', 'bmwm-intro bmwm-intro-skeleton');
+  const intro = el('div', 'vm-intro vm-intro-skeleton');
   intro.setAttribute('aria-busy', 'true');
   intro.setAttribute('aria-label', 'Loading the matcher');
-  const skel = (mod) => el('div', `bmwm-skel ${mod}`);
+  const skel = (mod) => el('div', `vm-skel ${mod}`);
   intro.append(
-    skel('bmwm-skel-kicker'),
-    skel('bmwm-skel-title'),
-    skel('bmwm-skel-line bmwm-skel-lede'),
-    skel('bmwm-skel-line bmwm-skel-lede'),
-    skel('bmwm-skel-line bmwm-skel-lede bmwm-skel-lede-last'),
-    skel('bmwm-skel-btn'),
+    skel('vm-skel-kicker'),
+    skel('vm-skel-title'),
+    skel('vm-skel-line vm-skel-lede'),
+    skel('vm-skel-line vm-skel-lede'),
+    skel('vm-skel-line vm-skel-lede vm-skel-lede-last'),
+    skel('vm-skel-btn'),
   );
   root.append(intro);
 }
@@ -2719,30 +2535,30 @@ function renderIntroSkeleton(root) {
  * flight. Mirrors the real layout — kicker, title, one big hero card, a 2-up
  * row of compact tiles — so the load reads as "this page, arriving" rather
  * than a centred spinner that then jumps to a dense grid. The shimmer is CSS
- * (see .bmwm-skel); reduced-motion users get a static tint instead.
+ * (see .vm-skel); reduced-motion users get a static tint instead.
  */
 function renderResultsSkeleton(root) {
   root.replaceChildren();
-  const screen = el('div', 'bmwm-screen bmwm-results bmwm-results-skeleton');
+  const screen = el('div', 'vm-screen vm-results vm-results-skeleton');
   // Announce the wait for assistive tech, since there's no visible status text.
   screen.setAttribute('aria-busy', 'true');
   screen.setAttribute('aria-label', 'Finding your matches');
 
-  // A skeleton block: className extends .bmwm-skel with a shape modifier.
-  const skel = (mod) => el('div', `bmwm-skel ${mod}`);
+  // A skeleton block: className extends .vm-skel with a shape modifier.
+  const skel = (mod) => el('div', `vm-skel ${mod}`);
 
-  screen.append(skel('bmwm-skel-kicker'), skel('bmwm-skel-title'));
+  screen.append(skel('vm-skel-kicker'), skel('vm-skel-title'));
 
   // Hero card: media band + a few body lines, matching matchCard(big).
-  const hero = el('div', 'bmwm-grid');
-  const heroCard = el('article', 'bmwm-card bmwm-card-big bmwm-skel-card');
-  heroCard.append(el('div', 'bmwm-skel bmwm-skel-media'));
-  const heroBody = el('div', 'bmwm-card-body');
+  const hero = el('div', 'vm-grid');
+  const heroCard = el('article', 'vm-card vm-card-big vm-skel-card');
+  heroCard.append(el('div', 'vm-skel vm-skel-media'));
+  const heroBody = el('div', 'vm-card-body');
   heroBody.append(
-    skel('bmwm-skel-line bmwm-skel-name'),
-    skel('bmwm-skel-line bmwm-skel-specs'),
-    skel('bmwm-skel-line bmwm-skel-blurb'),
-    skel('bmwm-skel-line bmwm-skel-blurb'),
+    skel('vm-skel-line vm-skel-name'),
+    skel('vm-skel-line vm-skel-specs'),
+    skel('vm-skel-line vm-skel-blurb'),
+    skel('vm-skel-line vm-skel-blurb'),
   );
   heroCard.append(heroBody);
   hero.append(heroCard);
@@ -2750,14 +2566,14 @@ function renderResultsSkeleton(root) {
 
   // Compact-tile skeletons, matching the tile row each group paints below its
   // lead cards.
-  const more = el('div', 'bmwm-tail-grid');
+  const more = el('div', 'vm-tail-grid');
   for (let i = 0; i < 3; i += 1) {
-    const tile = el('article', 'bmwm-card bmwm-card-compact bmwm-skel-card');
-    tile.append(el('div', 'bmwm-skel bmwm-skel-media'));
-    const body = el('div', 'bmwm-card-body');
+    const tile = el('article', 'vm-card vm-card-compact vm-skel-card');
+    tile.append(el('div', 'vm-skel vm-skel-media'));
+    const body = el('div', 'vm-card-body');
     body.append(
-      skel('bmwm-skel-line bmwm-skel-name'),
-      skel('bmwm-skel-line bmwm-skel-specs'),
+      skel('vm-skel-line vm-skel-name'),
+      skel('vm-skel-line vm-skel-specs'),
     );
     tile.append(body);
     more.append(tile);
@@ -2774,21 +2590,21 @@ function renderResultsSkeleton(root) {
  * match the real band exactly so filling it in causes no layout shift.
  */
 function renderNearbySkeleton(ctx, lede) {
-  const band = el('section', 'bmwm-nearby-band');
+  const band = el('section', 'vm-nearby-band');
   band.setAttribute('aria-busy', 'true');
   band.append(
-    el('h3', 'bmwm-subhead bmwm-nearby-heading', 'WORTH THE DRIVE'),
-    el('p', 'bmwm-lede bmwm-nearby-lede', lede),
+    el('h3', 'vm-subhead vm-nearby-heading', 'WORTH THE DRIVE'),
+    el('p', 'vm-lede vm-nearby-lede', lede),
   );
-  const track = el('div', 'bmwm-nearby');
+  const track = el('div', 'vm-nearby');
   // A few placeholder tiles mirroring the compact card (media band + 2 lines).
   for (let i = 0; i < 3; i += 1) {
-    const tile = el('article', 'bmwm-card bmwm-card-compact bmwm-skel-card');
-    tile.append(el('div', 'bmwm-skel bmwm-skel-media'));
-    const body = el('div', 'bmwm-card-body');
+    const tile = el('article', 'vm-card vm-card-compact vm-skel-card');
+    tile.append(el('div', 'vm-skel vm-skel-media'));
+    const body = el('div', 'vm-card-body');
     body.append(
-      el('div', 'bmwm-skel bmwm-skel-line bmwm-skel-name'),
-      el('div', 'bmwm-skel bmwm-skel-line bmwm-skel-specs'),
+      el('div', 'vm-skel vm-skel-line vm-skel-name'),
+      el('div', 'vm-skel vm-skel-line vm-skel-specs'),
     );
     tile.append(body);
     track.append(tile);
@@ -2804,8 +2620,8 @@ function renderNearbySkeleton(ctx, lede) {
  */
 function fillNearbyBand(band, ctx, nearby) {
   band.removeAttribute('aria-busy');
-  band.querySelector('.bmwm-nearby')?.remove();
-  const track = el('div', 'bmwm-nearby');
+  band.querySelector('.vm-nearby')?.remove();
+  const track = el('div', 'vm-nearby');
   // Focusable so the carousel is scrollable by keyboard, not just by swipe.
   track.tabIndex = 0;
   track.setAttribute('role', 'region');
@@ -2820,7 +2636,7 @@ async function renderResults(root, ctx, answers) {
   // Two-phase load. The retailer's own matches (fast: one feed) render first;
   // the nearby-retailer carousel (slow: a national distance search) is fetched
   // separately below so it never holds up the hero. See apiNearby / the
-  // .bmwm-nearby placeholder wired up further down.
+  // .vm-nearby placeholder wired up further down.
   let matches;
   // Whether the engine could actually pick a winner, and how big the tie is if
   // not (see matchCars). Defaults to the old behaviour — an API that doesn't
@@ -2892,16 +2708,16 @@ async function renderResults(root, ctx, answers) {
   ]);
 
   root.replaceChildren();
-  const screen = el('div', 'bmwm-screen bmwm-results');
+  const screen = el('div', 'vm-screen vm-results');
   const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
   const { name: brandName } = copy;
 
-  screen.append(el('p', 'bmwm-kicker', 'Your results'));
+  screen.append(el('p', 'vm-kicker', 'Your results'));
 
   if (matches.length === 0) {
     screen.append(
-      el('h2', 'bmwm-title', 'No matches found.'),
-      el('p', 'bmwm-lede', `Nothing in ${ctx.retailerLabel}'s current stock fits those answers. Try loosening the budget or seating needs.`),
+      el('h2', 'vm-title', 'No matches found.'),
+      el('p', 'vm-lede', `Nothing in ${ctx.retailerLabel}'s current stock fits those answers. Try loosening the budget or seating needs.`),
     );
   } else {
     // How many cars lead the page as EQUALS. One when the engine genuinely
@@ -2986,8 +2802,8 @@ async function renderResults(root, ctx, answers) {
       },
     };
 
-    const title = el('h2', 'bmwm-title', '');
-    const lede = el('p', 'bmwm-lede', '');
+    const title = el('h2', 'vm-title', '');
+    const lede = el('p', 'vm-lede', '');
     screen.append(title, lede);
 
     /*
@@ -3029,8 +2845,8 @@ async function renderResults(root, ctx, answers) {
     : null;
   if (nearbyBand) screen.append(nearbyBand);
 
-  const actions = el('div', 'bmwm-actions');
-  const share = el('button', 'bmwm-btn bmwm-btn-primary', 'Copy share link');
+  const actions = el('div', 'vm-actions');
+  const share = el('button', 'vm-btn vm-btn-primary', 'Copy share link');
   share.type = 'button';
   share.addEventListener('click', async () => {
     const url = `${window.location.origin}${window.location.pathname}#${HASH_KEY}=${encodeAnswers(answers)}`;
@@ -3042,10 +2858,10 @@ async function renderResults(root, ctx, answers) {
     }
     setTimeout(() => { share.textContent = 'Copy share link'; }, 2000);
   });
-  const tweak = el('button', 'bmwm-btn bmwm-btn-ghost', 'Tweak my answers');
+  const tweak = el('button', 'vm-btn vm-btn-ghost', 'Tweak my answers');
   tweak.type = 'button';
   tweak.addEventListener('click', () => ctx.showQuestion(visibleQuestions(ctx.questions, ctx.answers).length - 1));
-  const retake = el('button', 'bmwm-btn bmwm-btn-ghost', 'Start over');
+  const retake = el('button', 'vm-btn vm-btn-ghost', 'Start over');
   retake.type = 'button';
   retake.addEventListener('click', () => {
     ctx.answers = {};
@@ -3067,7 +2883,7 @@ async function renderResults(root, ctx, answers) {
   const disclaimer = ctx.overrides.disclaimer === undefined
     ? defaultDisclaimer
     : ctx.overrides.disclaimer;
-  if (disclaimer) screen.append(el('p', 'bmwm-disclaimer', disclaimer));
+  if (disclaimer) screen.append(el('p', 'vm-disclaimer', disclaimer));
 
   root.append(screen);
 
@@ -3130,7 +2946,7 @@ async function renderResults(root, ctx, answers) {
         // Above the cards, whatever frame they're in. The grid lives inside
         // the refine host — walk up to the screen-level ancestor, or
         // insertBefore throws on a non-child reference node.
-        let anchor = screen.querySelector('.bmwm-refine, .bmwm-grid');
+        let anchor = screen.querySelector('.vm-refine, .vm-grid');
         while (anchor && anchor.parentElement !== screen) anchor = anchor.parentElement;
         // No cards at all (state 5): the note still belongs with the results,
         // directly above whatever IS there.
@@ -3168,53 +2984,47 @@ async function renderResults(root, ctx, answers) {
 
 /* ------------------------------ decorate ------------------------------ */
 
-export default async function decorate(block) {
-  // Read authored config (e.g. the "Retailer ID" row) before clearing the
-  // block's children — the config rows live in the block's original markup.
-  const retailer = retailerSite(block);
-  const retailerLabel = retailerName(block);
-  const api = apiBase(block);
-  const brandKey = brand(block);
-  const overrides = copyOverrides(block);
+/*
+ * The questions interface as a mountable mode.
+ *
+ * The shell (../vehicle-matcher.js) has already read authored config and put
+ * `api`, `retailer`, `retailerLabel`, `brand` and `overrides` on `ctx`, applied
+ * the brand theme class to the block, and handed us `root` — a stage element we
+ * own outright (we may replaceChildren() it freely). `mount` augments `ctx`
+ * with this mode's own per-run state and navigation, then boots.
+ *
+ * `mount` is deliberately synchronous-return: EDS awaits the block's decorate()
+ * before it reveals the page, and the shell doesn't await us, so a slow first
+ * request never holds the document (or scrolling) hostage. We paint a skeleton
+ * immediately and swap in the real thing when the questions land.
+ */
+function mount(root, ctx) {
+  // Per-run UI state this mode owns, hung on the shared ctx.
+  ctx.answers = {};
+  ctx.questions = [];
+  // Live "best guess" strip state, kept on ctx so it survives the per-question
+  // re-render (see renderPreviewSection / schedulePreviewRefresh). `seq` is the
+  // latest-wins guard for the debounced refetch. `loaded` flips true once the
+  // first /api/preview response lands, so the strip can tell "still loading"
+  // (show skeleton) from "loaded, no matches" (hide the strip).
+  ctx.preview = { matches: [], seq: 0, loaded: false };
+  ctx.previewTimer = null;
+  // Set when a summary pill is tapped to edit an earlier answer: the index to
+  // return to once that answer is re-submitted (see renderAnswerPills /
+  // advance). Null the rest of the time.
+  ctx.editReturnIndex = null;
+  // Where the preview strip mounts within the quiz screen. This is the one spot
+  // that differs by layout: here it sits at the END of the screen, i.e. below
+  // the Back/Next nav.
+  ctx.mountPreview = (screen, section) => screen.append(section);
 
-  block.replaceChildren();
-  // Base class + brand theme class ('bmwm-bmw' | 'bmwm-mini'). The MINI theme
-  // (bmw-matcher.css) overrides the design tokens under .bmwm-mini.
-  block.classList.add('bmwm', `bmwm-${brandKey}`);
-
-  const ctx = {
-    answers: {},
-    api,
-    retailer,
-    retailerLabel,
-    brand: brandKey,
-    // Authored copy overrides (title / kicker / disclaimer) — see copyRow.
-    overrides,
-    questions: [],
-    // Live "best guess" strip state, kept on ctx so it survives the
-    // per-question re-render (see renderPreviewSection / schedulePreviewRefresh).
-    // `seq` is the latest-wins guard for the debounced refetch.
-    // `loaded` flips true once the first /api/preview response lands, so the
-    // strip can tell "still loading" (show skeleton) from "loaded, no matches"
-    // (hide the strip). `seq` is the latest-wins guard for the debounced fetch.
-    preview: { matches: [], seq: 0, loaded: false },
-    previewTimer: null,
-    // Set when a summary pill is tapped to edit an earlier answer: the index to
-    // return to once that answer is re-submitted (see renderAnswerPills /
-    // advance). Null the rest of the time.
-    editReturnIndex: null,
-    // Where the preview strip mounts within the quiz screen. This is the one
-    // spot that differs by layout: here it sits at the END of the screen, i.e.
-    // below the Back/Next nav.
-    mountPreview: (screen, section) => screen.append(section),
-  };
-  ctx.showIntro = () => renderIntro(block, ctx);
-  ctx.showQuestion = (i) => renderQuestion(block, ctx, i);
+  ctx.showIntro = () => renderIntro(root, ctx);
+  ctx.showQuestion = (i) => renderQuestion(root, ctx, i);
   ctx.showResults = (answers, { updateHash = false } = {}) => {
     if (updateHash) {
       window.history.replaceState(null, '', `#${HASH_KEY}=${encodeAnswers(answers)}`);
     }
-    renderResults(block, ctx, answers);
+    renderResults(root, ctx, answers);
   };
 
   // The question set lives behind the API, so load it before rendering.
@@ -3222,12 +3032,12 @@ export default async function decorate(block) {
     // Skeleton the intro while the question set loads — reads as the page
     // arriving rather than a "Loading…" status. (A deep-link run swaps to the
     // results skeleton a moment later inside renderResults.)
-    renderIntroSkeleton(block);
+    renderIntroSkeleton(root);
     try {
       const meta = await apiGetQuestions(ctx.api, ctx.retailer, ctx.brand);
       ctx.questions = meta.questions;
     } catch {
-      renderStatus(block, {
+      renderStatus(root, {
         kicker: 'Sorry',
         title: 'We couldn’t load the matcher',
         message: 'The matching service didn’t respond. Check your connection and try again.',
@@ -3246,12 +3056,7 @@ export default async function decorate(block) {
     }
   };
 
-  // Deliberately NOT awaited. EDS awaits every block's decorate() before it
-  // reveals the page (body gains `appear`), so awaiting a network round-trip
-  // here holds the WHOLE document hostage — including scrolling. Against a
-  // cold Render backend that's 30–50s of a page that looks broken: content
-  // visible, scroll dead. boot() paints its own skeleton immediately and swaps
-  // in the real thing whenever the questions land, so decorate() can return
-  // now and let the page finish loading.
   boot();
 }
+
+export default { key: 'questions', label: 'Questions', mount };

@@ -1,16 +1,21 @@
-# Find My Perfect BMW
+# Vehicle Matcher
 
-A consumer-facing quiz for the UK market: answer ~10 quick questions about your
-budget, lifestyle and driving, and get matched with your top 3 BMWs from the
-current UK range — with a plain-English explanation of *why* each one suits you.
+A consumer-facing car-matcher for the UK market: answer a few quick questions
+about your budget, lifestyle and driving, and get matched with the approved-used
+cars your retailer actually has — with a plain-English explanation of *why* each
+one suits you.
 
-The UI is a **portable Adobe Edge Delivery Services (EDS) block** — vanilla JS +
-CSS, no framework, no build step. The scoring engine and car dataset run behind
+The matcher is **brand-agnostic**: the brand (BMW, MINI, …) is authored config,
+not baked in, and the same engine serves every brand. The UI is a **portable
+Adobe Edge Delivery Services (EDS) block** — vanilla JS + CSS, no framework, no
+build step — built around interchangeable interface **modes** (see
+`blocks/vehicle-matcher/modes/`) so one page can showcase several matching
+approaches over the shared engine. The scoring engine and car dataset run behind
 a small **backend API** you host outside EDS, so the dataset and weights are
 never shipped to the browser.
 
-> Unofficial tool. Not affiliated with or endorsed by BMW. Prices and specs are
-> indicative — always check with a retailer.
+> Unofficial tool. Not affiliated with or endorsed by the brands it matches
+> (BMW, MINI). Prices and specs are indicative — always check with a retailer.
 
 > **New here, or coming back to it?** Read
 > **[docs/how-it-works.md](docs/how-it-works.md)** — the whole system on one
@@ -20,7 +25,7 @@ never shipped to the browser.
 
 Two deployables:
 
-- **`blocks/bmw-matcher/`** — the EDS block (quiz UI, results, share links). It
+- **`blocks/vehicle-matcher/`** — the EDS block (quiz UI, results, share links). It
   holds no dataset or weights; it calls the API for the quiz definition and for
   match results. Ports into a live EDS site by copy-paste; point it at your
   backend with a `data-api` attribute.
@@ -93,10 +98,16 @@ default), so bookmark/share the URL *with* the param.
 ## Project layout
 
 ```
-blocks/bmw-matcher/
-  bmw-matcher.js    # EDS block: decorate(block) — quiz UI, results, share links
-  bmw-matcher.css   # scoped styles (.bmwm), mobile-first, auto-loaded by EDS
-  quiz-meta.js      # client-only: conditional-question predicates + budget bands
+blocks/vehicle-matcher/
+  vehicle-matcher.js  # EDS block SHELL: decorate(block) — config, brand theme,
+                      #   mode switcher + stage; picks which interface to mount
+  vehicle-matcher.css # scoped styles (.vm), mobile-first, auto-loaded by EDS
+  engine.js           # shared engine client (apiMatch/apiNearby/… over HTTP)
+  ui.js               # shared UI primitives (el, cardinal, gbp)
+  quiz-meta.js        # client-only: conditional-question predicates + budget bands
+  modes/
+    index.js          # mode registry — { key, label, mount(root, ctx) }[]
+    questions.js      # the question-by-question interface (the original UI)
 server/
   index.js          # zero-dep Node API: /api/questions, /api/match, /health
   engine.js         # pure scoring engine + WEIGHTS config  (server-side only)
@@ -106,7 +117,7 @@ server/
   data.js           # test fixture cars (~35)                (server/test only)
   test/engine.test.js # engine tests (node --test)
   package.json      # server: start / test scripts
-index.html          # standalone preview harness (sets data-api)
+index.html          # standalone preview harness (brand-agnostic; ?brand=bmw|mini)
 scripts/serve.js    # zero-dep static server for the block (npm run serve)
 scripts/dump-stock.js         # national stock snapshot -> fixtures/ (--remap: no network)
 scripts/audit-questions.mjs   # do the QUESTIONS earn their screen? (npm run audit)
@@ -126,13 +137,19 @@ The block folder is the EDS deliverable; the `server/` folder is what you host.
 The block follows EDS conventions (`decorate(block)` default export, CSS named
 after the block, self-contained folder), so porting is a copy-paste:
 
-1. Copy `blocks/bmw-matcher/` into your EDS project's `blocks/` directory.
+1. Copy `blocks/vehicle-matcher/` into your EDS project's `blocks/` directory.
 2. In the document that drives the page, add a block table named
-   **BMW Matcher** (a one-cell table containing `bmw-matcher` works too).
+   **Vehicle Matcher** (a one-cell table containing `vehicle-matcher` works too).
 3. Add config rows below the block name — first cell the key, second the value.
    All are read with a `readBlockConfig()` helper, the standard `aem-boilerplate`
    convention:
-   - **Brand** — `BMW` or `MINI` (defaults to BMW).
+   - **Brand** — `BMW` or `MINI` (defaults to BMW). The block is brand-agnostic;
+     this row is the only thing that makes it a BMW or a MINI page.
+   - **Mode** — which interface to show, and whether visitors can switch. Set it
+     to a mode key (e.g. `questions`) to **lock** the page to that one interface
+     and hide the switcher — the production case. Leave it blank/absent to show
+     every registered mode with a switcher (the showcase). Mode keys live in
+     `blocks/vehicle-matcher/modes/index.js`.
    - **Retailer ID** — the retailer's `retailer_site` ID (e.g. `96`); omit to
      fall back to the backend's default retailer.
    - **Retailer Name** — the display name shown in copy.
@@ -148,21 +165,23 @@ after the block, self-contained folder), so porting is a copy-paste:
      the block under the page's own section heading without repeating it;
      blanking **Kicker** and **Disclaimer** drops the "unofficial matchmaker"
      framing, which suits a demo but not a retailer's own site.
-4. Publish. EDS auto-loads `bmw-matcher.css` and calls the block's
+4. Publish. EDS auto-loads `vehicle-matcher.css` and calls the block's
    `decorate()` — no other wiring needed.
 
 Example authored table:
 
-| bmw-matcher |  |
+| vehicle-matcher |  |
 |---|---|
 | Brand | MINI |
+| Mode | questions |
 | Retailer ID | 92 |
 | Retailer Name | Sytner Luton MINI |
 | API | https://your-backend.onrender.com |
 | Title |  |
 
 (The blank **Title** row above suppresses the block's own headline, for when it
-sits under the page's own "FIND YOUR MINI." section heading.)
+sits under the page's own "FIND YOUR MINI." section heading. The **Mode** row
+locks the page to the questions interface with no switcher.)
 
 The block ships **no font files**: it names the host site's licensed families
 first (`--heading-font-family` / `--body-font-family` on BMW, MINI's own faces
@@ -175,7 +194,7 @@ without editing the file. Both paths resolve through the same `apiBase()`.
 
 Notes:
 - The block itself ships no dataset or weights — those stay behind the API.
-- Styles are scoped under `.bmwm` and won't fight your site's global CSS.
+- Styles are scoped under `.vm` and won't fight your site's global CSS.
 - Share links use the URL hash (`#m=…`), which EDS passes through untouched.
 - The block makes requests to your API's origin. If your site enforces CSP, allow
   that origin in `connect-src`; the API sends permissive CORS headers by default.
@@ -248,7 +267,7 @@ Deterministic weighted scoring — transparent and unit-tested, no black box.
 | Budget stretch tolerance | `STRETCH_FACTOR` in `server/engine.js` |
 | New/updated model specs (0–62, boot, seats) | `MODEL_SPECS` in `server/mapping.js` — see [Updating the dataset](#updating-the-dataset) |
 | Test fixture cars | `server/data.js` (see field docs at top; used by `server/test/` only) |
-| Questions, options, budget bands | `server/questions.js` (mirror any conditional-question predicate in `blocks/bmw-matcher/quiz-meta.js`) |
+| Questions, options, budget bands | `server/questions.js` (mirror any conditional-question predicate in `blocks/vehicle-matcher/quiz-meta.js`) |
 
 Tuning lives entirely server-side, so you can retune weights or add new model
 specs and redeploy the backend **without touching the EDS block**.
@@ -307,5 +326,5 @@ simply stops appearing in the live feed.
   matches + answers to an LLM for prose. The backend already exists, so this is
   a natural next step — add it inside `/api/match` and return the prose alongside
   the scores.
-- **Real images:** each card has a media slot (`.bmwm-card-media`) ready for
+- **Real images:** each card has a media slot (`.vm-card-media`) ready for
   licensed imagery.

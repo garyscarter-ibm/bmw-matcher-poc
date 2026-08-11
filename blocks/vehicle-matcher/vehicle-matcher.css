@@ -1,0 +1,2081 @@
+/*
+ * Vehicle Matcher block styles. Scoped under .vm so the block drops into
+ * an existing EDS site without leaking styles. Mobile-first.
+ *
+ * The base (.vm) is brand-neutral; per-brand theming lives under a modifier
+ * class (.vm-bmw, .vm-mini) further down.
+ *
+ * Reskinned to the BMW / Grassick's design system — see docs/design-tokens.md.
+ * Light, sharp, editorial: BMW Blue accent, flat no-radius cards, the
+ * BMWTypeNext family (referenced by name; the retailer site loads it site-wide,
+ * and we fall through to a neutral geometric system stack in the preview
+ * harness where the proprietary font isn't available).
+ */
+
+.vm {
+  /* --- font ---
+     Host-first. An EDS site declares its own typography in
+     --heading-font-family / --body-font-family, so the block adopts the page's
+     typeface rather than naming families the host has never heard of.
+     That mattered: these used to ask for 'BMWTypeNextLatin-Light/-Regular/
+     -Bold', three families that don't exist on the live dealer site — it
+     declares ONE family, BMWTypeNextLatin, with weights 300/400/700. Every
+     rule silently fell through, so the whole block rendered in Helvetica next
+     to real BMWTypeNext. The literal names are kept as fallbacks for the
+     standalone harness; weight is carried by font-weight, as it should be. */
+  --vm-font-heading: var(--heading-font-family, 'BMWTypeNextLatin', 'BMWTypeNextLatin-Light', 'Helvetica Neue', arial, sans-serif);
+  --vm-font-body: var(--body-font-family, 'BMWTypeNextLatin', 'BMWTypeNextLatin-Regular', 'Helvetica Neue', arial, sans-serif);
+  --vm-font-bold: var(--body-font-family, 'BMWTypeNextLatin', 'BMWTypeNextLatin-Bold', 'Helvetica Neue', arial, sans-serif);
+
+  /* --- colour (light theme) --- */
+  --vm-ink: #262626;          /* primary text */
+  --vm-ink-strong: #000000;   /* pure-black text/CTAs */
+  --vm-ink-muted: #666666;    /* secondary/caption text */
+  --vm-surface: #ffffff;      /* page background */
+  --vm-surface-alt: #f5f5f5;  /* section band background */
+  --vm-surface-alt-2: #f9f9f9;/* secondary section band */
+  --vm-surface-dark: #262626; /* dark section band */
+  --vm-accent: #1c69d4;       /* BMW Blue — primary CTA, links, highlights */
+  --vm-accent-ink: #ffffff;   /* text/icon colour on the accent */
+  --vm-accent-secondary: #0085ac; /* BMW i teal */
+  /* Spot accent for small highlights (progress bar, score badge, slider fill).
+     BMW = the same blue; MINI overrides this to British Racing Green so its
+     buttons can be black while the green still appears, sparingly. */
+  --vm-accent-spot: var(--vm-accent);
+  /* A soft wash of the accent, for the selected answer's fill. Kept as a
+     token so each brand tints with its own colour. */
+  --vm-accent-soft: rgba(28, 105, 212, 0.06);
+  --vm-line: #d6d6d6;         /* hairline dividers/borders on the light theme */
+
+  /* Semantic aliases so the shared selectors below read cleanly. */
+  --vm-bg: var(--vm-surface);
+  --vm-surface-2: var(--vm-surface-alt);
+  --vm-text: var(--vm-ink);
+  --vm-muted: var(--vm-ink-muted);
+
+  /* --- spacing scale (4px based) --- */
+  --vm-space-1: 4px;
+  --vm-space-2: 8px;
+  --vm-space-3: 12px;
+  --vm-space-4: 16px;
+  --vm-space-5: 20px;
+  --vm-space-6: 24px;
+  --vm-space-8: 32px;
+  --vm-space-10: 40px;
+  --vm-space-12: 48px;
+  --vm-space-16: 64px;
+
+  /* --- geometry --- */
+  --vm-radius: 0px;           /* cards, media, options — BMW is sharp */
+  --vm-radius-control: 0px;   /* buttons/pills — MINI overrides to a pill */
+  --vm-radius-soft: 4px;      /* rare exception, e.g. inline links */
+  --vm-btn-height: 46px;
+  --vm-btn-padding: 12px 20px 15px;
+  --vm-btn-min-width: 232px;
+  --vm-border-width: 1px;
+
+  /* --- type scale (line-height 1.2× unless noted) --- */
+  --vm-text-h1: 40px;
+  --vm-text-h2-lg: 36px;
+  --vm-text-h2: 26px;
+  --vm-text-h3: 24px;
+  --vm-text-body-lg: 18px;
+  --vm-text-body: 16px;
+  --vm-text-label: 13px;
+  --vm-text-eyebrow: 10px;
+
+  /* Transparent, not white: the host section owns the background. Painting
+     our own white is invisible on a white page but becomes a white slab the
+     moment an author drops the block into a light-grey section. Card surfaces
+     still paint --vm-surface explicitly. */
+  background: transparent;
+  color: var(--vm-ink);
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-body);
+  border-radius: var(--vm-radius);
+  padding: var(--vm-space-6) var(--vm-space-5) var(--vm-space-8);
+  /* Cap the width on large screens, but fill (never exceed) a narrow viewport:
+     box-sizing keeps the side padding inside the 100%, so the block can't push
+     past the screen edge on mobile. Without width:100% a centred flex/grid
+     parent sizes the block to its 880px max-content and it overflows. */
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+.vm * { box-sizing: border-box; }
+
+/*
+ * Inside an EDS page the section already provides the content column, so the
+ * block fills it and lines up with its neighbours instead of nesting a second
+ * width limit inside the first. Measured on the live dealer site before this:
+ * the block's content started at 304px while every host section started at
+ * 160–270px, because an 880px centred box sat inside EDS's 1200px column — it
+ * read as inset and bolted-on. Standalone (the local harness / Pages demo)
+ * there's no wrapper, so the block keeps its own 880px reading measure.
+ */
+.vehicle-matcher-wrapper .vm {
+  max-width: none;
+  margin: 0;
+}
+
+@media (min-width: 900px) {
+  /* Matches the gutter the host's own sections use, so the left edges align.
+     On the BMW site the section is already a 1200px column, so 48px here puts
+     the content at 168px — exactly where the host's own sections sit. */
+  .vehicle-matcher-wrapper .vm {
+    padding-left: 48px;
+    padding-right: 48px;
+  }
+
+  /* MINI pages put this block in a FULL-BLEED section, so without a cap it ran
+     the whole 1440 and dwarfed its neighbours. The host's own sections there
+     ("FIND YOUR MINI.", "MINI OFFERS.") sit in a 1280px column — measured at
+     left 80 / right 1360 — so the block takes the same column and drops the
+     gutter, putting its content on exactly the same line. */
+  .vehicle-matcher-wrapper .vm.vm-mini {
+    max-width: 1280px;
+    margin-inline: auto;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/*
+ * Host pages style their own p / h2 / a / button, and a rule that matches an
+ * element directly beats a font inherited from an ancestor — so host
+ * typography can leak into the block. Re-assert inheritance for the elements
+ * the block renders. :where() keeps this at zero specificity, so every
+ * block rule below still wins.
+ */
+.vm :where(p, h1, h2, h3, h4, li, a, button, input, select, label, span) {
+  font-family: inherit;
+}
+
+/* ------------------------------ MINI theme ---------------------------- *
+ * Applied when the block is configured Brand: MINI (the .vm-mini class,
+ * added in decorate). MINI's real identity (per sytnerlutonmini.co.uk): a
+ * BLACK-on-white base — black is the primary button, white-with-a-2px-black-
+ * pill-border is the secondary. British Racing Green + teal are rare SPOT
+ * accents (score badge, progress bar, slider fill, focus ring), never the
+ * button colour. Serif UPPERCASE headlines with tight leading. Everything is a
+ * token override + a few MINI-scoped rules — no structural change to the base.
+ *
+ * Fonts are the HOST SITE'S. A MINI dealer site already declares and licenses
+ * MINI's web faces (the live one declares MINISerif-Regular), so the block
+ * asks for those by name instead of shipping its own. The four .woff files
+ * that used to live in ./fonts were removed with this change: self-hosting
+ * them was fine for a private demo but they were publicly served the moment
+ * the block was deployed to a real site, which the licence doesn't cover.
+ *
+ * Consequence to know about: on a host that provides no MINI sans face, body
+ * copy falls back to the neutral sans below rather than MINI Sans. Headings,
+ * which carry most of the brand character, still resolve from the host.
+ * -------------------------------------------------------------------- */
+
+.vm.vm-mini {
+  /* fonts: serif headings, sans body. Named host-first; weight comes from
+     font-weight (MINI titles set 700 below), not from a per-weight family. */
+  --vm-font-heading: 'MINISerif-Regular', 'MINISerif-Bold', Georgia, 'Times New Roman', serif;
+  /* Bold names the SAME family as body and lets font-weight: 700 do the work.
+     Naming a separate '-Bold' family is what broke BMW: if the host doesn't
+     declare that exact name the whole stack falls through to Helvetica, which
+     is measurably what happened to MINI's buttons and eyebrow labels. */
+  --vm-font-body: 'MINISans', 'MINISansSerif-Regular', 'MINISansSerif-Bold', 'Helvetica Neue', arial, sans-serif;
+  --vm-font-bold: var(--vm-font-body);
+
+  /* colour: black-on-white. The "accent" (primary button fill, selected-state
+     border) is near-black — that's MINI's primary. British Racing Green + teal
+     are SPOT colours applied only to small highlights (see --vm-accent-spot
+     rules below), not the button colour. */
+  --vm-ink: #000000;
+  --vm-ink-strong: #000000;
+  --vm-ink-muted: #555555;
+  --vm-accent: #111111;          /* near-black = MINI primary */
+  --vm-accent-ink: #ffffff;
+  --vm-accent-spot: #01693e;     /* British Racing Green — used sparingly */
+  --vm-accent-secondary: #0085ac; /* MINI teal — secondary spot */
+  /* Tinted with the green spot rather than the near-black accent, which
+     would just read as grey. */
+  --vm-accent-soft: rgba(1, 105, 62, 0.07);
+  /* Card/tile hairlines stay a soft grey (MINI reserves solid black for
+     buttons + selected states, applied explicitly below), so the quiz doesn't
+     read as a grid of heavy black boxes. */
+  --vm-line: #cfcfcf;
+
+  /* geometry: fully-round pill controls, softly-rounded cards */
+  --vm-radius: 6px;
+  --vm-radius-control: 999px;
+}
+
+/* MINI headlines: serif, UPPERCASE, tight leading (MINI sets ~0.95). */
+.vm.vm-mini .vm-title,
+.vm.vm-mini .vm-question,
+.vm.vm-mini .vm-subhead,
+.vm.vm-mini .vm-preview-heading,
+.vm.vm-mini .vm-nearby-heading {
+  text-transform: uppercase;
+  font-family: var(--vm-font-heading);
+  /* The serif is now a multi-weight family, so the weight has to be asked for.
+     BMW's titles are 300 (light); MINI's are heavy, matching the host's own
+     headings, which set 700 on the same face. */
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+}
+
+/*
+ * MINI's lede is body copy, not a headline. The base rule sets the lede in the
+ * HEADING font, which is right for BMW (a light grotesque reads well large)
+ * and wrong for MINI, whose heading face is a heavy display serif — it made
+ * every intro paragraph on the live site render in MINI Serif Black.
+ */
+.vm.vm-mini .vm-lede {
+  font-family: var(--vm-font-body);
+  font-weight: 400;
+}
+
+/* --- MINI buttons: black primary, outline-pill secondary --- */
+/* Secondary/ghost (Back): white fill, 2px black pill border — MINI's signature
+   secondary. The base .vm-btn uses a 1px border, so bump it to 2px here. */
+.vm.vm-mini .vm-btn-ghost {
+  border-width: 2px;
+  font-family: var(--vm-font-bold);
+}
+.vm.vm-mini .vm-btn-primary {
+  border-width: 2px; /* match the secondary's weight so the pair aligns */
+}
+.vm.vm-mini .vm-btn-primary:not(:disabled):hover { filter: none; background: #000; border-color: #000; }
+
+/* --- MINI spot-green touches (small highlights only) --- */
+/* Progress bar, score badges, slider fill and the focus ring carry the brand
+   green so it appears — but sparingly, the way the real site uses it. */
+.vm.vm-mini .vm-progress-bar { background: var(--vm-accent-spot); }
+.vm.vm-mini .vm-score {
+  background: var(--vm-accent-spot);
+  border-color: var(--vm-accent-spot);
+  color: #fff;
+}
+.vm.vm-mini .vm-range-fill,
+.vm.vm-mini .vm-slider-input::-webkit-slider-thumb,
+.vm.vm-mini .vm-slider-input::-moz-range-thumb { background: var(--vm-accent-spot); }
+.vm.vm-mini .vm-slider-input::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--vm-accent-spot); }
+.vm.vm-mini button:focus-visible,
+.vm.vm-mini .vm-slider-input:focus-visible::-webkit-slider-thumb {
+  outline-color: var(--vm-accent-spot);
+  box-shadow: 0 0 0 3px rgba(1, 105, 62, 0.35);
+}
+/* Selected option: black border (the accent) with a subtle green inner tick. */
+.vm.vm-mini .vm-option.is-selected {
+  box-shadow: inset 0 0 0 2px var(--vm-accent), inset 4px 0 0 var(--vm-accent-spot);
+}
+
+.vm-kicker {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-size: var(--vm-text-eyebrow);
+  line-height: 1.2;
+  color: var(--vm-ink-muted);
+  margin: 0 0 var(--vm-space-3);
+}
+
+.vm-title {
+  font-family: var(--vm-font-heading);
+  font-size: var(--vm-text-h1);
+  line-height: 1.2;
+  font-weight: 300;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  margin: 0 0 var(--vm-space-4);
+}
+
+.vm-lede {
+  font-family: var(--vm-font-heading);
+  font-weight: 300;
+  font-size: var(--vm-text-body-lg);
+  line-height: 1.2;
+  color: var(--vm-ink-muted);
+  max-width: 52ch;
+  margin: 0 0 var(--vm-space-6);
+}
+
+.vm-intro { padding: var(--vm-space-8) var(--vm-space-1); }
+
+/* Loading / error status screens (quiz load, match fetch). */
+.vm-status { padding: var(--vm-space-12) var(--vm-space-1); min-height: 180px; }
+
+/* --- buttons --- */
+
+.vm-btn {
+  /* Bold, matching the host sites' own CTAs — a regular-weight button read as
+     lighter than everything around it on the live pages. */
+  font-family: var(--vm-font-bold);
+  font-size: var(--vm-text-label);
+  font-weight: 700;
+  line-height: 1;
+  min-height: var(--vm-btn-height);
+  padding: var(--vm-btn-padding);
+  border-radius: var(--vm-radius-control);
+  cursor: pointer;
+  border: var(--vm-border-width) solid transparent;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.vm-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.vm-btn-primary {
+  background: var(--vm-accent);
+  color: var(--vm-accent-ink);
+  border-color: var(--vm-accent);
+}
+.vm-btn-primary:not(:disabled):hover { filter: brightness(1.08); }
+
+.vm-btn-ghost {
+  background: var(--vm-surface);
+  color: var(--vm-ink);
+  border-color: var(--vm-ink);
+}
+.vm-btn-ghost:not(:disabled):hover { background: var(--vm-surface-alt); }
+
+/* Primary CTAs that stand alone (intro/results/status) get the wide min-width;
+   in-flow nav/action buttons stay their natural size. */
+.vm-intro .vm-btn-primary,
+.vm-status .vm-btn-primary { min-width: var(--vm-btn-min-width); }
+
+.vm button:focus-visible {
+  outline: 2px solid var(--vm-accent);
+  outline-offset: 2px;
+}
+
+/* --- quiz --- */
+
+.vm-screen { animation: vm-in 0.25s ease; }
+
+@keyframes vm-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Skeleton shimmer: sweep the light band from left to right across the block. */
+@keyframes vm-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.vm-progress {
+  height: 4px;
+  background: var(--vm-surface-alt);
+  border-radius: var(--vm-radius);
+  overflow: hidden;
+  margin-bottom: var(--vm-space-3);
+}
+
+.vm-progress-bar {
+  height: 100%;
+  background: var(--vm-accent);
+  border-radius: var(--vm-radius);
+  transition: width 0.3s ease;
+}
+
+.vm-step {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  color: var(--vm-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0 0 var(--vm-space-4);
+}
+
+/* --- answered-question pills (running summary above the question) ---
+   One tap-to-edit chip per already-answered question; wraps onto multiple
+   lines as they accumulate. Sits between the step line and the question. */
+.vm-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vm-space-2);
+  margin: 0 0 var(--vm-space-5);
+}
+
+/* A flat chip in the section-fill grey with a hairline; whole chip is the tap
+   target (jumps back to edit that answer). Sharp corners per the design system. */
+.vm-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vm-space-2);
+  padding: var(--vm-space-1) var(--vm-space-3);
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-label);
+  line-height: 1.4;
+  color: var(--vm-ink);
+  background: var(--vm-surface-alt);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.vm-pill:hover { border-color: var(--vm-accent); background: var(--vm-surface); }
+.vm-pill:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 2px; }
+
+/* The edit glyph is a quiet affordance — muted, and picks up the accent on
+   hover so the whole chip reads as editable. */
+.vm-pill-edit {
+  font-size: var(--vm-text-eyebrow);
+  color: var(--vm-ink-muted);
+}
+.vm-pill:hover .vm-pill-edit { color: var(--vm-accent); }
+
+.vm-question {
+  font-family: var(--vm-font-heading);
+  font-weight: 300;
+  font-size: var(--vm-text-h2);
+  line-height: 1.2;
+  margin: 0 0 var(--vm-space-2);
+  outline: none;
+}
+
+.vm-help {
+  color: var(--vm-ink-muted);
+  font-size: var(--vm-text-body);
+  margin: 0 0 var(--vm-space-5);
+}
+
+.vm-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--vm-space-2);
+  margin: var(--vm-space-5) 0 var(--vm-space-6);
+}
+
+@media (min-width: 560px) {
+  .vm-options { grid-template-columns: 1fr 1fr; }
+}
+
+.vm-option {
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-body);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vm-space-1);
+  background: var(--vm-surface);
+  color: var(--vm-ink);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+  padding: var(--vm-space-4);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Hover is a quiet neutral — a faint tint and a slightly darker edge. It used
+   to jump straight to full ink, which shouted next to the unselected boxes. */
+.vm-option:hover {
+  border-color: var(--vm-ink-muted);
+  background: var(--vm-surface-alt);
+}
+
+/* Keyboard focus keeps a real, visible ring (hover styling alone is not an
+   accessible focus indicator). */
+.vm-option:focus-visible {
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: 2px;
+}
+
+/* Selected: ONE clean accent edge plus a soft wash of the same colour.
+   Previously this painted an accent border AND an inset accent ring, which
+   doubled into a thick saturated outline — the harsh blue box on BMW. */
+.vm-option.is-selected {
+  border-color: var(--vm-accent);
+  background: var(--vm-accent-soft);
+  box-shadow: none;
+}
+
+.vm-option-label { font-family: var(--vm-font-bold); font-weight: 700; }
+.vm-option-sub { font-size: var(--vm-text-label); color: var(--vm-ink-muted); }
+
+/* Slider question: one column, never the 2-up option grid. */
+.vm-options.vm-slider {
+  display: block;
+  padding: var(--vm-space-2) var(--vm-space-1) 0;
+}
+
+/* Big live value readout above the track. */
+.vm-slider-value {
+  display: block;
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-h2, 1.75rem);
+  line-height: 1.1;
+  color: var(--vm-ink-strong);
+  margin-bottom: var(--vm-space-4);
+}
+
+/* The range input, restyled off the native control in BMW blue. */
+.vm-slider-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 24px; /* generous hit area; visual track is drawn shorter below */
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Track — sharp corners, hairline fill, accent to the left of the thumb is
+   approximated by the fill colour (native range has no cheap "elapsed" fill,
+   so we keep a single neutral track with an accent thumb). */
+.vm-slider-input::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--vm-line);
+  border-radius: var(--vm-radius);
+}
+.vm-slider-input::-moz-range-track {
+  height: 4px;
+  background: var(--vm-line);
+  border-radius: var(--vm-radius);
+}
+.vm-slider-input::-moz-range-progress {
+  height: 4px;
+  background: var(--vm-accent);
+}
+
+.vm-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px; /* centre the 18px thumb on the 4px track */
+  background: var(--vm-accent);
+  border: 2px solid var(--vm-surface);
+  border-radius: var(--vm-radius); /* square, per the design system */
+  box-shadow: 0 0 0 1px var(--vm-accent);
+  transition: transform 0.1s ease;
+}
+.vm-slider-input::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--vm-accent);
+  border: 2px solid var(--vm-surface);
+  border-radius: var(--vm-radius);
+  box-shadow: 0 0 0 1px var(--vm-accent);
+}
+.vm-slider-input:hover::-webkit-slider-thumb { transform: scale(1.12); }
+.vm-slider-input:focus-visible { outline: none; }
+.vm-slider-input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(28, 105, 212, 0.35);
+}
+.vm-slider-input:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px rgba(28, 105, 212, 0.35);
+}
+
+/* Min/max end labels under the track. */
+.vm-slider-bounds {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--vm-space-2);
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+}
+
+/* Dual-thumb range (budget): two range inputs overlaid on one track. The track
+   is drawn once here; each input's own track is made transparent so only this
+   shared one shows, with an accent fill spanning the selected bracket. */
+.vm-range {
+  position: relative;
+  height: 24px;
+}
+.vm-range::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  background: var(--vm-line);
+}
+.vm-range-fill {
+  position: absolute;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  background: var(--vm-accent);
+}
+/* Both inputs fill the container and stack; the container's ::before is the
+   visible track, so hide each input's native track. Only the thumbs take
+   pointer events, so whichever thumb you grab wins even where they overlap. */
+.vm-range .vm-slider-input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 24px;
+  pointer-events: none;
+  background: transparent;
+}
+.vm-range .vm-slider-input::-webkit-slider-runnable-track { background: transparent; }
+.vm-range .vm-slider-input::-moz-range-track { background: transparent; }
+.vm-range .vm-slider-input::-moz-range-progress { background: transparent; }
+.vm-range .vm-slider-input::-webkit-slider-thumb { pointer-events: auto; }
+.vm-range .vm-slider-input::-moz-range-thumb { pointer-events: auto; }
+
+.vm-nav { display: flex; justify-content: space-between; gap: var(--vm-space-3); }
+
+/* --- results --- */
+
+/* Unmet-want note: "no fully electric cars here or nearby right now". Sits
+   between the results headline and the hero, because it changes how the hero
+   should be read — these are the closest fit, not the thing that was asked
+   for. Styled as a quiet grey field with a spot-colour edge (blue for BMW,
+   racing green for MINI, via --vm-accent-spot) rather than an alert: it's
+   an honest aside, not an error. Geometry comes from --vm-radius, so it's
+   sharp on BMW and softly rounded on MINI like every other surface. */
+.vm-unmet {
+  display: block;
+  background: var(--vm-surface-alt);
+  border-left: 3px solid var(--vm-accent-spot);
+  border-radius: var(--vm-radius);
+  padding: var(--vm-space-4) var(--vm-space-5);
+  margin: var(--vm-space-5) 0 0;
+}
+
+/* Brand lead-in (MINI only today — BMW states the fact without announcing
+   it), set as the block's standard eyebrow: bold, uppercase, spot colour. */
+.vm-unmet-label {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-size: var(--vm-text-eyebrow);
+  line-height: 1.2;
+  color: var(--vm-accent-spot);
+  margin: 0 0 var(--vm-space-2);
+}
+
+.vm-unmet-text {
+  margin: 0;
+  font-size: var(--vm-text-body);
+  line-height: 1.5;
+  color: var(--vm-ink);
+}
+
+.vm-grid { display: grid; gap: var(--vm-space-4); margin: var(--vm-space-6) 0 var(--vm-space-2); }
+
+/* A tie: no hero, no runners-up tier — every car at the same weight, because
+   the engine rates them the same. Two up from 560px; one column below that,
+   which the base .vm-grid already gives. */
+@media (min-width: 560px) {
+  .vm-grid-tied { grid-template-columns: 1fr 1fr; }
+}
+
+/* --- refine panel: breaking a tie on the things the questions didn't ask ---
+   Deliberately light — a row of chips, not a filter sidebar. This tool is for
+   the buyer who can't yet state a spec; the moment it looks like advanced
+   search it's competing with the real site's filters and losing. */
+.vm-refine { margin-top: var(--vm-space-5); }
+
+.vm-refine-label {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--vm-accent-spot);
+  margin: 0 0 var(--vm-space-3);
+}
+
+.vm-chips { display: flex; flex-wrap: wrap; gap: var(--vm-space-2); }
+
+/* Pill on both brands (MINI's --vm-radius-control is already a pill; BMW's
+   is square, so this is one of the few places the two geometries diverge on
+   purpose — a tappable filter reads as a chip, not a button). */
+.vm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vm-space-2);
+  padding: 8px 14px;
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-label);
+  line-height: 1.2;
+  color: var(--vm-ink);
+  background: var(--vm-surface);
+  border: 1px solid var(--vm-line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.vm-chip:hover { border-color: var(--vm-accent-spot); }
+.vm-chip:focus-visible {
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: 2px;
+}
+
+/* Applied: filled with the spot colour, carrying its own ✕ so it's obvious
+   both that it's on and that it can be taken off. */
+.vm-chip.is-on {
+  background: var(--vm-accent-spot);
+  border-color: var(--vm-accent-spot);
+  color: #fff;
+}
+.vm-chip-x { font-size: 11px; opacity: 0.85; }
+
+/* The paint swatch in a card's spec line: a small dot before the colour name.
+   Hairline border so the white swatch reads on a white card. */
+.vm-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 20%);
+  margin-right: 5px;
+  vertical-align: 1px;
+}
+
+/* --- "Not this one": rejection, and the why that makes it usable ---
+   Deliberately quiet — a small text button at the foot of the card, not a
+   red X. Rejecting is normal browsing behaviour, not an error state. */
+.vm-reject { margin-top: var(--vm-space-4); }
+
+/* Promoted from a small underlined link to a real control. It was styled like
+   a disclaimer while being the second most important thing on the page: it is
+   what makes this a conversation rather than a search result. Still quiet
+   (bordered, not filled — turning a car down is normal browsing, not an
+   error), but now clearly a button, and carrying a hint that says what it
+   does, because nothing previously suggested another car would come up. */
+.vm-reject-open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: var(--vm-space-3) var(--vm-space-4);
+  border: 1px solid var(--vm-line);
+  border-radius: var(--vm-radius, 0);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink);
+}
+
+.vm-reject-hint {
+  font-family: var(--vm-font-body);
+  font-weight: 400;
+  font-size: var(--vm-text-eyebrow);
+  color: var(--vm-ink-muted);
+}
+
+.vm-reject-open:hover {
+  border-color: var(--vm-accent);
+  background: var(--vm-accent-soft);
+}
+.vm-reject-open:focus-visible {
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: 2px;
+}
+
+.vm-reject-menu {
+  margin-top: var(--vm-space-3);
+  padding: var(--vm-space-3);
+  background: var(--vm-surface-alt);
+  border-radius: var(--vm-radius);
+}
+.vm-reject-prompt {
+  margin: 0 0 var(--vm-space-2);
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+}
+
+/* One reason per row: they're read, not scanned, and a wrapped row of pills
+   would invite a fast mis-tap on something that teaches us a dealbreaker. */
+.vm-reject-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--vm-space-2) var(--vm-space-3);
+  margin-bottom: 2px;
+  border: 0;
+  border-radius: var(--vm-radius);
+  background: var(--vm-surface);
+  cursor: pointer;
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink);
+}
+.vm-reject-option:last-child { margin-bottom: 0; }
+.vm-reject-option:hover { background: var(--vm-accent-spot); color: #fff; }
+.vm-reject-option:focus-visible {
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: -2px;
+}
+
+/* --- the running brief: what the tool has picked up so far ---
+   Grows as the buyer taps a chip or turns a car down, so the page visibly
+   holds a model of them instead of silently re-filtering. Deliberately quiet:
+   it's the tool listening, not the tool talking. */
+.vm-brief {
+  margin-top: var(--vm-space-4);
+  padding: var(--vm-space-4) var(--vm-space-5);
+  background: var(--vm-surface-alt);
+  border-left: 3px solid var(--vm-accent-spot);
+  border-radius: var(--vm-radius);
+}
+.vm-brief-label {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--vm-accent-spot);
+  margin: 0 0 var(--vm-space-2);
+}
+/* What they told us in the quiz — the starting brief, and now the whole of
+   what this panel says on its own account. */
+.vm-brief-said {
+  margin: 0 0 var(--vm-space-2);
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+}
+/* Everything learned since the quiz, one statement at a time, each with its
+   own undo. These are deliberately NOT chips: "+ Blue / − Not the red" reads
+   as a model of a person, a row of pills reads as a filter bar, and the model
+   is what this tool has that a stock search does not. The chip row below
+   carries only what could be added next, so each constraint is stated exactly
+   once, in the register that suits it, next to the control that clears it. */
+.vm-brief-item {
+  display: flex;
+  gap: var(--vm-space-2);
+  align-items: baseline;
+  justify-content: flex-start;
+  margin: 0 0 2px;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink);
+}
+.vm-brief-mark {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  width: 0.9em;
+  flex: none;
+  color: var(--vm-accent-spot);
+}
+.vm-brief-item.is-rule .vm-brief-mark { color: var(--vm-ink-muted); }
+/* Not flex-grow: the panel is full width, and stretching the text pinned the
+   undo to the far right where it read as unrelated to the statement it
+   clears. It sits immediately after the words instead. */
+.vm-brief-text { flex: 0 1 auto; min-width: 0; }
+/* Quiet until wanted: the statement is the point, the undo is the escape. */
+.vm-brief-undo {
+  flex: none;
+  padding: 0 var(--vm-space-1);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: var(--vm-text-eyebrow);
+  line-height: 1;
+  color: var(--vm-ink-muted);
+}
+.vm-brief-undo:hover { color: var(--vm-ink); }
+.vm-brief-undo:focus-visible {
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: 2px;
+}
+/* The single count, in the same panel as the statements that caused it. */
+.vm-brief-count {
+  margin: var(--vm-space-2) 0 0;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+}
+
+.vm-refine-status {
+  margin: var(--vm-space-3) 0 0;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+}
+
+/* Refined down to nothing — only reachable by combining chips, so it's an
+   explanation plus a way back, never a bare empty grid. */
+.vm-refine-empty {
+  grid-column: 1 / -1;
+  background: var(--vm-surface-alt);
+  border-left: 3px solid var(--vm-accent-spot);
+  border-radius: var(--vm-radius);
+  padding: var(--vm-space-5);
+}
+.vm-refine-empty-text {
+  margin: 0 0 var(--vm-space-4);
+  font-size: var(--vm-text-body);
+  line-height: 1.5;
+  color: var(--vm-ink);
+}
+
+/* --- results skeleton (shown while /api/match is in flight) ---
+   Reuses the real .vm-card / .vm-grid / .vm-tail-grid structure so the
+   placeholder occupies the same footprint the results will, avoiding a layout
+   jump. Each grey block shimmers via a sweeping gradient. */
+.vm-skel {
+  background: var(--vm-surface-alt);
+  border-radius: var(--vm-radius);
+  /* The sweep: a lighter band travelling across the grey base. */
+  background-image: linear-gradient(
+    90deg,
+    var(--vm-surface-alt) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    var(--vm-surface-alt) 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: vm-shimmer 1.3s ease-in-out infinite;
+}
+
+/* Skeleton cards keep the card frame but drop the shadow/hover affordance. */
+.vm-skel-card { pointer-events: none; }
+
+/* Media band matches the real card's 16:9 photo slot. */
+.vm-skel-media { aspect-ratio: 16 / 9; }
+
+/* Text-line placeholders. Height ≈ a line of body text; widths vary per role
+   so the block reads as text rather than solid bars. */
+.vm-skel-line { height: 0.85em; margin-bottom: var(--vm-space-3); }
+.vm-skel-kicker { height: 0.7em; width: 30%; margin-bottom: var(--vm-space-3); }
+.vm-skel-title { height: 1.6em; width: 70%; margin: 0 0 var(--vm-space-6); }
+.vm-skel-name { width: 60%; height: 1.1em; }
+.vm-skel-specs { width: 85%; }
+.vm-skel-blurb { width: 95%; }
+.vm-skel-blurb:last-child { width: 55%; margin-bottom: 0; }
+
+/* Intro-skeleton shapes: wider lede lines (the intro's lede runs ~3 lines) and
+   a button-shaped block matching the wide primary CTA. */
+.vm-skel-lede { height: 1.1em; width: 90%; }
+.vm-skel-lede-last { width: 65%; margin-bottom: var(--vm-space-8); }
+.vm-skel-btn {
+  height: var(--vm-btn-height);
+  width: var(--vm-btn-min-width);
+  max-width: 100%;
+}
+
+.vm-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+  overflow: hidden;
+}
+
+/* Full-width 16:9 photo band at the top of the card (matching the live-stock
+   API's sixteennine aspect ratio). Flat dark field standing in for the photo
+   until real imagery is wired in. */
+.vm-card-media {
+  position: relative;
+  background: var(--vm-surface-dark);
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: flex-end;
+  padding: var(--vm-space-4) var(--vm-space-5);
+  overflow: hidden;
+}
+
+/* Real retailer photo fills the media slot; the line label sits over it. */
+.vm-card-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vm-card-line {
+  position: relative; /* keep the label above the photo */
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--vm-accent-ink);
+}
+
+/* On photo cards, give the label a scrim so it stays legible over imagery. */
+.vm-card-media.has-photo .vm-card-line {
+  color: #fff;
+  padding: var(--vm-space-1) var(--vm-space-2);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/* "Images coming soon" — the placeholder for a photo-less listing, matching
+   usedcars.bmw.co.uk's own PDP: white bold caption centred on the dark media
+   field. Absolutely positioned so it centres independently of the bottom-left
+   line label. Hidden once a real photo loads (has-photo). */
+.vm-card-soon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--vm-space-4);
+  text-align: center;
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  color: var(--vm-accent-ink);
+}
+
+.vm-card-media.has-photo .vm-card-soon { display: none; }
+
+/* Column so the CTA can pin to the bottom (margin-top: auto below). Cards in
+   a tie now sit side by side at full size, where they used to be a single
+   full-width hero, so their heights vary with the picker and the reasons —
+   without this the link floated wherever the content stopped and the row read
+   as broken rather than as equal-weight options. */
+.vm-card-body {
+  display: flex;
+  flex-direction: column;
+  padding: var(--vm-space-6);
+}
+
+.vm-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--vm-space-3);
+}
+
+.vm-card-name {
+  font-family: var(--vm-font-heading);
+  font-weight: 300;
+  font-size: var(--vm-text-h3);
+  line-height: 1.33;
+  margin: 0;
+  /* Take the space the badge doesn't, and wrap between words rather than
+     orphaning the trim level onto its own line ("MINI Hatch Electric Level"
+     / "3"), which is what a shared baseline row produced once the cards
+     halved in width. */
+  flex: 1 1 auto;
+  min-width: 0;
+  text-wrap: balance;
+}
+
+.vm-score {
+  flex: none;
+  margin-top: 2px; /* optically centres on the name's first line */
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  color: var(--vm-accent-ink);
+  background: var(--vm-accent);
+  border: var(--vm-border-width) solid var(--vm-accent);
+  border-radius: var(--vm-radius);
+  font-size: var(--vm-text-label);
+  padding: var(--vm-space-1) var(--vm-space-3);
+}
+
+.vm-specs { color: var(--vm-ink-muted); font-size: var(--vm-text-label); margin: var(--vm-space-2) 0 var(--vm-space-2); }
+.vm-usedmeta {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  color: var(--vm-ink);
+  font-size: var(--vm-text-label);
+  margin: 0 0 var(--vm-space-3);
+}
+.vm-blurb { margin: 0 0 var(--vm-space-1); font-size: var(--vm-text-body); }
+
+.vm-card-link {
+  display: inline-block;
+  /* Pinned to the foot of the card so side-by-side cards line their CTAs up. */
+  margin-top: auto;
+  padding-top: var(--vm-space-4);
+  align-self: flex-start;
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  color: var(--vm-accent);
+  text-decoration: none;
+}
+.vm-card-link:hover { text-decoration: underline; }
+
+.vm-why-label {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  margin: var(--vm-space-4) 0 var(--vm-space-2);
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--vm-accent);
+}
+
+.vm-reasons { margin: 0; padding: 0 0 0 var(--vm-space-5); font-size: var(--vm-text-body); }
+.vm-reasons li { margin-bottom: var(--vm-space-1); }
+
+/* What's fitted, from the feed's factory options. A flat comma list rather
+   than a bulleted one: these are facts to scan for a word ("ISOFIX"), not an
+   argument to read, and bullets would give them the weight of the reasons
+   below. Muted like the spec line, which is the register they belong to. */
+.vm-kit {
+  margin: 0;
+  font-size: var(--vm-text-label);
+  line-height: 1.5;
+  color: var(--vm-ink-muted);
+}
+
+/* The hero card owning a want it doesn't meet ("Petrol, where you asked for
+   all-electric.") — the per-car sibling of the .vm-unmet note, so its
+   eyebrow takes the same spot colour as that note's edge: one colour for
+   honesty, everywhere it appears. Plain text under the eyebrow, no field or
+   border — it's a statement in the card's own voice, not a warning. */
+.vm-trade-label { color: var(--vm-accent-spot); }
+.vm-trade-text {
+  margin: 0;
+  font-size: var(--vm-text-body);
+  line-height: 1.5;
+  color: var(--vm-ink);
+}
+
+.vm-subhead {
+  font-family: var(--vm-font-heading);
+  font-weight: 300;
+  margin: var(--vm-space-8) 0 var(--vm-space-3);
+  font-size: var(--vm-text-h3);
+  color: var(--vm-ink);
+}
+
+/* --- "worth the drive": nearby-retailer carousel ---
+   Styled as a full-width grey content band (BMW's own "why choose BMW
+   servicing"-style module: grey field, uppercase heading, even 3-up
+   spacing) rather than sitting directly on the white results page. */
+
+/* --- the rest of the list ---
+   The "More at <retailer>" band that used to live here is gone: it was a
+   second ranked list with its own caption, and its caption ended up
+   contradicting the headline whenever it outscored the lead. */
+
+/* The rest of a group's list, smaller. Three up so it reads as a continuation
+   of the same list rather than as a second, competing one — the old two-up
+   "More at <retailer>" band looked like a fresh section with its own claim,
+   which is exactly what it turned out to be doing. No heading of its own any
+   more: it sits under its group's place label, and the weight step from cards
+   to tiles is the only thing marking it, which is right because the step is a
+   fact about rank inside one sorted list, not a claim about a different one. */
+.vm-tail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--vm-space-4);
+  align-items: start;
+}
+
+.vm-tail-grid .vm-card-compact {
+  border-color: var(--vm-line);
+  box-shadow: none;
+}
+
+@media (max-width: 1023px) {
+  .vm-tail-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 639px) {
+  .vm-tail-grid { grid-template-columns: 1fr; }
+}
+
+/* Where the car is, on every card. Muted, because it's a fact about the car
+   rather than a claim about the match. */
+.vm-distance-here {
+  font-family: var(--vm-font-body);
+  color: var(--vm-ink-muted);
+}
+
+/* The "we looked further afield" line. Accent-edged like the unmet/rescue notes
+   it sits alongside, because it is the same kind of statement: the tool telling
+   you something about its own search rather than about a car. */
+/* The working: what was searched, what survived, how far clear the winner is.
+   Last on the page and quiet with it, because it is evidence for the verdict
+   above rather than a claim of its own. Ruled off so it reads as a footnote to
+   the whole list rather than a note attached to the last card. */
+/* "Still checking other retailers" while the national search is outstanding.
+   Holds the group's space so its cars do not appear out of nothing several
+   seconds after the page settled. Quiet: it is a status, not a result. */
+.vm-pending {
+  display: flex;
+  align-items: center;
+  gap: var(--vm-space-2);
+  margin: 0 0 var(--vm-space-4);
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+}
+
+.vm-pending[hidden] { display: none; }
+
+.vm-pending-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--vm-accent);
+  animation: vm-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes vm-pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+/* Respect a stated preference for less motion: the dot still marks the spot,
+   it just stops pulsing. */
+@media (prefers-reduced-motion: reduce) {
+  .vm-pending-dot { animation: none; opacity: 0.6; }
+}
+
+.vm-working {
+  margin-top: var(--vm-space-7);
+  padding-top: var(--vm-space-4);
+  border-top: 1px solid var(--vm-line);
+}
+
+.vm-working[hidden] { display: none; }
+
+.vm-working-label {
+  margin: 0 0 var(--vm-space-1);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--vm-ink-muted);
+}
+
+.vm-working-text {
+  margin: 0;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+}
+
+.vm-notice {
+  margin-bottom: var(--vm-space-5);
+  padding: var(--vm-space-3) var(--vm-space-4);
+  border-left: 3px solid var(--vm-accent);
+  background: var(--vm-surface-alt);
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink);
+}
+
+/* The chips sit ABOVE the cards again: they're a control, and a control has to
+   be visible next to the thing it controls. Below the fold they read, in the
+   owner's words, as "unclear what clicking them affects". Kept to one light
+   strip so it's a control and not a second question between the headline and
+   the car. Deliberately not sticky — that fights the EDS host page's header. */
+.vm-refine-tools { margin: var(--vm-space-6) 0 var(--vm-space-5); }
+
+.vm-refine-tools:empty { display: none; }
+
+/* The brief sits ABOVE the cards, immediately over the chips, so the two read
+   as one statement: here is what I understand about you, and here is how to
+   change it. Below the cards it was unreachable — nobody scrolls past fourteen
+   cars to read what they typed themselves — which made the one signal that
+   says the tool holds a model of you the one thing never seen. No rule above
+   it: it opens the block rather than starting a new movement inside it. */
+.vm-brief-block { margin-bottom: var(--vm-space-4); }
+
+.vm-brief-block:empty { display: none; }
+
+/* --- the two groups: the retailer's cars, then everyone else's ---
+   The heading names a PLACE and nothing else. It is not allowed to rank, which
+   is why "NEXT BEST" and "Close, but not level with the cars above" are gone:
+   two sections making claims on one scale is how the old page ended up
+   contradicting itself. A place label can't contradict a score. */
+.vm-group + .vm-group { margin-top: var(--vm-space-8); }
+
+/* Full ink, not the muted grey the old "NEXT BEST" heading used. That one was
+   marking a demotion so it whispered; this one is the signpost that makes a
+   99% below a 96% read as a fact about geography rather than an error, and it
+   has to be seen for the page to be honest. The gap between groups comes from
+   the rule above, so the label itself sits tight to its cards. */
+.vm-group-label { margin-top: 0; }
+
+/* The group's own grids butt up under its label, so the lead grid drops the top
+   margin .vm-grid carries for the standalone case. Either grid can come back
+   empty — a group with no car outranking the retailer's best has tiles only,
+   and one with fewer than TAIL_SHOWN spare cars has lead cards only. */
+.vm-group > .vm-grid { margin-top: 0; }
+
+.vm-group > .vm-tail-grid { margin-top: var(--vm-space-4); }
+
+.vm-group > .vm-grid:empty,
+.vm-group > .vm-tail-grid:empty { display: none; }
+
+/* Bleeds out to the block's own edges by cancelling .vm's side padding,
+   so the band reads as a distinct section rather than an inset panel. */
+.vm-nearby-band {
+  background: var(--vm-surface-alt);
+  margin: var(--vm-space-8) calc(var(--vm-space-5) * -1) calc(var(--vm-space-2) * -1);
+  padding: var(--vm-space-8) var(--vm-space-5);
+}
+
+/* Matches BMW's own "WHY CHOOSE BMW SERVICING?" module heading: the Light
+   face (inherited from .vm-subhead) at 28px, left-aligned, normal tracking.
+   BMW bakes the caps into the copy rather than using text-transform, so the
+   heading text is authored in caps and no transform is applied here. */
+.vm-nearby-heading {
+  margin-top: 0;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+/* The lede sits under the subhead, so drop the subhead's bottom margin.
+   Also release .vm-lede's 52ch reading measure: that's tuned for the intro's
+   narrow column, but here the lede captions a full-width band and the 52ch cap
+   made it wrap mid-band on desktop. One sentence across the band is fine. */
+.vm-nearby-lede { margin: 0 0 var(--vm-space-6); max-width: none; }
+
+/* Horizontal scroll-snap track. Three tiles fit on desktop; on mobile the
+   clamp below leaves the next tile peeking, which is what signals "swipe". */
+.vm-nearby {
+  display: flex;
+  gap: var(--vm-space-6);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  /* Room for the focus ring, which would otherwise be clipped by overflow. */
+  padding: var(--vm-space-1);
+  margin: 0 calc(var(--vm-space-1) * -1);
+  scrollbar-width: none; /* the peeking tile is the affordance */
+}
+
+.vm-nearby::-webkit-scrollbar { display: none; }
+
+.vm-card-compact {
+  flex: 0 0 clamp(240px, 72vw, 300px);
+  scroll-snap-align: start;
+  /* On a grey band a bordered white card reads as a tile, matching the
+     photo-over-text module style rather than the hairline-bordered hero card. */
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* Tighter than a hero card: this is a glance, not a pitch. The body fills the
+   tile's height (tiles stretch to the tallest via the track's default
+   align-items: stretch) so the "View at…" anchor can be pinned to the bottom
+   edge — the card names run 1–2 lines and the distance/used-meta lines are
+   conditional, which would otherwise leave the CTAs at ragged heights. */
+.vm-card-compact .vm-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--vm-space-4);
+}
+
+/* Pin the anchor to the bottom of the tile, taking up the slack above it.
+   margin-top: auto eats the fixed gap, so restore the breathing room as
+   padding for the tallest tile (where there's no slack to absorb). */
+.vm-card-compact .vm-card-link {
+  margin-top: auto;
+  padding-top: var(--vm-space-4);
+}
+
+/* Most feed names are short (~24 chars), but a minority are raw Auto Trader
+   dumps up to 80 ("BMW 1.5 118i Sport Hatchback 5dr Petrol Auto Euro 6 (s/s)").
+   At the hero card's 24px those take four lines in a 300px tile, so step the
+   size down and cap at two. No title tooltip: the feed itself already sends
+   ~6% of these names pre-truncated with an ellipsis, so it would promise a
+   full name we don't have. The card links out for the full detail. */
+.vm-card-compact .vm-card-name {
+  font-size: var(--vm-text-body);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The score is a small badge, not a column-squeezing peer of the name. */
+.vm-card-compact .vm-card-head { gap: var(--vm-space-2); }
+.vm-card-compact .vm-score { flex: none; }
+
+.vm-distance {
+  margin: var(--vm-space-3) 0 0;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+}
+
+/* The distance is the reason this section exists — give it the accent. */
+.vm-distance-miles {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  color: var(--vm-accent);
+}
+
+.vm-actions { display: flex; flex-wrap: wrap; gap: var(--vm-space-3); margin: var(--vm-space-8) 0 var(--vm-space-2); }
+
+.vm-disclaimer { color: var(--vm-ink-muted); font-size: var(--vm-text-label); margin-top: var(--vm-space-5); }
+
+/* --- live "best guess" strip (quiz screen) ---
+   Always-open (no toggle): a heading + a horizontal track of compact result
+   tiles — the same card the results carousel uses. Only mounted once there are
+   matches (see showPreview), so there's never an empty state on screen. Sits
+   BELOW the quiz nav as a full-bleed grey band, reusing the .vm-nearby-band
+   treatment so it reads as a distinct section rather than an inset panel. */
+.vm-preview {
+  background: var(--vm-surface-alt);
+  margin: var(--vm-space-8) calc(var(--vm-space-5) * -1) calc(var(--vm-space-8) * -1);
+  padding: var(--vm-space-6) var(--vm-space-5);
+}
+
+/* Uppercase heading in the Light face, matching the results-page subheads
+   (inherits size/tracking from .vm-nearby-heading). */
+.vm-preview-heading { margin: 0 0 var(--vm-space-4); }
+
+/* The track reuses .vm-nearby's horizontal scroll-snap layout, so the tiles
+   scroll with the next one peeking — same affordance as the results carousel —
+   and the .vm-card-compact tile styling comes for free. The opacity
+   transition drives the soft cross-fade on re-rank (see paintPreview). */
+.vm-preview-track {
+  transition: opacity 0.15s ease;
+  align-items: stretch;
+}
+.vm-preview-track.is-fading { opacity: 0; }
+
+/* --- small "mini" preview tiles ---
+   A flat white card, lighter than the results-page compact card: small photo,
+   model name + match score, one spec line. The whole tile is the tap target
+   (an <a> to the live listing). Sharp corners + hairline to match the system. */
+.vm-ptile {
+  flex: 0 0 clamp(150px, 46vw, 176px);
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  color: var(--vm-ink);
+  text-decoration: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+a.vm-ptile:hover { border-color: var(--vm-ink); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); }
+a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 2px; }
+
+/* Media band: shorter than the results card; the line label sits in its
+   bottom corner over the photo (or the "Images coming soon" placeholder). */
+.vm-ptile-media {
+  aspect-ratio: 16 / 10;
+  padding: var(--vm-space-2);
+}
+.vm-ptile-media .vm-card-line { align-self: flex-end; }
+.vm-ptile-media .vm-card-soon { font-size: var(--vm-text-eyebrow); }
+
+.vm-ptile-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vm-space-1);
+  padding: var(--vm-space-3);
+}
+.vm-ptile-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--vm-space-2); }
+.vm-ptile-name {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  line-height: 1.25;
+  /* Wrap to two lines, then ellipsis — most names fit, the long Auto Trader
+     dumps truncate. Tiles stretch to the tallest (track align-items: stretch),
+     so a two-line name doesn't leave the others ragged. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Score badge: a touch smaller than the results card's. */
+.vm-ptile-score { flex: none; font-size: var(--vm-text-label); }
+.vm-ptile-specs { font-size: var(--vm-text-eyebrow); color: var(--vm-ink-muted); }
+
+/* Skeleton preview tile: same footprint as a real mini tile so the strip holds
+   its size, then real tiles swap in without a layout jump. The media band is a
+   plain shimmer block (no padding/line label), and the two text lines shimmer
+   in the body. Not interactive. */
+.vm-skel-ptile { pointer-events: none; }
+.vm-skel-ptile .vm-ptile-media { padding: 0; }
+.vm-skel-ptile .vm-skel-name { width: 70%; margin-bottom: var(--vm-space-2); }
+.vm-skel-ptile .vm-skel-specs { width: 45%; margin-bottom: 0; }
+
+/* Skeleton tiles drop the hairline everywhere — a borderless shimmer reads
+   cleaner. Only the border-COLOR goes (not the border itself) so the real
+   bordered card swaps in without a 1px layout shift. Lives down here so it
+   outranks the earlier same-specificity .vm-tail-grid .vm-card-compact and
+   .vm-ptile border rules. */
+.vm-card.vm-skel-card,
+.vm-tail-grid .vm-skel-card,
+.vm-skel-ptile { border-color: transparent; }
+
+/* Mobile: hero steps 40px → 32px (the one confirmed breakpoint data point);
+   other headings scale down ~proportionally. Desktop values are the defaults
+   above, so only the stepped-down overrides live here. */
+@media (max-width: 767px) {
+  .vm-title { font-size: 32px; }
+  .vm-question { font-size: 22px; }
+  .vm-card-name, .vm-subhead { font-size: 20px; }
+  /* BMW's own module steps its heading 28px → 18px at this same 768px
+     breakpoint; the .vm-subhead override above doesn't reach the more
+     specific nearby-heading rule, so step it down explicitly to match. */
+  .vm-nearby-heading { font-size: 18px; }
+  .vm-lede { font-size: var(--vm-text-body); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-screen { animation: none; }
+  .vm-btn, .vm-option, .vm-progress-bar { transition: none; }
+  .vm-slider-input::-webkit-slider-thumb { transition: none; }
+  .vm-slider-input:hover::-webkit-slider-thumb { transform: none; }
+  /* Drop the sweep; keep a static grey tint so the skeleton still reads. */
+  .vm-skel { animation: none; background-image: none; }
+  /* Instant swap instead of the cross-fade when the guess re-ranks. */
+  .vm-preview-track { transition: none; }
+  .vm-preview-track.is-fading { opacity: 1; }
+}
+
+/* Availability line on a grouped card: "4 available · £31k–£37k · Portimao
+   Blue, Brooklyn Grey or Alpine White". Quiet, factual, sits under the specs. */
+.vm-avail {
+  margin: var(--vm-space-2) 0 0;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+  line-height: 1.4;
+}
+.vm-avail-count {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  color: var(--vm-accent-spot);
+}
+
+/* --- "Choose yours": the last step, picking the actual car ---
+   A grouped card speaks for several listings of one model. These are those
+   listings: colour, price, mileage. Selecting one re-describes the card, so
+   the buyer leaves with a specific car rather than whichever advert ranked
+   first. Laid out as a column, because it's a decision, not a filter row. */
+.vm-pick { display: flex; flex-direction: column; gap: var(--vm-space-2); }
+
+.vm-pick-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--vm-space-3);
+  width: 100%;
+  text-align: left;
+  padding: var(--vm-space-3) var(--vm-space-4);
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+  cursor: pointer;
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.vm-pick-opt:hover {
+  border-color: var(--vm-ink-muted);
+  background: var(--vm-surface-alt);
+}
+.vm-pick-opt:focus-visible {
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: 2px;
+}
+.vm-pick-opt.is-on {
+  border-color: var(--vm-accent);
+  background: var(--vm-accent-soft);
+}
+.vm-pick-colour { font-family: var(--vm-font-bold); font-weight: 700; }
+/* Price and mileage sit right, so the colours read as a column on the left. */
+.vm-pick-meta { margin-left: auto; color: var(--vm-ink-muted); }
+
+/* --- mode switcher ------------------------------------------------------
+   Only present when the block is UNLOCKED and more than one interface mode is
+   registered (the showcase). A production page authors a "Mode" row, which
+   hides the switcher entirely — so these rules never apply there and the block
+   looks exactly as it did before modes existed. A quiet segmented control: it
+   picks the interface, so it must not compete with the interface's own CTA.
+   Themed off the shared tokens, so it follows brand (BMW blue / MINI green)
+   without a per-brand rule. */
+.vm-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--vm-line);
+}
+.vm-switcher-tab {
+  appearance: none;
+  border: 1px solid var(--vm-line);
+  background: transparent;
+  color: var(--vm-ink-muted);
+  font-family: var(--vm-font-body);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  padding: 7px 14px;
+  border-radius: var(--vm-radius-control);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.vm-switcher-tab:hover {
+  color: var(--vm-ink);
+  border-color: var(--vm-ink-muted);
+}
+.vm-switcher-tab.is-active {
+  color: var(--vm-accent-ink);
+  background: var(--vm-accent);
+  border-color: var(--vm-accent);
+  cursor: default;
+}
+
+/* The active mode mounts here. Transparent and layout-neutral: with no
+   switcher above it, the stage is indistinguishable from the block itself, so
+   a locked page is unchanged. */
+.vm-stage { display: block; }
+
+/* ========================================================================
+ * MINI Mingle — the swipe mode (modes/mingle.js)
+ *
+ * A Valentine's swipe game over the shared engine: a seed step, a swipeable
+ * deck of real stock, and a match reveal. All scoped under .vm and built on the
+ * same tokens as the questions mode; MINI tweaks live under .vm.vm-mini so a
+ * BMW skin inherits the base. Every animation is disabled under the
+ * reduced-motion block at the end of this section.
+ *
+ * A --vm-mingle-swatch custom property carries each card's paint colour (set in
+ * JS from the enriched car.colour) so the colour bar + media tint read one
+ * value. It falls back to a neutral so an un-enriched card still renders.
+ * ==================================================================== */
+
+.vm-mingle-wordmark { color: var(--vm-accent-spot); }
+
+/* --- seed step: budget + "what's it for" tiles --- */
+.vm-mingle-seed { padding: var(--vm-space-6) var(--vm-space-1) var(--vm-space-8); }
+
+.vm-mingle-seed-label {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--vm-ink-muted);
+  margin: var(--vm-space-6) 0 var(--vm-space-3);
+}
+
+.vm-mingle-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--vm-space-2);
+}
+@media (min-width: 560px) {
+  .vm-mingle-tiles-budget { grid-template-columns: repeat(5, 1fr); }
+  .vm-mingle-tiles-use { grid-template-columns: repeat(3, 1fr); }
+}
+
+.vm-mingle-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: var(--vm-space-3) var(--vm-space-4);
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+  cursor: pointer;
+  color: var(--vm-ink);
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-body);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.vm-mingle-tiles-budget .vm-mingle-tile {
+  align-items: center;
+  text-align: center;
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+}
+.vm-mingle-tile:hover { border-color: var(--vm-ink-muted); background: var(--vm-surface-alt); }
+.vm-mingle-tile:focus-visible { outline: 2px solid var(--vm-accent-spot); outline-offset: 2px; }
+.vm-mingle-tile.is-selected {
+  border-color: var(--vm-accent);
+  background: var(--vm-accent-soft);
+}
+.vm-mingle-tile-label { font-family: var(--vm-font-bold); font-weight: 700; }
+.vm-mingle-tile-hint { font-size: var(--vm-text-label); color: var(--vm-ink-muted); }
+
+.vm-mingle-seed-cta { margin-top: var(--vm-space-8); min-width: var(--vm-btn-min-width); }
+
+/* --- the swipe stage: taste panel + deck, stacked on mobile, side-by-side ≥560 --- */
+.vm-mingle-stage {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--vm-space-6);
+  animation: vm-in 0.25s ease;
+}
+@media (min-width: 560px) {
+  .vm-mingle-stage {
+    grid-template-columns: 220px 1fr;
+    align-items: start;
+  }
+}
+
+/* --- live taste profile (from the kept set) --- */
+.vm-mingle-taste {
+  order: 2;
+  padding: var(--vm-space-4);
+  background: var(--vm-surface-alt);
+  border-radius: var(--vm-radius);
+}
+@media (min-width: 560px) { .vm-mingle-taste { order: 0; } }
+
+.vm-mingle-taste-heading,
+.vm-mingle-kept-heading {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--vm-ink-muted);
+  margin: 0 0 var(--vm-space-3);
+}
+.vm-mingle-kept-heading { margin-top: var(--vm-space-5); }
+
+.vm-mingle-bars { display: flex; flex-direction: column; gap: var(--vm-space-3); }
+.vm-mingle-bar { display: grid; grid-template-columns: 3.5em 1fr auto; align-items: center; gap: var(--vm-space-2); }
+.vm-mingle-bar-key {
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--vm-ink-muted);
+}
+.vm-mingle-bar-track {
+  height: 6px;
+  background: var(--vm-surface);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.vm-mingle-bar-fill {
+  height: 100%;
+  width: 0;
+  background: var(--vm-accent-spot);
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+.vm-mingle-bar-val {
+  font-size: var(--vm-text-label);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  text-align: right;
+  min-width: 4.5em;
+}
+
+.vm-mingle-taste-empty { font-size: var(--vm-text-label); color: var(--vm-ink-muted); margin: 0; }
+.vm-mingle-kept { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--vm-space-1); }
+.vm-mingle-kept-item { font-size: var(--vm-text-label); }
+.vm-mingle-kept-item::before { content: '♥ '; color: var(--vm-accent-spot); }
+
+/* --- deck column: progress, stack, controls --- */
+.vm-mingle-deck { order: 1; display: flex; flex-direction: column; }
+.vm-mingle-deck:focus-visible { outline: 2px solid var(--vm-accent-spot); outline-offset: 4px; }
+
+.vm-mingle-progress { display: flex; align-items: center; gap: var(--vm-space-3); margin-bottom: var(--vm-space-2); }
+.vm-mingle-count {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--vm-ink-muted);
+}
+.vm-mingle-dots { display: flex; gap: 4px; flex-wrap: wrap; }
+.vm-mingle-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--vm-line);
+}
+.vm-mingle-dot.is-current { background: var(--vm-ink-muted); transform: scale(1.25); }
+.vm-mingle-dot.is-keep { background: var(--vm-accent-spot); }
+.vm-mingle-dot.is-pass { background: var(--vm-ink); opacity: 0.35; }
+
+.vm-mingle-instruction {
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+  margin: 0 0 var(--vm-space-4);
+  max-width: 40ch;
+}
+
+/* The card stack: front card in flow, the two behind it peek out and scale
+   down. A fixed-ratio well keeps the deck height stable as cards swap. */
+.vm-mingle-stack {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  max-width: 360px;
+  width: 100%;
+  margin: 0 auto var(--vm-space-5);
+}
+
+.vm-mingle-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+  overflow: hidden;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+  transform-origin: center bottom;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+/* Depth: front card live and upright; the ones behind sit lower + smaller. */
+.vm-mingle-card-0 { z-index: 3; }
+.vm-mingle-card-1 { z-index: 2; transform: translateY(10px) scale(0.96); }
+.vm-mingle-card-2 { z-index: 1; transform: translateY(20px) scale(0.92); }
+
+/* Fly-out on swipe. The front card leaves in the swipe direction with a tilt. */
+.vm-mingle-card-0.is-flying-right { transform: translateX(120%) rotate(20deg); opacity: 0; }
+.vm-mingle-card-0.is-flying-left { transform: translateX(-120%) rotate(-20deg); opacity: 0; }
+
+/* Colour bar across the top, tinted from the car's paint. */
+.vm-mingle-card-colour {
+  height: 6px;
+  flex: none;
+  background: var(--vm-mingle-swatch, #c8ccce);
+}
+
+.vm-mingle-card-media {
+  position: relative;
+  flex: 1;
+  background: var(--vm-surface-dark);
+  overflow: hidden;
+}
+/* A soft wash of the paint colour over the photo, so the deck reads by colour. */
+.vm-mingle-card-media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--vm-mingle-swatch, transparent);
+  mix-blend-mode: multiply;
+  opacity: 0.14;
+  pointer-events: none;
+}
+.vm-mingle-card-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.vm-mingle-card-media.no-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vm-mingle-swatch, var(--vm-surface-dark));
+}
+.vm-mingle-card-initial {
+  font-family: var(--vm-font-heading);
+  font-size: 64px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Flirty badge — flavour, top-left over the media. */
+.vm-mingle-badge {
+  position: absolute;
+  top: var(--vm-space-3);
+  left: var(--vm-space-3);
+  z-index: 1;
+  padding: var(--vm-space-1) var(--vm-space-3);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.68);
+  color: #fff;
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.vm-mingle-card-body { padding: var(--vm-space-4) var(--vm-space-5) var(--vm-space-5); }
+.vm-mingle-card-name {
+  font-family: var(--vm-font-heading);
+  font-size: var(--vm-text-h3);
+  font-weight: 300;
+  line-height: 1.15;
+  margin: 0 0 var(--vm-space-1);
+}
+.vm-mingle-card-spec { font-size: var(--vm-text-label); color: var(--vm-ink-muted); margin: 0 0 var(--vm-space-2); }
+.vm-mingle-card-price {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-body-lg);
+  margin: 0 0 var(--vm-space-3);
+}
+
+.vm-mingle-pills { display: flex; flex-wrap: wrap; gap: var(--vm-space-2); }
+.vm-mingle-pill {
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 3px var(--vm-space-3);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: 999px;
+  color: var(--vm-ink-muted);
+}
+
+/* --- swipe controls: Pass / Keep --- */
+.vm-mingle-controls { display: flex; justify-content: center; gap: var(--vm-space-5); margin-bottom: var(--vm-space-4); }
+.vm-mingle-swipe {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vm-space-2);
+  min-height: var(--vm-btn-height);
+  padding: 0 var(--vm-space-6);
+  border-radius: var(--vm-radius-control);
+  border: var(--vm-border-width) solid var(--vm-ink);
+  background: var(--vm-surface);
+  color: var(--vm-ink);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.vm-mingle-swipe:active { transform: scale(0.96); }
+.vm-mingle-swipe-glyph { font-size: var(--vm-text-body-lg); line-height: 1; }
+.vm-mingle-pass:hover { border-color: var(--vm-ink); background: var(--vm-ink); color: var(--vm-surface); }
+.vm-mingle-keep {
+  border-color: var(--vm-accent-spot);
+  color: var(--vm-accent-spot);
+}
+.vm-mingle-keep:hover { background: var(--vm-accent-spot); color: #fff; }
+.vm-mingle-swipe:focus-visible { outline: 2px solid var(--vm-accent-spot); outline-offset: 2px; }
+
+/* Undo / reveal-early — quiet text links under the controls. */
+.vm-mingle-extras { display: flex; flex-direction: column; align-items: center; gap: var(--vm-space-2); }
+.vm-mingle-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--vm-ink-muted);
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-label);
+  cursor: pointer;
+  padding: var(--vm-space-1) var(--vm-space-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.vm-mingle-link:hover { color: var(--vm-ink); }
+.vm-mingle-link:focus-visible { outline: 2px solid var(--vm-accent-spot); outline-offset: 2px; }
+.vm-mingle-reveal {
+  color: var(--vm-accent-spot);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+}
+
+/* --- seed / deck / result skeletons --- */
+.vm-mingle-skel-tiles { height: 68px; margin-bottom: var(--vm-space-4); }
+.vm-mingle-skel-card { aspect-ratio: 3 / 4; max-width: 360px; width: 100%; margin: 0 auto; }
+.vm-mingle-skel-hero { aspect-ratio: 16 / 9; width: 100%; margin-top: var(--vm-space-6); }
+
+/* --- result reveal --- */
+.vm-mingle-result { position: relative; padding: var(--vm-space-6) var(--vm-space-1) var(--vm-space-8); text-align: center; }
+.vm-mingle-match-kicker { color: var(--vm-accent-spot); }
+.vm-mingle-result .vm-title,
+.vm-mingle-result .vm-lede { text-align: center; margin-inline: auto; }
+
+.vm-mingle-hero {
+  display: flex;
+  flex-direction: column;
+  max-width: 420px;
+  margin: var(--vm-space-6) auto;
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+  text-align: left;
+}
+.vm-mingle-hero .vm-mingle-card-media { aspect-ratio: 16 / 9; flex: none; }
+
+.vm-mingle-why {
+  max-width: 460px;
+  margin: 0 auto var(--vm-space-5);
+  text-align: left;
+}
+.vm-mingle-why-intro {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--vm-ink-muted);
+  margin: 0 0 var(--vm-space-2);
+}
+.vm-mingle-why-list { margin: 0; padding-left: var(--vm-space-5); }
+.vm-mingle-why-item { margin-bottom: var(--vm-space-1); }
+.vm-mingle-callback {
+  margin: var(--vm-space-3) 0 0;
+  font-family: var(--vm-font-heading);
+  font-weight: 300;
+  color: var(--vm-accent-spot);
+}
+
+.vm-mingle-weak-note {
+  max-width: 460px;
+  margin: 0 auto var(--vm-space-5);
+  padding: var(--vm-space-3) var(--vm-space-4);
+  background: var(--vm-surface-alt);
+  border-radius: var(--vm-radius);
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+  line-height: 1.5;
+}
+
+.vm-mingle-ctas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vm-space-3);
+  max-width: 320px;
+  margin: 0 auto;
+}
+.vm-mingle-ctas .vm-btn { width: 100%; text-align: center; }
+.vm-mingle-drive { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+.vm-mingle-ctas .vm-btn-ghost { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+
+/* --- confetti burst on the match (gated on reduced-motion below) --- */
+.vm-mingle-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.vm-mingle-confetti-bit {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 12px;
+  background: var(--vm-accent-spot);
+  opacity: 0.9;
+  animation: vm-mingle-fall 1.4s ease-in forwards;
+}
+.vm-mingle-confetti-bit:nth-child(even) { background: var(--vm-accent-secondary); width: 7px; height: 7px; border-radius: 999px; }
+.vm-mingle-confetti-bit:nth-child(3n) { background: var(--vm-ink); }
+
+@keyframes vm-mingle-fall {
+  from { transform: translateY(0) rotate(0); opacity: 0.95; }
+  to { transform: translateY(420px) rotate(320deg); opacity: 0; }
+}
+
+/* --- MINI tweaks: pill controls + serif callback already inherit; nudge the
+   card name to the MINI uppercase-serif treatment the base .vm-title gets. --- */
+.vm.vm-mini .vm-mingle-card-name,
+.vm.vm-mini .vm-mingle-taste-heading,
+.vm.vm-mini .vm-mingle-kept-heading {
+  font-family: var(--vm-font-heading);
+  text-transform: uppercase;
+}
+
+/* --- reduced motion: kill every mingle animation + transition --- */
+@media (prefers-reduced-motion: reduce) {
+  .vm-mingle-stage { animation: none; }
+  .vm-mingle-card,
+  .vm-mingle-bar-fill,
+  .vm-mingle-swipe { transition: none; }
+  /* No fly-out — the JS commits instantly in this mode, so just hide the card. */
+  .vm-mingle-card-0.is-flying-right,
+  .vm-mingle-card-0.is-flying-left { transform: none; opacity: 0; }
+  .vm-mingle-confetti { display: none; }
+  .vm-mingle-skel-tiles,
+  .vm-mingle-skel-card,
+  .vm-mingle-skel-hero { animation: none; background-image: none; }
+}

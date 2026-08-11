@@ -80,7 +80,7 @@ function publicQuestions(brand) {
 
 /**
  * Project a car down to only the fields the result cards render (see
- * matchCard() in bmw-matcher.js). Internal scoring fields — tags, sizeClass,
+ * matchCard() in vehicle-matcher.js). Internal scoring fields — tags, sizeClass,
  * id — are omitted so responses can't be used to reconstruct the dataset. The
  * real display fields (mileage, plate, photo, retailerName, link) come from the
  * live feed and are passed through where present.
@@ -362,6 +362,37 @@ async function handlePreview(req, res) {
   } catch (err) {
     console.warn('[preview] ranking failed:', err?.message);
   }
+
+  // Paint the preview cards. The questions-mode drawer never needed colour, but
+  // the swipe mode (MINI Mingle) treats it as a first-class taste signal — a
+  // card's paint and the "Colour" bar both read car.colour, which only exists
+  // after a per-car PDP fetch (see enrichColours). Enrich the slice we're about
+  // to return, exactly as handleMatch does for its hero cars. Paint is cached
+  // permanently AND preview shares the stock cache with /api/match, so this is
+  // paid once per car ever and also warms the eventual match's colour — no
+  // wasted fetches. It's best-effort under a wall-clock budget: a card whose
+  // paint didn't land in time simply renders without colour (the client falls
+  // back to a neutral swatch), and enrichment never throws, so a slow PDP can't
+  // turn the "bonus" drawer into an error.
+  try {
+    await enrichColours(brand, [
+      ...matches.map((m) => m.car),
+      ...matches.flatMap((m) => m.listings || []),
+    ]);
+    // Fill in each grouped card's colour list now that its listings are painted
+    // (mirror handleMatch): a card standing for several listings can name the
+    // colours they come in.
+    for (const m of matches) {
+      if (m.listings?.length > 1) {
+        m.car.colours = [...new Set(m.listings
+          .map((c) => c.colour?.manufacturerColour || c.colour?.colour)
+          .filter(Boolean))];
+      }
+    }
+  } catch (err) {
+    console.warn('[preview] colour enrichment failed:', err?.message);
+  }
+
   return sendJson(res, 200, { matches: matches.map(publicMatch) });
 }
 
