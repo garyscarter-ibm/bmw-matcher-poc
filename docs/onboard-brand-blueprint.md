@@ -129,7 +129,16 @@ worked example):
     family resolves to nothing). If you truly can't source a brand's files, leave it
     host-first and say so in the theme comment + `DECISIONS.md`.
   - **Licence:** these are proprietary faces. Packaging + serving them publicly needs a
-    licence that permits self-hosting; record the decision in `DECISIONS.md`.
+    licence that permits self-hosting; record the decision in `DECISIONS.md`. **Check whether
+    the face is brand-owned or a licensed third-party retail face first** — BMW Type Next,
+    FordF1 and MINI's faces are brand-owned; Honda's is **Proxima Nova**, a commercial Mark
+    Simonson retail typeface Honda merely licenses (and serves with scrambled internal name
+    tables to deter reuse). Self-hosting a licensed retail face is on much weaker footing than
+    a brand-owned one; flag it to the owner before packaging (we did, and it was an explicit
+    "package anyway" call — see `[fonts-honda-proxima-caveat]`), and note the clean fallback:
+    a freely-licensed near-match under the same family names, `@font-face src` only.
+    Don't assume the brand's font is its own; verify the actual `font-family` the live site
+    loads (it may not be the "<Brand> Sans" you'd guess — Honda's placeholder was exactly that).
 - Geometry: `--vm-radius`, `--vm-radius-control`.
 - Motion character: `--vm-ease`, `--vm-pop` (the game animations read these, so the same
   keyframes feel crisp or springy per brand).

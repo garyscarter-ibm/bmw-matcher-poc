@@ -98,6 +98,88 @@
   font-display: swap;
 }
 
+/* Honda — Proxima Nova, the face honda.co.uk actually serves (NOT a "Honda
+   Sans"; that was a placeholder guess). Honda uses Proxima Nova Extra Condensed
+   for display/headings and regular-width Proxima Nova for body. The woff files
+   are lifted from honda.co.uk, where their internal name tables are deliberately
+   scrambled to deter reuse — that doesn't affect us, because @font-face matches
+   on the family name we declare here, not the file's internal name.
+   Licence caveat: Proxima Nova is a commercial Mark Simonson retail face Honda
+   licenses; unlike BMW Type Next it isn't a brand-owned asset. Self-hosting is
+   an owner decision recorded in DECISIONS.md, on weaker footing than BMW/MINI.
+   The Extra Condensed weights map by their internal usWeightClass: Light 300,
+   Regular 400, Semibold 600. */
+@font-face {
+  font-family: 'Proxima Nova ExCn';
+  src: url('./fonts/ProximaNovaExCn-Light.woff') format('woff');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Proxima Nova ExCn';
+  src: url('./fonts/ProximaNovaExCn-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Proxima Nova ExCn';
+  src: url('./fonts/ProximaNovaExCn-Semibold.woff') format('woff');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Proxima Nova';
+  src: url('./fonts/ProximaNova-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Ford — FordF1, Ford's current brand typeface (2023 on), self-hosted as woff2
+   (CFF outlines). Regular 400, Medium 500, Bold 700 by internal usWeightClass.
+   Ford Antenna (the previous brand face) follows as a woff fallback for the
+   same family stack, so older weights still resolve to a Ford face rather than
+   Helvetica. Both are Ford-owned brand faces, so this is the BMW-style footing,
+   not the Honda one. */
+@font-face {
+  font-family: 'FordF1';
+  src: url('./fonts/FordF1-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'FordF1';
+  src: url('./fonts/FordF1-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'FordF1';
+  src: url('./fonts/FordF1-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ford Antenna';
+  src: url('./fonts/FordAntenna-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ford Antenna';
+  src: url('./fonts/FordAntenna-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 .vm {
   /* --- font ---
      Packaged-first. 'BMW Type Next' is declared via @font-face at the top of
@@ -377,17 +459,20 @@
  * softly rounded corners and calm, honest motion — no bounce. It reads as
  * plain, practical and trustworthy, which is the brand and the voice.
  *
- * Fonts are the HOST SITE'S, host-first: a Honda dealer site declares Honda's
- * own faces, and we ask for them by name with a neutral sans fallback for the
- * standalone harness. We don't ship or self-host Honda's licensed webfonts.
- * (BMW and MINI ARE packaged from ./fonts — see the @font-face block up top —
- * because those were the two the brief called for; Honda/Ford weren't.)
+ * Fonts are PACKAGED from ./fonts (see the @font-face block up top), like BMW
+ * and MINI. Honda's real web face is Proxima Nova, not a "Honda Sans" (that was
+ * a placeholder guess); honda.co.uk uses Proxima Nova Extra Condensed for
+ * display/headings and regular-width Proxima Nova for body. Packaged family
+ * first so the standalone harness renders, then the host bridge
+ * (var(--*-font-family)) in case a host page overrides, then a system fallback.
+ * Licence note: Proxima Nova is a commercial licensed face, self-hosted by
+ * owner decision (weaker footing than BMW/MINI) — see DECISIONS.md.
  * -------------------------------------------------------------------- */
 .vm.vm-honda {
-  /* Sans for both headings and body (Honda has no display serif). Host-first,
-     then a neutral system sans so the harness still renders cleanly. */
-  --vm-font-heading: var(--heading-font-family, 'Honda Sans', 'HondaSans', 'Helvetica Neue', arial, sans-serif);
-  --vm-font-body: var(--body-font-family, 'Honda Sans', 'HondaSans', 'Helvetica Neue', arial, sans-serif);
+  /* Headings use the condensed display cut; body the regular width. Packaged
+     first, then host bridge, then a neutral system sans for safety. */
+  --vm-font-heading: 'Proxima Nova ExCn', var(--heading-font-family, 'Helvetica Neue'), arial, sans-serif;
+  --vm-font-body: 'Proxima Nova', var(--body-font-family, 'Helvetica Neue'), arial, sans-serif;
   --vm-font-bold: var(--vm-font-body);
 
   /* colour: dark-ink-on-white with Honda Red as the primary accent. Red is the
@@ -477,17 +562,18 @@
  * sells both a sensible Puma and a Mustang. It reads friendly, capable and
  * plainly British.
  *
- * Fonts are the HOST SITE'S, host-first (same rule as Honda): a Ford dealer
- * site declares Ford's own faces (FordF1 / Ford Antenna), and we ask for them
- * by name with a neutral sans fallback for the standalone harness. We don't
- * ship or self-host Ford's licensed webfonts (BMW and MINI ARE packaged; those
- * were the two the brief asked for).
+ * Fonts are PACKAGED from ./fonts (see the @font-face block up top), like BMW
+ * and MINI. FordF1 is Ford's current (2023-on) brand typeface; Ford Antenna is
+ * the previous one, kept as a same-stack fallback. Both are Ford-owned brand
+ * faces, so self-hosting sits on the BMW footing, not Honda's licensed-Proxima
+ * one. Packaged FordF1 first, then Antenna, then the host bridge, then a system
+ * sans for the standalone harness.
  * -------------------------------------------------------------------- */
 .vm.vm-ford {
-  /* Sans for both headings and body (Ford has no display serif). Host-first,
-     then a neutral system sans so the harness still renders cleanly. */
-  --vm-font-heading: var(--heading-font-family, 'FordF1', 'Ford Antenna', 'Helvetica Neue', arial, sans-serif);
-  --vm-font-body: var(--body-font-family, 'FordF1', 'Ford Antenna', 'Helvetica Neue', arial, sans-serif);
+  /* Sans for both headings and body (Ford has no display serif). Packaged first
+     (FordF1 -> Ford Antenna), then host bridge, then a neutral system sans. */
+  --vm-font-heading: 'FordF1', 'Ford Antenna', var(--heading-font-family, 'Helvetica Neue'), arial, sans-serif;
+  --vm-font-body: 'FordF1', 'Ford Antenna', var(--body-font-family, 'Helvetica Neue'), arial, sans-serif;
   --vm-font-bold: var(--vm-font-body);
 
   /* colour: dark-ink-on-white with Ford Blue as the primary accent. Blue is the
@@ -512,9 +598,12 @@
   --vm-pop: 0.38s;
 }
 
-/* Ford headlines: sans, sentence-case (NOT uppercased like BMW/MINI), semibold,
-   in the navy strong-ink. As with Honda, overriding text-transform is the key
-   move — the base .vm-title uppercases, which is wrong for Ford's register. */
+/* Ford headlines: sans, sentence-case (NOT uppercased like BMW/MINI), in the
+   navy strong-ink. As with Honda, overriding text-transform is the key move —
+   the base .vm-title uppercases, which is wrong for Ford's register.
+   Weight 500: FordF1's Medium cut, the weight ford.co.uk sets headings at. The
+   packaged FordF1 ships 400/500/700, so 500 resolves to a real face rather than
+   the browser synthesising a 600 from the 500. */
 .vm.vm-ford .vm-title,
 .vm.vm-ford .vm-question,
 .vm.vm-ford .vm-subhead,
@@ -522,7 +611,7 @@
 .vm.vm-ford .vm-nearby-heading {
   font-family: var(--vm-font-heading);
   text-transform: none;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.15;
   letter-spacing: 0;
 }

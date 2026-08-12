@@ -618,4 +618,46 @@ a deliberate, reversible call.
   correct specificity order. Cross-family mismatches now 0/963, pinned by a regression test. Follows
   the standing "stay as real and live as possible" honesty rule: a card must wear its own badge.
 
+## Fonts: package all four brands' typefaces into the block
+
+- **[fonts-packaged-all-four] The block self-hosts every brand's real typeface under
+  `blocks/vehicle-matcher/fonts/`, declared with `@font-face` at the top of the CSS and named
+  FIRST in each brand's `--vm-font-*` token stack.** Rationale: the standalone harness (and the
+  GitHub Pages build) has no host page to inherit fonts from, so a host-first stack fell straight
+  through to Helvetica there — the reported "fonts don't render" bug. Packaging makes each brand
+  render correctly everywhere it's embedded. One family per typeface with real `font-weight`s (never
+  a per-weight family name, which silently synthesises); `font-display: swap`. The Pages workflow
+  copies `blocks/` recursively and the EDS sync mirrors the whole block, so the files ship on both
+  paths with no extra wiring.
+
+- **[fonts-bmw-mini] BMW Type Next (BMW + Motorrad) and MINI Serif / MINI Sans (MINI) are the
+  exact woff/woff2 the live retailer sites load.** BMW Type Next: Thin 100 / Light 300 / Regular 400
+  / Bold 700 (woff2). MINI faces are woff only; the internal cuts are heavier than their filenames
+  suggest (MINI Sans "regular" is a Medium/500, both "bold" files are Black/900), each declared at
+  the 400/700 the CSS requests so weights resolve exactly rather than synthesising. Motorrad reuses
+  BMW Type Next (same @font-face, no separate files). These are brand-owned faces; self-hosting is
+  the straightforward call.
+
+- **[fonts-ford] Ford packages FordF1 (its current 2023-on brand face) plus Ford Antenna (the
+  previous one) as a same-stack fallback.** FordF1 woff2 (Regular 400 / Medium 500 / Bold 700) from
+  Ford's CDN via TrustFord; Ford Antenna woff (Regular 400 / Bold 700) self-hosted on TrustFord.
+  Stack is `'FordF1','Ford Antenna',<host bridge>,<system>`. Ford headings were retuned from
+  `font-weight: 600` to `500` because FordF1 ships no 600 cut and 500 (Medium) is the weight
+  ford.co.uk itself sets headings at — avoiding a synthesised weight. Both are Ford-owned brand
+  faces, so this sits on the same footing as BMW/MINI.
+
+- **[fonts-honda-proxima-caveat] Honda's real web face is Proxima Nova, NOT a "Honda Sans" (that
+  was a placeholder guess), and self-hosting it is a deliberate owner decision on weaker licence
+  footing.** honda.co.uk uses Proxima Nova Extra Condensed for display/headings (Light 300 / Regular
+  400 / Semibold 600 by internal `usWeightClass`) and regular-width Proxima Nova for body (400). Two
+  caveats, both flagged to and accepted by the owner: (1) Proxima Nova is a **commercial Mark
+  Simonson retail typeface Honda licenses**, not a Honda-owned brand asset like BMW Type Next — so
+  self-hosting it in this block has no clear licence, unlike BMW/Ford/MINI. (2) The woff files Honda
+  serves have **deliberately scrambled internal name tables** (an anti-reuse measure); that doesn't
+  break us because `@font-face` matches on the family name we declare (`'Proxima Nova'` /
+  `'Proxima Nova ExCn'`), not the file's internal name. The owner chose "package everywhere" for
+  consistency with BMW/MINI, accepting the weaker footing. If the licence is ever challenged, the
+  clean swap is a freely-licensed condensed sans (e.g. Barlow/Saira Condensed) under the same family
+  names — no CSS change beyond the `@font-face` `src`.
+
 <!-- Further decisions appended below as the run proceeds. -->

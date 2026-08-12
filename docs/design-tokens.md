@@ -9,26 +9,48 @@ a documented variable layer, applied lightly; the full visual reskin of
 
 ## Font
 
-Grassick's uses BMW's official proprietary typeface, in four weights:
+Grassick's uses BMW's official typeface, BMW Type Next, in four weights:
 
 ```
-BMWTypeNextLatin-Thin
-BMWTypeNextLatin-Light      ← headings
-BMWTypeNextLatin-Regular    ← body
-BMWTypeNextLatin-Bold       ← eyebrow/micro-labels
+BMWTypeNextLatin-Thin       (100)
+BMWTypeNextLatin-Light      (300) ← headings
+BMWTypeNextLatin-Regular    (400) ← body
+BMWTypeNextLatin-Bold       (700) ← eyebrow/micro-labels
 ```
 
-**Proprietary — cannot be shipped or hotlinked.** On the real EDS/retailer
-site it will already be loaded site-wide, so the block should simply
-reference the family name and fall through. For the standalone preview
-harness, fall back to a neutral system stack that approximates the
-light/geometric feel:
+> **Superseded — the block now PACKAGES fonts.** An earlier version of this doc
+> said BMW Type Next was "proprietary, cannot be shipped or hotlinked" and had
+> the block reference the family name and fall through to Helvetica on the
+> standalone harness. That produced the reported "fonts don't render" bug: the
+> harness (and the GitHub Pages build) has no host page to inherit from, so it
+> fell straight to Helvetica. By owner decision the block now **self-hosts every
+> brand's real typeface** under `blocks/vehicle-matcher/fonts/`, declared with
+> `@font-face` in `vehicle-matcher.css` and named first in the `--vm-font-*`
+> stack. See [`DECISIONS.md`](../DECISIONS.md) `[fonts-packaged-all-four]` and
+> the per-brand entries (`[fonts-bmw-mini]`, `[fonts-ford]`,
+> `[fonts-honda-proxima-caveat]`) for the licence footing of each — Honda's
+> Proxima Nova is on the weakest footing (a commercial licensed face).
+
+The packaged declaration uses **one family per typeface with real font-weights**,
+not the per-weight family names shown below — a per-weight family
+(`'BMWTypeNextLatin-Bold'`) is undeclared as a family, so it silently synthesises
+from Helvetica. Correct pattern:
 
 ```css
---bmwm-font-heading: 'BMWTypeNextLatin-Light', 'Helvetica Neue', Arial, sans-serif;
---bmwm-font-body: 'BMWTypeNextLatin-Regular', 'Helvetica Neue', Arial, sans-serif;
---bmwm-font-bold: 'BMWTypeNextLatin-Bold', 'Helvetica Neue', Arial, sans-serif;
+/* one @font-face per weight, all under the same family name */
+@font-face { font-family: 'BMW Type Next'; src: url('./fonts/BMWTypeNextLatin-Light.woff2') format('woff2'); font-weight: 300; font-display: swap; }
+/* ...Thin 100, Regular 400, Bold 700... */
+
+--vm-font-heading: 'BMW Type Next', var(--heading-font-family, 'Helvetica Neue'), arial, sans-serif;
+--vm-font-body: 'BMW Type Next', var(--body-font-family, 'Helvetica Neue'), arial, sans-serif;
+--vm-font-bold: var(--vm-font-body);
 ```
+
+Per-brand packaged faces: **BMW / Motorrad** → BMW Type Next (Motorrad reuses the
+same @font-face). **MINI** → MINI Serif (headings) + MINI Sans (body), woff.
+**Ford** → FordF1 (current brand face, 400/500/700 woff2) with Ford Antenna as a
+same-stack fallback. **Honda** → Proxima Nova Extra Condensed (headings) +
+Proxima Nova (body) — the face honda.co.uk actually serves, not a "Honda Sans".
 
 ## Colour
 

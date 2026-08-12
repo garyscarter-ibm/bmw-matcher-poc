@@ -370,8 +370,8 @@ BRAND_COPY.ford = {
   // proud of being the sensible, well-priced choice with room for the spirited
   // side. See docs/tone-style-guide.md (Ford).
   lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
-    + 'your miles and your money. We’ll line up the approved-used '
-    + `Fords at ${retailer} that are right for you, and tell you exactly why.`,
+    + 'your miles and your budget. We’ll pull together the approved-used '
+    + `Fords at ${retailer} that make real sense for you, and back it up with the reasons.`,
   unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
     + 'These are the closest to everything else you told us.',
   tiedTitle: ({ count }) => `${cardinal(count)} of these fit you just as well.`,
