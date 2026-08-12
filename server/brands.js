@@ -557,10 +557,13 @@ export const BRANDS = {
     // resolves to the full pool (the fixtures loader narrows by it, else serves
     // everything).
     defaultRetailer: 'honda-approved',
-    // Honda's live stock has no clean feed API to replay; its cars are scraped
-    // from the server-rendered listing pages into fixtures/honda-cars.json
-    // (already-mapped, via mapHondaRaw). Real stock, served with no network.
-    source: 'fixtures',
+    // Honda's live stock has no clean feed API, but its server-rendered listing
+    // pages ARE fetchable from this environment, so Honda runs genuinely live:
+    // stock.js fetches usedcars.honda.co.uk on demand (shared parser in
+    // honda-listing.js, mapped via mapHondaRaw) and degrades to the committed
+    // fixtures/honda-cars.json snapshot on any fetch failure, so the deck is
+    // never blank. See the Honda-live section of DECISIONS.md.
+    source: 'live-honda',
     // Honda used stock runs ~£8.5k–£22.5k in the scraped pool (median ~£19k), so
     // a £150k slider would bunch both thumbs at the far left. Cap at £30k with a
     // default bracket around the median.

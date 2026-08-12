@@ -371,6 +371,10 @@ a deliberate, reversible call.
   and it lights up. **On any failure it degrades to the curated fixtures rather than blanking the
   deck** (the "decide and keep moving" rule), and — like all fixtures brands — it serves no "near
   you" carousel and fetches no colour PDPs.
+  _Superseded on contract detail by [motorrad-images-real-source] / [motorrad-images-gate]: the
+  JSON route is `/api/ResultOverview/...` (not `/UK/...`), auth is a `GMB-SID` **header** (not a
+  cookie), and the body needs `MarktId: 2`. The adapter in `stock.js` was corrected to match; this
+  entry's high-level shape (dormant, degrade-to-fixtures, shared mapper) still holds._
 
 ## Testing (Motorrad)
 
@@ -386,7 +390,8 @@ a deliberate, reversible call.
   shapes + null-safety) and the row→raw→`mapMotorradRaw` contract. Motorrad is also in the
   headless render matrix (`render.test.js`): all three modes mount and paint for bikes, carry the
   `vm-motorrad` theme class, show the "BMW Motorrad" wordmark on the questions intro, and paint no
-  em dashes. Full suite: **140 green, no BMW/MINI regression** (was 94 at the start of the run).
+  em dashes. Full suite: **144 green, no BMW/MINI regression** (was 94 at the start of the run; the
+  four added since are the Honda live-listing adapter tests, see [honda-live-tests]).
 
 - **[motorrad-test-gap] Known gap, logged not closed: the live adapter's NETWORK path is untested.**
   The endpoint won't answer without a live session from this environment, so the POST/handshake/
@@ -394,5 +399,101 @@ a deliberate, reversible call.
   ARE tested (exported for exactly that); the network round-trip and the degrade-on-failure branch
   should get an integration test the first time the adapter runs from an allowed origin (or against
   a recorded session capture). Noted here so it isn't mistaken for covered.
+
+## Honda goes live
+
+- **[honda-live] Honda is now a genuinely live feed, not fixtures.** The user's brief is "keep this
+  as real and live as possible." Of the three fixtures brands, Honda is the one whose real inventory
+  is reachable from this environment: `usedcars.honda.co.uk` server-renders its listing pages, so the
+  adapter fetches them on demand, parses the cards, and maps them through `mapHondaRaw` — the exact
+  same projection the committed snapshot went through. Registry flipped `honda.source` from
+  `'fixtures'` to `'live-honda'`. Verified end to end this session: a real fetch returns ~96 cars,
+  all with real prices, mileages, and `/picserver` photos, in valid engine schema.
+
+- **[honda-live-shared-parser] One parser, two callers.** The parse logic (card split, spec
+  extraction, price/image/reg pulls) is lifted verbatim into `server/honda-listing.js` and shared by
+  both the offline scraper (`scripts/scrape-honda.mjs`) and the live adapter (`stock.js`). Pure, no
+  network — callers fetch the HTML and hand it in. This means the live path and the snapshot path
+  literally cannot drift in how they read a card. Exports: `parseListingHtml`, `parseCard`,
+  `listingUrl`, plus the base/warranty constants.
+
+- **[honda-live-degrade] On any fetch failure Honda degrades to the committed snapshot, not a blank
+  deck** (the "decide and keep moving" rule). `hondaLiveStock` throws `StockUnavailableError` on a
+  non-200 first page, a parse that yields nothing, or an empty pool; the dispatch catches it and
+  serves `fixtures/honda-cars.json` (348 cars, all photo-bearing). So the worst case is stale-but-
+  real stock, never an empty screen.
+
+- **[honda-live-location] Honda's dealer filter is location-based (postcode + radius), NOT a
+  dealer id.** Investigated and corrected an earlier assumption: the listing has no `dealer=<id>`
+  facet (the `dealerID` in the page is an analytics blob; `DealerKey=WAY200` is a finance-widget
+  key). The real "near me" facet is `zip` + `radius` (miles), verified live (`SW1A1AA&radius=10` →
+  1 car vs `PH13GA&radius=10` → 12). `listingUrl(page, {zip, radius})` carries it; pagination is a
+  `/pageN` PATH segment, not a query param.
+
+- **[honda-live-nearby] Honda serves no "near you" carousel, by design.** The location facet narrows
+  the MAIN pool honestly, but the carousel needs per-car distances and a distinct anchor dealer to
+  rank "other dealers near you" — and Honda's cards carry neither (no per-car distance, one national
+  "Honda Approved Used" retailer). Rather than fake a distance ranking, `fetchNearbyStock` returns
+  `[]` for `live-honda`, exactly as it does for the other non-Auto-Trader brands. `enrichColours`
+  also short-circuits: the listing already carries an "Exterior colour" per card, so there's no
+  colour PDP to fetch.
+
+- **[honda-live-tests] Four adapter tests added (144 green total, up from 140).** They pin the
+  fragile seam — parsing real HTML — against a card in the site's true shape: `parseCard` reads one
+  card (cash price beats monthly, mileage/fuel/doors/colour/year, absolute link + image);
+  `parseListingHtml` keeps real cards and drops chrome; the parseCard → `mapHondaRaw` handoff is
+  proven engine-valid (the live == snapshot contract); and `listingUrl` carries the warranty
+  programme + the zip/radius facet with pages as a path segment. The existing config test was
+  updated to assert `source: 'live-honda'`.
+
+## Motorrad images: real source found, gated behind a browser session
+
+- **[motorrad-images] Root cause of the missing images: the fixtures are synthesised per MODEL and
+  never carried an image field.** `build-motorrad-fixtures.mjs` emits one raw record per (model,
+  price, mileage) with no `image`, so every mapped bike had `photo: undefined`. The mapper already
+  supports `photo` (reads `raw.image`); the data side just never populated it. Confirmed by data:
+  honda-cars 348/348 have photos, motorrad-bikes 0/49.
+
+- **[motorrad-images-real-source] The real per-vehicle photos live in the approved-used listing
+  feed, and its contract is now fully reverse-engineered.** From the site's own Angular bundle:
+  the feed is `POST /api/ResultOverview/ShowResultsFilterChanged` (ApplPath is "/", so the JSON
+  route is under `/api/`, NOT the `/UK/...` path — that returns the HTML shell); it authenticates
+  with a **`GMB-SID` request header** (read from the page's hidden `#hfSID` field, a base64 of
+  `<caller-ip>;<guid>`); the body needs `MarktId: 2` (UK). Vehicle rows carry the photo as
+  `ImageSrc` (overview) / `sliderImageLinks` / `ImageLinks` arrays. Verified live: with the correct
+  route + header the endpoint returns real `application/json` (was HTML before), proving the
+  contract.
+
+- **[motorrad-images-gate] But the rows themselves are gated behind a live browser session.** Even
+  with the correct route, a freshly-scraped SID (whose embedded IP matches our egress IP), the
+  MarktId body, and browser-like headers, the endpoint returns `{"SearchFilter":null,"ResTable":null}`
+  — the null envelope that means "no live session." The AngularJS app mints a valid session through
+  an in-browser bootstrap sequence we can't replicate with `curl`/node. So the real photos are
+  genuinely unreachable from this scripted environment. This is the same gate documented under
+  [motorrad-data]; the added detail is that we now know the exact contract and that the block is the
+  session bootstrap, not the route or the auth mechanism.
+
+- **[motorrad-images-decision] User's call: capture the feed from a browser; do NOT substitute
+  generic marketing images.** When asked, the user directed: use the real used-bike LISTING images,
+  not the model/press shots from the public bmw-motorrad.co.uk site, and chose to capture the feed
+  themselves. So we did NOT wire in the (reachable, official, but generic) per-model nav images from
+  the brand site — that would misrepresent a marketing render as a used-listing photo. The honest
+  state ships: Motorrad cards render photo-less until a real capture lands.
+
+- **[motorrad-images-turnkey] Everything is staged so a capture is a one-step rebuild.** (1) The live
+  adapter (`stock.js`) is corrected to the proven contract (route, `GMB-SID` header, MarktId body,
+  and `motorradRowToRaw` now reads the real `ImageSrc`/`sliderImageLinks`/`ImageLinks` fields). (2) A
+  new `scripts/build-motorrad-fixtures-from-capture.mjs` ingests a saved feed response (raw JSON or a
+  HAR), runs it through the SAME production path (`motorradRowsFromEnvelope → motorradRowToRaw →
+  mapMotorradRaw`), validates every bike is engine-valid, and writes `fixtures/motorrad-bikes.json`
+  with real photos. Its header carries the exact browser capture recipe. When the user pastes a
+  capture, the fixtures rebuild from genuine data + images with no further reverse-engineering.
+
+- **[motorrad-images-degrade] Photo-less cards degrade cleanly, so shipping without images is safe,
+  not broken.** The mode renderers guard with `if (car.photo)` and fall back to a `.no-photo`
+  treatment with the model initial; a broken `img.src` self-heals via an `error` handler that removes
+  the image and adds `.no-photo`. `photosFirst` sinks photo-less cars to the back of the field. So
+  the Motorrad deck looks flatter than the photo-bearing brands but shows no broken-image icons and
+  no empty media boxes.
 
 <!-- Further decisions appended below as the run proceeds. -->

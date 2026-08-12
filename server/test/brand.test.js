@@ -10,6 +10,7 @@ import { questionsForBrand, applyBespokeAnswers } from '../questions.js';
 import { normalizeBrand, brandConfig, brandTuning } from '../brands.js';
 import { rankCars } from '../engine.js';
 import { motorradRowsFromEnvelope, motorradRowToRaw } from '../stock.js';
+import { parseListingHtml, parseCard, listingUrl } from '../honda-listing.js';
 
 /* Feed-shaped fixtures (the fields mapVehicle actually reads). */
 const bmwVehicle = {
@@ -547,9 +548,9 @@ const hondaRaw = (overrides = {}) => ({
   ...overrides,
 });
 
-test('brand config: honda is a fixtures-source brand with a Honda origin', () => {
+test('brand config: honda is a live-source brand with a Honda origin', () => {
   const cfg = brandConfig('honda');
-  assert.equal(cfg.source, 'fixtures', 'honda serves from fixtures, not the live feed');
+  assert.equal(cfg.source, 'live-honda', 'honda fetches its listing live, degrading to fixtures');
   assert.match(cfg.origin, /honda\.co\.uk/);
   assert.equal(normalizeBrand('Honda'), 'honda');
   assert.equal(normalizeBrand('HONDA'), 'honda');
@@ -631,6 +632,96 @@ test('honda tuning ranks a thrifty hatch a real family buyer would pick', () => 
   };
   const ranked = rankCars(valueFamily, [thirsty, jazz], brandTuning('honda'));
   assert.equal(ranked[0].car.id, 'jazz', 'the economical Honda tops for a value buyer under Honda tuning');
+});
+
+/* ------------------------------------------------------------------ *
+ * Honda live listing adapter (honda-listing.js). Honda runs genuinely
+ * live now: stock.js fetches usedcars.honda.co.uk and parses the
+ * server-rendered cards with these functions, degrading to the fixtures
+ * snapshot on any failure. The parser is the fragile seam (it reads real
+ * HTML), so it's pinned here against a card in the site's real shape, and
+ * the parseCard -> mapHondaRaw handoff is proven so the live path and the
+ * snapshot path stay contract-compatible.
+ * ------------------------------------------------------------------ */
+
+// One vehicle card in the shape the real listing renders: a "vehicle-inner"
+// wrapper, a Honda detail link + title attr, a monthly then a cash £, a spec
+// <li> list (label tag then value tag), a reg data-attr and a /picserver image.
+const hondaCardHtml = `
+<div class="vehicle-inner">
+  <a href="/en/used-cars/approved-cars/honda/civic/1-0-vtec-turbo-se-500243" title="Honda Civic 1.0 VTEC Turbo SE 5dr">
+    <img src="/picserver1/userdata/46/500243/Y.jpg" alt="Honda Civic">
+  </a>
+  <span class="monthly">&pound;189</span>
+  <span class="price">&pound;8,799</span>
+  <ul>
+    <li><span>Mileage</span><span>72,500&nbsp;miles</span></li>
+    <li><span>Fuel Type</span><span>Petrol</span></li>
+    <li><span>Transmission</span><span>Manual</span></li>
+    <li><span>Doors</span><span>5</span></li>
+    <li><span>mpg combined</span><span>47.1</span></li>
+    <li><span>Exterior colour</span><span>Crystal Black</span></li>
+    <li><span>First registration date</span><span>01/03/2021</span></li>
+  </ul>
+  <div data-modix-360-reg="LX21ABC"></div>
+</div>`;
+
+test('parseCard reads one real-shape Honda listing card into the flat raw record', () => {
+  const raw = parseCard(hondaCardHtml.split('class="vehicle-inner"')[1]);
+  assert.ok(raw, 'a real vehicle card parses');
+  assert.match(raw.title, /^Honda Civic 1\.0 VTEC Turbo SE/);
+  assert.equal(raw.price, 8799, 'the cash price wins over the smaller monthly figure');
+  assert.equal(raw.mileage, 72500);
+  assert.equal(raw.fuel, 'Petrol');
+  assert.equal(raw.transmission, 'Manual');
+  assert.equal(raw.doors, 5);
+  assert.equal(raw.colour, 'Crystal Black');
+  assert.equal(raw.year, 2021, 'the year comes from the first-registration date');
+  assert.match(raw.link, /^https:\/\/usedcars\.honda\.co\.uk\/en\/used-cars\//, 'link is absolute');
+  assert.match(raw.image, /^https:\/\/usedcars\.honda\.co\.uk\/picserver/, 'image is absolute');
+});
+
+test('parseListingHtml keeps real vehicle cards and drops chrome', () => {
+  // A page is real cards plus a trailing chunk with no Honda link/title.
+  const page = `<html><body>${hondaCardHtml}
+    <div class="vehicle-inner"><div class="pager">Next page</div></div>
+  </body></html>`;
+  const raw = parseListingHtml(page);
+  assert.equal(raw.length, 1, 'the pager chunk is not a vehicle and is dropped');
+  assert.equal(raw[0].price, 8799);
+});
+
+test('a parsed Honda card feeds mapHondaRaw into an engine-valid car (live == snapshot contract)', () => {
+  // This is the seam that matters: whatever the live parse produces must satisfy
+  // the same projection the committed snapshot went through, or the live deck and
+  // the fixtures deck would disagree in shape.
+  const [raw] = parseListingHtml(hondaCardHtml);
+  const car = mapHondaRaw(raw);
+  assert.ok(car, 'a live-parsed card maps to a car');
+  for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
+    assert.ok(car[field] !== undefined, `live-mapped Honda missing ${field}`);
+  }
+  assert.equal(car.line, 'Civic');
+  assert.equal(car.body, 'hatchback');
+  assert.equal(car.fuel, 'petrol');
+  assert.equal(car.priceMin, 8799);
+  assert.equal(car.priceMax, 8799);
+  assert.match(car.photo, /picserver/, 'the live photo survives into the car');
+  assert.ok(!car.blurb.includes('—'), 'no em dash in a live-derived blurb');
+});
+
+test('listingUrl carries the approved-used programme and the location facet, page as a path', () => {
+  const p1 = listingUrl(1);
+  assert.match(p1, /warrantyProgram=22/, 'page 1 keeps the approved-used filter');
+  assert.ok(!/\/page/.test(p1), 'page 1 is the bare base, no /pageN');
+
+  const p2 = listingUrl(2);
+  assert.match(p2, /\/page2\?/, 'later pages are a /pageN path segment, not a query param');
+
+  const near = listingUrl(1, { zip: 'PH1 3GA', radius: 25 });
+  assert.match(near, /zip=PH1\+3GA/, 'the postcode is the location facet (zip)');
+  assert.match(near, /radius=25/, 'radius is in miles');
+  assert.match(near, /warrantyProgram=22/, 'the location facet does not drop the programme filter');
 });
 
 /* ================================================================== *

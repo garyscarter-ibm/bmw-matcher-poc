@@ -25,8 +25,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { lookupDealer } from './dealers.js';
-import { mapVehicle, mapMotorradRaw } from './mapping.js';
+import { mapVehicle, mapMotorradRaw, mapHondaRaw } from './mapping.js';
 import { brandConfig, normalizeBrand } from './brands.js';
+import { parseListingHtml, listingUrl } from './honda-listing.js';
 
 // Repo root, from this module's location (server/ → ..). Used to resolve the
 // fixtures directory for fixtures-backed brands without depending on cwd.
@@ -309,6 +310,72 @@ function fixturesRetailerStock(brand, retailerSite) {
   return narrowed.length ? narrowed : cars;
 }
 
+/* ---------------------------- live Honda feed ------------------------- *
+ * Honda's approved-used stock (usedcars.honda.co.uk) has no JSON API, but its
+ * listing pages are fully server-rendered — so "live" here means fetch the real
+ * listing HTML and parse it, the same parse that built the snapshot (see
+ * honda-listing.js). Unlike BMW/MINI (Auto Trader JSON at /vehicle/api/list/),
+ * this is HTML, so it gets its own adapter rather than the feed path.
+ *
+ * Honda's listing has NO dealer-id filter; it filters by LOCATION (a postcode +
+ * a radius in miles — the site's "search near me"). That maps cleanly onto the
+ * matcher's existing "near you" concept: fetchRetailerStock pulls the national
+ * pool, and a caller can narrow by passing a postcode/radius (see hondaLiveStock
+ * opts). Cards carry no stable per-dealer identity in the markup, so every car
+ * keeps the single "Honda Approved Used" retailer tag the snapshot uses.
+ *
+ * Dormant while the registry says `source: 'fixtures'`; flip Honda to
+ * `source: 'live-honda'` and it fetches live, degrading to the snapshot on any
+ * failure so the deck is never blank. The parse and the mapper are shared with
+ * the snapshot path, so a live car is indistinguishable from a fixture car.
+ * --------------------------------------------------------------------- */
+
+// How many listing pages to pull. The live inventory is small (a dozen or so
+// under the approved-used programme at any time) and pages repeat once exhausted,
+// so we stop as soon as a page yields no NEW cars. This is the safety cap.
+const HONDA_PAGE_LIMIT = Number(process.env.HONDA_PAGE_LIMIT) || 8;
+
+/**
+ * Fetch and map the live Honda pool. Walks listing pages until one adds no new
+ * cars (the inventory is small and pages repeat past the end), dedupes by the
+ * real PDP link, and maps each raw record through the shared mapHondaRaw — the
+ * identical projection the snapshot uses.
+ *
+ * @param {{zip?: string, radius?: number}} [opts] optional location filter:
+ *   a postcode + radius (miles) narrows to stock near that location, which is
+ *   how Honda expresses "a dealer near you" (it has no dealer-id filter).
+ * @returns {Promise<Array>} mapped Honda cars
+ */
+async function hondaLiveStock(opts = {}) {
+  const seen = new Set();
+  const cars = [];
+  for (let page = 1; page <= HONDA_PAGE_LIMIT; page += 1) {
+    const url = listingUrl(page, opts);
+    // eslint-disable-next-line no-await-in-loop
+    const res = await httpsGet(url, { Accept: 'text/html' });
+    if (res.status !== 200) {
+      // A first-page failure is fatal (nothing to serve); a later-page failure
+      // just ends pagination with what we have.
+      if (page === 1) throw new StockUnavailableError(`Honda listing returned HTTP ${res.status}`);
+      break;
+    }
+    const raw = parseListingHtml(res.body);
+    let added = 0;
+    for (const rec of raw) {
+      if (seen.has(rec.link)) continue;
+      seen.add(rec.link);
+      const car = mapHondaRaw(rec);
+      if (car) { cars.push(car); added += 1; }
+    }
+    // No new cars on this page → we've walked the whole (small) inventory.
+    if (added === 0) break;
+  }
+  if (cars.length === 0) {
+    throw new StockUnavailableError('Honda listing returned no usable cars');
+  }
+  return cars;
+}
+
 /* --------------------------- live Motorrad feed ----------------------- *
  * Motorrad's approved-used stock is served by a session-gated ASP.NET app
  * behind ResultOverview/ShowResultsFilterChanged: a POST endpoint that takes a
@@ -326,21 +393,32 @@ function fixturesRetailerStock(brand, retailerSite) {
  * BMW/MINI feed, so a caller can't tell a live brand from a fixtures one.
  * --------------------------------------------------------------------- */
 
-// The result-overview endpoint, relative to the brand origin. Kept here (not in
-// the registry) because it's an implementation detail of this adapter.
-const MOTORRAD_FEED_PATH = '/UK/ResultOverview/ShowResultsFilterChanged';
+// The result-overview endpoint, relative to the brand origin. Confirmed live
+// this session: the app's own bundle builds it as `<ApplPath>api/` + route (see
+// ServiceCallResOV.showResOverviewFilterChanged), and ApplPath on the UK site is
+// "/", so the JSON route is /api/ResultOverview/ShowResultsFilterChanged. The
+// older /UK/... path returns the HTML shell, not JSON. Kept here (not in the
+// registry) because it's an implementation detail of this adapter.
+const MOTORRAD_FEED_PATH = '/api/ResultOverview/ShowResultsFilterChanged';
 
-// A session token, if the deploying origin can supply one. The endpoint binds
-// results to a GMB session (a GMB-SID cookie/header); absent a session it
-// returns a null envelope. Provided out-of-band by the host, never invented.
+// The GMB session id. The endpoint authenticates with a `GMB-SID` REQUEST HEADER
+// (the bundle reads it from the page's hidden #hfSID field: a base64 of
+// "<caller-ip>;<guid>" the server issues per session and binds to that browser).
+// With the correct route + header the endpoint returns real JSON; without the
+// SID it returns a null envelope. The SID is issued to a live browser session,
+// so it's supplied out-of-band by the host (never invented here).
 const MOTORRAD_SESSION = process.env.MOTORRAD_SESSION || '';
 
-// The minimal filter body the endpoint expects. InitFilter:true asks for the
-// unfiltered result set (all approved-used bikes); the matcher does its own
-// scoring downstream, so we pull the whole pool once rather than round-tripping
-// the site's own facets. Extra facets can be merged in later without touching
-// the plumbing.
-const MOTORRAD_FILTER_BODY = { InitFilter: true };
+// The filter body the endpoint expects. Confirmed this session: MarktId (2 for
+// the UK market, from the page's #hfMarktID) is required, and InitFilter:true
+// asks for the unfiltered result set (all approved-used bikes); the matcher does
+// its own scoring downstream, so we pull the whole pool once rather than
+// round-tripping the site's own facets. The market/culture fields mirror the
+// page's hidden inputs. Extra facets can be merged in later without touching the
+// plumbing.
+const MOTORRAD_FILTER_BODY = {
+  InitFilter: true, MarktId: 2, MarktISO2: 'UK', RC: 'en-gb',
+};
 
 /**
  * Dig the vehicle rows out of the SearchFilter envelope. The contract nests the
@@ -365,14 +443,21 @@ export function motorradRowsFromEnvelope(env) {
  * this adapter changes; mapMotorradRaw and everything downstream stay put.
  */
 export function motorradRowToRaw(row = {}) {
+  // sliderImageLinks/ImageLinks are arrays of photo URLs (the app binds the first
+  // to the overview thumbnail via item.ImageSrc); take the first as the card photo.
+  const firstImage = (v) => (Array.isArray(v) ? v.find(Boolean) : v) || undefined;
   return {
-    id: row.Id ?? row.id ?? row.StockNumber ?? row.VehicleId,
-    title: row.Title ?? row.Name ?? row.ModelName ?? row.Description,
-    price: row.Price ?? row.CashPrice ?? row.PriceValue,
-    mileage: row.Mileage ?? row.Odometer ?? row.Miles,
+    id: row.Id ?? row.id ?? row.AngebotsNo ?? row.StockNumber ?? row.VehicleId,
+    title: row.Title ?? row.Name ?? row.ModelName ?? row.Bezeichnung ?? row.Description,
+    price: row.Price ?? row.Preis ?? row.CashPrice ?? row.PriceValue,
+    mileage: row.Mileage ?? row.KM ?? row.Odometer ?? row.Miles,
     reg: row.Registration ?? row.Reg ?? row.NumberPlate,
-    fuel: row.Fuel ?? row.FuelType,
-    image: row.ImageUrl ?? row.Image ?? row.MainImage,
+    fuel: row.Fuel ?? row.FuelType ?? row.Antrieb,
+    // Overview rows carry ImageSrc; detail/slider rows carry sliderImageLinks /
+    // ImageLinks arrays. Accept all, first URL wins. (Field names confirmed from
+    // the site's own Angular bundle this session.)
+    image: firstImage(row.ImageSrc ?? row.sliderImageLinks ?? row.ImageLinks
+      ?? row.ThumbnailLinks ?? row.ImageUrl ?? row.Image ?? row.MainImage),
     link: row.DetailUrl ?? row.Url ?? row.Link,
   };
 }
@@ -382,10 +467,14 @@ export function motorradRowToRaw(row = {}) {
  *  it drops into the same degrade-to-fixtures/error path as the BMW/MINI feed. */
 async function motorradLiveStock(origin) {
   const url = `${origin}${MOTORRAD_FEED_PATH}`;
-  const headers = { Referer: `${origin}/UK/` };
-  // The endpoint reads its session from a GMB-SID cookie; forward one if the
-  // host supplied it. Without it the endpoint answers, but with a null envelope.
-  if (MOTORRAD_SESSION) headers.Cookie = `GMB-SID=${MOTORRAD_SESSION}`;
+  const headers = {
+    Referer: `${origin}/UK/Home.cshtml?id=UK&RC=en-gb`,
+    Accept: 'application/json, text/plain, */*',
+  };
+  // The endpoint authenticates with a GMB-SID request header (the value the site
+  // embeds in #hfSID). Forward one if the host supplied it. Without it the
+  // endpoint answers 200 but with a null envelope (no live session).
+  if (MOTORRAD_SESSION) headers['GMB-SID'] = MOTORRAD_SESSION;
 
   let res;
   try {
@@ -439,6 +528,22 @@ export async function fetchRetailerStock(brand = 'bmw', retailerSite) {
   // Fixtures-backed brands never touch the network or the TTL cache — the
   // snapshot is static for the run and the cars are already mapped.
   if (source === 'fixtures') return fixturesRetailerStock(b, site);
+
+  // Honda's live feed, when the registry opts into it. The listing is
+  // server-rendered HTML (not JSON), so it has its own adapter; it's cached like
+  // the BMW/MINI feed and degrades to the snapshot on any failure so the deck is
+  // never blank. Honda filters by location (postcode + radius), not dealer id —
+  // fetchNearbyStock handles the "near you" narrowing; here we pull the pool.
+  if (source === 'live-honda') {
+    const key = keyFor(b, site);
+    seenRetailers.set(key, { brand: b, retailerSite: site });
+    return cachedFetch(cacheByRetailer, key, () =>
+      hondaLiveStock().catch((err) => {
+        // eslint-disable-next-line no-console
+        console.warn(`[honda] live feed unavailable, serving fixtures: ${err?.message}`);
+        return fixturesRetailerStock(b, site);
+      }));
+  }
 
   // Motorrad's live feed, when the registry opts into it. It's cached per
   // brand+retailer exactly like the BMW/MINI feed; on any failure (typically no
@@ -550,7 +655,11 @@ export async function fetchNearbyStock(brand = 'bmw', retailerSite) {
   // real feed is wired and the brand flips to 'feed', this lights up for free.)
   // Motorrad's live feed is a single national pool with no distance facet, so it
   // has no honest "near you" either — same empty result.
-  if (source === 'fixtures' || source === 'live-motorrad') return [];
+  // Honda's live feed CAN filter by location (postcode + radius), but its cards
+  // carry no per-car distance and no distinct dealer identity, so it can't build
+  // the distance-ranked, other-dealers carousel this returns. The location filter
+  // belongs on the main pool fetch instead (hondaLiveStock opts), not here.
+  if (source === 'fixtures' || source === 'live-motorrad' || source === 'live-honda') return [];
 
   const key = keyFor(b, site);
   seenRetailers.set(key, { brand: b, retailerSite: site });
@@ -770,7 +879,9 @@ export async function enrichColours(brand, cars, budgetMs = COLOUR_BUDGET_MS) {
   // Skip the network entirely rather than fetching against the wrong origin.
   // Motorrad's live feed uses the UVL PDP shape too, so its rows carry any paint
   // inline already; there's no separate colour PDP to fetch on this origin.
-  if (source === 'fixtures' || source === 'live-motorrad') return cars;
+  // Honda's live listing already carries an "Exterior colour" spec per card, so
+  // its cars gain colour at map time — there's no colour PDP to fetch here either.
+  if (source === 'fixtures' || source === 'live-motorrad' || source === 'live-honda') return cars;
   const queue = cars.filter((c) => c?.id);
   const deadline = Date.now() + budgetMs;
   for (let i = 0; i < queue.length; i += COLOUR_CONCURRENCY) {
