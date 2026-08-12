@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { lookupDealer } from './dealers.js';
-import { mapVehicle } from './mapping.js';
+import { mapVehicle, mapMotorradRaw } from './mapping.js';
 import { brandConfig, normalizeBrand } from './brands.js';
 
 // Repo root, from this module's location (server/ → ..). Used to resolve the
@@ -82,6 +82,43 @@ function httpsGet(url, headers = {}) {
     );
     req.on('error', reject);
     req.setTimeout(10_000, () => req.destroy(new Error('Request timed out')));
+    req.end();
+  });
+}
+
+/** POST a JSON body over node:https. Resolves { status, headers, body }.
+ *  Used by the Motorrad live adapter, whose feed is a POST endpoint (the BMW/
+ *  MINI feed is GET-only and never touches this). */
+function httpsPostJson(url, body, headers = {}) {
+  const payload = Buffer.from(JSON.stringify(body), 'utf8');
+  return new Promise((resolve, reject) => {
+    const req = request(
+      url,
+      {
+        method: 'POST',
+        headers: {
+          'User-Agent': USER_AGENT,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'Content-Length': payload.length,
+          ...headers,
+        },
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () =>
+          resolve({
+            status: res.statusCode,
+            headers: res.headers,
+            body: Buffer.concat(chunks).toString('utf8'),
+          }),
+        );
+      },
+    );
+    req.on('error', reject);
+    req.setTimeout(10_000, () => req.destroy(new Error('Request timed out')));
+    req.write(payload);
     req.end();
   });
 }
@@ -235,12 +272,15 @@ function cachedFetch(cache, key, load) {
 // a run); cars are already mapped so there's no per-request work to cache.
 const fixturesByBrand = new Map();
 
-/** Load and cache a brand's fixtures snapshot. Throws StockUnavailableError with
+/** Load and cache a brand's fixtures snapshot. The file is `<brand>-cars.json`
+ *  by default; a brand whose stock isn't cars (Motorrad's bikes) overrides it
+ *  with `fixturesFile` on its registry entry. Throws StockUnavailableError with
  *  a clear message if the file is missing or unusable, so a mis-seeded brand
  *  fails loudly rather than serving an empty pool. */
 function loadFixtures(brand) {
   if (fixturesByBrand.has(brand)) return fixturesByBrand.get(brand);
-  const path = join(REPO_ROOT, 'fixtures', `${brand}-cars.json`);
+  const { fixturesFile } = brandConfig(brand);
+  const path = join(REPO_ROOT, 'fixtures', fixturesFile || `${brand}-cars.json`);
   let cars;
   try {
     cars = JSON.parse(readFileSync(path, 'utf8'));
@@ -269,6 +309,115 @@ function fixturesRetailerStock(brand, retailerSite) {
   return narrowed.length ? narrowed : cars;
 }
 
+/* --------------------------- live Motorrad feed ----------------------- *
+ * Motorrad's approved-used stock is served by a session-gated ASP.NET app
+ * behind ResultOverview/ShowResultsFilterChanged: a POST endpoint that takes a
+ * filter body and returns the result set inside a SearchFilter envelope. It is
+ * cross-origin and iframe-embedded, and returns a NULL envelope to any request
+ * without a live GMB session (see the Motorrad section of DECISIONS.md), so it
+ * cannot be reached from this environment — which is why Motorrad ships on
+ * curated fixtures today.
+ *
+ * This is the real adapter, wired against that discovered contract. It stays
+ * dormant while the registry says `source: 'fixtures'`; flip Motorrad to
+ * `source: 'live-motorrad'` (and run from an origin that carries a session, or
+ * pass MOTORRAD_SESSION) and it lights up with NO other change. It reuses the
+ * same map-then-filter path and the same StockUnavailableError contract as the
+ * BMW/MINI feed, so a caller can't tell a live brand from a fixtures one.
+ * --------------------------------------------------------------------- */
+
+// The result-overview endpoint, relative to the brand origin. Kept here (not in
+// the registry) because it's an implementation detail of this adapter.
+const MOTORRAD_FEED_PATH = '/UK/ResultOverview/ShowResultsFilterChanged';
+
+// A session token, if the deploying origin can supply one. The endpoint binds
+// results to a GMB session (a GMB-SID cookie/header); absent a session it
+// returns a null envelope. Provided out-of-band by the host, never invented.
+const MOTORRAD_SESSION = process.env.MOTORRAD_SESSION || '';
+
+// The minimal filter body the endpoint expects. InitFilter:true asks for the
+// unfiltered result set (all approved-used bikes); the matcher does its own
+// scoring downstream, so we pull the whole pool once rather than round-tripping
+// the site's own facets. Extra facets can be merged in later without touching
+// the plumbing.
+const MOTORRAD_FILTER_BODY = { InitFilter: true };
+
+/**
+ * Dig the vehicle rows out of the SearchFilter envelope. The contract nests the
+ * rows under SearchFilter.ResOverviewData.ResTable (with a totalItemCount
+ * alongside); older captures put them directly under ResTable. We accept either
+ * and normalise to a flat array, so a shape drift on their side degrades to
+ * "empty" (a clean StockUnavailableError) rather than a crash.
+ */
+export function motorradRowsFromEnvelope(env) {
+  const sf = env?.SearchFilter ?? env;
+  const table = sf?.ResOverviewData?.ResTable ?? sf?.ResTable ?? env?.ResTable;
+  const rows = table?.Items ?? table?.items ?? (Array.isArray(table) ? table : []);
+  return Array.isArray(rows) ? rows : [];
+}
+
+/**
+ * Project one live result row into the flat shape mapMotorradRaw consumes. The
+ * live field names aren't confirmable from here (the endpoint won't answer
+ * without a session), so this reads a spread of plausible keys and leaves the
+ * canonical projection (category, cc, licence band, blurb) to mapMotorradRaw —
+ * the same mapper the fixtures go through. When the real field names land, only
+ * this adapter changes; mapMotorradRaw and everything downstream stay put.
+ */
+export function motorradRowToRaw(row = {}) {
+  return {
+    id: row.Id ?? row.id ?? row.StockNumber ?? row.VehicleId,
+    title: row.Title ?? row.Name ?? row.ModelName ?? row.Description,
+    price: row.Price ?? row.CashPrice ?? row.PriceValue,
+    mileage: row.Mileage ?? row.Odometer ?? row.Miles,
+    reg: row.Registration ?? row.Reg ?? row.NumberPlate,
+    fuel: row.Fuel ?? row.FuelType,
+    image: row.ImageUrl ?? row.Image ?? row.MainImage,
+    link: row.DetailUrl ?? row.Url ?? row.Link,
+  };
+}
+
+/** Fetch and map the whole live Motorrad pool. Throws StockUnavailableError on
+ *  any failure (no session, non-200, null envelope, non-JSON, empty result), so
+ *  it drops into the same degrade-to-fixtures/error path as the BMW/MINI feed. */
+async function motorradLiveStock(origin) {
+  const url = `${origin}${MOTORRAD_FEED_PATH}`;
+  const headers = { Referer: `${origin}/UK/` };
+  // The endpoint reads its session from a GMB-SID cookie; forward one if the
+  // host supplied it. Without it the endpoint answers, but with a null envelope.
+  if (MOTORRAD_SESSION) headers.Cookie = `GMB-SID=${MOTORRAD_SESSION}`;
+
+  let res;
+  try {
+    res = await httpsPostJson(url, MOTORRAD_FILTER_BODY, headers);
+  } catch (cause) {
+    throw new StockUnavailableError('Motorrad live feed request failed', { cause });
+  }
+  if (res.status !== 200) {
+    throw new StockUnavailableError(`Motorrad feed returned HTTP ${res.status}`);
+  }
+  let env;
+  try {
+    env = JSON.parse(res.body);
+  } catch (cause) {
+    throw new StockUnavailableError('Motorrad feed returned non-JSON', { cause });
+  }
+  // A null SearchFilter is the signature of a request with no live session.
+  if (env?.SearchFilter === null && env?.ResTable == null) {
+    throw new StockUnavailableError(
+      'Motorrad feed returned a null envelope (no live session)',
+    );
+  }
+  const bikes = motorradRowsFromEnvelope(env)
+    .map(motorradRowToRaw)
+    .map(mapMotorradRaw)
+    .filter(Boolean);
+  if (bikes.length === 0) {
+    throw new StockUnavailableError('Motorrad feed returned no usable bikes');
+  }
+  return bikes;
+}
+
 /* ------------------------------ public API ---------------------------- */
 
 /**
@@ -290,6 +439,22 @@ export async function fetchRetailerStock(brand = 'bmw', retailerSite) {
   // Fixtures-backed brands never touch the network or the TTL cache — the
   // snapshot is static for the run and the cars are already mapped.
   if (source === 'fixtures') return fixturesRetailerStock(b, site);
+
+  // Motorrad's live feed, when the registry opts into it. It's cached per
+  // brand+retailer exactly like the BMW/MINI feed; on any failure (typically no
+  // live session in this environment) it degrades to the curated snapshot
+  // rather than blanking the deck — the "decide and keep moving" rule. Flip the
+  // registry back to 'fixtures' to disable it entirely.
+  if (source === 'live-motorrad') {
+    const key = keyFor(b, site);
+    seenRetailers.set(key, { brand: b, retailerSite: site });
+    return cachedFetch(cacheByRetailer, key, () =>
+      motorradLiveStock(origin).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.warn(`[motorrad] live feed unavailable, serving fixtures: ${err?.message}`);
+        return fixturesRetailerStock(b, site);
+      }));
+  }
 
   const key = keyFor(b, site);
   seenRetailers.set(key, { brand: b, retailerSite: site });
@@ -383,7 +548,9 @@ export async function fetchNearbyStock(brand = 'bmw', retailerSite) {
   // no honest "near you" pool to build. Return empty: callers treat a throw or
   // empty as "no carousel", and the hero matches never depend on it. (When a
   // real feed is wired and the brand flips to 'feed', this lights up for free.)
-  if (source === 'fixtures') return [];
+  // Motorrad's live feed is a single national pool with no distance facet, so it
+  // has no honest "near you" either — same empty result.
+  if (source === 'fixtures' || source === 'live-motorrad') return [];
 
   const key = keyFor(b, site);
   seenRetailers.set(key, { brand: b, retailerSite: site });
@@ -601,7 +768,9 @@ export async function enrichColours(brand, cars, budgetMs = COLOUR_BUDGET_MS) {
   // such PDPs to scrape (its links point at the real brand site, not this
   // origin), so any paint it shows must already be baked into the snapshot.
   // Skip the network entirely rather than fetching against the wrong origin.
-  if (source === 'fixtures') return cars;
+  // Motorrad's live feed uses the UVL PDP shape too, so its rows carry any paint
+  // inline already; there's no separate colour PDP to fetch on this origin.
+  if (source === 'fixtures' || source === 'live-motorrad') return cars;
   const queue = cars.filter((c) => c?.id);
   const deadline = Date.now() + budgetMs;
   for (let i = 0; i < queue.length; i += COLOUR_CONCURRENCY) {

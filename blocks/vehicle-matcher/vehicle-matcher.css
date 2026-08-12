@@ -481,6 +481,81 @@
   box-shadow: inset 0 0 0 2px var(--vm-accent), inset 4px 0 0 var(--vm-accent-spot);
 }
 
+/* -------------------------------- Motorrad ---------------------------------
+ * BMW Motorrad is the same parent marque as BMW cars but a distinct sub-brand
+ * with its own tougher, more technical register: motorsport red/blue on a near-
+ * black anthracite, sharp geometry (a bike is mechanical, precise), and crisp,
+ * confident motion. Shares BMW's uppercase headline treatment (it inherits the
+ * base .vm-title, unlike Ford/Honda which un-uppercase) because Motorrad's own
+ * marketing sets model names and headlines in caps. Accent is Motorrad blue;
+ * the motorsport red is the secondary spot that appears on small highlights. */
+.vm.vm-motorrad {
+  /* Host-first, then a neutral system sans. Motorrad uses the same BMWType
+     family as BMW, so fall through to it, then to a system sans. */
+  --vm-font-heading: var(--heading-font-family, 'BMWMotorrad', 'BMWTypeNextLatin', 'Helvetica Neue', arial, sans-serif);
+  --vm-font-body: var(--body-font-family, 'BMWMotorrad', 'BMWTypeNextLatin', 'Helvetica Neue', arial, sans-serif);
+  --vm-font-bold: var(--vm-font-body);
+
+  /* colour: darker and more assertive than BMW cars. Strong near-black ink, a
+     Motorrad blue accent for CTAs/links, and the motorsport red as the spot. */
+  --vm-ink: #1c1c1c;
+  --vm-ink-strong: #0a0a0a;
+  --vm-ink-muted: #5c5c5c;
+  --vm-accent: #0066b1;          /* BMW Motorrad blue — primary CTA, links */
+  --vm-accent-ink: #ffffff;
+  --vm-accent-secondary: #e2001a; /* Motorsport red — energy on small chrome */
+  --vm-accent-spot: var(--vm-accent-secondary); /* red spot: progress, score, slider */
+  --vm-accent-soft: rgba(0, 102, 177, 0.07);
+  --vm-line: #d2d2d2;
+
+  /* geometry: sharp. A bike's design language is hard edges and machined metal,
+     so square corners like BMW (not Ford/Honda's rounding). */
+  --vm-radius: 0px;
+  --vm-radius-control: 0px;
+
+  /* motion: crisp and quick, a touch faster than BMW cars — the sportier
+     sub-brand — but no bounce. */
+  --vm-ease: cubic-bezier(0.2, 0.65, 0.15, 1);
+  --vm-pop: 0.36s;
+}
+
+/* Motorrad primary button: Motorrad blue fill, deeper blue on hover (not the
+   base filter). The red is reserved for spot chrome, so the main CTA stays blue
+   and legible. */
+.vm.vm-motorrad .vm-btn-primary {
+  background: var(--vm-accent);
+  border-color: var(--vm-accent);
+  color: var(--vm-accent-ink);
+}
+.vm.vm-motorrad .vm-btn-primary:not(:disabled):hover {
+  filter: none;
+  background: #004f8a;
+  border-color: #004f8a;
+}
+
+/* Motorsport-red spot touches: progress bar, score badge, slider fill and focus
+   ring carry the red, the sub-brand's signature energy on the small chrome the
+   base leaves neutral. (--vm-accent-spot is red for Motorrad, blue elsewhere.) */
+.vm.vm-motorrad .vm-progress-bar { background: var(--vm-accent-spot); }
+.vm.vm-motorrad .vm-score {
+  background: var(--vm-accent-spot);
+  border-color: var(--vm-accent-spot);
+  color: #fff;
+}
+.vm.vm-motorrad .vm-range-fill,
+.vm.vm-motorrad .vm-slider-input::-webkit-slider-thumb,
+.vm.vm-motorrad .vm-slider-input::-moz-range-thumb { background: var(--vm-accent-spot); }
+.vm.vm-motorrad button:focus-visible,
+.vm.vm-motorrad .vm-slider-input:focus-visible::-webkit-slider-thumb {
+  outline-color: var(--vm-accent-spot);
+  box-shadow: 0 0 0 3px rgba(226, 0, 26, 0.3);
+}
+/* Selected option: blue border (the calm primary), with a red inner edge so the
+   selection reads with the sub-brand's motorsport spark. */
+.vm.vm-motorrad .vm-option.is-selected {
+  box-shadow: inset 0 0 0 2px var(--vm-accent), inset 4px 0 0 var(--vm-accent-spot);
+}
+
 .vm-kicker {
   font-family: var(--vm-font-bold);
   font-weight: 700;

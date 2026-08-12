@@ -3,10 +3,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { mapVehicle, mapHondaRaw, mapFordRaw } from '../mapping.js';
+import {
+  mapVehicle, mapHondaRaw, mapFordRaw, mapMotorradRaw,
+} from '../mapping.js';
 import { questionsForBrand, applyBespokeAnswers } from '../questions.js';
 import { normalizeBrand, brandConfig, brandTuning } from '../brands.js';
 import { rankCars } from '../engine.js';
+import { motorradRowsFromEnvelope, motorradRowToRaw } from '../stock.js';
 
 /* Feed-shaped fixtures (the fields mapVehicle actually reads). */
 const bmwVehicle = {
@@ -775,4 +778,212 @@ test('ford tuning ranks a practical family SUV a real Ford buyer would pick', ()
   };
   const ranked = rankCars(family, [mustang, kuga], brandTuning('ford'));
   assert.equal(ranked[0].car.id, 'kuga', 'the practical Ford SUV tops for a family under Ford tuning');
+});
+
+/* ==================================================================
+ * Motorrad — the first NON-CAR brand: BMW's used-bike range on the
+ * same engine. It proves the engine is vehicle-agnostic, not just
+ * multi-marque. The mapped shape is the identical engine schema, but
+ * every field carries a bike meaning: `body` is the riding category
+ * (adventure/tourer/sport/naked/roadster/heritage/scooter), `boot` is
+ * luggage litres, `seats` is pillion capability, `sizeClass` is a
+ * licence-and-manageability band, and only the CE 04 is electric. The
+ * live feed is a session-gated SPA (unreachable here), so fixtures are
+ * curated and projected by mapMotorradRaw. See the Motorrad section of
+ * DECISIONS.md for the full field-by-field axis map and the tuning
+ * recalibration (bike 0-62 curve, luggage bootNeed, seat floors).
+ * ================================================================== */
+
+// The flat-raw shape mapMotorradRaw consumes (curated fixtures, or the live
+// adapter): a listing title, a ride-away price, mileage and a plate.
+const motorradRaw = (overrides = {}) => ({
+  id: 'MOT-TEST-1',
+  title: 'BMW R 1250 GS',
+  price: 13500,
+  mileage: 9200,
+  reg: 'MOT 1',
+  ...overrides,
+});
+
+test('brand config: motorrad is a fixtures-source brand serving a bikes file', () => {
+  const cfg = brandConfig('motorrad');
+  assert.equal(cfg.source, 'fixtures', 'motorrad serves from fixtures, not the live feed');
+  assert.equal(cfg.fixturesFile, 'motorrad-bikes.json', 'motorrad reads the bikes file, not <brand>-cars.json');
+  assert.match(cfg.origin, /bmw-motorrad\.co\.uk/);
+  assert.equal(normalizeBrand('Motorrad'), 'motorrad');
+  assert.equal(normalizeBrand('MOTORRAD'), 'motorrad');
+});
+
+test('mapMotorradRaw projects a flat bike record into the engine schema', () => {
+  const bike = mapMotorradRaw(motorradRaw());
+  for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
+    assert.ok(bike[field] !== undefined, `mapped Motorrad missing ${field}`);
+  }
+  assert.equal(bike.line, 'R 1250 GS');
+  assert.equal(bike.body, 'adventure', 'the GS is an adventure bike, and body carries the category');
+  assert.equal(bike.fuel, 'petrol');
+  assert.equal(bike.priceMin, 13500);
+  assert.equal(bike.priceMax, 13500, 'a used bike is a single ride-away price, not a range');
+  assert.ok(bike.mpg > 0, 'a combustion bike is scored on mpg');
+  assert.equal(bike.seats, 2, 'the GS carries a pillion');
+  assert.equal(bike.retailerName, 'BMW Motorrad Approved Used');
+  assert.match(bike.name, /^BMW /, 'the display name leads with the marque');
+  assert.equal(bike.cc, 1254, 'engine capacity is surfaced for the card');
+  assert.match(bike.blurb, /ride away/, 'bikes ride away, they do not drive away');
+});
+
+test('mapMotorradRaw derives the category (body) from the model across the range', () => {
+  const cases = [
+    ['BMW R 1300 GS', 'adventure'],
+    ['BMW R 1250 RT', 'tourer'],
+    ['BMW S 1000 RR', 'sport'],
+    ['BMW S 1000 R', 'naked'],
+    ['BMW R 1250 R', 'roadster'],
+    ['BMW R 18', 'heritage'],
+    ['BMW CE 04', 'scooter'],
+  ];
+  for (const [title, category] of cases) {
+    const bike = mapMotorradRaw(motorradRaw({ title }));
+    assert.equal(bike.body, category, `${title} should map to the ${category} category`);
+    assert.ok(bike.tags.includes(category), `${title} carries its category as a tag`);
+  }
+});
+
+test('mapMotorradRaw makes only the CE 04 electric; everything else is petrol', () => {
+  const ce04 = mapMotorradRaw(motorradRaw({ title: 'BMW CE 04', price: 11000 }));
+  assert.equal(ce04.fuel, 'ev', 'the CE 04 is the one electric bike in the range');
+  assert.ok(ce04.evRange > 0, 'an electric bike needs a range for the economy axis');
+  assert.ok(!ce04.mpg, 'an EV carries no mpg (scored on range instead)');
+  assert.equal(ce04.body, 'scooter');
+  // The scooter blurb already says "electric"; it must not double it up.
+  assert.ok(!/electric electric/i.test(ce04.blurb), 'the scooter blurb does not double "electric"');
+
+  const gs = mapMotorradRaw(motorradRaw());
+  assert.equal(gs.fuel, 'petrol');
+  assert.ok(gs.mpg > 0);
+  assert.equal(gs.evRange, undefined, 'a petrol bike carries no ev range');
+});
+
+test('mapMotorradRaw returns null for a priceless record (never invents a price)', () => {
+  assert.equal(mapMotorradRaw(motorradRaw({ price: 0 })), null);
+  assert.equal(mapMotorradRaw(motorradRaw({ price: undefined })), null);
+});
+
+test('every Motorrad fixture is engine-valid (the curated bikes the app serves)', () => {
+  const path = fileURLToPath(new URL('../../fixtures/motorrad-bikes.json', import.meta.url));
+  const bikes = JSON.parse(readFileSync(path, 'utf8'));
+  assert.ok(bikes.length > 0, 'motorrad fixtures are not empty');
+  for (const bike of bikes) {
+    for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
+      assert.ok(bike[field] !== undefined, `${bike.name || bike.id} missing ${field}`);
+    }
+    assert.ok(bike.priceMin <= bike.priceMax, `${bike.name} price range inverted`);
+    if (bike.fuel === 'ev') assert.ok(bike.evRange > 0, `${bike.name} (ev) needs evRange`);
+    else assert.ok(bike.mpg > 0, `${bike.name} needs mpg`);
+    assert.ok(!bike.blurb.includes('—'), `${bike.name} blurb has an em dash`);
+    assert.ok(!bike.name.includes('—'), `${bike.name} name has an em dash`);
+  }
+});
+
+/* ---- Motorrad bespoke bike questions ---- */
+
+test('questionsForBrand(motorrad) drops car-only questions and adds the bike ones', () => {
+  const ids = questionsForBrand('motorrad').map((q) => q.id);
+  // Car-only questions Motorrad drops (a bike has no charging plug question,
+  // no "how many people", and comfort<->sporty is folded into ridingStyle).
+  for (const dropped of ['charging', 'people', 'style']) {
+    assert.ok(!ids.includes(dropped), `motorrad should drop the car-only "${dropped}" question`);
+  }
+  // Bike-native questions Motorrad adds.
+  assert.ok(ids.includes('ridingStyle'), 'motorrad asks what kind of riding it is for');
+  assert.ok(ids.includes('licence'), 'motorrad asks which licence you ride on');
+  // The bespoke questions are spliced in after bodyStyles, in order.
+  assert.ok(ids.indexOf('ridingStyle') > ids.indexOf('bodyStyles'), 'ridingStyle follows bodyStyles');
+  assert.ok(ids.indexOf('licence') > ids.indexOf('ridingStyle'), 'licence follows ridingStyle');
+});
+
+test('applyBespokeAnswers(motorrad) folds ridingStyle into standard engine fields', () => {
+  // "Adventure" must resolve to primaryUse:roadtrips (not fun) so the GS range's
+  // big-frame + luggage strengths surface — see brands.js for the rationale.
+  const adv = applyBespokeAnswers('motorrad', { ridingStyle: 'adventure' });
+  assert.equal(adv.primaryUse, 'roadtrips', 'adventure riding folds to roadtrips so GS bikes surface');
+  assert.equal(adv.style, '3');
+  assert.deepEqual(adv.priorities, ['comfort']);
+
+  const sport = applyBespokeAnswers('motorrad', { ridingStyle: 'sport' });
+  assert.equal(sport.primaryUse, 'fun');
+  assert.deepEqual(sport.priorities, ['performance']);
+
+  // An explicit standard answer still wins over the bespoke nudge (a scalar only
+  // fills a blank; it never overwrites what the rider set directly).
+  const explicit = applyBespokeAnswers('motorrad', { primaryUse: 'city', ridingStyle: 'sport' });
+  assert.equal(explicit.primaryUse, 'city', 'an explicit primaryUse is not overwritten by the bespoke fold');
+});
+
+test('motorrad tuning surfaces a go-anywhere GS for an adventure rider, over a sportbike', () => {
+  // The riskiest product claim of the whole bike adaptation: an adventure rider
+  // should be shown a GS, not an S 1000 RR. The GS wins on category fit + size +
+  // luggage once "adventure" folds to roadtrips; the sportbike is quicker but
+  // impractical for the stated use. This is the tuning end-to-end, through the
+  // real bespoke fold and the real rankCars.
+  const gs = {
+    id: 'gs', name: 'BMW R 1250 GS', line: 'R 1250 GS', body: 'adventure', fuel: 'petrol',
+    priceMin: 13500, priceMax: 13500, sizeClass: 5, seats: 2, boot: 68, zeroTo62: 3.4,
+    mpg: 56, tags: ['adventure', 'touring'], blurb: '',
+  };
+  const rr = {
+    id: 'rr', name: 'BMW S 1000 RR', line: 'S 1000 RR', body: 'sport', fuel: 'petrol',
+    priceMin: 13500, priceMax: 13500, sizeClass: 4, seats: 1, boot: 0, zeroTo62: 2.9,
+    mpg: 42, tags: ['sport', 'sporty'], blurb: '',
+  };
+  const rider = applyBespokeAnswers('motorrad', {
+    budget: [8000, 18000], bodyStyles: ['adventure'], fuel: ['petrol'],
+    ridingStyle: 'adventure', licence: 'a', mileage: 8000,
+  });
+  const ranked = rankCars(rider, [rr, gs], brandTuning('motorrad'));
+  assert.equal(ranked[0].car.id, 'gs', 'the GS tops for an adventure rider under Motorrad tuning');
+});
+
+/* ---- Motorrad live-feed adapter (dormant until hosted, but guarded) ---- */
+
+test('motorradRowsFromEnvelope reads both envelope shapes and null-safes the rest', () => {
+  const rows = [{ id: 1 }, { id: 2 }];
+  // The documented nested shape: SearchFilter.ResOverviewData.ResTable.Items.
+  assert.deepEqual(
+    motorradRowsFromEnvelope({ SearchFilter: { ResOverviewData: { ResTable: { Items: rows } } } }),
+    rows,
+    'reads the nested ResOverviewData.ResTable shape',
+  );
+  // The flatter capture some responses use: SearchFilter.ResTable.items.
+  assert.deepEqual(
+    motorradRowsFromEnvelope({ SearchFilter: { ResTable: { items: rows } } }),
+    rows,
+    'reads the flatter ResTable shape',
+  );
+  // The null envelope a session-less request gets back — no rows, no throw.
+  assert.deepEqual(motorradRowsFromEnvelope({ SearchFilter: null, ResTable: null }), []);
+  assert.deepEqual(motorradRowsFromEnvelope(null), [], 'a null body is empty, not a crash');
+  assert.deepEqual(motorradRowsFromEnvelope({}), [], 'an unknown shape degrades to empty');
+});
+
+test('a live Motorrad row projects and maps to the same engine schema as a fixture', () => {
+  // Prove the adapter feeds mapMotorradRaw the shape it expects: a live row, read
+  // by motorradRowToRaw, then mapped, lands as a valid engine bike identical in
+  // shape to a fixture. When the real field names arrive, only the row->raw step
+  // changes; this test pins the contract between the two.
+  const liveRow = {
+    Id: 'LIVE-1', Title: 'BMW R 1250 GS', Price: 14250, Mileage: 6100,
+    Registration: '23 BMW', FuelType: 'Petrol',
+  };
+  const raw = motorradRowToRaw(liveRow);
+  assert.equal(raw.id, 'LIVE-1');
+  assert.equal(raw.title, 'BMW R 1250 GS');
+  assert.equal(raw.price, 14250);
+
+  const bike = mapMotorradRaw(raw);
+  for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
+    assert.ok(bike[field] !== undefined, `mapped live bike missing ${field}`);
+  }
+  assert.equal(bike.body, 'adventure');
+  assert.equal(bike.priceMin, 14250);
 });

@@ -26,9 +26,25 @@ Format: **[area] decision** — why, and how to undo if you disagree.
   detail link, pagination), and the provided `soap/kfz/?gw=search_form` returns clean
   JSON filter metadata as a bonus. Scraped into `fixtures/honda-cars.json`.
 
-- **[motorrad-data] Motorrad uses real stock.** The provided
-  `POST /api/ResultOverview/ShowResultsFilterChanged` returns 200 JSON; a real filter
-  body returns bikes. Dumped to `fixtures/motorrad-bikes.json`.
+- **[motorrad-data] Motorrad uses curated sample fixtures, not the live feed (corrected
+  after a deeper probe during implementation).** The first-pass reachability check saw the
+  endpoint return `200 application/json` and assumed a filter body would return bikes. It does
+  not, and the reason is structural: `ResultOverview/ShowResultsFilterChanged` is a
+  session-gated, cross-origin, iframe-embedded legacy ASP.NET app. Every plausible body
+  returns the null envelope `{"SearchFilter":null,"ResTable":null}`; the AMS bundle
+  (`/bundles/ams`) shows the real call needs (a) a `GMB-SID` session header minted per page
+  load into a hidden `#hfSID` field, (b) an `InitFilter:true` flag on a fully-populated filter
+  model (`PreisVon`, `PowerUnit`, `Segment`, `FuelType`, `Farbe...`), and (c) the real
+  `rootPath` `/gmb_kunden/`, which 302s to a notfound page when hit without the hosting
+  iframe's session. That is the same "not scriptable from this environment" class as Ford's
+  Akamai wall. So Motorrad serves `fixtures/motorrad-bikes.json`, curated from the public BMW
+  Motorrad range. I wired the real adapter against the DISCOVERED contract (POST to
+  `ResultOverview/ShowResultsFilterChanged`, `GMB-SID` header, `{InitFilter:true, ...filter}`
+  body, response read from `SearchFilter.ResOverviewData` / `ResTable`), so it goes live when
+  run from an allowed session origin. To undo: run from within the hosting session and flip
+  Motorrad's registry `source` back to `feed`.
+  The response envelope is now known (`SearchFilter.ResOverviewData.totalItemCount`, `ResTable`),
+  which shaped both the adapter and the fixture schema.
 
 ## Foundations (branch `vehicle-brand-ford-honda`)
 
@@ -242,5 +258,141 @@ Format: **[area] decision** — why, and how to undo if you disagree.
   literal, skipping pure-comment lines and dev-only console diagnostics (author-facing, out of
   scope). It covers all screens at once and blocks any future reintroduction. Suite: 126 tests
   green.
+
+## Motorrad (branch `bike-brand-motorrad`) — bikes on a car engine
+
+The ambitious stretch: the matcher was built for cars, and Motorrad sells motorcycles.
+Rather than fork the engine, Motorrad reuses every scorer by mapping bike attributes onto
+the engine's existing axes. This section documents each repurposing, because it is the
+riskiest surface in the whole run: a proxy that reads wrong would mis-rank silently. Each is
+a deliberate, reversible call.
+
+- **[motorrad-axis-map] The engine's car axes are repurposed for bikes, one to one, no engine
+  change.** The engine scores nine axes; here is what each means for a bike, and how honest the
+  proxy is:
+  - `priceMin`/`priceMax` → **bike price.** Direct, no repurposing. (honest)
+  - `body` → **bike category** (naked, roadster, adventure, tourer, sport, heritage, scooter).
+    A direct conceptual analogue of car body style: the silhouette-and-purpose class a rider
+    shops by. Uses a bike-specific option set in the `bodyStyles` question, not the car list. (honest)
+  - `fuel` → **petrol for all combustion bikes; `ev` for the CE 04 electric scooter** (with a
+    real electric range). BMW Motorrad's used range is overwhelmingly petrol, so the fuel axis
+    barely separates bikes; it is kept truthful rather than leaned on. (honest)
+  - `seats` → **pillion capability: 2 = dual-seat, 1 = solo/track.** Repurposes the car "who's on
+    board" axis as "can it carry a passenger." A single-seat or track-focused bike scores 1.
+    (proxy, documented)
+  - `boot` → **luggage / touring capacity in litres** (panniers + top box for tourers/adventure,
+    ~0 for sport/naked). The engine's practicality scorer reads boot against a derived "need";
+    for bikes that need becomes "do you tour / carry gear." A GS with full luggage reads
+    practical; a sportbike does not. (proxy, documented — the boldest one)
+  - `zeroTo62` → **bike 0-62 (seconds).** Direct, but the SCALE is different: bikes are far
+    quicker than cars (a sportbike is ~3s, a small commuter ~6s), so the performance tuning's
+    `zeroBase`/`span` are recalibrated for the bike range (below), otherwise every bike would
+    peg the performance axis at 1.0. (honest field, recalibrated scale)
+  - `mpg` → **bike mpg.** Direct; bikes are frugal (50-80mpg typical). (honest)
+  - `sizeClass` (1-5) → **engine/size band, a licence-and-manageability proxy:** 1 ≈ A1/A2-friendly
+    small-capacity (~<500cc), 3 ≈ midweight (~600-900cc), 5 ≈ big tourer/adventure (~1200cc+).
+    The engine's size scorer maps "city" to low class and "roadtrip" to high class, which lands
+    correctly for bikes: a nimble commuter is low, a big-mile tourer is high. (proxy, documented)
+  - `tags` → **riding character** (`touring`, `adventure`, `commuter`, `sporty`, `heritage`,
+    `a2-friendly`, `electric`). Read by scoreCharacter exactly as car tags are. (honest)
+  - `styleLine` / `doors` → **unused for bikes** (no trim-line or door split); left null, the
+    engine simply doesn't score a null. (n/a)
+
+  To undo any single proxy: it lives in `mapMotorradRaw` (server/mapping.js) and the Motorrad
+  tuning block (server/brands.js); change the projection and rebuild the fixtures.
+
+- **[motorrad-tuning] The tuning is recalibrated for the bike range, not just reskinned.** A car
+  brand's tuning is mostly weights; bikes need the SCALES moved too, or car-shaped thresholds
+  mis-score. Four recalibrations, all in `MOTORRAD_TUNING` (server/brands.js), each load-bearing:
+  - **Performance curve.** Cars span ~4.5-13s 0-62; bikes span ~2.8-7.7s. On BMW's car curve
+    (10.5s→0, 4.5s→1) every bike would peg at 1.0 and the axis would carry no signal. Re-pointed
+    to `zeroBase: 8.0, span: 5.2` so a ~7.7s G 310 sits low and a ~2.8s M 1000 RR tops out, with
+    midweights spread between. Without this the whole performance axis is dead.
+  - **Luggage need.** `practicality.bootNeed` moved to `{ small: 0, medium: 30, big: 80 }` litres —
+    a bike's real luggage range (0 on a sportbike to ~110 on a K 1600), not a car boot's ~550L.
+    Otherwise a fully-panniered tourer still reads impractical against a car-sized need.
+  - **Seat floors.** `seatsFloor: 1` and `crewBonusSeats: 99` so no bike is marked down for
+    carrying 1-2 people and the car "crew bonus" is unreachable. A motorcycle is not a 5-seater
+    and must not be penalised as one.
+  - **Hard filters.** `hardFilter` crew/family seat+boot gates dropped to 1/0 so the car-oriented
+    "needs 5 seats / a big boot" exclusions can never wipe the bike deck.
+  - **Weights.** `body: 4.5` (category is how a rider shops first), `character: 2.4` and
+    `performance: 2.2` up (this is BMW's sporting arm), `economy: 1.0` and `fuel: 1.0` down (bikes
+    are all frugal and nearly all petrol, so those axes barely separate them).
+
+- **[motorrad-questions] The car question set is reshaped to bike-native, via drop/add + scoresAs,
+  with the engine untouched.** Dropped `charging` (only the CE 04 is electric — not worth a
+  screen), `people` (a bike carries a rider + maybe a pillion, never a "crew"), and `style`
+  (comfort↔sporty folds into riding style instead). Added two bike questions whose options fold
+  back to standard engine fields via `scoresAs`, exactly as MINI's trim question does:
+  - `ridingStyle` (commute / adventure / touring / sport / heritage) — the heart of a bike search.
+  - `licence` (A1 / A2 / full A) — gates capacity; A1/A2 nudge toward smaller, a2-friendly bikes.
+  - **[motorrad-adventure-call] Product judgement: "adventure" folds to `primaryUse: roadtrips`,
+    NOT `fun`.** An adventure rider is shopping for a GS, whose edge is a big frame (sizeClass 5)
+    and real luggage (68L). Only `roadtrips` fires the size `roadtripMinClass` bonus AND a non-zero
+    boot need, which is exactly what surfaces the GS range; `fun` would flatten practicality to 1.0
+    and bury the GS's whole reason to exist. Kept `style: '3'` (vs touring's `'2'`) so the character
+    stays distinct from a pure tourer. This is pinned by a test (below), because it is the single
+    claim the bike adaptation lives or dies on.
+  - **[motorrad-phev-fix] Gated `phev` out of the fuel question for Motorrad.** The base `phev`
+    option carried no `brands` marker, so it showed for every brand — including Motorrad, which has
+    no plug-in hybrid bike. Added `brands: ['bmw','mini','honda','ford']` to it; Motorrad's fuel
+    question is now petrol / electric / open, matching the real range.
+
+- **[motorrad-blurb] The rider-facing blurb reads for bikes, and its grammar is generated, not
+  templated.** Bikes "ride away", they don't "drive away". An early version produced "a adventure"
+  and bare-adjective categories; fixed with a `CATEGORY_WORD` noun-phrase table ("an adventure
+  bike", "a naked roadster", "a sports bike") plus an `article()` helper that picks a/an by leading
+  sound, and a guard so the electric scooter phrase never doubles "electric". All seven category
+  blurbs read naturally; the fixture-validity test asserts no em dash slips in.
+
+- **[motorrad-theme] The `.vm.vm-motorrad` theme is Motorrad's own, not BMW's blue reused.**
+  Motorrad blue (`#0066b1`) as the primary CTA, motorsport red (`#e2001a`) as the secondary/spot
+  accent, square radius (0) and a punchier motion curve (`--vm-ease` sporting, `--vm-pop: 0.36s`).
+  The match-signal character map gets a `motorrad` entry (`count: 36` — a denser celebration burst,
+  energy that reads sporting, not cutesy). Brace balance verified.
+
+- **[motorrad-mode-copy] Every game mode is re-voiced for bikes.** Questions ("Find my bike", stock
+  counted as bikes, "a match for your licence and riding"), mingle ("Bike Match", "deck of bikes",
+  "Book a test ride"), knockout ("Two bikes go head to head. Pick the one you'd rather ride."). The
+  unmet/trade-off phrase tables (`UNMET_PHRASES`, `TRADE_COPY`) carry bike wording ("a naked bike",
+  "an adventure bike", "petrol / electric bikes") so the reasons a bike scored the way it did read
+  natively. No em dashes anywhere (guarded by the source-scan test).
+
+- **[motorrad-live-adapter] The real live adapter is wired in `stock.js`, dormant behind the
+  registry.** Motorrad's feed is a session-gated ASP.NET endpoint (`POST
+  .../ResultOverview/ShowResultsFilterChanged`) that returns a null `SearchFilter` envelope to any
+  request without a live GMB session — unreachable from this environment. The adapter is written
+  against that discovered contract anyway: a JSON POST with `{ InitFilter: true }`, an optional
+  `GMB-SID` session from `MOTORRAD_SESSION`, envelope parsing that accepts both the nested
+  `ResOverviewData.ResTable` and the flatter `ResTable` shapes, and a row→raw projection that reads
+  a spread of plausible field names and hands off to `mapMotorradRaw` (the same mapper the fixtures
+  use). It stays dormant while `source: 'fixtures'`; flip the registry to `source: 'live-motorrad'`
+  and it lights up. **On any failure it degrades to the curated fixtures rather than blanking the
+  deck** (the "decide and keep moving" rule), and — like all fixtures brands — it serves no "near
+  you" carousel and fetches no colour PDPs.
+
+## Testing (Motorrad)
+
+- **[motorrad-tests] Nine server tests + two adapter tests in `brand.test.js`, plus the render
+  matrix.** The server tests cover: the fixtures-source config (and the `fixturesFile` override),
+  `mapMotorradRaw` projecting the full engine schema, category→body derivation across all seven
+  categories, the CE 04 being the only EV (petrol everywhere else, no double-"electric" blurb),
+  null-on-priceless, "every Motorrad fixture is engine-valid" (the same guard the render test
+  relies on, with em-dash checks on name and blurb), the bespoke drop/add question shape, the
+  `ridingStyle` scoresAs fold, and — the keystone — **the adventure/roadtrips tuning test that
+  proves a GS out-ranks an S 1000 RR for an adventure rider**, end to end through the real
+  `applyBespokeAnswers` and `rankCars`. The two adapter tests guard the envelope parser (both
+  shapes + null-safety) and the row→raw→`mapMotorradRaw` contract. Motorrad is also in the
+  headless render matrix (`render.test.js`): all three modes mount and paint for bikes, carry the
+  `vm-motorrad` theme class, show the "BMW Motorrad" wordmark on the questions intro, and paint no
+  em dashes. Full suite: **140 green, no BMW/MINI regression** (was 94 at the start of the run).
+
+- **[motorrad-test-gap] Known gap, logged not closed: the live adapter's NETWORK path is untested.**
+  The endpoint won't answer without a live session from this environment, so the POST/handshake/
+  degrade-to-fixtures flow can't be exercised hermetically here. The pure parsing/projection helpers
+  ARE tested (exported for exactly that); the network round-trip and the degrade-on-failure branch
+  should get an integration test the first time the adapter runs from an allowed origin (or against
+  a recorded session capture). Noted here so it isn't mistaken for covered.
 
 <!-- Further decisions appended below as the run proceeds. -->

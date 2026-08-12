@@ -422,6 +422,38 @@ BRAND_COPY.ford = {
 };
 
 /*
+ * Motorrad copy. Same all-or-nothing build as Honda/Ford: spread the BMW base so
+ * every key resolves, then override the marque lines AND the ones that say "car"
+ * or "drive" (a rider reads "bike" and "ride"). Motorrad's voice is rider-first
+ * and technical, confident and a little adrenaline-forward. No em dashes.
+ *
+ * Note on "big enough for you" in `working`: for a bike that phrasing is wrong
+ * (a bike isn't judged on space), so Motorrad re-voices it to "a match for your
+ * licence and riding" - the real gate a rider cares about. No em dashes.
+ */
+BRAND_COPY.motorrad = {
+  ...BRAND_COPY.bmw,
+  name: 'BMW Motorrad',
+  title: 'Find your perfect BMW Motorrad.',
+  cta: 'Find my bike',
+  lede: ({ questions, retailer }) => `${questions} quick questions about your riding, `
+    + 'your miles and your budget. We’ll match you with the approved-used '
+    + `bikes at ${retailer} that suit you best, and tell you why.`,
+  unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
+    + 'These are the closest matches to everything else you asked for.',
+  refineStatus: ({ shown, wants }) => (shown === 1
+    ? `One bike still matches, with ${wants}.`
+    : `${shown} bikes still match, with ${wants}.`),
+  refineStatusPlain: ({ shown }) => (shown === 1
+    ? 'One bike still matches.'
+    : `${shown} bikes still match.`),
+  working: ({ total, eligible }) => `We went through all ${total} BMW Motorrad bikes in stock here. `
+    + `${eligible} were in budget and a match for your licence and riding.`,
+  workingScore: ' A match score is how well a bike fits your answers, nothing else, '
+    + 'so bikes that suit you equally share one.',
+};
+
+/*
  * How an unmet want is named in the results note, per brand — plural noun
  * phrases that drop into "No ___ at <retailer>…". Per-brand because MINI
  * names its own shapes (a Countryman, not an SUV) and calls its EVs
@@ -472,6 +504,19 @@ const UNMET_PHRASES = {
       convertible: 'convertibles', mpv: 'people carriers', pickup: 'pickups',
     },
   },
+  motorrad: {
+    // Motorrad is petrol plus one electric (the CE 04); no diesel/PHEV. The
+    // bodyStyles keys here are the bike categories the mapper emits as `body`
+    // (see MODEL_SPECS_MOTORRAD), not car shapes.
+    fuel: {
+      petrol: 'petrol bikes', ev: 'electric bikes',
+    },
+    bodyStyles: {
+      naked: 'naked bikes', roadster: 'roadsters', adventure: 'adventure bikes',
+      tourer: 'tourers', sport: 'sports bikes', heritage: 'heritage bikes',
+      scooter: 'electric scooters',
+    },
+  },
 };
 
 /*
@@ -518,6 +563,15 @@ const TRADE_COPY = {
     bodyStyles: {
       hatchback: 'a hatchback', estate: 'an estate', suv: 'an SUV', coupe: 'a coupé',
       convertible: 'a convertible', mpv: 'a people carrier', pickup: 'a pickup',
+    },
+  },
+  motorrad: {
+    label: 'The trade-off',
+    fuel: { petrol: 'petrol', ev: 'electric' },
+    bodyStyles: {
+      naked: 'a naked bike', roadster: 'a roadster', adventure: 'an adventure bike',
+      tourer: 'a tourer', sport: 'a sports bike', heritage: 'a heritage bike',
+      scooter: 'an electric scooter',
     },
   },
 };

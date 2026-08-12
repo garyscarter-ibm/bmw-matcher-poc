@@ -341,7 +341,11 @@ export function idOf(car) {
  * entry here (plus its CSS token block), never an edit to celebrate() itself.
  *
  *   - restrained (BMW, Ford): measured, fewer plainer bits.
- *   - lively (MINI, Honda, Motorrad): warm and playful, denser burst.
+ *   - lively (MINI, Honda): warm and playful, denser burst.
+ *   - punchy (Motorrad): a denser burst too, but the energy is sporting, not
+ *     cutesy — the sharpness comes from the theme (motorsport-red spot + crisp,
+ *     unbouncy --vm-ease), so the count just turns the exuberance up. Finding
+ *     your bike is a high-adrenaline moment; the burst should match it.
  *
  * A brand not listed falls back to the restrained default, so a new brand is
  * never broken here — it just starts understated until it opts into warmth.

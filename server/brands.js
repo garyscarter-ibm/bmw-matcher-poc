@@ -372,6 +372,74 @@ const FORD_TUNING = {
   },
 };
 
+/*
+ * Motorrad overrides — the recalibration that makes a CAR engine rank BIKES
+ * sensibly. Bikes live on different scales from cars, so the axes the engine
+ * reads must be re-pointed or the scores flatten: every bike is quick, every
+ * bike is frugal, and "boot" means litres of luggage, not car-boot litres. See
+ * the Motorrad axis map in DECISIONS.md for the field-by-field rationale.
+ * Everything not restated inherits BMW's base via mergeTuning.
+ */
+const MOTORRAD_TUNING = {
+  weights: {
+    // Category (body) is how a rider shops first (GS vs sportbike vs tourer), so
+    // it stays the dominant axis. Performance and character matter more than on a
+    // mainstream car brand (this is BMW's sporting arm), economy less (bikes are
+    // all frugal, so it barely separates them). Fuel is near-dead (almost all
+    // petrol), so it's light.
+    budget: 3.0, body: 4.5, fuel: 1.0, practicality: 1.8,
+    performance: 2.2, economy: 1.0, size: 1.4, character: 2.4,
+  },
+  priorityBoosts: {
+    economy: { economy: 1.4, budget: 0.5 },
+    performance: { performance: 1.8, character: 0.6 },
+    comfort: { character: 1.0, size: 0.6 }, // a tourer's comfort reads through category + size
+    tech: { character: 0.9 },
+    image: { character: 1.0 },
+  },
+  // THE critical recalibration. Car 0-62 spans ~4.5-13s; bikes span ~2.8-7.7s. On
+  // BMW's car curve (10.5s->0, 4.5s->1) every bike would peg at 1.0 and the axis
+  // would carry no signal. Re-point it to the bike range: a ~7.7s G 310 sits near
+  // the bottom, a ~2.8s M 1000 RR at the top, midweights spread between.
+  performance: { zeroBase: 8.0, span: 5.2 },
+  practicality: {
+    // "boot" is luggage litres here: 0 (sportbike) to ~110 (K 1600 tourer). The
+    // need scale must match, or a fully-panniered tourer would still read as
+    // impractical against a car-sized need. small=0, medium=30 (a top box),
+    // big=80 (full touring luggage).
+    bootNeed: { small: 0, medium: 30, big: 80 },
+    // A bike carries at most a pillion: "crew" isn't a thing, so the floors that
+    // penalise low seat counts must not fire. Floor at 1 so no bike is marked
+    // down for seats, and the crew bonus is unreachable.
+    seatsFloor: 1,
+    crewBonusSeats: 99,
+  },
+  // Road trips want a big-capacity tourer/adventure (size band 4+); town riding
+  // wants a low band. cityDivisor 5 keeps the small-bike bonus gentle.
+  size: { roadtripMinClass: 4, cityDivisor: 5 },
+  // Never hard-exclude a bike for "seats"/"boot": a motorcycle has 1-2 seats and
+  // little luggage by nature. Drop the crew/family seat+boot gates to zero so the
+  // car-oriented hard filters can't wipe the deck.
+  hardFilter: { crewBoot: 0, crewSeats: 1, familySeats: 1 },
+  /*
+   * Reasons in a rider's register: "ride", not "drive"; category and capability,
+   * not doors and boots. Numbers/honesty match the base; only the voice changes.
+   */
+  reasons: {
+    roadtrip: () => 'Built to cover big miles two-up, with the luggage to match',
+    city: () => 'Light and low enough to be easy through town and traffic',
+    tags: {
+      adventure: 'A go-anywhere GS, as happy on a green lane as a motorway',
+      touring: 'Set up for distance, with wind protection and luggage',
+      sporty: 'The sharp end of the range, track-bred and seriously quick',
+      commuter: 'An easy, upright everyday ride for the daily run',
+      heritage: 'Classic BMW boxer character with modern underpinnings',
+      electric: 'Silent, twist-and-go electric power for the city',
+      'a2-friendly': 'A2-licence friendly, an ideal step up for newer riders',
+    },
+  },
+};
+
 /** Deep-merge a brand's overrides onto the BMW base so partial tuning works. */
 function mergeTuning(overrides) {
   const out = { ...BMW_TUNING };
@@ -528,6 +596,128 @@ export const BRANDS = {
     // Ford's shared question set fits its range as-is (it sells the full spread
     // of bodies and fuels the standard questions already cover). No surgery
     // needed; if a future gap appears, add `questions: { drop, add }` here.
+  },
+  motorrad: {
+    label: 'BMW Motorrad',
+    // The public approved-used site (PDP links + origin fallback). Motorrad
+    // approved-used is a national programme, treated as one pool like Honda/Ford.
+    origin: 'https://approvedused.bmw-motorrad.co.uk',
+    defaultRetailer: 'motorrad-approved', // matches MOTORRAD_RETAILER_ID in mapping.js
+    // The live feed (ResultOverview/ShowResultsFilterChanged) is a session-gated,
+    // cross-origin, iframe-embedded ASP.NET app that returns a null envelope to any
+    // scripted request (see DECISIONS.md). The real adapter is wired in stock.js
+    // against the discovered contract and goes live from an allowed session
+    // origin; until then Motorrad serves curated fixtures/motorrad-bikes.json,
+    // already mapped via mapMotorradRaw. No network needed.
+    source: 'fixtures',
+    // Motorrad stock is bikes, not cars, so the snapshot is <brand>-bikes.json.
+    // The fixtures loader defaults to <brand>-cars.json; this override points it
+    // at the bike file. (The blueprint documents this as the one field a
+    // non-car brand adds.)
+    fixturesFile: 'motorrad-bikes.json',
+    // BMW Motorrad used bikes run ~£4k (a used G 310) to ~£25k (a nearly-new
+    // K 1600 GT / M 1000 RR). Cap at £30k with a default around the volume
+    // midweights (F-series, R 1250 GS ~£10k-£16k).
+    budget: { max: 30000, default: [7000, 16000] },
+    tuning: mergeTuning(MOTORRAD_TUNING),
+    /*
+     * Bikes need a different question set from cars. The car questions that make
+     * no sense for a motorcycle are dropped; bike-native ones are added, each
+     * folding back to standard engine answers via `scoresAs` so the engine is
+     * untouched (the same mechanism MINI's trim question uses).
+     *
+     *  drop — car-only questions:
+     *    `charging` (only one electric bike, the CE 04; not worth a screen),
+     *    `people` (a bike carries a rider + maybe a pillion, never a "crew" —
+     *    pillion capability is captured by `ridingStyle` below instead),
+     *    `style` (comfort<->sporty is folded into `ridingStyle`).
+     *  The engine still reads any of these if a legacy value arrives.
+     *
+     *  add — bike-native questions:
+     *    `ridingStyle` (what kind of riding — commute / adventure / touring /
+     *    sport / heritage) is the heart of a bike search; each option's
+     *    `scoresAs` sets `primaryUse` (so the size/practicality scorers fire the
+     *    right way) and `priorities`/`style` so character scores in the right
+     *    direction, and seeds `bodyStyles` toward the matching category.
+     *    `licence` (A1/A2/A) gates capacity: A1/A2 riders are steered to
+     *    smaller, a2-friendly bikes via `bodyStyles`/`priorities`, a full-A
+     *    rider is open to everything.
+     */
+    questions: {
+      drop: ['charging', 'people', 'style'],
+      add: [
+        {
+          id: 'ridingStyle',
+          title: 'What kind of riding is this for?',
+          help: 'Sets the character we lean towards. Pick the one that fits best.',
+          insertAfter: 'bodyStyles',
+          options: [
+            {
+              value: 'commute',
+              label: 'Commuting and everyday',
+              sub: 'Town, traffic, the daily run',
+              scoresAs: { primaryUse: 'city', style: '3', priorities: ['economy'] },
+            },
+            {
+              value: 'adventure',
+              label: 'Adventure and green lanes',
+              sub: 'On and off the beaten track',
+              // primaryUse:roadtrips (not fun): an adventure rider wants the
+              // go-anywhere GS bikes, whose edge is a big frame (sizeClass 5) and
+              // real luggage (68L). Only `roadtrips` fires the size roadtripMinClass
+              // bonus and a non-zero boot need, so it's what surfaces the GS range;
+              // `fun` would flatten practicality to 1.0 and bury the GS's strength.
+              // Character stays distinct from touring via style '3' (vs '2').
+              scoresAs: { primaryUse: 'roadtrips', style: '3', priorities: ['comfort'] },
+            },
+            {
+              value: 'touring',
+              label: 'Touring and big miles',
+              sub: 'Distance, two-up, with luggage',
+              scoresAs: { primaryUse: 'roadtrips', style: '2', priorities: ['comfort'] },
+            },
+            {
+              value: 'sport',
+              label: 'Sport and track',
+              sub: 'Sharp, fast, focused',
+              scoresAs: { primaryUse: 'fun', style: '5', priorities: ['performance'] },
+            },
+            {
+              value: 'heritage',
+              label: 'Classic and heritage',
+              sub: 'Timeless boxer character',
+              scoresAs: { primaryUse: 'fun', style: '3', priorities: ['image'] },
+            },
+          ],
+        },
+        {
+          id: 'licence',
+          title: 'Which licence do you ride on?',
+          help: 'We only show bikes you can ride. A2 has a power limit; full A is unrestricted.',
+          insertAfter: 'ridingStyle',
+          options: [
+            {
+              value: 'a1',
+              label: 'A1',
+              sub: 'Up to 125cc, learner-friendly',
+              scoresAs: { priorities: ['economy'] },
+            },
+            {
+              value: 'a2',
+              label: 'A2',
+              sub: 'Restricted power, stepping up',
+              scoresAs: { priorities: ['economy'] },
+            },
+            {
+              value: 'a',
+              label: 'Full A',
+              sub: 'No restrictions',
+              scoresAs: {},
+            },
+          ],
+        },
+      ],
+    },
   },
 };
 

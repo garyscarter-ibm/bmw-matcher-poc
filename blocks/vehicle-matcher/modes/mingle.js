@@ -282,6 +282,58 @@ const MINGLE_COPY = {
     errLede: 'The matching service didn’t respond. Check your connection and try again.',
     retryLabel: 'Try again',
   },
+  // Motorrad's register: rider-first and technical, with real adrenaline (this is
+  // the sportiest sub-brand). Every car word becomes a bike word: a "deck" of
+  // bikes, you "ride away", you book a "test ride". No em dashes (house rule). Its
+  // own wordmark so the mode reads as Motorrad's, not a car skin.
+  motorrad: {
+    wordmark: 'Bike Match',
+    seedKicker: 'First, the essentials',
+    seedTitle: 'What are you after?',
+    seedLede: 'Two quick things and we’ll build you a deck of bikes to swipe through.',
+    budgetLabel: 'Budget',
+    useLabel: 'What’s it for?',
+    seedCta: 'Start swiping',
+    deckInstruction: 'Drag right to keep, left to pass, or use the buttons.',
+    passLabel: 'Pass',
+    keepLabel: 'Keep',
+    stampKeep: 'KEEP',
+    stampPass: 'PASS',
+    undoLabel: '↩ Bring that one back',
+    revealLabel: 'Reveal my match',
+    progress: ({ done, total }) => `${done} of ${total}`,
+    badgesWarm: ['Strong match', 'Made for you', 'Head-turner'],
+    badgesCool: ['Your kind of ride?', 'One to consider', 'In the running'],
+    tasteHeading: 'Your taste, so far',
+    tasteEmpty: 'Nothing yet, start swiping.',
+    keptHeading: 'Kept',
+    barLabels: {
+      fuel: 'Power', colour: 'Colour', budget: 'Budget', body: 'Type',
+    },
+    matchKicker: 'Your match',
+    matchTitle: ({ model }) => `The ${model}.`,
+    matchLede: 'Based on the ones you kept.',
+    whyIntro: 'Why it suits you:',
+    swipeCallback: ({ trait }) => `It’s the ${trait} one you kept coming back to.`,
+    thinTitle: 'Not much to go on.',
+    thinLede: 'You kept your options open, so here’s the best fit for what you told us.',
+    weakNote: 'That said, none of these quite matched your taste. Stock changes '
+      + 'weekly, so it’s worth another look soon.',
+    testDriveCta: 'Book a test ride',
+    detailsCta: 'See full details',
+    shareCta: 'Share this match',
+    shareCopied: 'Link copied',
+    againCta: 'Swipe again',
+    shareText: ({ model, retailer }) => `I matched with a ${model} at ${retailer}.`,
+    emptyPoolTitle: 'Nothing in that range just now.',
+    emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got anything under that at the `
+      + 'moment. Raise your budget and we’ll build a fresh deck.',
+    emptyPoolCta: 'Adjust budget',
+    errKicker: 'Sorry',
+    errTitle: 'We couldn’t reach the matcher',
+    errLede: 'The matching service didn’t respond. Check your connection and try again.',
+    retryLabel: 'Try again',
+  },
 };
 
 /*

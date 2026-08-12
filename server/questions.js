@@ -39,17 +39,29 @@ export const QUESTIONS = [
     title: 'Any body styles you’re drawn to?',
     help: 'Pick as many as you like or keep an open mind.',
     multi: true,
-    // `brands` limits an option to specific brands; absent means all brands.
-    // MINI sells no saloons, coupés or 7-seat MPVs, so those are BMW-only.
+    // `brands` limits an option to specific brands; absent means all CAR brands.
+    // MINI sells no saloons, coupés or 7-seat MPVs, so those are BMW-only. The
+    // car bodies are gated to the car brands so Motorrad (bikes) doesn't offer
+    // them; Motorrad supplies its own category options below. `any` shows for all.
     options: [
-      { value: 'hatchback', label: 'Hatchback' },
+      { value: 'hatchback', label: 'Hatchback', brands: ['bmw', 'mini', 'honda', 'ford'] },
       { value: 'saloon', label: 'Saloon', brands: ['bmw'] },
-      { value: 'estate', label: 'Estate or Touring' },
-      { value: 'suv', label: 'SUV' },
+      { value: 'estate', label: 'Estate or Touring', brands: ['bmw', 'mini', 'honda', 'ford'] },
+      { value: 'suv', label: 'SUV', brands: ['bmw', 'mini', 'honda', 'ford'] },
       { value: 'coupe', label: 'Coupé', brands: ['bmw'] },
-      { value: 'convertible', label: 'Convertible' },
+      { value: 'convertible', label: 'Convertible', brands: ['bmw', 'mini', 'ford'] },
       { value: 'mpv', label: 'Family carrier', brands: ['bmw'] },
-      { value: 'any', label: 'No preference', sub: 'Open to any body style' },
+      // Bike categories — Motorrad only. Each value matches a `body` the Motorrad
+      // mapper emits (see mapMotorradRaw / MODEL_SPECS_MOTORRAD), so the engine's
+      // body scorer works unchanged.
+      { value: 'adventure', label: 'Adventure / GS', sub: 'Go-anywhere, upright', brands: ['motorrad'] },
+      { value: 'tourer', label: 'Tourer', sub: 'Distance and comfort', brands: ['motorrad'] },
+      { value: 'sport', label: 'Sport', sub: 'Fast and focused', brands: ['motorrad'] },
+      { value: 'roadster', label: 'Roadster', sub: 'Naked, everyday', brands: ['motorrad'] },
+      { value: 'naked', label: 'Naked', sub: 'Stripped-back street bike', brands: ['motorrad'] },
+      { value: 'heritage', label: 'Heritage', sub: 'Classic boxer character', brands: ['motorrad'] },
+      { value: 'scooter', label: 'Electric scooter', sub: 'Twist-and-go, silent', brands: ['motorrad'] },
+      { value: 'any', label: 'No preference', sub: 'Open to any style' },
     ],
   },
   {
@@ -57,10 +69,13 @@ export const QUESTIONS = [
     title: 'What fuel types suit you?',
     help: 'Pick as many as you like, or let us help you decide.',
     multi: true,
+    // `phev` is gated to the car brands: BMW Motorrad sells petrol bikes plus one
+    // electric (CE 04), no plug-in hybrid, so a rider never sees it. `petrol`,
+    // `ev` and `open` carry no `brands` marker, so they show for every brand.
     options: [
       { value: 'petrol', label: 'Petrol' },
       { value: 'diesel', label: 'Diesel', sub: 'Higher miles, more torque', brands: ['bmw'] },
-      { value: 'phev', label: 'Plug-in hybrid', sub: 'Electric and petrol combined' },
+      { value: 'phev', label: 'Plug-in hybrid', sub: 'Electric and petrol combined', brands: ['bmw', 'mini', 'honda', 'ford'] },
       { value: 'ev', label: 'Fully electric' },
       { value: 'open', label: 'Help me decide', sub: 'Open to any fuel type' },
     ],
@@ -175,6 +190,55 @@ export const BUDGET_BANDS = {
  * → { label?, sub? } } }. A brand with no entry (BMW) keeps the base copy.
  */
 const BRAND_COPY = {
+  motorrad: {
+    // Bike-native voice. Motorrad drops charging/people/style (see
+    // BRANDS.motorrad.questions.drop) and adds ridingStyle + licence, whose copy
+    // lives with them in brands.js. Here we re-voice the questions it keeps so a
+    // rider never reads a car word: "car" becomes "bike", "on board" becomes the
+    // pillion, "drive" becomes "ride". Ids and option values are untouched, so
+    // the engine scores a bike exactly as it scores a car.
+    budget: {
+      title: 'What’s your budget?',
+      help: 'Rough ride-away price. We’ll flag anything that’s a slight stretch.',
+    },
+    bodyStyles: {
+      title: 'What kind of riding calls to you?',
+      help: 'Pick as many as you like, or keep an open mind.',
+    },
+    fuel: {
+      title: 'Petrol or electric?',
+      help: 'Most of the range is petrol; the CE 04 is fully electric.',
+      options: {
+        petrol: { label: 'Petrol' },
+        ev: { label: 'Fully electric', sub: 'Silent, instant torque' },
+        open: { label: 'Help me decide', sub: 'Open to either' },
+      },
+    },
+    primaryUse: {
+      title: 'What will this bike mostly do?',
+      options: {
+        city: { label: 'City riding', sub: 'Short hops, filtering, easy parking' },
+        commute: { label: 'The daily commute' },
+        family: { label: 'Two-up touring', sub: 'You and a pillion, regularly' },
+        roadtrips: { label: 'Long-distance touring' },
+        fun: { label: 'Weekend blasts', sub: 'For the joy of the road' },
+      },
+    },
+    mileage: {
+      title: 'How many miles a year?',
+      help: 'Roughly. It helps us weigh fuel type and running costs.',
+    },
+    priorities: {
+      title: 'Finally, pick your top two priorities.',
+      options: {
+        economy: { label: 'Running costs' },
+        performance: { label: 'Performance' },
+        comfort: { label: 'Comfort over distance' },
+        tech: { label: 'Tech & electronics' },
+        image: { label: 'Style & character' },
+      },
+    },
+  },
   mini: {
     budget: {
       title: 'WHAT’S THE BUDGET?',

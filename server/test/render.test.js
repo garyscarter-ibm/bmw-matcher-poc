@@ -27,7 +27,7 @@ import {
   installDom, resetDom, startModeServer, loadMode, mountMode, settle,
 } from './dom-harness.js';
 import {
-  bmwPool, miniPool, hondaPool, fordPool,
+  bmwPool, miniPool, hondaPool, fordPool, motorradPool,
 } from './helpers.js';
 
 // Brands under render test, each with a stock pool and the marque name. The
@@ -37,12 +37,15 @@ import {
 // "Head to Head" on BMW) and reveal the brand voice later, by design (see the
 // mode requirement docs). So the universal render check is "paints + correct
 // theme + no em dashes"; the wordmark check is scoped to questions.
-// Motorrad appends its own entry as it onboards.
+// Motorrad is the first non-car brand: its pool is BIKES (motorrad-bikes.json),
+// but the mapped shape is identical, so the same render matrix applies. Its
+// wordmark on the questions intro is "BMW Motorrad".
 const BRANDS = [
   { key: 'bmw', pool: () => bmwPool(20), name: /BMW/i },
   { key: 'mini', pool: () => miniPool(8), name: /MINI/i },
   { key: 'honda', pool: () => hondaPool(20), name: /Honda/i },
   { key: 'ford', pool: () => fordPool(20), name: /Ford/i },
+  { key: 'motorrad', pool: () => motorradPool(20), name: /Motorrad/i },
 ];
 
 const MODES = ['questions', 'mingle', 'knockout'];

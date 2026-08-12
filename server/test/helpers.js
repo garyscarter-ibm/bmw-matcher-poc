@@ -183,6 +183,22 @@ export function fordPool(n = 20) {
 }
 
 /**
+ * A pool of `n` real Motorrad BIKES from `fixtures/motorrad-bikes.json` — the
+ * curated, mapMotorradRaw-projected file the fixtures stock source serves for
+ * Motorrad. Same rationale as ford/honda: no replayable live feed here (a
+ * session-gated SPA), so the render test uses the real fixtures, exercising the
+ * exact bikes a browser sees across every category (GS adventure, RT/K tourers,
+ * S/M sport, naked/roadster, R heritage, the electric CE 04). These are bikes,
+ * not cars, but the shape mapMotorradRaw produces is the same engine schema, so
+ * every downstream consumer treats them identically.
+ */
+export function motorradPool(n = 20) {
+  const path = fileURLToPath(new URL('../../fixtures/motorrad-bikes.json', import.meta.url));
+  const all = JSON.parse(readFileSync(path, 'utf8'));
+  return all.slice(0, n);
+}
+
+/**
  * A fake fetchRetailerStock that serves a per-brand pool and records every
  * call's (brand, retailer) so a test can assert the handler threaded them
  * through. Unknown brands fall back to the bmw pool (matching normalizeBrand's

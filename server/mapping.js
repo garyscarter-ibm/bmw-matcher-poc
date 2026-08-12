@@ -873,6 +873,188 @@ export function mapFordRaw(raw) {
   };
 }
 
+/* ====================================================================== *
+ * Motorrad — motorcycles on the car engine (branch bike-brand-motorrad).
+ *
+ * The matcher scores cars; Motorrad sells bikes. Rather than fork the engine,
+ * a bike is projected onto the SAME mapped-vehicle schema, with several axes
+ * repurposed. Every repurposing is documented in the Motorrad section of
+ * DECISIONS.md; the short version, per field:
+ *   body      -> bike category (naked/adventure/tourer/sport/roadster/heritage/scooter)
+ *   seats     -> pillion capability (2 dual-seat, 1 solo/track)
+ *   boot      -> luggage/touring litres (panniers + top box; ~0 for sport/naked)
+ *   sizeClass -> engine/size band 1-5 (A2-friendly small .. big tourer), a
+ *                licence-and-manageability proxy the size scorer reads as city..roadtrip
+ *   zeroTo62  -> bike 0-62s (honest field; the SCALE is recalibrated in tuning)
+ *   mpg       -> bike mpg (honest); fuel petrol, or ev for the CE 04 scooter
+ * Like Honda/Ford this is a FLAT-record projection (mapMotorradRaw), not a
+ * BRAND_MAPPERS entry, emitting the identical schema the engine scores.
+ * ====================================================================== */
+
+/* Per-model bike figures the listing lacks: category, cc, pillion seats,
+ * luggage litres, 0-62s, size band 1-5, mpg (or evRange for electric). Grounded
+ * in the public BMW Motorrad UK range. Keyed by normalised model line. */
+const MODEL_SPECS_MOTORRAD = {
+  // Roadster / naked
+  'R 1250 R': { category: 'roadster', cc: 1254, seats: 2, boot: 0, zeroTo62: 3.2, sizeClass: 4, mpg: 55 },
+  'S 1000 R': { category: 'naked', cc: 999, seats: 2, boot: 0, zeroTo62: 3.1, sizeClass: 4, mpg: 45 },
+  'F 900 R': { category: 'roadster', cc: 895, seats: 2, boot: 0, zeroTo62: 3.7, sizeClass: 3, mpg: 62 },
+  'G 310 R': { category: 'naked', cc: 313, seats: 2, boot: 0, zeroTo62: 7.5, sizeClass: 1, mpg: 85 },
+  // Adventure / GS
+  'R 1300 GS': { category: 'adventure', cc: 1300, seats: 2, boot: 68, zeroTo62: 3.0, sizeClass: 5, mpg: 57 },
+  'R 1250 GS': { category: 'adventure', cc: 1254, seats: 2, boot: 68, zeroTo62: 3.4, sizeClass: 5, mpg: 56 },
+  'F 900 GS': { category: 'adventure', cc: 895, seats: 2, boot: 45, zeroTo62: 4.0, sizeClass: 3, mpg: 60 },
+  'F 850 GS': { category: 'adventure', cc: 853, seats: 2, boot: 45, zeroTo62: 4.4, sizeClass: 3, mpg: 61 },
+  'G 310 GS': { category: 'adventure', cc: 313, seats: 2, boot: 20, zeroTo62: 7.7, sizeClass: 1, mpg: 83 },
+  // Sport
+  'S 1000 RR': { category: 'sport', cc: 999, seats: 1, boot: 0, zeroTo62: 2.9, sizeClass: 4, mpg: 42 },
+  'M 1000 RR': { category: 'sport', cc: 999, seats: 1, boot: 0, zeroTo62: 2.8, sizeClass: 5, mpg: 40 },
+  'S 1000 XR': { category: 'sport', cc: 999, seats: 2, boot: 32, zeroTo62: 3.2, sizeClass: 4, mpg: 48 },
+  // Tourer
+  'R 1250 RT': { category: 'tourer', cc: 1254, seats: 2, boot: 94, zeroTo62: 3.6, sizeClass: 5, mpg: 54 },
+  'R 1300 RT': { category: 'tourer', cc: 1300, seats: 2, boot: 94, zeroTo62: 3.5, sizeClass: 5, mpg: 55 },
+  'K 1600 GT': { category: 'tourer', cc: 1649, seats: 2, boot: 110, zeroTo62: 3.4, sizeClass: 5, mpg: 44 },
+  // Heritage
+  'R 12 nineT': { category: 'heritage', cc: 1170, seats: 2, boot: 0, zeroTo62: 3.5, sizeClass: 4, mpg: 52 },
+  'R 18': { category: 'heritage', cc: 1802, seats: 2, boot: 0, zeroTo62: 4.8, sizeClass: 5, mpg: 42 },
+  // Roadster midweight
+  'F 900 XR': { category: 'sport', cc: 895, seats: 2, boot: 32, zeroTo62: 3.9, sizeClass: 3, mpg: 60 },
+  // Electric scooter
+  'CE 04': { category: 'scooter', cc: 0, seats: 2, boot: 30, zeroTo62: 3.5, sizeClass: 2, evRange: 80 },
+};
+const DEFAULT_SPEC_MOTORRAD = { category: 'naked', cc: 850, seats: 2, boot: 20, zeroTo62: 4.5, sizeClass: 3, mpg: 55 };
+
+const MOTORRAD_RETAILER_ID = 'motorrad-approved';
+const MOTORRAD_RETAILER_NAME = 'BMW Motorrad Approved Used';
+
+/** Normalise a bike title to a MODEL_SPECS_MOTORRAD key. Longer/more-specific
+ *  model codes are tested before shorter ones (M 1000 RR before S 1000 RR;
+ *  R 1300 GS before R 1250 GS) so a title folds to the right entry. */
+function motorradLine(title = '') {
+  const s = String(title).toUpperCase().replace(/\s+/g, ' ').trim();
+  // Exact-ish contains, ordered specific -> general.
+  const KEYS = [
+    'M 1000 RR', 'S 1000 RR', 'S 1000 XR', 'S 1000 R',
+    'R 1300 GS', 'R 1250 GS', 'F 900 GS', 'F 850 GS', 'G 310 GS',
+    'R 1300 RT', 'R 1250 RT', 'K 1600 GT',
+    'F 900 XR', 'F 900 R', 'G 310 R', 'R 1250 R',
+    'R 12 NINETY', 'R 12 NINET', 'R 18', 'CE 04',
+  ];
+  for (const k of KEYS) {
+    if (s.includes(k)) {
+      // Map the two heritage spellings back to the canonical key.
+      if (k.startsWith('R 12 NINET')) return 'R 12 nineT';
+      return k;
+    }
+  }
+  // Loose fallbacks by family so an unlisted variant still lands sensibly.
+  if (/\bGS\b/.test(s)) return 'R 1250 GS';
+  if (/\bRT\b/.test(s)) return 'R 1250 RT';
+  if (/\bRR\b/.test(s)) return 'S 1000 RR';
+  if (/NINET|NINE T/.test(s)) return 'R 12 nineT';
+  return 'R 1250 R';
+}
+
+/** Bike fuel: electric only for the CE 04, else petrol. */
+function motorradFuel(line, rawFuel) {
+  if (line === 'CE 04' || /electric/i.test(String(rawFuel || ''))) return 'ev';
+  return 'petrol';
+}
+
+/** Riding-character tags from category + size, read by scoreCharacter. */
+function motorradTags(category, sizeClass, fuel) {
+  const tags = [category];
+  if (category === 'tourer' || category === 'adventure') tags.push('touring');
+  if (category === 'adventure') tags.push('adventure');
+  if (category === 'sport') tags.push('sporty');
+  if (category === 'roadster' || category === 'naked') tags.push('commuter');
+  if (category === 'heritage') tags.push('heritage');
+  if (fuel === 'ev') tags.push('electric', 'commuter');
+  if (sizeClass <= 2) tags.push('a2-friendly');
+  return Array.from(new Set(tags));
+}
+
+// Full noun phrases so the blurb reads naturally ("an adventure bike", not
+// "a adventure"). scooter already carries "electric", so motorradBlurb doesn't
+// prefix it again.
+const CATEGORY_WORD = {
+  naked: 'naked roadster',
+  roadster: 'roadster',
+  adventure: 'adventure bike',
+  tourer: 'tourer',
+  sport: 'sports bike',
+  heritage: 'heritage roadster',
+  scooter: 'electric scooter',
+};
+
+/** "a" or "an" for the word that follows, by its leading sound. */
+function article(word = '') {
+  return /^[aeiou]/i.test(String(word).trim()) ? 'an' : 'a';
+}
+
+/** A rider-facing blurb. Bikes "ride away", they don't "drive away". */
+function motorradBlurb(line, category, fuel, retailerName) {
+  const cat = CATEGORY_WORD[category] || 'motorcycle';
+  // The scooter phrase already says "electric"; don't double it up.
+  const power = fuel === 'ev' && category !== 'scooter' ? 'electric ' : '';
+  const from = retailerName ? ` from ${retailerName}` : '';
+  const kind = `${power}${cat}`;
+  return `Approved-used BMW ${line}, ${article(kind)} ${kind}, ready to ride away${from}.`;
+}
+
+/**
+ * Project one FLAT bike record (curated fixtures, or the live adapter once the
+ * session-gated Motorrad feed is reachable) to the engine's mapped-vehicle
+ * schema. See the Motorrad axis map in DECISIONS.md for what each field means
+ * for a bike. Returns null (caller filters) if there's no price.
+ */
+export function mapMotorradRaw(raw) {
+  const line = motorradLine(raw?.title);
+  const spec = MODEL_SPECS_MOTORRAD[line] || DEFAULT_SPEC_MOTORRAD;
+  // Never invent a price (same honesty rule as Ford/Honda).
+  const price = num(raw?.price);
+  if (!price) return null;
+
+  const { origin } = brandConfig('motorrad');
+  const fuel = motorradFuel(line, raw?.fuel);
+  const evRange = fuel === 'ev' ? (num(raw?.range) || spec.evRange || 80) : undefined;
+
+  return {
+    id: String(raw?.id ?? raw?.reg ?? `${line}-${price}`),
+    // The title already reads "BMW <model>"; keep it, else compose one.
+    name: /^bmw/i.test(String(raw?.title || '')) ? String(raw.title) : `BMW ${line}`,
+    line,
+    body: spec.category, // bike category stands in for car body style
+    fuel,
+    priceMin: price,
+    priceMax: price,
+    sizeClass: spec.sizeClass, // engine/size band (licence-and-manageability proxy)
+    seats: spec.seats, // pillion capability (2 dual-seat, 1 solo/track)
+    boot: spec.boot, // luggage/touring litres
+    zeroTo62: spec.zeroTo62, // honest field; scale recalibrated in tuning
+    styleLine: null,
+    doors: null,
+    features: [],
+    transmission: transmissionFor(raw?.transmission),
+    // Combustion bikes score on mpg; the electric CE 04 leaves mpg unset and
+    // scores on evRange instead.
+    mpg: fuel === 'ev' ? undefined : (num(raw?.mpg) || spec.mpg),
+    ...(evRange ? { evRange } : {}),
+    // Bike-specific display extras (harmless to the engine, surfaced on cards).
+    cc: spec.cc,
+    tags: motorradTags(spec.category, spec.sizeClass, fuel),
+    blurb: motorradBlurb(line, spec.category, fuel, MOTORRAD_RETAILER_NAME),
+
+    // ---- display-only ----
+    mileage: num(raw?.mileage),
+    plate: raw?.reg || undefined,
+    photo: raw?.image || undefined,
+    retailerName: MOTORRAD_RETAILER_NAME,
+    retailerId: MOTORRAD_RETAILER_ID,
+    link: raw?.link || `${origin}/`,
+  };
+}
+
 /* ---------------------- per-brand derivation config -------------------- *
  * mapVehicle dispatches on brand through this table. BMW keeps its existing
  * model-aware derivations; MINI uses the simpler ones above. The engine
