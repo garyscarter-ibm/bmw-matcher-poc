@@ -625,6 +625,11 @@ export function mapHondaRaw(raw) {
     // ---- display-only (surfaced by index.js publicCar) ----
     mileage: num(raw.mileage),
     plate: raw.reg || undefined,
+    // Registration year/date power the swipe card's "N years old" frame; where
+    // present they're more accurate than decoding the age code off the plate,
+    // so ageInYears prefers them (see match-signal.js).
+    year: raw.year || undefined,
+    firstReg: raw.firstReg || undefined,
     photo: raw.image || undefined,
     retailerName: HONDA_RETAILER_NAME,
     retailerId: HONDA_RETAILER_ID,
@@ -1133,6 +1138,10 @@ export function mapMotorradRaw(raw) {
     // ---- display-only ----
     mileage: num(raw?.mileage),
     plate: raw?.reg || undefined,
+    // Bikes carry no plate in the feed, so the swipe card's "N years old" frame
+    // has to read the registration year/date instead (ageInYears prefers these).
+    year: raw?.year || undefined,
+    firstReg: raw?.firstReg || undefined,
     photo: raw?.image || undefined,
     retailerName: MOTORRAD_RETAILER_NAME,
     retailerId: MOTORRAD_RETAILER_ID,

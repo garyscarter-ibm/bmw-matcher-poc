@@ -138,6 +138,13 @@ function publicCar(car) {
     // Live retailer detail (present when sourced from the live feed).
     mileage: car.mileage,
     plate: car.plate,
+    // Age source for the swipe card's dating frame ("3 years old" instead of a
+    // reg plate). The plate encodes the age code for plated brands, but bikes
+    // (Motorrad) carry no plate in the feed, so the registration year/date are
+    // surfaced here too. Both describe the listing, so a card that prints an age
+    // is fair game (see ageInYears in match-signal.js for the derivation order).
+    year: car.year,
+    firstReg: car.firstReg,
     photo: car.photo,
     // Granular facts the life-fit questions never ask about, for the
     // refinement step: equipment concepts (mapping.js FEATURE_CONCEPTS),

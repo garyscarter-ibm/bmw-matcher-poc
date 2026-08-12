@@ -34,7 +34,7 @@ import {
   WEAK_SCORE, SHADE_HEX, NEUTRAL_SWATCH,
   budgetBandsFromQuestion, useTilesFromQuestion,
   shuffle, photosFirst, shadeOf, swatchFor, priceLabel, cap, gbpShort,
-  modal, rankByFrequency, swipesToAnswers, celebrate,
+  modal, rankByFrequency, swipesToAnswers, celebrate, ageInYears,
 } from './match-signal.js';
 
 /* How many cards make a good swipe session — enough to read a taste, few enough
@@ -89,6 +89,10 @@ const MINGLE_COPY = {
     // are nudged toward higher-scoring cards, but nothing here is negative.
     badgesWarm: ['Hot right now', 'Strong chemistry', 'Head-turner'],
     badgesCool: ['Your type?', 'Plays hard to get', 'Bit of a charmer'],
+    // Age-aware flavour badge, MINI at its most playful, used only at the ends
+    // of the age range (very new / a bit older); null → fall back to the score
+    // pool above. Flavour only, never a verdict (§4.4).
+    ageBadge: (years) => (years <= 1 ? 'Barely driven' : years >= 6 ? 'Seen a few B-roads' : null),
     // Taste profile
     tasteHeading: 'Your type, so far',
     tasteEmpty: 'Nothing yet. Start swiping.',
@@ -150,6 +154,8 @@ const MINGLE_COPY = {
     progress: ({ done, total }) => `${done} of ${total}`,
     badgesWarm: ['Strong match', 'Well suited', 'Worth a look'],
     badgesCool: ['Your type?', 'One to consider', 'In the running'],
+    // Age-aware badge, BMW-restrained; null falls back to the score pool.
+    ageBadge: (years) => (years <= 1 ? 'As new' : years >= 6 ? 'Nicely run in' : null),
     tasteHeading: 'Your taste, so far',
     tasteEmpty: 'Nothing yet. Start swiping.',
     keptHeading: 'Kept',
@@ -201,6 +207,8 @@ const MINGLE_COPY = {
     progress: ({ done, total }) => `${done} of ${total}`,
     badgesWarm: ['Strong match', 'Well suited', 'Worth a look'],
     badgesCool: ['Your type?', 'One to consider', 'In the running'],
+    // Age-aware badge, Honda's plain-warm register; null falls back to the pool.
+    ageBadge: (years) => (years <= 1 ? 'Nearly new' : years >= 6 ? 'Been around' : null),
     tasteHeading: 'Your taste, so far',
     tasteEmpty: 'Nothing yet, start swiping.',
     keptHeading: 'Kept',
@@ -252,6 +260,8 @@ const MINGLE_COPY = {
     progress: ({ done, total }) => `${done} of ${total}`,
     badgesWarm: ['Strong match', 'Right up your street', 'Head-turner'],
     badgesCool: ['Your type?', 'One to consider', 'In the running'],
+    // Age-aware badge, Ford's friendly-plain register; null falls back to the pool.
+    ageBadge: (years) => (years <= 1 ? 'Barely driven' : years >= 6 ? 'Plenty of miles in it' : null),
     tasteHeading: 'Your taste, so far',
     tasteEmpty: 'Nothing yet, start swiping.',
     keptHeading: 'Kept',
@@ -304,6 +314,8 @@ const MINGLE_COPY = {
     progress: ({ done, total }) => `${done} of ${total}`,
     badgesWarm: ['Strong match', 'Made for you', 'Head-turner'],
     badgesCool: ['Your kind of ride?', 'One to consider', 'In the running'],
+    // Age-aware badge, Motorrad's rider register; null falls back to the pool.
+    ageBadge: (years) => (years <= 1 ? 'Barely run in' : years >= 6 ? 'Well ridden' : null),
     tasteHeading: 'Your taste, so far',
     tasteEmpty: 'Nothing yet, start swiping.',
     keptHeading: 'Kept',
@@ -370,6 +382,11 @@ function mount(root, ctx) {
 
   const reducedMotion = window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Live card elements in the visible stack, keyed by car id, reused across
+  // renders so the card behind animates up into focus rather than popping in
+  // (see renderDeckColumn). Cleared whenever a fresh deck is dealt.
+  const cardEls = new Map();
 
   /* ---- error screen (local reimplementation of the renderStatus pattern) ---- */
   const showError = (onRetry) => {
@@ -498,6 +515,7 @@ function mount(root, ctx) {
     state.index = 0;
     state.kept = [];
     state.history = [];
+    cardEls.clear(); // a new deck: no card elements carry over
     renderDeck();
   };
 
@@ -527,11 +545,20 @@ function mount(root, ctx) {
   };
 
   /* ------------------------------ deck ------------------------------ */
+  // The stage element persists across swipes. Rebuilding it (root.replaceChildren)
+  // on every commit collapsed the section to zero height for an instant and
+  // re-fired the vm-in entry animation, so the whole panel visibly jumped on each
+  // Pass/Keep — the reported jump on click AND on swipe. Keeping one stage and
+  // swapping only its two columns in place holds the layout steady, and lets the
+  // card behind animate up into focus (its .vm-mingle-card transition carries the
+  // depth class change) instead of popping in from a fresh teardown.
+  let stageEl = null;
   const renderDeck = () => {
-    root.replaceChildren();
-    const stage = el('div', 'vm-mingle-stage');
-    stage.append(renderTaste(), renderDeckColumn());
-    root.append(stage);
+    if (!stageEl || stageEl.parentNode !== root) {
+      stageEl = el('div', 'vm-mingle-stage');
+      root.replaceChildren(stageEl);
+    }
+    stageEl.replaceChildren(renderTaste(), renderDeckColumn());
   };
 
   // Live taste profile from the KEPT set only (a Pass is weak signal; §5.2).
@@ -604,19 +631,48 @@ function mount(root, ctx) {
     col.append(el('p', 'vm-mingle-instruction', copy.deckInstruction));
 
     // The card stack — at most three deep (§11.1). Front card is live.
+    //
+    // Cards are REUSED across renders, keyed by car id: the card that was second
+    // in the stack keeps its DOM element and just has its depth class swapped
+    // (vm-mingle-card-1 → -0), so the CSS transform transition animates it up
+    // into focus as the leaver flies out — instead of a brand-new element popping
+    // in at the front. buildCard is only called for a card entering the visible
+    // three for the first time. Stale entries (already swiped) are dropped so the
+    // map can't grow past the deck.
     const stack = el('div', 'vm-mingle-stack');
     const upcoming = state.deck.slice(done, done + 3);
+    const freshKeys = new Set();
     upcoming.forEach((match, depth) => {
-      stack.append(buildCard(match, depth));
+      const key = match.car?.id != null ? String(match.car.id) : `i${done + depth}`;
+      freshKeys.add(key);
+      let card = cardEls.get(key);
+      if (!card) {
+        card = buildCard(match, depth);
+        cardEls.set(key, card);
+      } else {
+        // Reused: retarget its depth (0/1/2) and clear any leftover drag/fly
+        // state from when it was the front card of a previous position.
+        card.className = `vm-mingle-card vm-mingle-card-${depth}`;
+        card.style.transform = '';
+        card.style.removeProperty('--vm-drag-stamp');
+      }
+      stack.append(card);
     });
+    // Forget cards that have left the visible window so the map stays bounded.
+    cardEls.forEach((_, key) => { if (!freshKeys.has(key)) cardEls.delete(key); });
     col.append(stack);
 
     // Make the front card draggable (pointer). The buttons/keys below stay the
     // source of truth; drag is an enhancement that reuses the same doSwipe
     // commit. No-op under reduced motion (drag would fight the instant commit).
+    // A reused front card may already carry the handler, so guard against a
+    // double-bind with a dataset flag.
     if (!reducedMotion) {
       const front = stack.querySelector('.vm-mingle-card-0');
-      if (front) dragToSwipe(front);
+      if (front && !front.dataset.draggable) {
+        front.dataset.draggable = '1';
+        dragToSwipe(front);
+      }
     }
 
     // Controls — the source of truth (buttons; gesture/keys mirror them).
@@ -666,16 +722,18 @@ function mount(root, ctx) {
     const card = el('article', `vm-mingle-card vm-mingle-card-${depth}`);
     card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
 
-    // Drag stamps — only the front card is live, so only it carries them. They
-    // sit hidden (opacity 0) until dragToSwipe raises the one matching the
-    // direction of pull. Purely decorative; the buttons remain the a11y truth.
-    if (depth === 0) {
-      const keepStamp = el('span', 'vm-mingle-stamp vm-mingle-stamp-keep', copy.stampKeep);
-      const passStamp = el('span', 'vm-mingle-stamp vm-mingle-stamp-pass', copy.stampPass);
-      keepStamp.setAttribute('aria-hidden', 'true');
-      passStamp.setAttribute('aria-hidden', 'true');
-      card.append(keepStamp, passStamp);
-    }
+    // Drag stamps on every card, not just the current front one: cards are
+    // reused across renders (a depth-1 card is promoted to depth-0 in place, see
+    // renderDeckColumn), so the stamps must already be present when a card
+    // becomes the front, or a promoted card would drag with no KEEP/NOPE stamp.
+    // They sit hidden (opacity 0, pointer-events none) and CSS only reveals them
+    // on .vm-mingle-card-0.is-dragging-*, so carrying them on the back cards is
+    // inert. Purely decorative; the buttons remain the a11y truth.
+    const keepStamp = el('span', 'vm-mingle-stamp vm-mingle-stamp-keep', copy.stampKeep);
+    const passStamp = el('span', 'vm-mingle-stamp vm-mingle-stamp-pass', copy.stampPass);
+    keepStamp.setAttribute('aria-hidden', 'true');
+    passStamp.setAttribute('aria-hidden', 'true');
+    card.append(keepStamp, passStamp);
 
     // Colour bar across the top + tinted media (§11.4).
     card.append(el('div', 'vm-mingle-card-colour'));
@@ -692,17 +750,28 @@ function mount(root, ctx) {
       media.classList.add('no-photo');
       media.append(el('span', 'vm-mingle-card-initial', (car.name || '?').charAt(0)));
     }
-    // Flirty badge — warmer pool nudged toward higher scores, but only as a
+    // Flirty badge — an age-aware line takes the badge at the extremes (barely
+    // used / been around), leaning the dating frame into the data we have;
+    // otherwise the warmer pool is nudged toward higher scores, but only as a
     // nudge; nothing negative, no printed number.
+    const years = ageInYears(car);
+    const ageBadge = (years != null && copy.ageBadge) ? copy.ageBadge(years) : null;
     const pool = (score >= 80 ? copy.badgesWarm : copy.badgesCool);
-    const badge = el('span', 'vm-mingle-badge', pool[car.id ? hashPick(car.id, pool.length) : 0]);
+    const badgeText = ageBadge || pool[car.id ? hashPick(car.id, pool.length) : 0];
+    const badge = el('span', 'vm-mingle-badge', badgeText);
     media.append(badge);
     card.append(media);
 
     const body = el('div', 'vm-mingle-card-body');
     body.append(el('h3', 'vm-mingle-card-name', car.name));
-    const spec = [car.plate, car.mileage ? `${car.mileage.toLocaleString('en-GB')} mi` : null]
-      .filter(Boolean).join(' · ');
+    // Swipe leans into the dating frame (§9): the spec line reads the car as a
+    // date, not a listing — its AGE instead of a reg plate, and mileage as
+    // "miles under the belt". Age falls back to the plate when no listing date
+    // is surfaced (see ageInYears / registrationDate); if we can't work it out,
+    // the plate stands rather than printing a guessed age.
+    const age = ageLabel(car);
+    const miles = car.mileage ? `${car.mileage.toLocaleString('en-GB')} miles under the belt` : null;
+    const spec = [age, miles].filter(Boolean).join(' · ');
     if (spec) body.append(el('p', 'vm-mingle-card-spec', spec));
     body.append(el('p', 'vm-mingle-card-price', priceLabel(car)));
     const pills = el('div', 'vm-mingle-pills');
@@ -711,6 +780,18 @@ function mount(root, ctx) {
     body.append(pills);
     card.append(body);
     return card;
+  };
+
+  // The card's age, in the dating-frame voice: "Brand new" under a year, then
+  // "1 year old" / "N years old". Returns null when we can't derive an age (no
+  // listing date and an unreadable/absent plate), so the caller can fall back
+  // rather than print a made-up number. ageInYears is brand-neutral (plate/
+  // firstReg/year), so this reads for every brand the swipe deck supports.
+  const ageLabel = (car) => {
+    const years = ageInYears(car);
+    if (years == null) return car.plate || null;
+    if (years <= 0) return 'Brand new';
+    return years === 1 ? '1 year old' : `${years} years old`;
   };
 
   // Deterministic "random" pick per car so the badge is stable across re-renders
@@ -768,6 +849,12 @@ function mount(root, ctx) {
     let startT = 0;
     let dx = 0;
     let dragging = false;
+    // Mark the card as an active swipe surface. The CSS `touch-action: none`
+    // that stops the page scrolling mid-swipe is scoped to THIS class, so it
+    // only applies when a drag handler is actually attached — under reduced
+    // motion dragToSwipe isn't called, the class is absent, and a touch that
+    // lands on the card scrolls the page normally instead of being trapped.
+    card.classList.add('is-draggable');
     // Commit past ~32% of the card width, or a fast flick in either direction.
     const threshold = () => Math.max(64, card.offsetWidth * 0.32);
 
@@ -822,6 +909,13 @@ function mount(root, ctx) {
       startT = e.timeStamp || 0;
       dx = 0;
       card.classList.remove('is-returning');
+      // Capture the pointer to THIS card so the gesture is ours start to finish:
+      // move/up keep firing even if the finger slides off the card, and — with
+      // touch-action: none on the card (CSS) — the browser won't reinterpret the
+      // touch as a page scroll partway through. Without this a touch swipe with
+      // any vertical drift scrolled the page (the reported jump). Guarded: some
+      // engines throw if the pointer is already released.
+      try { card.setPointerCapture(e.pointerId); } catch { /* no-op */ }
       document.addEventListener('pointermove', onMove);
       document.addEventListener('pointerup', onUp);
       document.addEventListener('pointercancel', onUp);

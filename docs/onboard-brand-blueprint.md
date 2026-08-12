@@ -164,6 +164,19 @@ signatures you must set deliberately, not inherit**:
 - **Button-label casing is CSS, never copy.** If a brand shouts its CTAs in caps (Motorrad),
   add `text-transform: uppercase` to `.vm.vm-<brand> .vm-btn` — do not uppercase the label
   strings in JS (that would corrupt share/analytics text and is easy to get wrong).
+- **The mode switcher is brand chrome too, and its RESTING state is what betrays a
+  half-themed tab bar.** The `.vm-switcher-tab` base is wired to the shared tokens, but only
+  the one *active* tab picks up `--vm-accent`; the resting tabs are transparent with a muted
+  grey border and grey text for every brand, so the control reads as a generic grey segmented
+  strip and a bold brand (Motorrad especially) looks un-themed. Confirm the tab bar wears the
+  brand at rest: it now uses `--vm-font-bold` (the brand's shout face, not plain body) and the
+  brand `--vm-accent` on hover, and a brand whose CTA signature differs from `--vm-accent`
+  must mirror it here exactly as it does on `.vm-btn` — Motorrad overrides
+  `.vm.vm-<brand> .vm-switcher-tab` to UPPERCASE and the active tab to the near-black fill, not
+  blue. Same rule as the primary-button fill: don't let a brand's identity stop at the stage
+  edge. (The tab *labels* stay brand-neutral by design — "Questions"/"Swipe"/"Head to head" —
+  the brand name lives in the in-stage wordmark, spec §9; this bullet is about colour/font, not
+  copy.)
 
 ### Layer 5 — Copy (`server/questions.js`, `BRAND_COPY[brand]`; per-brand `questions{}`)
 The brand's voice. `BRAND_COPY[brand]` overrides question/option **text only** — ids and
@@ -271,8 +284,11 @@ the engine**:
    subheads are the usual offenders. Every visible string must resolve from this brand's
    copy/config, never a hardcoded default.
 6. Eyeball the brand at each mode against the real site: primary-button fill (accent vs
-   black), heading weight + casing, button-label casing (Layer 4). Tests don't catch
-   rendered typography, so this is a manual gate.
+   black), heading weight + casing, button-label casing, **and the mode switcher tab bar
+   at rest** — open `?brand=<key>` with no `mode` lock so the switcher shows, and confirm the
+   inactive tabs carry the brand (accent on hover, brand font, any per-brand casing/fill
+   signature), not the generic grey pills (Layer 4). Tests don't catch rendered typography,
+   so this is a manual gate.
 7. Read every brand's intro `lede` (and `title`/`cta`) side by side. If swapping the marque
    nouns would make them indistinguishable, the voice work isn't done (Layer 5) — rewrite in
    the brand's register, don't leave BMW's sentence with a new noun in it.
@@ -312,6 +328,10 @@ the engine**:
 - [ ] Heading weight + casing overridden to the brand's own register (base `.vm-title` is
       BMW-cars Light-300 uppercase); button-label casing done via CSS `text-transform`, never
       by uppercasing copy strings.
+- [ ] Mode switcher tabs read as the brand at REST, not just on the active tab — if the
+      brand's CTA signature differs from `--vm-accent` (black fill, uppercase), mirror it on
+      `.vm.vm-<brand> .vm-switcher-tab` as Motorrad does. Checked with the switcher visible
+      (no `mode` lock).
 - [ ] Game character registered (Section 8).
 - [ ] All of Section 6 passes.
 

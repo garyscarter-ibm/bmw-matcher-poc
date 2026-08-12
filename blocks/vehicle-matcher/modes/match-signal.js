@@ -174,6 +174,72 @@ export function priceLabel(car) {
 export const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 /*
+ * The approximate registration date of a car, as a Date, from whatever the feed
+ * gives us — brand-neutral because the `plate` field arrives in three shapes and
+ * some brands surface a date instead:
+ *   1. `firstReg` "dd/mm/yyyy" (Honda/Motorrad listings) — the exact date.
+ *   2. `year` (a plain number, same brands) — 1 March of that year, a fair midpoint.
+ *   3. `plate` — the DVLA age identifier, embedded differently per brand:
+ *        BMW/MINI  bare code            "23", "72"
+ *        Ford      code + dealer tag    "23 FRD"      (first token)
+ *        Honda     full VRM             "AU19MVG"     (chars 3-4)
+ *      Code 1-50  = March of 2000+code (23 → Mar 2023).
+ *      Code 51-99 = September of 2000+(code-50) (72 → Sep 2022).
+ * Returns null when nothing usable is present (never guess an age).
+ */
+export function registrationDate(car) {
+  if (!car) return null;
+  // 1. Exact first-registration date, if the feed parsed one.
+  if (typeof car.firstReg === 'string' && car.firstReg.includes('/')) {
+    const [d, m, y] = car.firstReg.split('/').map((n) => parseInt(n, 10));
+    if (y > 1990 && m >= 1 && m <= 12 && d >= 1 && d <= 31) return new Date(y, m - 1, d);
+  }
+  // 2. A plain registration year.
+  if (Number.isFinite(car.year) && car.year > 1990) return new Date(car.year, 2, 1);
+  // 3. Decode the DVLA age identifier out of the plate.
+  const code = plateAgeCode(car.plate);
+  if (code != null) {
+    if (code >= 1 && code <= 50) return new Date(2000 + code, 2, 1); // March
+    if (code >= 51 && code <= 99) return new Date(2000 + code - 50, 8, 1); // September
+  }
+  return null;
+}
+
+/*
+ * Age of a car in whole years from its registration date to `now` (defaults to
+ * today). Floored, so a car registered 3y 10m ago is "3", matching how a person
+ * states an age. Returns null when the date is unknown. `now` is injectable so
+ * the pure function is testable without the clock.
+ */
+export function ageInYears(car, now = new Date()) {
+  const reg = registrationDate(car);
+  if (!reg) return null;
+  let years = now.getFullYear() - reg.getFullYear();
+  // Not yet reached this year's registration anniversary → one fewer.
+  const beforeAnniversary = now.getMonth() < reg.getMonth()
+    || (now.getMonth() === reg.getMonth() && now.getDate() < reg.getDate());
+  if (beforeAnniversary) years -= 1;
+  return years < 0 ? 0 : years;
+}
+
+/*
+ * Pull the two-digit DVLA age identifier out of a plate, whatever the brand's
+ * plate shape (see registrationDate). Current-style plates are "AB12 CDE": two
+ * letters, the age code, then three letters. We take the first run of letters,
+ * then the two digits that follow. A bare "23" or "23 FRD" has no leading
+ * letters, so the digits are just the front of the string. Returns 1-99 or null.
+ */
+function plateAgeCode(plate) {
+  if (typeof plate !== 'string') return null;
+  const s = plate.trim().toUpperCase();
+  // Leading letters (0-2 for a modern VRM, 0 for a bare code), then two digits.
+  const m = s.match(/^[A-Z]*?(\d{2})/);
+  if (!m) return null;
+  const code = parseInt(m[1], 10);
+  return code >= 1 && code <= 99 ? code : null;
+}
+
+/*
  * The modal value in a list, with its share of the total. Used for the taste
  * bars: {value, count, share} where share is 0–1. Ties break to first seen.
  */

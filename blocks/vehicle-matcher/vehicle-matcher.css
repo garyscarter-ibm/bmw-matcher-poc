@@ -2096,7 +2096,12 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   border: 1px solid var(--vm-line);
   background: transparent;
   color: var(--vm-ink-muted);
-  font-family: var(--vm-font-body);
+  /* The brand's bold face, not plain body — the wordmark-adjacent chrome should
+     carry the typeface the brand shouts in (BMW Type Next bold, MINI Sans,
+     FordF1, Proxima Nova), so the control reads as the brand's at rest, before
+     any tab is active. */
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
   font-size: 13px;
   letter-spacing: 0.02em;
   padding: 7px 14px;
@@ -2104,15 +2109,32 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
+/* Resting/hover state carries the brand accent, not a neutral grey — so the two
+   inactive tabs also read as the brand's, not just the one active tab. */
 .vm-switcher-tab:hover {
-  color: var(--vm-ink);
-  border-color: var(--vm-ink-muted);
+  color: var(--vm-accent);
+  border-color: var(--vm-accent);
 }
 .vm-switcher-tab.is-active {
   color: var(--vm-accent-ink);
   background: var(--vm-accent);
   border-color: var(--vm-accent);
   cursor: default;
+}
+
+/* Motorrad's switcher wears the marque's CTA signature, same as its buttons
+   (see .vm.vm-motorrad .vm-btn above): UPPERCASE labels, and the active tab is
+   the near-black fill rather than blue — blue is a link/accent colour for
+   Motorrad, not a fill. Without this the tabs read as the generic grey control
+   and Motorrad's strong identity stops at the stage edge. */
+.vm.vm-motorrad .vm-switcher-tab {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.vm.vm-motorrad .vm-switcher-tab.is-active {
+  background: var(--vm-ink-strong);
+  border-color: var(--vm-ink-strong);
+  color: #fff;
 }
 
 /* The active mode mounts here. Transparent and layout-neutral: with no
@@ -2292,13 +2314,23 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 }
 
 /* The card stack: front card in flow, the two behind it peek out and scale
-   down. A fixed-ratio well keeps the deck height stable as cards swap. */
+   down. A fixed-ratio well keeps the deck height stable as cards swap.
+
+   The well's box is the FRONT card (the cards are position:absolute; inset:0,
+   so they resolve against this box — don't add padding here or inset:0 stretches
+   them). The two cards behind sit at translateY(10px)/(20px), a transform, so
+   they paint up to 20px BELOW the well without enlarging it. The bottom margin
+   therefore has to clear that peek AND still leave a gap to the Pass/Keep
+   buttons, or the deepest card crowds them (and the gap looks like it shrinks as
+   the deck empties and the peek disappears). --vm-space-8 (32px) = the 20px peek
+   plus a clean ~12px gap, constant whether the stack is full or on its last
+   card. */
 .vm-mingle-stack {
   position: relative;
   aspect-ratio: 3 / 4;
   max-width: 360px;
   width: 100%;
-  margin: 0 auto var(--vm-space-5);
+  margin: 0 auto var(--vm-space-8);
 }
 
 .vm-mingle-card {
@@ -2328,7 +2360,17 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    so kill the transition — it should track the finger 1:1, not lag behind it. */
 .vm-mingle-card-0.is-dragging-keep,
 .vm-mingle-card-0.is-dragging-pass { transition: none; cursor: grabbing; }
-.vm-mingle-card-0 { cursor: grab; touch-action: pan-y; }
+/* touch-action: none — the front card owns the whole gesture. pan-y (reserve
+   vertical scroll for the browser) let the vertical component of a real finger
+   swipe scroll the page: the UI jumped down then sprang back on every swipe. The
+   drag handler is horizontal-only and takes a pointer capture (mingle.js), so
+   the page must not also try to scroll from a touch that starts on the card. The
+   card is small (max 360px) and the rest of the page still scrolls normally.
+   Scoped to .is-draggable (added by dragToSwipe) so under reduced motion — where
+   no drag handler is attached — the card keeps normal touch-action and doesn't
+   trap the user's scroll. */
+.vm-mingle-card-0 { cursor: grab; }
+.vm-mingle-card-0.is-draggable { touch-action: none; }
 
 /* Spring back to centre when a drag is released short of the threshold. The
    inline transform is cleared by JS; this transition carries it home (with the
