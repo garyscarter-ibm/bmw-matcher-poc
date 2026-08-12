@@ -30,4 +30,30 @@ Format: **[area] decision** — why, and how to undo if you disagree.
   `POST /api/ResultOverview/ShowResultsFilterChanged` returns 200 JSON; a real filter
   body returns bikes. Dumped to `fixtures/motorrad-bikes.json`.
 
+## Foundations (branch `vehicle-brand-ford-honda`)
+
+- **[fixtures-loader] `source: 'feed' | 'fixtures'` on the brand registry.** New brands
+  read `fixtures/<brand>-cars.json` (already-mapped cars) with no network and no TTL
+  cache; nearby-stock returns empty and colour enrichment no-ops for them. BMW/MINI stay
+  `source: 'feed'`; their live fetch path is byte-for-byte unchanged. To move a brand to a
+  live feed later: wire its adapter and flip `source` back to `feed`, no other change.
+
+- **[nearby-empty] A fixtures brand shows no "worth the drive" carousel.** It has no
+  distance API and no per-car geo, so there is no honest nearby pool to build. Returning
+  empty (the mode already treats empty/throw as "no carousel") is truthful; a fabricated
+  distance would not be. Undo: only relevant once a real feed with geo is wired.
+
+## Testing
+
+- **[testing-gap-client-render] Closed the biggest gap: no test ever mounted a client
+  mode.** Client render regressions were caught only by eyeballing the browser. Added a
+  jsdom harness (`server/test/dom-harness.js`) + `server/test/render.test.js` that mounts
+  every mode (questions/mingle/knockout) for every brand against a real in-process server,
+  and asserts it paints, carries its theme class, and shows no em dashes. New brands add
+  one line to the `BRANDS` array and inherit the whole matrix. `jsdom` is a dev dependency.
+  - **Known limitation:** the render tests assert the *first painted screen* (intro/seed),
+    not the full drive-through (answering questions, swiping a deck, playing a bracket to
+    reveal). That deeper flow is still manual. Logged as a follow-up test gap, not filled
+    tonight (it needs simulated user interaction across many async steps).
+
 <!-- Further decisions appended below as the run proceeds. -->
