@@ -38,7 +38,7 @@ import {
   WEAK_SCORE,
   budgetBandsFromQuestion, useTilesFromQuestion,
   shuffle, swatchFor, priceLabel, cap,
-  bracketToAnswers, idOf,
+  bracketToAnswers, idOf, averageScore, celebrate,
 } from './match-signal.js';
 
 /* The most cars we'll ever field, even when stock is deep — four rounds
@@ -76,6 +76,16 @@ const KNOCKOUT_COPY = {
     pickHint: 'Tap the one you’d rather take home.',
     roundKicker: ({ round }) => round,
     matchupProgress: ({ done, total }) => `Match ${done} of ${total}`,
+    // Between-round ceremony: a banner naming the round you’re entering, and a
+    // bigger interstitial when you reach the Final.
+    roundAdvance: ({ round, survivors }) => `${round} · ${survivors} still standing ♥`,
+    finalKicker: 'It’s down to two',
+    finalTitle: 'The Final.',
+    finalLede: 'Two left standing. One crown. Choose with your heart.',
+    finalCta: 'Bring it on ♥',
+    // The engine "form" meter on the rail — surfaces the engine’s own score of
+    // the cars still in, climbing as strong picks advance.
+    formLabel: 'Chemistry',
     // Result — the champion is always the hero (decision: champion, engine validates)
     matchKicker: 'Your champion ♥',
     matchTitle: ({ model }) => `You crowned the ${model}.`,
@@ -116,6 +126,12 @@ const KNOCKOUT_COPY = {
     pickHint: 'Pick the one you’d rather have.',
     roundKicker: ({ round }) => round,
     matchupProgress: ({ done, total }) => `Match ${done} of ${total}`,
+    roundAdvance: ({ round, survivors }) => `${round} · ${survivors} remaining`,
+    finalKicker: 'Down to two',
+    finalTitle: 'The Final.',
+    finalLede: 'Two cars left. Pick the one you’d take.',
+    finalCta: 'Continue',
+    formLabel: 'Fit',
     matchKicker: 'Your winner',
     matchTitle: ({ model }) => `The ${model} takes it.`,
     matchLede: 'It beat every car you put against it.',
@@ -192,6 +208,13 @@ function mount(root, ctx) {
     rounds: [], // bracket log: { roundIndex, winner, loser } per head-to-head
     fieldSize: 0, // the starting field size (for round naming + weighting)
     roundIndex: 0, // 0 = first round
+    // The engine's own per-card score (0–100) from /api/field, keyed by idOf.
+    // The GAME plays with display cars (score is never a visible verdict), but
+    // we surface the AVERAGE score of the survivors as a "form" meter — the
+    // engine signal the mode used to discard. Normalised against the field's own
+    // top score so the meter reads as "how strong is what's left", not raw %.
+    scoreById: new Map(),
+    bestScore: 0, // the highest field score, for normalising the meter
     busy: false, // pick lock while a matchup transitions out
   };
 
@@ -312,7 +335,18 @@ function mount(root, ctx) {
     // face-off card falls back to a neutral swatch (swatchFor handles absent colour).
     const matches = await apiField(ctx.api, state.seed, ctx.retailer, ctx.brand, MAX_FIELD);
     // Field returns match objects { car, score, ... }; the game plays with the
-    // display cars, exactly as the swipe game does with match.car.
+    // display cars, exactly as the swipe game does with match.car — but we no
+    // longer THROW AWAY the engine's per-car score. Stash it (keyed by stable
+    // identity) so the "form" meter can average the survivors' scores as the
+    // bracket narrows. This is the engine signal the mode used to discard.
+    state.scoreById = new Map();
+    state.bestScore = 0;
+    for (const m of matches) {
+      if (m?.car && typeof m.score === 'number') {
+        state.scoreById.set(idOf(m.car), m.score);
+        if (m.score > state.bestScore) state.bestScore = m.score;
+      }
+    }
     const cars = shuffle(matches.map((m) => m.car)).filter(Boolean);
     const size = largestPowerOfTwo(Math.min(cars.length, MAX_FIELD));
     if (size < MIN_FIELD) {
@@ -369,6 +403,37 @@ function mount(root, ctx) {
     renderMatchup();
   };
 
+  /*
+   * The "form" meter, 0–100: the average engine score of the cars still standing
+   * this round, normalised against the field's own best score so a full field of
+   * merely-decent cars doesn't read as low. Returns null when we have no scores
+   * (an un-scored field), so the rail can hide the meter rather than show 0. As
+   * the player advances the cars the engine also rates, this climbs — an honest,
+   * zero-server surfacing of the signal the mode used to throw away.
+   */
+  const formPercent = () => {
+    if (!state.bestScore) return null;
+    const standing = state.round.map((c) => state.scoreById.get(idOf(c))).filter((s) => typeof s === 'number');
+    const avg = averageScore(standing);
+    if (avg == null) return null;
+    return Math.max(0, Math.min(100, Math.round((avg / state.bestScore) * 100)));
+  };
+
+  // The slim engine-form indicator for the progress rail (a labelled climbing
+  // bar). Null form (un-scored field) → nothing, so the rail just omits it.
+  const renderForm = () => {
+    const pct = formPercent();
+    if (pct == null) return null;
+    const wrap = el('div', 'vm-knockout-form');
+    wrap.append(el('span', 'vm-knockout-form-label', copy.formLabel));
+    const track = el('div', 'vm-knockout-form-track');
+    const fill = el('div', 'vm-knockout-form-fill');
+    fill.style.width = `${pct}%`;
+    track.append(fill);
+    wrap.append(track);
+    return wrap;
+  };
+
   const renderMatchup = () => {
     root.replaceChildren();
     const [a, b] = state.pairings[state.matchIndex];
@@ -376,12 +441,15 @@ function mount(root, ctx) {
 
     const screen = el('div', 'vm-screen vm-knockout-stage');
 
-    // Progress rail — where we are in the tournament (round name + match n of m).
+    // Progress rail — where we are in the tournament (round name + match n of m),
+    // now with the engine "form" meter beneath it.
     const rail = el('div', 'vm-knockout-rail');
     rail.append(el('span', 'vm-knockout-round', roundName(entrants)));
     rail.append(el('span', 'vm-knockout-count',
       copy.matchupProgress({ done: state.matchIndex + 1, total: state.pairings.length })));
     screen.append(rail);
+    const form = renderForm();
+    if (form) screen.append(form);
 
     screen.append(el('p', 'vm-lede vm-knockout-hint', copy.pickHint));
 
@@ -454,10 +522,12 @@ function mount(root, ctx) {
         state.matchIndex += 1;
         renderMatchup();
       } else {
-        // Round complete — the winners become the next round's entrants.
+        // Round complete — the winners become the next round's entrants. Make a
+        // ceremony of it: a sweep banner naming the round we're entering, or the
+        // big Final interstitial when it's down to the last two.
         state.round = state.winners;
         state.roundIndex += 1;
-        startRound();
+        advanceRound();
       }
     };
 
@@ -471,6 +541,83 @@ function mount(root, ctx) {
     root.querySelector(winnerSel)?.classList.add('is-crowned');
     cards.forEach((c) => { c.disabled = true; });
     setTimeout(advance, 300);
+  };
+
+  /* --------------------------- round ceremony --------------------------- */
+  // Between rounds we make "moving on" a moment. One survivor → the champion
+  // reveal. Two survivors → the Final gets a dedicated interstitial (one tap, the
+  // climax earns it). Otherwise a quick banner sweep names the round you're
+  // entering, then the next matchup paints. Under reduced motion the sweep is
+  // skipped (it would just flash) and we go straight to the round.
+  const advanceRound = () => {
+    const survivors = state.round.length;
+    if (survivors <= 1) { startRound(); return; }
+    if (survivors === 2) { renderRoundInterstitial(); return; }
+    if (reducedMotion) { startRound(); return; }
+    renderRoundSweep(survivors);
+  };
+
+  // A full-width banner that sweeps across the stage naming the round the player
+  // is entering, then hands off to the round. Self-timed (~800ms) so it's a beat,
+  // not a wait.
+  const renderRoundSweep = (survivors) => {
+    root.replaceChildren();
+    const screen = el('div', 'vm-screen vm-knockout-stage vm-knockout-sweep-stage');
+    const banner = el('div', 'vm-knockout-sweep');
+    banner.append(el('span', 'vm-knockout-sweep-round', roundName(survivors)));
+    banner.append(el('span', 'vm-knockout-sweep-sub',
+      copy.roundAdvance({ round: roundName(survivors), survivors })));
+    screen.append(banner);
+    root.append(screen);
+    window.setTimeout(startRound, 800);
+  };
+
+  // The Final gets its own screen: the two finalists as crests, the "The Final"
+  // headline, and a single tap to begin. This is the one deliberate extra tap in
+  // the flow, and only ever once. Reduced motion keeps the screen (it's content,
+  // not motion) — the JS just doesn't animate the crest entrance.
+  const renderRoundInterstitial = () => {
+    root.replaceChildren();
+    const [a, b] = state.round;
+    const screen = el('div', 'vm-screen vm-knockout-interstitial');
+    if (!reducedMotion) screen.classList.add('is-revealing');
+    if (!reducedMotion) celebrate(screen, { brand: ctx.brand });
+
+    screen.append(el('p', 'vm-kicker vm-knockout-final-kicker', copy.finalKicker));
+    screen.append(el('h2', 'vm-title', copy.finalTitle));
+
+    const crests = el('div', 'vm-knockout-crests');
+    crests.append(buildCrest(a), el('div', 'vm-knockout-vs', copy.versus), buildCrest(b));
+    screen.append(crests);
+
+    screen.append(el('p', 'vm-lede', copy.finalLede));
+
+    const cta = el('button', 'vm-btn vm-btn-primary', copy.finalCta);
+    cta.type = 'button';
+    cta.addEventListener('click', startRound);
+    screen.append(cta);
+    root.append(screen);
+    cta.focus();
+  };
+
+  // A small "crest" for a finalist on the interstitial — the paint colour, the
+  // initial/photo, and the name. Lighter than a full contender card.
+  const buildCrest = (car) => {
+    const crest = el('div', 'vm-knockout-crest');
+    crest.style.setProperty('--vm-mingle-swatch', swatchFor(car));
+    const disc = el('div', 'vm-knockout-crest-disc');
+    if (car.photo) {
+      const img = el('img', 'vm-knockout-crest-photo');
+      img.src = car.photo; img.alt = car.name || ''; img.loading = 'lazy';
+      img.addEventListener('error', () => { img.remove(); disc.classList.add('no-photo'); });
+      disc.append(img);
+    } else {
+      disc.classList.add('no-photo');
+      disc.append(el('span', 'vm-mingle-card-initial', (car.name || '?').charAt(0)));
+    }
+    crest.append(disc);
+    if (car.name) crest.append(el('span', 'vm-knockout-crest-name', car.name));
+    return crest;
   };
 
   /* --------------------------- result --------------------------- */
@@ -517,7 +664,7 @@ function mount(root, ctx) {
       || hasUnmet(result.unmet);
 
     const screen = el('div', 'vm-screen vm-mingle-result vm-knockout-result');
-    if (!reducedMotion) confetti(screen);
+    if (!reducedMotion) celebrate(screen, { brand: ctx.brand });
 
     screen.append(el('p', 'vm-kicker vm-mingle-match-kicker', copy.matchKicker));
     screen.append(el('h2', 'vm-title', copy.matchTitle({ model: champion.name })));
@@ -576,6 +723,8 @@ function mount(root, ctx) {
 
   const buildHero = (car) => {
     const card = el('article', 'vm-mingle-hero');
+    // Entrance: a spring/precise settle as the champion is crowned (CSS).
+    if (!reducedMotion) card.classList.add('is-revealing');
     card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
     card.append(el('div', 'vm-mingle-card-colour'));
     const media = el('div', 'vm-mingle-card-media');
@@ -638,20 +787,8 @@ function mount(root, ctx) {
     } catch { /* clipboard blocked — leave the label */ }
   };
 
-  /* A small, self-contained confetti burst on the champion reveal. Particle
-   * colour from --vm-accent-spot so a brand skin re-tints it. Gated on
-   * reduced-motion by the caller. Mirrors the swipe game's confetti. */
-  const confetti = (host) => {
-    const layer = el('div', 'vm-mingle-confetti');
-    layer.setAttribute('aria-hidden', 'true');
-    for (let i = 0; i < 24; i += 1) {
-      const bit = el('span', 'vm-mingle-confetti-bit');
-      bit.style.left = `${(i / 24) * 100}%`;
-      bit.style.animationDelay = `${(i % 6) * 0.06}s`;
-      layer.append(bit);
-    }
-    host.append(layer);
-  };
+  /* The champion-reveal confetti is the shared celebrate() helper
+   * (match-signal.js) — the same crescendo the swipe game uses. */
 
   /* ------------------------------ boot ------------------------------
    * Same shape as the swipe game: the seed's tiles are per-brand and live behind

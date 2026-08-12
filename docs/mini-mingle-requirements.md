@@ -362,9 +362,18 @@ negative). The "♥" glyph is a nice MINI-Valentine beat. Keep the copy in
 - **Pass** (left) and **Keep** (right):
   - Buttons: a circular ✕ **Pass** (outlined) and a ♥ **Keep** (filled with
     `--vm-accent`, or `--vm-accent-spot` on MINI for the "Valentine" beat).
-  - Drag/swipe gesture on the card should mirror the buttons (pointer + touch),
-    but the **buttons are the source of truth** — gesture is an enhancement and
-    must degrade to button-only where pointer events aren't available.
+  - **Drag gesture (built — `dragToSwipe()`):** the front card follows the
+    pointer. On `pointerdown` it captures the pointer; on `pointermove` it drives
+    an inline `translateX` + a small proportional tilt, and fades in a **KEEP ♥ /
+    PASS ✕ stamp** whose opacity tracks the horizontal drag distance (via a
+    `--vm-drag-stamp` ratio). Release **past the threshold** (`max(64px, 32% of
+    card width)`, or a fast horizontal flick) **commits** via the same
+    `doSwipe(keep, viaDrag)` path the buttons use — so kept-set / taste tallies /
+    undo / reveal are untouched; the card is already displaced, so the commit just
+    finishes the fly-out. Release **early springs back** (`is-returning`, a
+    `--vm-pop`/`--vm-ease` transition). The **buttons remain the source of truth** —
+    the gesture is a progressive enhancement bound only on the live (`depth 0`)
+    card, and is skipped entirely under reduced motion (button/key only).
   - Keyboard: Left arrow = Pass, Right arrow = Keep, so it's operable without a
     pointer (accessibility; the PRD omitted this).
 - Advancing: on Pass or Keep, the card animates out, the next becomes live, the
@@ -570,10 +579,19 @@ not styling to be sanded off. The earlier draft's instinct to neutralise all thi
 in the name of brand-agnosticism was wrong for this brief (§9).
 
 - **Confetti** on the match reveal (PRD §8.3): a pink/Valentine burst — keep it,
-  it's part of the payoff. Small self-contained function in `mingle.js`; particle
-  colour from `--vm-accent-spot` so a future brand skin re-tints it.
+  it's part of the payoff. **Built as the shared `celebrate(host, { brand })`
+  helper in `match-signal.js`** (not a per-mode copy), so the swipe reveal and the
+  knockout champion crescendo can't drift apart. MINI leans warm — ~40 particles,
+  every third a ♥ heart, in `--vm-accent-spot`/`--vm-accent-secondary`; BMW stays
+  measured — ~26 plain bits, monochrome. Character is carried by the CSS token
+  (`--vm-accent-spot`, `--vm-ease`) and the `.vm-mini` scope, so the JS only varies
+  particle count and whether hearts are dealt.
+- **Reveal entrance.** The hero match card gets an `is-revealing` entrance (a
+  spring settle on MINI via `--vm-ease`, a crisp ease on BMW) so the payoff lands
+  as a crescendo, not a static swap.
 - **Gate motion on `prefers-reduced-motion`** — respect the OS setting (the PRD
-  didn't). Reduced-motion users still get the match, just without the burst.
+  didn't). Reduced-motion users still get the match, just without the burst or the
+  entrance animation (the CSS also hides the confetti layer as a second guard).
 - If build time is tight, confetti is a fair cut (§6.3) — the *copy* conceit is
   not.
 
@@ -705,10 +723,11 @@ raw average, so it reads as a preference ("Under £30k") rather than a number.
 
 ### 11.7 What the prototype does NOT have (so we decide deliberately)
 
-- **No undo, no gesture-drag** — it's buttons only, and "swipe" is a metaphor,
-  not a drag. §5.1 (gesture as progressive enhancement) and §5.4 (one-step
-  undo) are **our additions**, not the prototype's. They're worth adding, but
-  flag them as scope beyond a like-for-like port.
+- **No undo, no gesture-drag** — the prototype is buttons only, and its "swipe"
+  is a metaphor, not a drag. §5.1 (full pointer-drag + KEEP/PASS stamp,
+  `dragToSwipe()`) and §5.4 (one-step undo) are **our additions** — now built,
+  beyond the like-for-like port. The drag reuses the buttons' commit path, so it
+  adds tension without a second source of truth.
 - **No keyboard support** — arrow-key Pass/Keep (§5.1) is our accessibility
   addition.
 - **Hard-coded "1 of 10", a fixed 10-car deck, in rank order** — do **not** copy

@@ -34,7 +34,7 @@ import {
   WEAK_SCORE, SHADE_HEX, NEUTRAL_SWATCH,
   budgetBandsFromQuestion, useTilesFromQuestion,
   shuffle, shadeOf, swatchFor, priceLabel, cap, gbpShort,
-  modal, rankByFrequency, swipesToAnswers,
+  modal, rankByFrequency, swipesToAnswers, celebrate,
 } from './match-signal.js';
 
 /* How many cards make a good swipe session — enough to read a taste, few enough
@@ -70,9 +70,12 @@ const MINGLE_COPY = {
     // `primaryUse` questions), so MINI's own labels and MINI-scale budget show
     // without duplicating the source of truth. Only the seed's framing lives here.
     // Deck
-    deckInstruction: 'Pass on the ones that leave you cold. Keep the ones that catch your eye.',
+    deckInstruction: 'Drag right for yes, left for no — or tap. Keep the ones that catch your eye.',
     passLabel: 'Pass',
     keepLabel: 'Keep',
+    // Drag stamps — the big word that lands on the card as you pull it.
+    stampKeep: 'KEEP',
+    stampPass: 'NOPE',
     undoLabel: '↩ Bring that one back',
     revealLabel: 'Reveal my match ♥',
     progress: ({ done, total }) => `${done} of ${total}`,
@@ -131,9 +134,11 @@ const MINGLE_COPY = {
     seedCta: 'Start swiping',
     // Budget bands + "what's it for" options come from the engine per brand
     // (see the MINI note above), not from copy.
-    deckInstruction: 'Pass the ones that don’t appeal. Keep the ones that do.',
+    deckInstruction: 'Drag right to keep, left to pass — or use the buttons.',
     passLabel: 'Pass',
     keepLabel: 'Keep',
+    stampKeep: 'KEEP',
+    stampPass: 'PASS',
     undoLabel: '↩ Bring that one back',
     revealLabel: 'Reveal my match',
     progress: ({ done, total }) => `${done} of ${total}`,
@@ -442,6 +447,14 @@ function mount(root, ctx) {
     });
     col.append(stack);
 
+    // Make the front card draggable (pointer). The buttons/keys below stay the
+    // source of truth; drag is an enhancement that reuses the same doSwipe
+    // commit. No-op under reduced motion (drag would fight the instant commit).
+    if (!reducedMotion) {
+      const front = stack.querySelector('.vm-mingle-card-0');
+      if (front) dragToSwipe(front);
+    }
+
     // Controls — the source of truth (buttons; gesture/keys mirror them).
     const controls = el('div', 'vm-mingle-controls');
     const passBtn = el('button', 'vm-mingle-swipe vm-mingle-pass');
@@ -489,6 +502,17 @@ function mount(root, ctx) {
     const card = el('article', `vm-mingle-card vm-mingle-card-${depth}`);
     card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
 
+    // Drag stamps — only the front card is live, so only it carries them. They
+    // sit hidden (opacity 0) until dragToSwipe raises the one matching the
+    // direction of pull. Purely decorative; the buttons remain the a11y truth.
+    if (depth === 0) {
+      const keepStamp = el('span', 'vm-mingle-stamp vm-mingle-stamp-keep', copy.stampKeep);
+      const passStamp = el('span', 'vm-mingle-stamp vm-mingle-stamp-pass', copy.stampPass);
+      keepStamp.setAttribute('aria-hidden', 'true');
+      passStamp.setAttribute('aria-hidden', 'true');
+      card.append(keepStamp, passStamp);
+    }
+
     // Colour bar across the top + tinted media (§11.4).
     card.append(el('div', 'vm-mingle-card-colour'));
 
@@ -535,7 +559,10 @@ function mount(root, ctx) {
   };
 
   /* --------------------------- swiping --------------------------- */
-  const doSwipe = (keep) => {
+  // Commit a swipe. `viaDrag` means the card is ALREADY displaced by a finger
+  // drag past the threshold, so we let it finish flying under its own transform
+  // rather than re-triggering the class-based fly-out from centre.
+  const doSwipe = (keep, viaDrag = false) => {
     if (state.busy || state.index >= state.deck.length) return;
     const match = state.deck[state.index];
     const front = root.querySelector('.vm-mingle-card-0');
@@ -551,9 +578,90 @@ function mount(root, ctx) {
 
     if (reducedMotion || !front) { commit(); return; }
     state.busy = true;
+    if (viaDrag) {
+      // The drag handler removed its inline transform and stamped the direction
+      // class; the card is on its way out. Just advance when the CSS finishes.
+      window.setTimeout(commit, 280);
+      return;
+    }
     front.classList.add(keep ? 'is-flying-right' : 'is-flying-left');
     // Advance after the fly-out (prototype uses ~280ms; match the CSS 0.3s).
     window.setTimeout(commit, 280);
+  };
+
+  /*
+   * Pointer-drag on the front card: it follows the finger with a slight tilt, a
+   * KEEP/PASS stamp fades in with the pull, and releasing past a threshold (or a
+   * quick flick) commits that swipe via doSwipe; releasing short springs it back.
+   * This is the "feels like a swipe" layer over the button-driven model — the
+   * buttons and arrow keys still do exactly what they did, and this is skipped
+   * entirely under reduced motion (see the caller). Listeners live on THIS card;
+   * a re-render (renderDeck) throws the card away, so nothing leaks — and the
+   * document-level move/up listeners are removed the moment the gesture ends.
+   */
+  const dragToSwipe = (card) => {
+    let startX = 0;
+    let startT = 0;
+    let dx = 0;
+    let dragging = false;
+    // Commit past ~32% of the card width, or a fast flick in either direction.
+    const threshold = () => Math.max(64, card.offsetWidth * 0.32);
+
+    const onMove = (e) => {
+      if (!dragging) return;
+      dx = e.clientX - startX;
+      const tilt = dx / 18; // deg — gentle
+      card.style.transform = `translateX(${dx}px) rotate(${tilt}deg)`;
+      // Stamp opacity ramps to 1 by the threshold; only the matching one shows.
+      const ratio = Math.min(1, Math.abs(dx) / threshold());
+      card.classList.toggle('is-dragging-keep', dx > 8);
+      card.classList.toggle('is-dragging-pass', dx < -8);
+      card.style.setProperty('--vm-drag-stamp', String(ratio));
+    };
+
+    const cleanup = () => {
+      dragging = false;
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+    };
+
+    const onUp = (e) => {
+      if (!dragging) return;
+      cleanup();
+      const elapsed = (e.timeStamp || 0) - startT;
+      const flick = Math.abs(dx) > 48 && elapsed < 250;
+      const past = Math.abs(dx) >= threshold() || flick;
+      card.classList.remove('is-dragging-keep', 'is-dragging-pass');
+      if (past && !state.busy && state.index < state.deck.length) {
+        // Hand off to the fly-out: clear the inline transform so the direction
+        // class drives it, then commit on the shared path.
+        const keep = dx > 0;
+        card.style.transform = '';
+        card.style.removeProperty('--vm-drag-stamp');
+        card.classList.add(keep ? 'is-flying-right' : 'is-flying-left');
+        doSwipe(keep, true);
+      } else {
+        // Short pull — spring back to centre.
+        card.classList.add('is-returning');
+        card.style.transform = '';
+        card.style.removeProperty('--vm-drag-stamp');
+        card.addEventListener('transitionend', () => card.classList.remove('is-returning'), { once: true });
+      }
+    };
+
+    card.addEventListener('pointerdown', (e) => {
+      // Ignore secondary buttons and any pull once a swipe is mid-flight.
+      if (state.busy || (e.button && e.button !== 0)) return;
+      dragging = true;
+      startX = e.clientX;
+      startT = e.timeStamp || 0;
+      dx = 0;
+      card.classList.remove('is-returning');
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+      document.addEventListener('pointercancel', onUp);
+    });
   };
 
   const undoSwipe = () => {
@@ -606,7 +714,7 @@ function mount(root, ctx) {
     const weak = hero.score < WEAK_SCORE || hasUnmet(result.unmet);
 
     const screen = el('div', 'vm-screen vm-mingle-result');
-    if (!reducedMotion) confetti(screen);
+    if (!reducedMotion) celebrate(screen, { brand: ctx.brand });
 
     screen.append(el('p', 'vm-kicker vm-mingle-match-kicker', copy.matchKicker));
     screen.append(el('h2', 'vm-title', thin ? copy.thinTitle : copy.matchTitle({ model: hero.car.name })));
@@ -667,6 +775,8 @@ function mount(root, ctx) {
   const buildHero = (match) => {
     const { car } = match;
     const card = el('article', 'vm-mingle-hero');
+    // Entrance: a spring/precise settle as the match lands (CSS + --vm-ease).
+    if (!reducedMotion) card.classList.add('is-revealing');
     card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
     card.append(el('div', 'vm-mingle-card-colour'));
     const media = el('div', 'vm-mingle-card-media');
@@ -733,20 +843,8 @@ function mount(root, ctx) {
     } catch { /* clipboard blocked — leave the label */ }
   };
 
-  /* A small, self-contained confetti burst on the match reveal (§8). Particle
-   * colour from --vm-accent-spot so a brand skin re-tints it. Gated on
-   * reduced-motion by the caller. */
-  const confetti = (host) => {
-    const layer = el('div', 'vm-mingle-confetti');
-    layer.setAttribute('aria-hidden', 'true');
-    for (let i = 0; i < 24; i += 1) {
-      const bit = el('span', 'vm-mingle-confetti-bit');
-      bit.style.left = `${(i / 24) * 100}%`;
-      bit.style.animationDelay = `${(i % 6) * 0.06}s`;
-      layer.append(bit);
-    }
-    host.append(layer);
-  };
+  /* The confetti burst on the match reveal is the shared celebrate() helper
+   * (match-signal.js), so the swipe and knockout crescendos can't drift. */
 
   /* ------------------------------ boot ------------------------------
    * The seed's budget bands and "what's it for" tiles are per-brand, and the

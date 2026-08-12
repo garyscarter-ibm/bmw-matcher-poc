@@ -70,6 +70,14 @@
   --vm-radius-control: 0px;   /* buttons/pills — MINI overrides to a pill */
   --vm-radius-soft: 4px;      /* rare exception, e.g. inline links */
   --vm-btn-height: 46px;
+
+  /* --- motion character (the game modes lean on these) ---
+     One easing + one "pop" duration, referenced by the swipe/knockout
+     animations so the SAME keyframes read differently per brand. BMW is
+     precise and decisive: a tight ease-out, no overshoot. MINI overrides
+     --vm-ease to a springy curve (go-kart energy) further down. */
+  --vm-ease: cubic-bezier(0.2, 0.6, 0.2, 1);   /* BMW: crisp, no bounce */
+  --vm-pop: 0.42s;                             /* reveal/entrance duration */
   --vm-btn-padding: 12px 20px 15px;
   --vm-btn-min-width: 232px;
   --vm-border-width: 1px;
@@ -208,6 +216,12 @@
   /* geometry: fully-round pill controls, softly-rounded cards */
   --vm-radius: 6px;
   --vm-radius-control: 999px;
+
+  /* motion: MINI is playful — the same game animations get a springy
+     overshoot (a little go-kart bounce as cards settle and stamps land),
+     and a slightly longer pop so the bounce has room to read. */
+  --vm-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --vm-pop: 0.52s;
 }
 
 /* MINI headlines: serif, UPPERCASE, tight leading (MINI sets ~0.95). */
@@ -1826,9 +1840,58 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-mingle-card-1 { z-index: 2; transform: translateY(10px) scale(0.96); }
 .vm-mingle-card-2 { z-index: 1; transform: translateY(20px) scale(0.92); }
 
-/* Fly-out on swipe. The front card leaves in the swipe direction with a tilt. */
+/* Fly-out on swipe. The front card leaves in the swipe direction with a tilt.
+   The easing is the brand token, so MINI's exit carries a touch of spring. */
 .vm-mingle-card-0.is-flying-right { transform: translateX(120%) rotate(20deg); opacity: 0; }
 .vm-mingle-card-0.is-flying-left { transform: translateX(-120%) rotate(-20deg); opacity: 0; }
+
+/* While a finger is dragging the front card, its transform is set inline (JS),
+   so kill the transition — it should track the finger 1:1, not lag behind it. */
+.vm-mingle-card-0.is-dragging-keep,
+.vm-mingle-card-0.is-dragging-pass { transition: none; cursor: grabbing; }
+.vm-mingle-card-0 { cursor: grab; touch-action: pan-y; }
+
+/* Spring back to centre when a drag is released short of the threshold. The
+   inline transform is cleared by JS; this transition carries it home (with the
+   brand's bounce on MINI). */
+.vm-mingle-card-0.is-returning {
+  transition: transform var(--vm-pop) var(--vm-ease);
+}
+
+/* Drag stamps: the big KEEP/PASS word that lands on the card as you pull it.
+   Hidden until a drag; opacity is driven by --vm-drag-stamp (0→1, set in JS from
+   how far past the threshold the pull is), and only the stamp matching the drag
+   direction is revealed via the is-dragging-* class. Decorative, aria-hidden. */
+.vm-mingle-stamp {
+  position: absolute;
+  top: var(--vm-space-5);
+  z-index: 4;
+  padding: 4px var(--vm-space-3);
+  border: 3px solid currentcolor;
+  border-radius: var(--vm-radius-soft);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+}
+.vm-mingle-stamp-keep {
+  left: var(--vm-space-5);
+  color: var(--vm-accent-spot);
+  transform: rotate(-14deg);
+}
+.vm-mingle-stamp-pass {
+  right: var(--vm-space-5);
+  color: #c0392b;
+  transform: rotate(14deg);
+}
+/* Reveal the matching stamp, scaled by the drag ratio the JS reports. */
+.vm-mingle-card-0.is-dragging-keep .vm-mingle-stamp-keep,
+.vm-mingle-card-0.is-dragging-pass .vm-mingle-stamp-pass {
+  opacity: var(--vm-drag-stamp, 0);
+}
 
 /* Colour bar across the top, tinted from the car's paint. */
 .vm-mingle-card-colour {
@@ -1986,6 +2049,15 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 }
 .vm-mingle-hero .vm-mingle-card-media { aspect-ratio: 16 / 9; flex: none; }
 
+/* Hero entrance — the match/champion card settles in as a crescendo. The scale
+   overshoot reads as a precise "lock-in" on BMW and a springy pop on MINI,
+   because both use the brand's --vm-ease token on the same keyframes. */
+.vm-mingle-hero.is-revealing { animation: vm-hero-in var(--vm-pop) var(--vm-ease) both; }
+@keyframes vm-hero-in {
+  from { transform: scale(0.86) translateY(14px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
 .vm-mingle-why {
   max-width: 460px;
   margin: 0 auto var(--vm-space-5);
@@ -2046,14 +2118,33 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   height: 12px;
   background: var(--vm-accent-spot);
   opacity: 0.9;
-  animation: vm-mingle-fall 1.4s ease-in forwards;
+  animation: vm-mingle-fall 1.5s ease-in forwards;
 }
 .vm-mingle-confetti-bit:nth-child(even) { background: var(--vm-accent-secondary); width: 7px; height: 7px; border-radius: 999px; }
 .vm-mingle-confetti-bit:nth-child(3n) { background: var(--vm-ink); }
 
+/* MINI deals hearts among the confetti (celebrate() sets .is-heart). They fall a
+   touch slower and sway, so the warm, playful character reads. BMW never gets
+   these — its burst stays plain rectangular confetti (measured, not cute). */
+.vm-mingle-confetti-bit.is-heart {
+  width: auto;
+  height: auto;
+  background: none;
+  color: var(--vm-accent-spot);
+  font-size: 16px;
+  line-height: 1;
+  animation: vm-mingle-heart-fall 1.9s ease-in forwards;
+}
+.vm-mingle-confetti-bit.is-heart:nth-child(6n) { color: #c0536a; }
+
 @keyframes vm-mingle-fall {
   from { transform: translateY(0) rotate(0); opacity: 0.95; }
   to { transform: translateY(420px) rotate(320deg); opacity: 0; }
+}
+@keyframes vm-mingle-heart-fall {
+  0% { transform: translateY(0) translateX(0) rotate(0); opacity: 0.95; }
+  50% { transform: translateY(210px) translateX(14px) rotate(12deg); opacity: 0.95; }
+  100% { transform: translateY(440px) translateX(-8px) rotate(-8deg); opacity: 0; }
 }
 
 /* --- MINI tweaks: pill controls + serif callback already inherit; nudge the
@@ -2069,11 +2160,15 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 @media (prefers-reduced-motion: reduce) {
   .vm-mingle-stage { animation: none; }
   .vm-mingle-card,
+  .vm-mingle-card-0.is-returning,
   .vm-mingle-bar-fill,
   .vm-mingle-swipe { transition: none; }
-  /* No fly-out — the JS commits instantly in this mode, so just hide the card. */
+  /* No fly-out — the JS commits instantly in this mode, so just hide the card.
+     Drag is skipped entirely in JS here, so the stamps never show. */
   .vm-mingle-card-0.is-flying-right,
   .vm-mingle-card-0.is-flying-left { transform: none; opacity: 0; }
+  .vm-mingle-stamp { display: none; }
+  .vm-mingle-hero.is-revealing { animation: none; }
   .vm-mingle-confetti { display: none; }
   .vm-mingle-skel-tiles,
   .vm-mingle-skel-card,
@@ -2112,6 +2207,41 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 }
 .vm-knockout-count { font-size: var(--vm-text-label); color: var(--vm-ink-muted); }
 .vm-knockout-hint { margin: 0 0 var(--vm-space-5); }
+
+/* Engine "form" meter — the average engine score of the cars still standing,
+   surfaced as a thin climbing bar under the rail. It's the signal the mode used
+   to discard; here it rises as strong cars advance. Sits between the rail and
+   the pick hint. Hidden by the JS when the field is unscored. */
+.vm-knockout-form {
+  display: flex;
+  align-items: center;
+  gap: var(--vm-space-3);
+  margin: 0 0 var(--vm-space-4);
+}
+.vm-knockout-form-label {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--vm-ink-muted);
+  flex: none;
+  min-width: 5em;
+}
+.vm-knockout-form-track {
+  flex: 1;
+  height: 6px;
+  background: var(--vm-surface-alt);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.vm-knockout-form-fill {
+  height: 100%;
+  width: 0;
+  background: var(--vm-accent-spot);
+  border-radius: 999px;
+  transition: width var(--vm-pop) var(--vm-ease);
+}
 
 /* The face-off: two contenders with a "vs" between. Stacked on narrow screens
    (the "or" sits between the rows), side-by-side from 560px. */
@@ -2170,6 +2300,100 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   box-shadow: 0 0 0 2px var(--vm-accent-spot);
 }
 
+/* --- round ceremony ---------------------------------------------------------
+   Between rounds we make "moving on" a moment. The default is a banner that
+   sweeps across the stage naming the round you're entering; the Final swaps that
+   for a dedicated interstitial (the crescendo before the last pick). Both use
+   the brand's --vm-ease so MINI's ceremony has a spring BMW's doesn't. */
+
+/* The sweep: a full-bleed band that flies in from the left, holds, and the
+   JS paints the next matchup ~800ms later. */
+.vm-knockout-sweep-stage {
+  display: grid;
+  place-items: center;
+  min-height: 320px;
+  overflow: hidden;
+}
+.vm-knockout-sweep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vm-space-2);
+  width: 100%;
+  padding: var(--vm-space-8) var(--vm-space-4);
+  text-align: center;
+  color: var(--vm-accent-ink);
+  background: var(--vm-accent);
+  animation: vm-knockout-sweep-in 0.8s var(--vm-ease) both;
+}
+.vm-knockout-sweep-round {
+  font-family: var(--vm-font-heading);
+  font-weight: 300;
+  font-size: var(--vm-text-h2-lg);
+  line-height: 1;
+}
+.vm-knockout-sweep-sub {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  opacity: 0.85;
+}
+@keyframes vm-knockout-sweep-in {
+  0% { transform: translateX(-100%); opacity: 0; }
+  30% { transform: translateX(0); opacity: 1; }
+  80% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+/* The Final interstitial: two finalist crests, a big headline, one CTA. */
+.vm-knockout-interstitial {
+  position: relative;
+  text-align: center;
+  padding: var(--vm-space-8) var(--vm-space-1);
+}
+.vm-knockout-interstitial.is-revealing { animation: vm-hero-in var(--vm-pop) var(--vm-ease) both; }
+.vm-knockout-final-kicker { color: var(--vm-accent-spot); }
+.vm-knockout-interstitial .vm-title { text-align: center; margin-inline: auto; }
+.vm-knockout-interstitial .vm-lede { text-align: center; margin-inline: auto; max-width: 30ch; }
+.vm-knockout-interstitial .vm-btn-primary { margin-top: var(--vm-space-6); min-width: var(--vm-btn-min-width); }
+
+.vm-knockout-crests {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vm-space-5);
+  margin: var(--vm-space-6) 0;
+}
+.vm-knockout-crest {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vm-space-2);
+  max-width: 40%;
+}
+.vm-knockout-crest-disc {
+  width: 96px;
+  height: 96px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--vm-mingle-swatch, var(--vm-surface-dark));
+  border: 3px solid var(--vm-mingle-swatch, var(--vm-line));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.vm-knockout-crest-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.vm-knockout-crest-name {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  line-height: 1.2;
+}
+.vm-knockout-crests .vm-knockout-vs { margin: 0; }
+
 /* Field-loading skeletons — two blank contender cards. */
 .vm-knockout-skel-card { aspect-ratio: 4 / 3; width: 100%; }
 
@@ -2181,11 +2405,16 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    contender card just needs the softer MINI corner the deck cards get. --- */
 .vm.vm-mini .vm-knockout-card { border-radius: var(--vm-radius); }
 
-/* --- reduced motion: no fly-out, no crown lift — the JS commits instantly. --- */
+/* --- reduced motion: no fly-out, no crown lift — the JS commits instantly.
+   The Final interstitial still SHOWS (it's content — the round change must stay
+   legible) but doesn't animate in; the sweep is skipped in JS entirely. --- */
 @media (prefers-reduced-motion: reduce) {
   .vm-knockout-card { transition: none; }
   .vm-knockout-card.is-out-left,
   .vm-knockout-card.is-out-right { transform: none; opacity: 0; }
   .vm-knockout-card.is-crowned { box-shadow: none; }
+  .vm-knockout-form-fill { transition: none; }
+  .vm-knockout-sweep { animation: none; }
+  .vm-knockout-interstitial.is-revealing { animation: none; }
   .vm-knockout-skel-card { animation: none; background-image: none; }
 }

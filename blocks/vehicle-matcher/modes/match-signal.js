@@ -8,9 +8,10 @@
  * These helpers are the mode-agnostic, brand-safe pieces of that job:
  *   - display: SHADE_HEX / swatchFor / priceLabel / gbpShort / cap
  *   - deck:    shuffle
- *   - reading: modal / rankByFrequency
+ *   - reading: modal / rankByFrequency / averageScore
  *   - seed:    budgetBandsFromQuestion / useTilesFromQuestion
  *   - infer:   swipesToAnswers (swipe) / bracketToAnswers (knockout)
+ *   - reveal:  celebrate (the shared confetti crescendo)
  *
  * They were originally private to mingle.js; extracted here so the two game modes
  * share ONE tuning surface for how taste becomes answers, rather than a drifting
@@ -19,7 +20,7 @@
  * would reject (MINI has no saloon/coupe/mpv/diesel — those are brands:['bmw']).
  */
 
-import { gbp } from '../ui.js';
+import { el, gbp } from '../ui.js';
 
 /*
  * Below this the engine stops calling its leader a match at all — the client's
@@ -140,6 +141,19 @@ export function modal(values) {
     if (c > bestCount) { best = v; bestCount = c; }
   }
   return best == null ? null : { value: best, count: bestCount, share: bestCount / values.length };
+}
+
+/*
+ * Mean of a list of engine scores (0–100), ignoring non-numbers, or null when
+ * there's nothing to average. Used by the knockout's "form" indicator: the
+ * average engine-score of the cars still standing, which climbs as the player
+ * keeps advancing the cars the engine also rates. This surfaces the engine's own
+ * per-card signal (from /api/field) that the game would otherwise discard.
+ */
+export function averageScore(scores) {
+  const nums = scores.filter((s) => typeof s === 'number' && !Number.isNaN(s));
+  if (!nums.length) return null;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
 }
 
 /** Distinct values ranked by frequency: [{value, count}], most-kept first. */
@@ -280,4 +294,41 @@ export function bracketToAnswers(rounds, seed) {
  * fall back to name+price so a feed without links still de-dupes sanely. */
 export function idOf(car) {
   return car?.link || `${car?.name || ''}|${car?.priceMin ?? ''}`;
+}
+
+/* ------------------------------ reveal ------------------------------ */
+
+/*
+ * The shared celebration burst on a result reveal — one implementation for both
+ * games (the swipe match and the knockout champion), so the crescendo can't
+ * drift between them. Was a 24-bit copy in each mode; extracted and enriched
+ * here into a denser, staggered burst with per-brand character:
+ *
+ *   - MINI leans warm and playful: more particles, a good share of them ♥
+ *     hearts, in the brand's spot + secondary colours.
+ *   - BMW stays measured: fewer, plainer chevron/confetti bits, monochrome-ish.
+ *
+ * Character is carried by a `.vm-mini`/`.vm-bmw`-scoped CSS + the token
+ * (--vm-ease / --vm-accent-spot), so the JS just varies the particle COUNT and
+ * whether hearts are dealt; colour and easing are the stylesheet's job. The
+ * caller gates this on prefers-reduced-motion (the CSS also hides it as a belt-
+ * and-braces second guard). `host` should be position:relative so the absolutely
+ * positioned layer fills it.
+ */
+export function celebrate(host, { brand } = {}) {
+  const mini = brand === 'mini';
+  const count = mini ? 40 : 26;
+  const layer = el('div', 'vm-mingle-confetti');
+  layer.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < count; i += 1) {
+    // Every third bit on MINI is a heart; BMW gets none (measured, not cute).
+    const isHeart = mini && i % 3 === 0;
+    const bit = el('span', `vm-mingle-confetti-bit${isHeart ? ' is-heart' : ''}`, isHeart ? '♥' : '');
+    bit.style.left = `${(i / count) * 100}%`;
+    // Stagger across a wider window than the old 6-step cycle, so the burst
+    // rains rather than dropping in one sheet.
+    bit.style.animationDelay = `${(i % 10) * 0.05}s`;
+    layer.append(bit);
+  }
+  host.append(layer);
 }

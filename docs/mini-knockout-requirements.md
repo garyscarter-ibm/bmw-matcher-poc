@@ -73,12 +73,35 @@ fresh local object (never on the shared `ctx`), so a re-mount from the switcher 
    > This is the server half of the block's "one engine, an interface-shaped read each" seam;
    > `PREVIEW_COUNT` and the questions drawer are untouched.
 5. **Lean face-off UI.** Each matchup is two clean comparison cards side by side with a
-   "vs" between, plus a bracket progress rail (round name + "Match n of m"). Minimal chrome,
-   emphasis on the choice — a distinct "versus" feel, not the swipe card stack.
+   "vs" between, plus a bracket progress rail (round name + "Match n of m") and the slim
+   **form indicator** (§3.8) beneath it. Minimal chrome, emphasis on the choice — a distinct
+   "versus" feel, not the swipe card stack.
 6. **Taste weighted by advancement.** Head-to-head picks still become engine answer keys
    (the point of the mode), but a car's voice scales with how far it advanced: champion
    heaviest, then finalist, semi-finalist, … first-round exit lightest. This is the mode's
    one tuning surface (§5).
+7. **Make a thing of the round.** Advancing must *feel* like advancing, not a label
+   ticking over. Between rounds `advanceRound()` runs a **ceremony**: by default a
+   full-width **inline sweep banner** (`vm-knockout-sweep`) naming the round the player is
+   *entering* animates across the stage (~800ms via `--vm-ease`/`--vm-pop`), then the next
+   matchup paints — no extra tap. Reaching **the Final** (2 survivors) escalates to a
+   dedicated **interstitial** (`renderRoundInterstitial()`): a big "The Final", the two
+   finalists shown as crests (`buildCrest`), a `celebrate` burst, and one "tap to continue"
+   CTA — the climax earns the one extra tap, once. Under reduced motion (or a lone Final /
+   ≤1 survivor edge case) the ceremony collapses straight to `startRound()`, so the round
+   change is still legible but instant. Copy key: `roundAdvance({ round, survivors })`.
+8. **Surface the engine's own signal — the "form" indicator.** `/api/field` returns a
+   `score` per car that the mode used to discard when it mapped the field down to bare
+   `car` objects. Now `loadField` keeps it: `state.scoreById` (keyed by `idOf`) and
+   `state.bestScore` (the field's top score) are built *before* the shuffle. A slim
+   labelled bar in the progress rail (`renderForm` → `formPercent()`) shows the **average
+   engine-score of the cars still standing, normalised against the field's best**, so it
+   climbs as the player advances the cars the engine also rates and dips when they back an
+   underdog. It's honest — it's the engine's own number, not a fabricated meter — and it's
+   the "make the most of the engine" beat with **zero server change** (the score was
+   already in the response). Null-safe: an unscored field simply hides the bar.
+   `bracketToAnswers` is unaffected — it reads the winner/loser *cars*, which still carry
+   through unchanged.
 
 ## 4. Flow
 
@@ -86,8 +109,8 @@ fresh local object (never on the shared `ctx`), so a re-mount from the switcher 
 2. **Field** — `apiField(ctx.api, seed, retailer, brand, MAX_FIELD)` → shuffle → snap to a
    power of two (§3.4). The field plays a
    bracket: `pairUp` into round-1 matchups; each pick advances the winner and logs the
-   result; when a round's matchups are exhausted its winners seed the next round; one car
-   left → champion → result.
+   result; when a round's matchups are exhausted, `advanceRound()` runs the **round
+   ceremony** (§3.7) before its winners seed the next round; one car left → champion → result.
 3. **Result** — the champion is the hero; `apiMatch(bracketToAnswers(rounds, seed))`
    supplies its real reasons and the honesty signal (§6).
 
@@ -114,13 +137,19 @@ inference idiom shared between the two games, not two that can drift. `budget` a
   line, plus an optional aside naming the engine's own favourite. The hero never changes.
 - **CTAs**: test drive → `car.link`; full details → `car.link`; Web Share (with copy-link
   fallback) of the champion; "New tournament" → a fresh reshuffled field on the same seed.
-- **Motion**: confetti + pick fly-out, both gated on `prefers-reduced-motion`.
+- **Motion**: the champion card gets an `is-revealing` entrance (spring on MINI, crisp on
+  BMW, via `--vm-ease`/`--vm-pop`) and the shared **`celebrate(host, { brand })`** burst
+  from `match-signal.js` — the *same* crescendo the swipe reveal fires, so the two games
+  can't drift (BMW measured/monochrome, MINI warm with hearts). Pick fly-out, the round
+  ceremony (§3.7), the entrance and the confetti are all gated on `prefers-reduced-motion`.
 
 ## 7. Accessibility & re-mount
 
 - The whole contender is a `<button>` (full tap target); `←`/`→` pick the left/right car.
 - A `busy` lock ignores a second pick while a matchup transitions out.
-- `prefers-reduced-motion` skips the fly-out and confetti (the JS commits instantly).
+- `prefers-reduced-motion` skips the fly-out, the round ceremony travel (§3.7), the
+  champion entrance and the confetti (the JS commits/paints instantly — every screen stays
+  legible and every round reachable).
 - Re-mount safe: switching tabs re-calls `mount` and starts a clean run.
 
 ## 8. Files
