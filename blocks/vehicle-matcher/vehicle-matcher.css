@@ -286,6 +286,103 @@
   box-shadow: inset 0 0 0 2px var(--vm-accent), inset 4px 0 0 var(--vm-accent-spot);
 }
 
+/* ------------------------------ Honda theme --------------------------- *
+ * Applied when the block is configured Brand: Honda (the .vm-honda class,
+ * added in decorate). Honda UK's identity (per honda.co.uk): a clean, modern
+ * SANS look on white, with Honda Red as the one signature accent. Unlike BMW
+ * (light grotesque, uppercase, sharp corners) and MINI (heavy display serif,
+ * uppercase, pill controls), Honda is sentence-case, medium-weight sans with
+ * softly rounded corners and calm, honest motion — no bounce. It reads as
+ * plain, practical and trustworthy, which is the brand and the voice.
+ *
+ * Fonts are the HOST SITE'S, host-first (same rule as MINI): a Honda dealer
+ * site declares Honda's own faces, and we ask for them by name with a neutral
+ * sans fallback for the standalone harness. We don't ship or self-host Honda's
+ * licensed webfonts.
+ * -------------------------------------------------------------------- */
+.vm.vm-honda {
+  /* Sans for both headings and body (Honda has no display serif). Host-first,
+     then a neutral system sans so the harness still renders cleanly. */
+  --vm-font-heading: var(--heading-font-family, 'Honda Sans', 'HondaSans', 'Helvetica Neue', arial, sans-serif);
+  --vm-font-body: var(--body-font-family, 'Honda Sans', 'HondaSans', 'Helvetica Neue', arial, sans-serif);
+  --vm-font-bold: var(--vm-font-body);
+
+  /* colour: dark-ink-on-white with Honda Red as the primary accent. Red is the
+     CTA/link/highlight colour (Honda leads with it far more than BMW leads with
+     blue), so unlike MINI the accent IS the button colour here. */
+  --vm-ink: #1a1a1a;
+  --vm-ink-strong: #000000;
+  --vm-ink-muted: #5a5a5a;
+  --vm-accent: #cc0000;          /* Honda Red — primary CTA, links, highlights */
+  --vm-accent-ink: #ffffff;
+  --vm-accent-spot: var(--vm-accent);
+  --vm-accent-secondary: #333333; /* graphite — secondary spot */
+  --vm-accent-soft: rgba(204, 0, 0, 0.06);
+  --vm-line: #d9d9d9;
+
+  /* geometry: softly rounded, between BMW's sharp 0 and MINI's full pill. */
+  --vm-radius: 8px;
+  --vm-radius-control: 8px;
+
+  /* motion: calm and honest — a clean ease-out with no overshoot (Honda isn't
+     playful like MINI; it's steady). Slightly quicker than BMW's pop. */
+  --vm-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --vm-pop: 0.4s;
+}
+
+/* Honda headlines: sans, sentence-case (NOT uppercased like BMW/MINI), medium
+   weight. Overriding text-transform is the key move — the base .vm-title
+   uppercases, which is wrong for Honda's register. */
+.vm.vm-honda .vm-title,
+.vm.vm-honda .vm-question,
+.vm.vm-honda .vm-subhead,
+.vm.vm-honda .vm-preview-heading,
+.vm.vm-honda .vm-nearby-heading {
+  font-family: var(--vm-font-heading);
+  text-transform: none;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+/* Honda's lede is body copy in the sans, like MINI's override (the base sets it
+   in the heading font at weight 300, which reads too thin for Honda's sans). */
+.vm.vm-honda .vm-lede {
+  font-family: var(--vm-font-body);
+  font-weight: 400;
+  text-transform: none;
+}
+
+/* Honda buttons: red primary fill. The base .vm-btn-primary already uses the
+   accent, so the token override does most of the work; nudge the hover to a
+   deeper red rather than the base's filter so it stays on-brand. */
+.vm.vm-honda .vm-btn-primary:not(:disabled):hover {
+  filter: none;
+  background: #a30000;
+  border-color: #a30000;
+}
+
+/* Honda spot-red touches: progress bar, score badge, slider fill, focus ring
+   all carry the accent (it's the same red, so these just make it appear on the
+   small chrome the base leaves neutral). */
+.vm.vm-honda .vm-progress-bar { background: var(--vm-accent-spot); }
+.vm.vm-honda .vm-score {
+  background: var(--vm-accent-spot);
+  border-color: var(--vm-accent-spot);
+  color: #fff;
+}
+.vm.vm-honda .vm-range-fill,
+.vm.vm-honda .vm-slider-input::-webkit-slider-thumb,
+.vm.vm-honda .vm-slider-input::-moz-range-thumb { background: var(--vm-accent-spot); }
+.vm.vm-honda button:focus-visible {
+  outline-color: var(--vm-accent-spot);
+  box-shadow: 0 0 0 3px rgba(204, 0, 0, 0.3);
+}
+/* Selected option: red border with a subtle red inner edge. */
+.vm.vm-honda .vm-option.is-selected {
+  box-shadow: inset 0 0 0 2px var(--vm-accent), inset 4px 0 0 var(--vm-accent-spot);
+}
+
 .vm-kicker {
   font-family: var(--vm-font-bold);
   font-weight: 700;

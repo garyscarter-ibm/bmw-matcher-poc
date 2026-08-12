@@ -428,6 +428,212 @@ function miniBlurb(line, body, fuel, retailerName) {
   return `Approved-used MINI ${line} ${bodyWord}, ${fuelWord}, ready to drive away${from}.`;
 }
 
+/* -------------------------- Honda derivations -------------------------- *
+ * Honda's approved-used stock has no clean feed API, so its cars come from a
+ * scrape of the server-rendered listing pages (scripts/scrape-honda.mjs) into
+ * a FLAT raw record — { title, price, mileage, fuel, transmission, doors, bhp,
+ * cc, mpg, co2, colour, year, reg, image, link } — NOT the Auto Trader feed
+ * shape mapVehicle() consumes. So Honda is mapped by its own projection,
+ * mapHondaRaw() below, run once by scripts/build-honda-fixtures.mjs to produce
+ * the already-mapped fixtures/honda-cars.json the fixtures loader serves.
+ *
+ * The scrape carries mileage / fuel / transmission / doors / power / mpg /
+ * colour / year directly (near 100% complete), richer than the BMW feed. What
+ * it lacks — 0-62, boot litres, seat count, size class — comes from the
+ * per-line spec table below, exactly as BMW/MINI fill those from MODEL_SPECS.
+ * ---------------------------------------------------------------------- */
+
+/* Honda UK range. Keyed by the normalized model line (see hondaLine). boot =
+ * litres (rear seats up), sizeClass 1..5 on the shared BMW/MINI scale so the
+ * engine's size scoring is comparable across brands. zeroTo62 is the model's
+ * mainstream figure (Honda has no fast performance trims in this used pool, so
+ * unlike BMW/MINI there's no trim speed-up). Figures are official Honda UK /
+ * carwow / Auto Express (see the Honda section of DECISIONS.md). */
+// `mpg` is the official Honda UK WLTP combined figure, used as a fallback for
+// the handful of listings the scrape leaves without one — a combustion car with
+// no mpg can't be scored on the engine's economy axis, so the model figure fills
+// it the same way boot/seats/zeroTo62 do. (The e:HEV hybrids' real-world figures
+// are high, which is the point — a mileage-conscious buyer should be steered to
+// them.) EV lines carry no mpg; they're scored on evRange instead.
+const MODEL_SPECS_HONDA = {
+  Jazz: { boot: 304, seats: 5, zeroTo62: 9.4, sizeClass: 1, mpg: 62 }, // supermini; e:HEV hybrid
+  Civic: { boot: 410, seats: 5, zeroTo62: 7.8, sizeClass: 2, mpg: 56 }, // 11th-gen e:HEV hatch
+  'HR-V': { boot: 319, seats: 5, zeroTo62: 10.6, sizeClass: 2, mpg: 52 }, // small SUV; e:HEV
+  'ZR-V': { boot: 380, seats: 5, zeroTo62: 8.0, sizeClass: 3, mpg: 48 }, // mid SUV; e:HEV
+  'CR-V': { boot: 587, seats: 5, zeroTo62: 9.5, sizeClass: 3, mpg: 44 }, // large SUV; e:HEV (587L 5-seat)
+  // The two electric lines carry a WLTP range so the engine's economy axis has
+  // the figure it needs for an EV (evRange, not mpg). Honda e = 35.5kWh ~137mi;
+  // e:Ny1 = 68.8kWh ~256mi (official Honda UK WLTP).
+  e: { boot: 171, seats: 4, zeroTo62: 8.3, sizeClass: 1, evRange: 137 }, // electric city car (Honda e)
+  'e:Ny1': { boot: 361, seats: 5, zeroTo62: 7.7, sizeClass: 2, evRange: 256 }, // electric small SUV
+};
+const DEFAULT_SPEC_HONDA = {
+  boot: 330, seats: 5, zeroTo62: 9.5, sizeClass: 2, mpg: 50, evRange: 150,
+};
+
+/** Normalise a scraped Honda title to a MODEL_SPECS_HONDA key. The scrape's
+ *  casing is inconsistent ("HR-V"/"Hr-v", "CR-V"/"Cr-v", "ZR-V"/"Zr-v") and the
+ *  Honda e is titled "Honda Honda E …", so fold all of that here. */
+function hondaLine(title = '') {
+  // Strip a leading "Honda" (and the doubled "Honda Honda" the e carries).
+  const t = title.replace(/^Honda\s+/i, '').replace(/^Honda\s+/i, '').trim();
+  const w = (t.split(/\s+/)[0] || '').toLowerCase();
+  if (w === 'civic') return 'Civic';
+  if (w === 'jazz') return 'Jazz';
+  if (w === 'hr-v' || w === 'hrv') return 'HR-V';
+  if (w === 'cr-v' || w === 'crv') return 'CR-V';
+  if (w === 'zr-v' || w === 'zrv') return 'ZR-V';
+  if (w.startsWith('e:ny')) return 'e:Ny1';
+  if (w === 'e') return 'e';
+  return t.split(/\s+/)[0] || 'Jazz';
+}
+
+/** Body style for a Honda. The e is a hatchback; HR-V / ZR-V / CR-V are SUVs;
+ *  Jazz and Civic are hatchbacks. e:Ny1 is a small electric SUV. */
+function hondaBody(line) {
+  if (line === 'HR-V' || line === 'CR-V' || line === 'ZR-V' || line === 'e:Ny1') return 'suv';
+  return 'hatchback';
+}
+
+/**
+ * Fuel for a Honda, from the scrape's fuel string. Honda's big hybrid slice is
+ * "Petrol Hybrid" — these are FULL (self-charging i-MMD / e:HEV) hybrids, not
+ * plug-ins, so like the BMW mapper's mild hybrids they collapse to petrol on
+ * the engine's fuel axis (petrol|diesel|phev|ev). The hybrid identity, which is
+ * a real Honda selling point, is carried as a tag and in the blurb instead of a
+ * fuel category the engine doesn't model. Honda sells no diesel or plug-in
+ * hybrid in this pool bar a handful of older diesel HR-Vs.
+ */
+function hondaFuel(raw = '') {
+  const f = String(raw).toLowerCase();
+  if (f.includes('electric')) return 'ev';
+  if (f.includes('diesel')) return 'diesel';
+  return 'petrol'; // "Petrol", "Petrol Hybrid"
+}
+
+/** True when the scrape's fuel string marks a self-charging hybrid. */
+function hondaIsHybrid(raw = '') {
+  return /hybrid/i.test(String(raw));
+}
+
+/** Tags for a Honda — the range skews practical, efficient and family. */
+function hondaTags(line, body, rawFuel) {
+  const tags = new Set();
+  const fuel = hondaFuel(rawFuel);
+  if (body === 'suv') { tags.add('family'); tags.add('practical'); }
+  if (line === 'Jazz') { tags.add('urban'); tags.add('practical'); }
+  if (line === 'Civic') tags.add('family');
+  if (line === 'e') { tags.add('urban'); tags.add('tech'); }
+  if (fuel === 'ev') { tags.add('tech'); tags.add('efficient'); }
+  if (hondaIsHybrid(rawFuel)) tags.add('efficient');
+  if (tags.size === 0) tags.add('practical'); // never leave a Honda untagged
+  return [...tags];
+}
+
+/** Honda display name: keep the full scraped title (it carries the trim), but
+ *  fix the doubled marque the e ships with ("Honda Honda E …" → "Honda e …"),
+ *  normalise a stray ALL-CAPS model echo ("Jazz JAZZ 1.3 …" → "Jazz 1.3"), and
+ *  restore the canonical model casing the scrape mangles ("Cr-v" → "CR-V"). */
+function hondaDisplayName(title = '') {
+  let name = String(title).replace(/^Honda\s+Honda\s+/i, 'Honda ').trim();
+  // "Honda E" reads better lowercased as the model is styled "Honda e".
+  name = name.replace(/^Honda E\b/, 'Honda e');
+  // Drop an all-caps echo of the model word right after the model word.
+  name = name.replace(/\b(Jazz|Civic)\s+\1\b/i, '$1');
+  // The listing scrape lower-cases the hyphenated SUV names inconsistently
+  // ("Cr-v", "Hr-v", "Zr-v"); restore Honda's canonical CR-V / HR-V / ZR-V.
+  name = name.replace(/\b([CHZ])r-v\b/gi, (_, c) => `${c.toUpperCase()}R-V`);
+  return name.replace(/\s+/g, ' ').trim();
+}
+
+/** A short derived blurb for a Honda (the scrape has no marketing copy). */
+function hondaBlurb(line, body, rawFuel, retailerName) {
+  const bodyWord = { hatchback: 'hatchback', suv: 'SUV' }[body] || 'car';
+  let fuelWord;
+  if (hondaFuel(rawFuel) === 'ev') fuelWord = 'fully electric';
+  else if (hondaIsHybrid(rawFuel)) fuelWord = 'self-charging hybrid';
+  else fuelWord = hondaFuel(rawFuel) === 'diesel' ? 'diesel' : 'petrol';
+  const from = retailerName ? ` from ${retailerName}` : '';
+  return `Approved-used Honda ${line} ${bodyWord}, ${fuelWord}, ready to drive away${from}.`;
+}
+
+/* Honda's approved-used stock is a single national programme, not a network of
+ * distinct dealer sites like BMW/MINI, so every scraped car gets one stable
+ * synthetic retailer identity. The fixtures loader then serves the whole pool
+ * for any retailer request (it narrows by retailerId only when a match exists,
+ * else serves everything). */
+const HONDA_RETAILER_ID = 'honda-approved';
+const HONDA_RETAILER_NAME = 'Honda Approved Used';
+
+/**
+ * Project one FLAT scraped Honda record (scripts/scrape-honda.mjs output) to the
+ * engine's mapped-car schema — the SAME shape mapVehicle() produces for BMW/MINI
+ * and the fixtures loader serves. Returns null (caller filters) if there's no
+ * price, since a car with no price can't be scored on budget.
+ */
+export function mapHondaRaw(raw) {
+  const price = num(raw?.price);
+  if (!price) return null;
+
+  const { origin, defaultRetailer } = brandConfig('honda');
+  const line = hondaLine(raw.title);
+  const spec = MODEL_SPECS_HONDA[line] || DEFAULT_SPEC_HONDA;
+  if (!MODEL_SPECS_HONDA[line]) {
+    const warnKey = `honda:${line}`;
+    if (!warnedLines.has(warnKey)) {
+      warnedLines.add(warnKey);
+      // eslint-disable-next-line no-console
+      console.warn(`[mapping] no honda MODEL_SPECS for line "${line}" — using defaults`);
+    }
+  }
+  const body = hondaBody(line);
+  const fuel = hondaFuel(raw.fuel);
+  // An EV is scored on range, not mpg. Prefer the scrape's own figure if it
+  // carried one, else the model spec's WLTP range. Non-EVs leave this undefined.
+  const evRange = fuel === 'ev' ? (num(raw.range) || spec.evRange) : undefined;
+
+  return {
+    // ---- engine-scored fields (same shape as data.js / mapVehicle) ----
+    id: String(raw.id ?? raw.reg ?? `${raw.title}-${price}`),
+    name: hondaDisplayName(raw.title),
+    line,
+    body,
+    fuel,
+    priceMin: price,
+    priceMax: price,
+    sizeClass: spec.sizeClass,
+    seats: spec.seats,
+    boot: spec.boot,
+    zeroTo62: spec.zeroTo62,
+    // Honda asks neither trim-line nor door question (its used range is single
+    // trim-tier per car with a fixed 5-door body), so these stay null like BMW.
+    styleLine: null,
+    doors: num(raw.doors) === 3 ? 3 : null,
+    // The scrape carries no factory-options list, so there are no equipment
+    // concepts to surface. Empty is honest — the refinement step reads variance
+    // and simply finds none, exactly as it would for a feed that omitted them.
+    features: [],
+    transmission: transmissionFor(raw.transmission),
+    // A combustion car needs a positive mpg for the economy axis; if the scrape
+    // omitted it, fall back to the model's official WLTP combined figure. EVs
+    // leave mpg 0 (they're scored on evRange).
+    mpg: fuel === 'ev' ? num(raw.mpg) : (num(raw.mpg) || spec.mpg),
+    ...(evRange ? { evRange } : {}),
+    tags: hondaTags(line, body, raw.fuel),
+    blurb: hondaBlurb(line, body, raw.fuel, HONDA_RETAILER_NAME),
+
+    // ---- display-only (surfaced by index.js publicCar) ----
+    mileage: num(raw.mileage),
+    plate: raw.reg || undefined,
+    photo: raw.image || undefined,
+    retailerName: HONDA_RETAILER_NAME,
+    retailerId: HONDA_RETAILER_ID,
+    // The scrape captured each car's real PDP link; fall back to the brand
+    // origin if a record ever lacks one.
+    link: raw.link || `${origin}/?retailer_site=${encodeURIComponent(defaultRetailer)}`,
+  };
+}
+
 /* ---------------------- per-brand derivation config -------------------- *
  * mapVehicle dispatches on brand through this table. BMW keeps its existing
  * model-aware derivations; MINI uses the simpler ones above. The engine

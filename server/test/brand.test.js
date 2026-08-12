@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-import { mapVehicle } from '../mapping.js';
+import { mapVehicle, mapHondaRaw } from '../mapping.js';
 import { questionsForBrand, applyBespokeAnswers } from '../questions.js';
 import { normalizeBrand, brandConfig, brandTuning } from '../brands.js';
 import { rankCars } from '../engine.js';
@@ -516,4 +518,114 @@ test('contrast roof reads as styling, not as any string with a colour in it', ()
   // Things that merely mention a roof or a colour are not a contrast roof.
   assert.ok(!mapVehicle(equipped('Roof Rails', 'Anthracite Roof Lining'), 'mini').features.includes('contrastRoof'));
   assert.ok(!mapVehicle(equipped('19" M Double-spoke Jet Black Alloy Wheels'), 'bmw').features.includes('contrastRoof'));
+});
+
+/* ================================================================== *
+ * Honda — the first fixtures-source brand. Honda has no Auto Trader
+ * feed shape; its stock is scraped into a flat record and projected by
+ * mapHondaRaw (not BRAND_MAPPERS), then served as-is by the fixtures
+ * source. These prove the projection is engine-valid and the config /
+ * tuning resolve, so the brand can't silently rot behind the render test.
+ * ================================================================== */
+
+// The raw scrape shape mapHondaRaw consumes: flat, string-ish fields.
+const hondaRaw = (overrides = {}) => ({
+  id: 'HND-TEST-1',
+  title: 'Honda Civic 1.5 VTEC Turbo Sport',
+  price: 18995,
+  fuel: 'Petrol',
+  mileage: 14200,
+  mpg: 47.1,
+  reg: 'LX21 ABC',
+  doors: 5,
+  transmission: 'Manual',
+  image: 'https://img/honda-civic.jpg',
+  link: 'https://usedcars.honda.co.uk/vehicle/HND-TEST-1',
+  ...overrides,
+});
+
+test('brand config: honda is a fixtures-source brand with a Honda origin', () => {
+  const cfg = brandConfig('honda');
+  assert.equal(cfg.source, 'fixtures', 'honda serves from fixtures, not the live feed');
+  assert.match(cfg.origin, /honda\.co\.uk/);
+  assert.equal(normalizeBrand('Honda'), 'honda');
+  assert.equal(normalizeBrand('HONDA'), 'honda');
+});
+
+test('mapHondaRaw projects a flat scrape record into the engine car schema', () => {
+  const car = mapHondaRaw(hondaRaw());
+  for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
+    assert.ok(car[field] !== undefined, `mapped Honda missing ${field}`);
+  }
+  assert.equal(car.line, 'Civic');
+  assert.equal(car.body, 'hatchback');
+  assert.equal(car.fuel, 'petrol');
+  assert.equal(car.priceMin, 18995);
+  assert.equal(car.priceMax, 18995, 'a used car is a single price, not a range');
+  assert.equal(car.transmission, 'manual');
+  assert.equal(car.retailerName, 'Honda Approved Used');
+  assert.match(car.name, /^Honda /, 'the display name leads with the marque');
+  assert.match(car.link, /usedcars\.honda\.co\.uk/);
+});
+
+test('mapHondaRaw folds Honda hybrids onto the petrol axis, carries hybrid identity in tags', () => {
+  // The engine fuel axis is petrol|diesel|phev|ev; Honda's self-charging
+  // i-MMD/e:HEV is not plug-in, so it scores as petrol but must still read as
+  // efficient so a mileage-conscious buyer is steered to it.
+  const hybrid = mapHondaRaw(hondaRaw({ fuel: 'Petrol Hybrid', title: 'Honda Jazz 1.5 i-MMD Advance' }));
+  assert.equal(hybrid.fuel, 'petrol', 'a self-charging hybrid is petrol on the engine axis');
+  assert.ok(hybrid.tags.includes('efficient'), 'hybrid identity survives as the efficient tag');
+  assert.match(hybrid.blurb, /hybrid/i, 'the blurb still tells the buyer it is a hybrid');
+});
+
+test('mapHondaRaw maps a real EV line to ev + evRange, an SUV line to suv', () => {
+  const ev = mapHondaRaw(hondaRaw({ fuel: 'Electric', title: 'Honda e:Ny1 Advance' }));
+  assert.equal(ev.fuel, 'ev');
+  assert.ok(ev.evRange > 0, 'an EV needs a range for the engine economy axis');
+  const suv = mapHondaRaw(hondaRaw({ title: 'Honda CR-V 2.0 i-MMD Hybrid EX', fuel: 'Petrol Hybrid' }));
+  assert.equal(suv.body, 'suv');
+  assert.match(suv.name, /Honda CR-V/, 'CR-V casing is preserved, not lower-cased');
+});
+
+test('mapHondaRaw returns null for a priceless record (nothing to rank)', () => {
+  assert.equal(mapHondaRaw(hondaRaw({ price: 0 })), null);
+  assert.equal(mapHondaRaw(hondaRaw({ price: undefined })), null);
+});
+
+test('every Honda fixture is engine-valid (real shipped stock, not a synthetic sample)', () => {
+  const path = fileURLToPath(new URL('../../fixtures/honda-cars.json', import.meta.url));
+  const cars = JSON.parse(readFileSync(path, 'utf8'));
+  assert.ok(cars.length > 0, 'honda fixtures are not empty');
+  for (const car of cars) {
+    for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
+      assert.ok(car[field] !== undefined, `${car.name || car.id} missing ${field}`);
+    }
+    assert.ok(car.priceMin <= car.priceMax, `${car.name} price range inverted`);
+    if (car.fuel === 'ev') assert.ok(car.evRange > 0, `${car.name} (ev) needs evRange`);
+    else assert.ok(car.mpg > 0, `${car.name} needs mpg`);
+    assert.ok(!car.blurb.includes('—'), `${car.name} blurb has an em dash`);
+    assert.ok(!car.name.includes('—'), `${car.name} name has an em dash`);
+  }
+});
+
+test('honda tuning ranks a thrifty hatch a real family buyer would pick', () => {
+  // Honda tuning leans economy + practicality. A frugal Jazz should out-rank a
+  // thirstier, sportier car for a value-minded family, where BMW's image-leaning
+  // curve would not separate them the same way.
+  const jazz = {
+    id: 'jazz', name: 'Honda Jazz', line: 'Jazz', body: 'hatchback', fuel: 'petrol',
+    priceMin: 17000, priceMax: 17000, sizeClass: 1, seats: 5, boot: 304, zeroTo62: 9.4,
+    mpg: 62, tags: ['urban', 'efficient'], blurb: '',
+  };
+  const thirsty = {
+    ...jazz, id: 'thirsty', name: 'Thirsty Hatch', mpg: 34, zeroTo62: 7.0,
+    tags: ['urban', 'drivers-car'],
+  };
+  const valueFamily = {
+    budget: [12000, 22000], bodyStyles: ['hatchback'], fuel: ['petrol'], charging: 'none',
+    primaryUse: 'commute', people: 'couple', mileage: 18000, style: '3',
+    priorities: ['economy'],
+  };
+  const ranked = rankCars(valueFamily, [thirsty, jazz], brandTuning('honda'));
+  assert.equal(ranked[0].car.id, 'jazz', 'the economical Honda tops for a value buyer under Honda tuning');
 });

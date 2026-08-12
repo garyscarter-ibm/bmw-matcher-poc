@@ -224,6 +224,78 @@ const MINI_TUNING = {
   },
 };
 
+/*
+ * Honda overrides. Honda's approved-used range is mainstream and value-led:
+ * small, efficient, practical cars (Jazz supermini through CR-V family SUV),
+ * heavy on self-charging hybrids, with no performance halo the way BMW has M or
+ * MINI has JCW. So its calibration leans the OPPOSITE way to BMW's image-first
+ * blend — economy and practicality carry more, performance and character less —
+ * and the absolute-speed curve is softened because the whole range is unhurried
+ * (a 7.8s Civic e:HEV is the quick end, not the norm). Everything Honda doesn't
+ * restate inherits BMW's base via mergeTuning, so this block stays small.
+ */
+const HONDA_TUNING = {
+  weights: {
+    // Economy + practicality up, performance + character down vs BMW. A Honda
+    // buyer is choosing on running cost and usable space, not kerb appeal, so
+    // the blend should reward the sensible car, not the fast or flashy one.
+    budget: 3.0, body: 4.5, fuel: 2.5, practicality: 2.5,
+    performance: 1.0, economy: 2.5, size: 1.0, character: 1.5,
+  },
+  // Priorities skew to the reasons a Honda actually gets bought: running cost
+  // and space. Performance/image still resolve (a Civic can be the "sportier"
+  // pick) but lean lighter than BMW's.
+  priorityBoosts: {
+    economy: { economy: 2.0, budget: 0.5 },
+    performance: { performance: 1.2, character: 0.3 },
+    comfort: { character: 0.8, size: 0.5 },
+    tech: { character: 0.8 },
+    image: { character: 0.8 },
+  },
+  // 0-62 curve for a slow-by-BMW-terms range. BMW is 10.5s→0, 4.5s→1; a Honda
+  // scored on that curve would read as uniformly sluggish. Recentre so the
+  // range spreads: 12.5s→0, 6.5s→1 → a 7.8s Civic reads ~0.78 (brisk for a
+  // Honda), a 10.6s HR-V ~0.32 (leisurely), which is the honest spread.
+  performance: { zeroBase: 12.5, span: 6 },
+  practicality: {
+    // Honda boots run small-to-mid (Jazz 304L, HR-V 319L, CR-V 587L). Scale the
+    // "big" need down from BMW's 500 so a CR-V clears "big" and a Jazz isn't
+    // crushed for "medium"; still above MINI's floors (Honda carries more).
+    bootNeed: { small: 0, medium: 300, big: 450 },
+    seatsFloor: 5, // all Hondas here are 5-seat bar the 4-seat e
+    crewBonusSeats: 5, // no 7-seaters in this pool; 5 is a full house
+  },
+  // No 7-seat Honda in the pool, so don't shrink a car's score for lacking the
+  // 7th seat a "crew" buyer ideally wants — 5 seats is the most Honda offers.
+  crewSeatShortfall: 1,
+  // A CR-V/ZR-V (class 3) is the big end for road trips; the range has nothing
+  // larger, so don't demand a class the stock can't supply.
+  size: { roadtripMinClass: 3, cityDivisor: 5 },
+  // Don't hard-exclude the small-booted Hondas from family/crew searches: a
+  // 319L HR-V should survive "family", and the 4-seat e shouldn't be filtered
+  // out of everything. Floors sit below the range's real figures.
+  hardFilter: { crewBoot: 300, crewSeats: 5, familySeats: 4 },
+  /*
+   * Only the reason strings whose REGISTER is Honda's rather than BMW's. Honda's
+   * voice is plain, practical and unshowy — it talks about running cost, space
+   * and reliability, not driving pleasure or kerb appeal. The numbers and the
+   * honesty are identical to the base; only the temperature changes. `tags` is
+   * merged key-by-key in engine.js, so any tag Honda leaves alone keeps BMW's.
+   */
+  reasons: {
+    roadtrip: () => 'Roomy and settled enough for a long motorway run',
+    city: () => 'Easy to place and park on a tight street',
+    tags: {
+      'drivers-car': 'The sharper-driving end of the Honda range',
+      family: 'A family shape, and the seats and boot above are the size of it',
+      urban: 'Small and light for town, easy to park and cheap to run',
+      efficient: 'The self-charging hybrid does the work; low running cost',
+      tech: 'The current cabin and driver aids, not the outgoing ones',
+      practical: 'Built around usable space first, as the boot figure shows',
+    },
+  },
+};
+
 /** Deep-merge a brand's overrides onto the BMW base so partial tuning works. */
 function mergeTuning(overrides) {
   const out = { ...BMW_TUNING };
@@ -329,6 +401,31 @@ export const BRANDS = {
         },
       ],
     },
+  },
+  honda: {
+    label: 'Honda',
+    // Public used-car site (used for PDP links and the origin fallback). Honda's
+    // approved-used stock is a single national programme, not a network of
+    // dealer sites, so there's no per-retailer origin to switch between.
+    origin: 'https://usedcars.honda.co.uk',
+    // Synthetic single-retailer id — the whole scraped pool is one programme.
+    // matches HONDA_RETAILER_ID in mapping.js so a retailer-scoped request still
+    // resolves to the full pool (the fixtures loader narrows by it, else serves
+    // everything).
+    defaultRetailer: 'honda-approved',
+    // Honda's live stock has no clean feed API to replay; its cars are scraped
+    // from the server-rendered listing pages into fixtures/honda-cars.json
+    // (already-mapped, via mapHondaRaw). Real stock, served with no network.
+    source: 'fixtures',
+    // Honda used stock runs ~£8.5k–£22.5k in the scraped pool (median ~£19k), so
+    // a £150k slider would bunch both thumbs at the far left. Cap at £30k with a
+    // default bracket around the median.
+    budget: { max: 30000, default: [12000, 20000] },
+    tuning: mergeTuning(HONDA_TUNING),
+    // Honda's used range is single-trim-tier per car with a fixed 5-door body,
+    // so the MINI-style trim/door questions don't apply — the shared question
+    // pool as tuned for a mainstream brand fits Honda as-is. No surgery needed;
+    // if a future gap appears, add `questions: { drop, add }` here.
   },
 };
 

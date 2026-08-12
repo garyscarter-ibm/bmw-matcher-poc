@@ -17,6 +17,8 @@
  */
 
 import { once } from 'node:events';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import { buildServer } from '../index.js';
 import { mapVehicle } from '../mapping.js';
@@ -151,6 +153,20 @@ export function miniPool(n = 6) {
     miniFeedVehicle({ cash_price: { value: 24000 + i * 500 } }),
     'mini',
   ));
+}
+
+/**
+ * A pool of `n` real Honda cars, read from the same `fixtures/honda-cars.json`
+ * the fixtures stock source serves in production. Unlike bmw/mini, Honda has no
+ * live feed shape — its fixtures ARE the mapped output of mapHondaRaw — so the
+ * render test loads the real file rather than synthesising one, exercising the
+ * exact cars a browser would see. Sampled from the front of the pool (which the
+ * build script writes in file order) for a deterministic, em-dash-free slice.
+ */
+export function hondaPool(n = 20) {
+  const path = fileURLToPath(new URL('../../fixtures/honda-cars.json', import.meta.url));
+  const all = JSON.parse(readFileSync(path, 'utf8'));
+  return all.slice(0, n);
 }
 
 /**

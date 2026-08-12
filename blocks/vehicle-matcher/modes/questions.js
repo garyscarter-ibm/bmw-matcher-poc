@@ -280,6 +280,78 @@ const BRAND_COPY = {
 };
 
 /*
+ * Honda's voice: plain, warm and practical, sentence-case throughout. It sits
+ * between BMW's terse authority and MINI's uppercase play — it talks about
+ * running costs, space and reliability rather than driving pleasure or kerb
+ * appeal, and it never oversells (see docs/tone-style-guide.md). Built on the
+ * BMW base (spread first) so every key is present — the resolver is all-or-
+ * nothing, BRAND_COPY[brand] || BRAND_COPY.bmw — then only the lines that carry
+ * Honda's marque or register are overridden. No em dashes in any of it.
+ */
+BRAND_COPY.honda = {
+  ...BRAND_COPY.bmw,
+  name: 'Honda',
+  title: 'Find the right Honda for you.',
+  cta: 'Find my Honda',
+  lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
+    + 'your miles and your budget. We’ll match you with the approved-used '
+    + `Hondas at ${retailer} that fit you best, and tell you why.`,
+  unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
+    + 'These are the closest to everything else you told us.',
+  tiedTitle: ({ count }) => `${cardinal(count)} of these fit you just as well.`,
+  tiedTitleHere: ({ count, retailer }) => `At ${retailer}, ${cardinal(count)} of these `
+    + 'fit you just as well.',
+  tasteTitle: ({ model }) => `Your best match is the ${model}.`,
+  tasteTitleHere: ({ model, retailer }) => `Your best match at ${retailer} is the ${model}.`,
+  tasteLede: () => 'A few of these suit you equally well on paper. This one lines up '
+    + 'best with what you said matters most.',
+  tiedLede: () => 'On your answers we can’t separate them: each suits you as well as '
+    + 'the next. It comes down to which you prefer the look of.',
+  refineLabel: ({ count }) => (count > 1 ? `Narrow these ${count} down` : 'Narrow this one down'),
+  refineStatus: ({ shown, wants }) => (shown === 1
+    ? `One car still fits, with ${wants}.`
+    : `${shown} cars still fit, with ${wants}.`),
+  refineStatusPlain: ({ shown }) => (shown === 1 ? 'One car still fits.' : `${shown} cars still fit.`),
+  refineEmpty: ({ wants }) => `Nothing here has ${wants} together. `
+    + 'Drop one of those and we’ll show you what does.',
+  refineEmptyHidden: 'That’s all of them ruled out. Bring one back, or start over.',
+  tiedEmptyTitle: 'Nothing left to show.',
+  rejectOpen: 'Not this one',
+  rejectPrompt: 'What put you off?',
+  rejectJust: 'Just not this one',
+  pickLabel: 'Choose yours',
+  kitLabel: 'What’s fitted',
+  briefLabel: 'What I’ve picked up',
+  closestTitle: ({ retailer }) => `The closest matches at ${retailer}.`,
+  closestLede: () => 'Nothing here ticks every box you gave us. Each card says what it '
+    + 'gets right, and what it doesn’t.',
+  closestSettled: ({ model }) => `Your closest match here is the ${model}.`,
+  closestSettledHere: ({ model, retailer }) => `Your closest match at ${retailer} is the ${model}.`,
+  weakTitle: ({ retailer }) => `Nothing at ${retailer} is close to what you asked for.`,
+  weakLede: () => 'These are the nearest we hold, and each one misses something you '
+    + 'said mattered. If none of them works, nothing here does.',
+  rescueNote: ({ list, retailer, miles, where }) => `No ${list} at ${retailer} right now. `
+    + `The nearest is ${miles} away at ${where}, and it’s in the list below.`,
+  driveLede: {
+    empty: ({ retailer }) => `Nothing at ${retailer} fits those answers, so these are the `
+      + 'closest matches at other retailers instead.',
+  },
+  hereHeading: ({ retailer }) => `AT ${retailer.toUpperCase()}`,
+  awayHeading: 'AT OTHER RETAILERS',
+  rejectHint: 'Turned down? We’ll bring the next one up.',
+  searchingNearby: 'Still checking other retailers within reach',
+  workingLabel: 'HOW WE GOT HERE',
+  working: ({ total, eligible }) => `We went through all ${total} Hondas in stock here. `
+    + `${eligible} were in budget and big enough for you.`,
+  workingMargin: ({ margin }) => ` Nothing else here came within ${margin} points.`,
+  workingWeak: ({ top }) => ` The best of them reached ${top}%.`,
+  workingScore: ' A match score is how well a car fits your answers, nothing else, '
+    + 'so cars that suit you equally share one.',
+  searchedWider: ({ model, miles, where }) => 'We looked further afield too. '
+    + `The ${model} at ${where} scores higher, and it’s ${miles}.`,
+};
+
+/*
  * How an unmet want is named in the results note, per brand — plural noun
  * phrases that drop into "No ___ at <retailer>…". Per-brand because MINI
  * names its own shapes (a Countryman, not an SUV) and calls its EVs
@@ -304,6 +376,17 @@ const UNMET_PHRASES = {
     bodyStyles: {
       hatchback: 'hatchbacks', estate: 'Clubman estates', suv: 'Countryman crossovers',
       convertible: 'convertibles',
+    },
+  },
+  honda: {
+    // Honda's self-charging hybrids score as petrol on the engine's fuel axis
+    // (see hondaFuel in mapping.js), so the fuel warnings only ever name petrol,
+    // diesel or fully electric — the values the quiz collects.
+    fuel: {
+      petrol: 'petrol Hondas', diesel: 'diesel Hondas', ev: 'fully electric Hondas',
+    },
+    bodyStyles: {
+      hatchback: 'hatchbacks', suv: 'SUVs',
     },
   },
 };
@@ -338,6 +421,11 @@ const TRADE_COPY = {
     // Countryman there would mislabel an Aceman on its own card. The want
     // side stays "a Countryman": that's the word the quiz option used.
     got: { bodyStyles: { suv: 'a crossover' } },
+  },
+  honda: {
+    label: 'The trade-off',
+    fuel: { petrol: 'petrol', diesel: 'diesel', ev: 'fully electric' },
+    bodyStyles: { hatchback: 'a hatchback', suv: 'an SUV' },
   },
 };
 
