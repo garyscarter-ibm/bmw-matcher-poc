@@ -24,7 +24,9 @@ import assert from 'node:assert/strict';
 import {
   installDom, resetDom, startModeServer, loadMode, mountMode, settle,
 } from './dom-harness.js';
-import { bmwPool, miniPool, hondaPool } from './helpers.js';
+import {
+  bmwPool, miniPool, hondaPool, fordPool,
+} from './helpers.js';
 
 // Brands under render test, each with a stock pool and the marque name. The
 // wordmark is asserted only where a mode actually shows it: the questions
@@ -33,11 +35,12 @@ import { bmwPool, miniPool, hondaPool } from './helpers.js';
 // "Head to Head" on BMW) and reveal the brand voice later, by design (see the
 // mode requirement docs). So the universal render check is "paints + correct
 // theme + no em dashes"; the wordmark check is scoped to questions.
-// Ford/Motorrad append their own entry as they onboard.
+// Motorrad appends its own entry as it onboards.
 const BRANDS = [
   { key: 'bmw', pool: () => bmwPool(20), name: /BMW/i },
   { key: 'mini', pool: () => miniPool(8), name: /MINI/i },
   { key: 'honda', pool: () => hondaPool(20), name: /Honda/i },
+  { key: 'ford', pool: () => fordPool(20), name: /Ford/i },
 ];
 
 const MODES = ['questions', 'mingle', 'knockout'];

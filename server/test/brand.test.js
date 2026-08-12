@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { mapVehicle, mapHondaRaw } from '../mapping.js';
+import { mapVehicle, mapHondaRaw, mapFordRaw } from '../mapping.js';
 import { questionsForBrand, applyBespokeAnswers } from '../questions.js';
 import { normalizeBrand, brandConfig, brandTuning } from '../brands.js';
 import { rankCars } from '../engine.js';
@@ -628,4 +628,151 @@ test('honda tuning ranks a thrifty hatch a real family buyer would pick', () => 
   };
   const ranked = rankCars(valueFamily, [thirsty, jazz], brandTuning('honda'));
   assert.equal(ranked[0].car.id, 'jazz', 'the economical Honda tops for a value buyer under Honda tuning');
+});
+
+/* ================================================================== *
+ * Ford — the second fixtures-source brand, and the broadest range we
+ * carry. Its live feed is Akamai-blocked here, so fixtures are curated
+ * and projected by mapFordRaw (a flat-raw → mapped-car projection, the
+ * same shape the live adapter will feed). Ford's mapper is richer than
+ * Honda's: a real performance halo (ST/GT speed-up), a genuine EV+PHEV
+ * split, and body derivation across estate/convertible/pickup/mpv. These
+ * prove all of that, plus the same engine-validity guard the render test
+ * relies on. See the Ford section of DECISIONS.md.
+ * ================================================================== */
+
+// The flat-raw shape mapFordRaw consumes (curated fixtures, or the live adapter).
+const fordRaw = (overrides = {}) => ({
+  id: 'FRD-TEST-1',
+  title: 'Ford Focus',
+  derivative: '1.0 EcoBoost mHEV 125 Titanium 5dr',
+  fuel: 'Petrol',
+  price: 16500,
+  mileage: 18400,
+  reg: '72 FRD',
+  colour: 'Frozen White',
+  ...overrides,
+});
+
+test('brand config: ford is a fixtures-source brand with a Ford origin', () => {
+  const cfg = brandConfig('ford');
+  assert.equal(cfg.source, 'fixtures', 'ford serves from fixtures, not the live feed');
+  assert.match(cfg.origin, /ford\.co\.uk/);
+  assert.equal(normalizeBrand('Ford'), 'ford');
+  assert.equal(normalizeBrand('FORD'), 'ford');
+});
+
+test('mapFordRaw projects a flat record into the engine car schema', () => {
+  const car = mapFordRaw(fordRaw());
+  for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
+    assert.ok(car[field] !== undefined, `mapped Ford missing ${field}`);
+  }
+  assert.equal(car.line, 'Focus');
+  assert.equal(car.body, 'hatchback');
+  assert.equal(car.fuel, 'petrol');
+  assert.equal(car.priceMin, 16500);
+  assert.equal(car.priceMax, 16500, 'a used car is a single price, not a range');
+  assert.ok(car.mpg > 0, 'a combustion Ford is scored on mpg');
+  assert.equal(car.retailerName, 'Ford Approved Used');
+  assert.match(car.name, /^Ford Focus /, 'the display name leads with marque + line');
+  assert.match(car.name, /Titanium/, 'the derivative is carried so trims are distinguishable');
+});
+
+test('mapFordRaw fires the ST/GT performance halo, but not on ST-Line', () => {
+  // ST-Line is a styling pack, not the hot car; only ST/GT get the 0-62 speed-up.
+  const base = mapFordRaw(fordRaw());
+  const stLine = mapFordRaw(fordRaw({ derivative: '1.0 EcoBoost mHEV 155 ST-Line 5dr' }));
+  assert.equal(stLine.zeroTo62, base.zeroTo62, 'ST-Line is NOT sped up (it is a look, not the hot car)');
+  assert.ok(!stLine.tags.includes('drivers-car'), 'ST-Line is not a performance flag');
+
+  const focusST = mapFordRaw(fordRaw({ derivative: '2.3 EcoBoost ST 5dr' }));
+  assert.ok(focusST.zeroTo62 < base.zeroTo62, 'the real Focus ST is quicker than the mainstream trim');
+  assert.ok(focusST.zeroTo62 <= 6.0, 'Focus ST 0-62 is a hot-hatch figure (~5.7s)');
+  assert.ok(focusST.tags.includes('drivers-car'), 'the ST reads as a performance car');
+
+  const machEgt = mapFordRaw(fordRaw({ title: 'Ford Mustang Mach-E', derivative: 'GT AWD 5dr Auto', fuel: 'Electric', price: 38000 }));
+  assert.ok(machEgt.zeroTo62 < 5, 'the Mach-E GT is properly fast');
+  assert.equal(machEgt.fuel, 'ev');
+});
+
+test('mapFordRaw splits EV, PHEV and petrol correctly', () => {
+  const ev = mapFordRaw(fordRaw({ title: 'Ford Explorer', derivative: 'Extended Range RWD Premium 5dr Auto', fuel: 'Electric', price: 38000 }));
+  assert.equal(ev.fuel, 'ev');
+  assert.ok(ev.evRange > 0, 'an EV needs a range for the economy axis');
+  assert.ok(!ev.mpg, 'an EV carries no usable mpg (scored on range instead)');
+
+  // Kuga PHEV: a real plug-in, NOT folded to petrol (unlike Honda's self-charging
+  // hybrids). It carries both a plug-in range and an mpg.
+  const phev = mapFordRaw(fordRaw({ title: 'Ford Kuga', derivative: '2.5 PHEV ST-Line X 5dr Auto', fuel: 'Plug-in Hybrid', price: 24000 }));
+  assert.equal(phev.fuel, 'phev', 'a plug-in hybrid keeps its own fuel category');
+  assert.ok(phev.evRange > 0, 'the PHEV carries an electric-only range');
+  assert.ok(phev.mpg > 0, 'the PHEV also carries a combustion mpg');
+
+  // Mild-hybrid EcoBoost is petrol, not phev/ev.
+  const mhev = mapFordRaw(fordRaw({ derivative: '1.0 EcoBoost mHEV ST-Line 5dr' }));
+  assert.equal(mhev.fuel, 'petrol', 'mild-hybrid EcoBoost scores as petrol');
+});
+
+test('mapFordRaw derives body from line + derivative (estate, convertible, pickup, mpv)', () => {
+  const estate = mapFordRaw(fordRaw({ derivative: '1.0 EcoBoost mHEV 155 Titanium Estate 5dr' }));
+  assert.equal(estate.body, 'estate');
+  assert.ok(estate.boot >= 550, 'the estate carries more boot than the hatch');
+
+  const convertible = mapFordRaw(fordRaw({ title: 'Ford Mustang', derivative: '5.0 V8 GT Convertible 2dr Auto', price: 40000 }));
+  assert.equal(convertible.body, 'convertible');
+
+  const coupe = mapFordRaw(fordRaw({ title: 'Ford Mustang', derivative: '5.0 V8 GT 2dr Auto', price: 40000 }));
+  assert.equal(coupe.body, 'coupe');
+  assert.equal(coupe.seats, 4, 'the Mustang is a 4-seat coupe');
+
+  const pickup = mapFordRaw(fordRaw({ title: 'Ford Ranger', derivative: '2.0 EcoBlue Wildtrak Double Cab Auto', fuel: 'Diesel', price: 30000 }));
+  assert.equal(pickup.body, 'pickup');
+
+  const mpv = mapFordRaw(fordRaw({ title: 'Ford Galaxy', derivative: '2.0 EcoBlue 150 Titanium 5dr', fuel: 'Diesel', price: 19000 }));
+  assert.equal(mpv.body, 'mpv');
+  assert.equal(mpv.seats, 7, 'the Galaxy is a 7-seat MPV');
+});
+
+test('mapFordRaw returns null for a priceless record (nothing to rank)', () => {
+  assert.equal(mapFordRaw(fordRaw({ price: 0 })), null);
+  assert.equal(mapFordRaw(fordRaw({ price: undefined })), null);
+});
+
+test('every Ford fixture is engine-valid (the curated stock the app serves)', () => {
+  const path = fileURLToPath(new URL('../../fixtures/ford-cars.json', import.meta.url));
+  const cars = JSON.parse(readFileSync(path, 'utf8'));
+  assert.ok(cars.length > 0, 'ford fixtures are not empty');
+  for (const car of cars) {
+    for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
+      assert.ok(car[field] !== undefined, `${car.name || car.id} missing ${field}`);
+    }
+    assert.ok(car.priceMin <= car.priceMax, `${car.name} price range inverted`);
+    if (car.fuel === 'ev') assert.ok(car.evRange > 0, `${car.name} (ev) needs evRange`);
+    else assert.ok(car.mpg > 0, `${car.name} needs mpg`);
+    assert.ok(!car.blurb.includes('—'), `${car.name} blurb has an em dash`);
+    assert.ok(!car.name.includes('—'), `${car.name} name has an em dash`);
+  }
+});
+
+test('ford tuning ranks a practical family SUV a real Ford buyer would pick', () => {
+  // Ford tuning leans practicality + economy + body fit, lighter on image than
+  // BMW. For a family needing space, a roomy Kuga should out-rank a sporty but
+  // impractical Mustang under Ford tuning.
+  const kuga = {
+    id: 'kuga', name: 'Ford Kuga', line: 'Kuga', body: 'suv', fuel: 'petrol',
+    priceMin: 20000, priceMax: 20000, sizeClass: 4, seats: 5, boot: 475, zeroTo62: 9.5,
+    mpg: 45, tags: ['family', 'practical'], blurb: '',
+  };
+  const mustang = {
+    id: 'mustang', name: 'Ford Mustang', line: 'Mustang', body: 'coupe', fuel: 'petrol',
+    priceMin: 20000, priceMax: 20000, sizeClass: 5, seats: 4, boot: 408, zeroTo62: 5.3,
+    mpg: 28, tags: ['image', 'drivers-car'], blurb: '',
+  };
+  const family = {
+    budget: [15000, 25000], bodyStyles: ['suv'], fuel: ['petrol'], charging: 'none',
+    primaryUse: 'family', people: 'family', mileage: 15000, style: '3',
+    priorities: ['practicality'],
+  };
+  const ranked = rankCars(family, [mustang, kuga], brandTuning('ford'));
+  assert.equal(ranked[0].car.id, 'kuga', 'the practical Ford SUV tops for a family under Ford tuning');
 });

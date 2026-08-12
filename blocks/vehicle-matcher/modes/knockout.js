@@ -202,6 +202,50 @@ const KNOCKOUT_COPY = {
     errLede: 'The matching service didn’t respond. Check your connection and try again.',
     retryLabel: 'Try again',
   },
+  // Ford's register: friendly and confident, with a touch of competitive spirit
+  // (Ford's ST/Mustang heritage earns the light bracket framing). No em dashes
+  // (house rule). Its own wordmark so the mode reads as Ford's.
+  ford: {
+    wordmark: 'Head to Head',
+    seedTitle: 'Set up your bracket.',
+    seedLede: 'Two quick things and we’ll seed the field, then it’s head-to-head to a winner.',
+    budgetLabel: 'Budget',
+    useLabel: 'What’s it for?',
+    seedCta: 'Seed the bracket',
+    versus: 'VS',
+    pickHint: 'Two cars go head to head. Pick the one you’d rather have.',
+    roundKicker: ({ round }) => round,
+    matchupProgress: ({ done, total }) => `Match ${done} of ${total}`,
+    roundAdvance: ({ round, survivors }) => `${round} · ${survivors} remaining`,
+    finalKicker: 'Down to two',
+    finalTitle: 'The Final.',
+    finalLede: 'Two cars left. Pick the one you’d take.',
+    finalCta: 'Continue',
+    verdictForm: ({ model }) => `The ${model} was the higher-rated of the two.`,
+    verdictUpset: ({ model }) => `The ${model} goes through, the lower-rated pick.`,
+    matchKicker: 'Your winner',
+    matchTitle: ({ model }) => `The ${model} takes it.`,
+    matchLede: 'It beat every car you put against it.',
+    whyIntro: 'Why it stands out:',
+    crownCallback: ({ beaten }) => `It saw off ${beaten} to win the bracket.`,
+    weakNote: 'For the record, the numbers don’t fully back this one. Stock changes '
+      + 'weekly, so it’s worth another run soon.',
+    alsoNote: ({ model }) => `On the numbers, the ${model} is the closest fit if you’d reconsider.`,
+    testDriveCta: 'Book a test drive',
+    detailsCta: 'See full details',
+    shareCta: 'Share this winner',
+    shareCopied: 'Link copied',
+    againCta: 'New tournament',
+    shareText: ({ model, retailer }) => `My pick is a ${model} at ${retailer}.`,
+    emptyPoolTitle: 'Not enough in that range for a bracket.',
+    emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got enough under that to run a knockout. `
+      + 'Raise your budget and we’ll seed a fresh field.',
+    emptyPoolCta: 'Adjust budget',
+    errKicker: 'Sorry',
+    errTitle: 'We couldn’t reach the matcher',
+    errLede: 'The matching service didn’t respond. Check your connection and try again.',
+    retryLabel: 'Try again',
+  },
 };
 
 /* ------------------------------ helpers ------------------------------ */

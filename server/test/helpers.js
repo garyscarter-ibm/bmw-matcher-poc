@@ -170,6 +170,19 @@ export function hondaPool(n = 20) {
 }
 
 /**
+ * A pool of `n` real Ford cars from `fixtures/ford-cars.json` — the curated,
+ * mapFordRaw-projected file the fixtures stock source serves for Ford. Same
+ * rationale as hondaPool: Ford has no replayable live feed here (Akamai edge),
+ * so the render test uses the real fixtures, exercising the exact cars a browser
+ * sees, including the ST/GT halo and the EV/PHEV split.
+ */
+export function fordPool(n = 20) {
+  const path = fileURLToPath(new URL('../../fixtures/ford-cars.json', import.meta.url));
+  const all = JSON.parse(readFileSync(path, 'utf8'));
+  return all.slice(0, n);
+}
+
+/**
  * A fake fetchRetailerStock that serves a per-brand pool and records every
  * call's (brand, retailer) so a test can assert the handler threaded them
  * through. Unknown brands fall back to the bmw pool (matching normalizeBrand's

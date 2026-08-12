@@ -296,6 +296,82 @@ const HONDA_TUNING = {
   },
 };
 
+/*
+ * Ford overrides. Ford's range is the broadest of the four: a £5k Ka city car
+ * through a £45k Explorer / Mustang Mach-E, spanning every body from supermini
+ * to pickup and every fuel from petrol-mHEV to full EV. Crucially, unlike Honda
+ * it HAS a real performance halo (Fiesta/Focus/Puma ST, and the Mustang V8 +
+ * Mach-E GT), so its calibration sits BETWEEN BMW and Honda: value- and
+ * practicality-leaning like a mainstream brand, but with performance and
+ * character weighted enough that an ST or a Mustang reads as the genuinely
+ * exciting car it is, and a 0-62 curve wide enough to separate a 12s EcoSport
+ * from a 4.5s Mustang. Everything Ford doesn't restate inherits BMW's base via
+ * mergeTuning.
+ */
+const FORD_TUNING = {
+  weights: {
+    // Between BMW (image-first) and Honda (economy-first). Economy + practicality
+    // lifted over BMW because most Fords are bought as sensible everyday cars,
+    // but performance/character stay meaningful (higher than Honda) so the ST /
+    // Mustang halo cars aren't flattened.
+    budget: 3.0, body: 4.5, fuel: 2.5, practicality: 2.2,
+    performance: 1.3, economy: 2.0, size: 1.0, character: 1.8,
+  },
+  // Priorities: an economy buyer is well served (Ford sells a lot of frugal
+  // superminis), but a performance buyer must be able to find the ST / Mustang,
+  // so the performance boost stays closer to BMW's than Honda's.
+  priorityBoosts: {
+    economy: { economy: 1.8, budget: 0.5 },
+    performance: { performance: 1.6, character: 0.4 },
+    comfort: { character: 0.9, size: 0.5 },
+    tech: { character: 0.9 },
+    image: { character: 0.9 },
+  },
+  // 0-62 curve wide enough for the real spread: an EcoSport is ~12s and a
+  // Mustang GT ~4.5s, so keep close to BMW's own curve (10.5s→0, 4.5s→1) rather
+  // than Honda's softened one. A Fiesta ST (~6.5s) reads genuinely quick; a
+  // family Kuga (~9s) reads middling; the Mustang tops out. zeroBase a touch
+  // higher than BMW so a mainstream 9-10s Ford isn't scored as sluggish.
+  performance: { zeroBase: 11.5, span: 7 },
+  practicality: {
+    // Ford boots run small (Fiesta 292L) to large (Kuga 475L, Galaxy/S-Max
+    // huge). Mid-scale the "big" need between BMW's 500 and Honda's 450.
+    bootNeed: { small: 0, medium: 300, big: 470 },
+    seatsFloor: 5, // most Fords are 5-seat; MPVs add two, the Mustang has 4
+    crewBonusSeats: 7, // Ford DOES sell 7-seat MPVs (Galaxy, S-Max, Grand Tourneo)
+  },
+  // Ford has genuine 7-seaters, so a crew buyer who wants the 7th seat should be
+  // rewarded for it and (gently) marked down without it — keep BMW's behaviour.
+  // (crewSeatShortfall inherits BMW's base.)
+  // Road trips want a mid-size+ car; the range has large SUVs and MPVs, so keep
+  // BMW's class-4 floor rather than lowering it as Honda did.
+  size: { roadtripMinClass: 4, cityDivisor: 5 },
+  // Don't hard-exclude Ford's smaller cars from family searches (a Focus is a
+  // legitimate family hatch), but Ford does have proper 7-seaters and big boots,
+  // so keep the crew floors near BMW's rather than Honda's lower ones.
+  hardFilter: { crewBoot: 400, crewSeats: 5, familySeats: 4 },
+  /*
+   * Only the reason strings whose REGISTER is Ford's rather than BMW's. Ford's
+   * voice is friendly, confident and plainly practical, with a little warmth and
+   * spirit (it's allowed to enjoy an ST). Numbers and honesty are identical to
+   * the base; only the temperature changes. `tags` merges key-by-key in
+   * engine.js, so any tag Ford leaves alone keeps BMW's.
+   */
+  reasons: {
+    roadtrip: () => 'Roomy and settled enough for a proper long-distance run',
+    city: () => 'Compact and easy to park on a tight street',
+    tags: {
+      'drivers-car': 'The genuinely fun end of the range, an ST or a Mustang',
+      family: 'A real family shape, with the seats and boot to back it up',
+      urban: 'Small and light for town, easy to park and cheap to run',
+      efficient: 'Low running costs, whether that is the mild hybrid or the EV',
+      tech: 'The current cabin and driver aids, not the outgoing ones',
+      practical: 'Built around usable space first, as the boot figure shows',
+      cruiser: 'The comfortable, settled end of the range for covering miles',
+    },
+  },
+};
+
 /** Deep-merge a brand's overrides onto the BMW base so partial tuning works. */
 function mergeTuning(overrides) {
   const out = { ...BMW_TUNING };
@@ -426,6 +502,32 @@ export const BRANDS = {
     // so the MINI-style trim/door questions don't apply — the shared question
     // pool as tuned for a mainstream brand fits Honda as-is. No surgery needed;
     // if a future gap appears, add `questions: { drop, add }` here.
+  },
+  ford: {
+    label: 'Ford',
+    // Public used-car site (used for PDP links and the origin fallback). Ford's
+    // approved-used programme is national; individual dealers exist but the
+    // showcase treats it as one pool, like Honda.
+    origin: 'https://www.ford.co.uk',
+    // Synthetic single-retailer id — matches FORD_RETAILER_ID in mapping.js so a
+    // retailer-scoped request resolves to the full pool (the fixtures loader
+    // narrows by it, else serves everything).
+    defaultRetailer: 'ford-approved',
+    // Ford's live approved-used feed (servicescache.ford.com) sits behind an
+    // Akamai edge that drops the connection from this environment (HTTP 000), so
+    // its cars are a curated fixtures/ford-cars.json built from public Ford UK
+    // spec data. The real adapter is wired in stock.js and goes live the day the
+    // feed is reachable; until then this brand serves from fixtures, no network.
+    // See the Ford section of DECISIONS.md.
+    source: 'fixtures',
+    // Ford used stock runs the widest of the four: a ~£5k Ka through a ~£45k
+    // Explorer / Mustang Mach-E. Cap at £60k (headroom for a Mustang V8) with a
+    // default bracket around the volume models (Puma/Focus/Kuga, ~£15k–£25k).
+    budget: { max: 60000, default: [12000, 25000] },
+    tuning: mergeTuning(FORD_TUNING),
+    // Ford's shared question set fits its range as-is (it sells the full spread
+    // of bodies and fuels the standard questions already cover). No surgery
+    // needed; if a future gap appears, add `questions: { drop, add }` here.
   },
 };
 

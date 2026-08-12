@@ -634,6 +634,245 @@ export function mapHondaRaw(raw) {
   };
 }
 
+/* ======================================================================= *
+ * FORD — the second fixtures-source brand (curated, not scraped).
+ *
+ * Ford's live approved-used feed (servicescache.ford.com) is behind an Akamai
+ * edge that drops the connection from this environment, so fixtures/ford-cars.json
+ * is curated from public Ford UK spec data. It uses the SAME flat-raw → mapped-car
+ * projection as Honda (mapFordRaw), so when the real feed becomes reachable its
+ * adapter can hand the same flat records straight in. See DECISIONS.md.
+ *
+ * Ford's range is the broadest we carry: a Ka city car through a Mustang and a
+ * Mach-E, every body from supermini to pickup, every fuel from petrol-mHEV to EV.
+ * Two things make its mapper richer than Honda's: a real performance halo (ST /
+ * Mustang / Mach-E GT get a proper 0-62 speed-up, like BMW's M trims), and a
+ * genuine EV + PHEV split (Kuga PHEV, and the Mach-E / Explorer / Capri / Puma
+ * Gen-E EVs), so fuel is read from the derivative as well as the fuel field.
+ * ======================================================================= */
+
+/* Per-line spec fill (boot litres, seats, base 0-62s, sizeClass 1..5, combined
+ * mpg for combustion, evRange miles for EV/PHEV). Figures are official Ford UK /
+ * WLTP; the base 0-62 is a mainstream trim, sped up for ST/GT in trimZeroTo62Ford.
+ * See the Ford section of DECISIONS.md for sourcing. */
+const MODEL_SPECS_FORD = {
+  // Figures reconciled against carwow / Auto Express / Parkers (Aug 2026 research
+  // pass); the base 0-62 is a mainstream trim, sped up for ST/GT below.
+  Ka: { boot: 270, seats: 5, zeroTo62: 13.3, sizeClass: 1, mpg: 56 }, // Ka+ city car
+  Fiesta: { boot: 292, seats: 5, zeroTo62: 9.9, sizeClass: 2, mpg: 53 }, // supermini (292L, 53.3mpg WLTP)
+  Focus: { boot: 375, seats: 5, zeroTo62: 9.7, sizeClass: 3, mpg: 55 }, // family hatch (375L; estate 575L below)
+  Puma: { boot: 456, seats: 5, zeroTo62: 9.8, sizeClass: 3, mpg: 52 }, // small SUV, mHEV (456L, 52mpg)
+  'Puma Gen-E': { boot: 523, seats: 5, zeroTo62: 8.0, sizeClass: 3, evRange: 233 }, // electric Puma (WLTP 233mi)
+  Kuga: { boot: 412, seats: 5, zeroTo62: 9.5, sizeClass: 4, mpg: 45 }, // mid SUV 1.5 EcoBoost (412L; PHEV below)
+  EcoSport: { boot: 355, seats: 5, zeroTo62: 12.7, sizeClass: 3, mpg: 48 }, // small SUV (older)
+  Mondeo: { boot: 541, seats: 5, zeroTo62: 9.4, sizeClass: 4, mpg: 56 }, // large hatch 2.0 EcoBlue (541L, 56.5mpg)
+  Mustang: { boot: 408, seats: 4, zeroTo62: 5.3, sizeClass: 5, mpg: 28 }, // 5.0 V8 GT coupe (408L, 5.3s, 28mpg)
+  'Mustang Mach-E': { boot: 402, seats: 5, zeroTo62: 6.3, sizeClass: 4, evRange: 273 }, // electric SUV (Ext Range RWD)
+  Explorer: { boot: 470, seats: 5, zeroTo62: 6.4, sizeClass: 5, evRange: 374 }, // electric SUV (Ext Range RWD)
+  Capri: { boot: 572, seats: 5, zeroTo62: 6.4, sizeClass: 4, evRange: 390 }, // electric coupe-SUV (Ext Range RWD)
+  Galaxy: { boot: 300, seats: 7, zeroTo62: 10.9, sizeClass: 5, mpg: 52 }, // 7-seat MPV (300L all-up, 52.3mpg)
+  'S-Max': { boot: 285, seats: 7, zeroTo62: 10.8, sizeClass: 5, mpg: 53 }, // 7-seat MPV (285L all-up, 53.3mpg)
+  Tourneo: { boot: 1213, seats: 5, zeroTo62: 11.4, sizeClass: 4, mpg: 50 }, // Tourneo Connect (1,213L behind row 2)
+  Ranger: { boot: 1200, seats: 5, zeroTo62: 9.0, sizeClass: 5, mpg: 33 }, // pickup, open load bed scored as boot
+};
+const DEFAULT_SPEC_FORD = {
+  boot: 400, seats: 5, zeroTo62: 10.0, sizeClass: 3, mpg: 48, evRange: 250,
+};
+
+/* A used-price fallback per line, so a curated record without a price can still
+ * be scored (the fixtures builder always sets one, but this keeps the projection
+ * total). Representative 2-4-year-old GBP values. */
+// The Kuga PHEV's official electric-only WLTP range (miles). The petrol Kuga
+// scores on mpg; the PHEV scores on evRange, so it needs its own figure — the
+// spec table's Kuga entry is the petrol one.
+const KUGA_PHEV_RANGE = 42;
+
+/** Normalise a Ford title/derivative to a MODEL_SPECS_FORD key. Order matters:
+ *  the multi-word lines (Mustang Mach-E, Puma Gen-E, S-Max) are tested before the
+ *  bare ones so "Mustang Mach-E" doesn't fold to "Mustang". */
+function fordLine(title = '', derivative = '') {
+  const s = `${title} ${derivative}`.toLowerCase();
+  if (/mach-?e/.test(s)) return 'Mustang Mach-E';
+  if (/mustang/.test(s)) return 'Mustang';
+  if (/puma\s*gen-?e|gen-?e/.test(s)) return 'Puma Gen-E';
+  if (/\bpuma\b/.test(s)) return 'Puma';
+  if (/\bkuga\b/.test(s)) return 'Kuga';
+  if (/\bfocus\b/.test(s)) return 'Focus';
+  if (/\bfiesta\b/.test(s)) return 'Fiesta';
+  if (/ecosport/.test(s)) return 'EcoSport';
+  if (/\bmondeo\b/.test(s)) return 'Mondeo';
+  if (/\bexplorer\b/.test(s)) return 'Explorer';
+  if (/\bcapri\b/.test(s)) return 'Capri';
+  if (/\bgalaxy\b/.test(s)) return 'Galaxy';
+  if (/s-?max/.test(s)) return 'S-Max';
+  if (/tourneo/.test(s)) return 'Tourneo';
+  if (/\branger\b/.test(s)) return 'Ranger';
+  if (/\bka\b/.test(s)) return 'Ka';
+  return 'Focus'; // sensible mainstream default
+}
+
+/** Body style for a Ford. EV/large SUVs and crossovers → suv; MPVs → mpv;
+ *  Mustang V8 → coupe (or convertible if the derivative says so); Ranger →
+ *  pickup; Focus/Mondeo estate variants → estate; else hatchback. */
+function fordBody(line, derivative = '') {
+  const d = derivative.toLowerCase();
+  if (line === 'Mustang') return /convertible|cabrio|drop/.test(d) ? 'convertible' : 'coupe';
+  if (line === 'Ranger') return 'pickup';
+  if (line === 'Galaxy' || line === 'S-Max' || line === 'Tourneo') return 'mpv';
+  if (['Puma', 'Puma Gen-E', 'Kuga', 'EcoSport', 'Mustang Mach-E', 'Explorer', 'Capri'].includes(line)) return 'suv';
+  if ((line === 'Focus' || line === 'Mondeo') && /estate|wagon|turnier|sportbrake/.test(d)) return 'estate';
+  return 'hatchback';
+}
+
+/** Fuel for a Ford, from the fuel string first, then the derivative (which is
+ *  often where the electrification is named). phev is a real category for Ford
+ *  (Kuga PHEV), so unlike Honda it is not folded into petrol. Mild-hybrid
+ *  EcoBoost mHEV is petrol. */
+function fordFuel(rawFuel = '', line = '', derivative = '') {
+  const f = String(rawFuel).toLowerCase();
+  const d = derivative.toLowerCase();
+  // Electric-only lines are always EV regardless of a sparse fuel field.
+  if (['Puma Gen-E', 'Mustang Mach-E', 'Explorer', 'Capri'].includes(line)) return 'ev';
+  if (f.includes('electric') || /\bev\b|gen-?e|mach-?e/.test(d)) return 'ev';
+  if (f.includes('plug') || /phev|plug-?in/.test(f) || /phev|plug-?in/.test(d)) return 'phev';
+  if (f.includes('diesel') || /tdci|ecoblue/.test(d)) return 'diesel';
+  return 'petrol'; // petrol, EcoBoost, mHEV
+}
+
+/** True when the derivative marks a Ford performance trim (ST / ST-Line is a
+ *  look, not the hot car, so only ST / ST-X / GT / Mach-E GT count). */
+function fordIsPerformance(derivative = '') {
+  return /\bst\b|\bst-x\b|\bgt\b/i.test(derivative) && !/st-line/i.test(derivative);
+}
+
+/** 0-62 for a Ford: the line base, sped up for the real hot trims. Fiesta ST
+ *  ~6.5s, Focus ST ~5.7s, Puma ST ~6.7s, Mach-E GT ~3.7s, Mustang GT already
+ *  fast. Only applied when fordIsPerformance detects a genuine ST/GT. */
+function trimZeroTo62Ford(base, line, derivative = '') {
+  if (!fordIsPerformance(derivative)) return base;
+  const hot = {
+    Fiesta: 6.5, Focus: 5.7, Puma: 6.7, 'Mustang Mach-E': 3.7, Mustang: 4.5,
+  }[line];
+  return hot || Math.max(base - 2.0, 4.5); // generic hot-trim shave, floored
+}
+
+/** Tags for a Ford — practical mainstream, with a performance flag for the hot
+ *  cars and efficient for EV/PHEV/mHEV. */
+function fordTags(line, body, fuel, derivative = '') {
+  const tags = new Set();
+  if (body === 'suv' || body === 'mpv' || body === 'estate') { tags.add('family'); tags.add('practical'); }
+  if (body === 'mpv') tags.add('cruiser');
+  if (line === 'Ka' || line === 'Fiesta') tags.add('urban');
+  if (fuel === 'ev' || fuel === 'phev') { tags.add('efficient'); tags.add('tech'); }
+  if (line === 'Mustang' || line === 'Mustang Mach-E') tags.add('image');
+  if (fordIsPerformance(derivative)) { tags.add('drivers-car'); tags.add('image'); }
+  if (['Explorer', 'Capri', 'Mustang Mach-E', 'Puma Gen-E'].includes(line)) tags.add('tech');
+  if (tags.size === 0) tags.add('practical'); // never leave a Ford untagged
+  return [...tags];
+}
+
+/** Ford display name: "Ford <line> <derivative>", the way an Auto Trader / Honda
+ *  listing reads — so a Focus ST and a Focus Titanium are distinguishable in the
+ *  deck and in head-to-head, not two rows both saying "Ford Focus". Folds a
+ *  doubled marque, avoids repeating the line if the derivative already names it,
+ *  and tidies whitespace. */
+function fordDisplayName(title = '', derivative = '') {
+  let name = String(title).trim();
+  if (!/^ford\b/i.test(name)) name = `Ford ${name}`;
+  name = name.replace(/^Ford\s+Ford\s+/i, 'Ford ');
+  const deriv = String(derivative).trim();
+  // Only append the derivative when it adds information (the title is just the
+  // marque + line; the derivative carries engine/trim/body).
+  if (deriv && !new RegExp(`\\b${deriv.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(name)) {
+    name = `${name} ${deriv}`;
+  }
+  return name.replace(/\s+/g, ' ').trim();
+}
+
+/** A short derived blurb for a Ford (curated records carry no marketing copy). */
+function fordBlurb(line, body, fuel, retailerName, derivative = '') {
+  const bodyWord = {
+    hatchback: 'hatchback', estate: 'estate', suv: 'SUV', coupe: 'coupé',
+    convertible: 'convertible', mpv: 'people carrier', pickup: 'pickup',
+  }[body] || 'car';
+  let fuelWord;
+  if (fuel === 'ev') fuelWord = 'fully electric';
+  else if (fuel === 'phev') fuelWord = 'plug-in hybrid';
+  else if (fuel === 'diesel') fuelWord = 'diesel';
+  else if (/mhev|ecoboost hybrid|mild hybrid/i.test(derivative)) fuelWord = 'mild-hybrid petrol';
+  else fuelWord = 'petrol';
+  const sporty = fordIsPerformance(derivative) ? 'performance ' : '';
+  const from = retailerName ? ` from ${retailerName}` : '';
+  return `Approved-used ${sporty}Ford ${line} ${bodyWord}, ${fuelWord}, ready to drive away${from}.`;
+}
+
+const FORD_RETAILER_ID = 'ford-approved';
+const FORD_RETAILER_NAME = 'Ford Approved Used';
+
+/**
+ * Project one FLAT Ford record (curated fixtures, or the live adapter when it's
+ * reachable) to the engine's mapped-car schema — the SAME shape mapVehicle() and
+ * mapHondaRaw() produce. Returns null (caller filters) if there's no price.
+ */
+export function mapFordRaw(raw) {
+  const line = fordLine(raw?.title, raw?.derivative);
+  const spec = MODEL_SPECS_FORD[line] || DEFAULT_SPEC_FORD;
+  // Price is the single most decision-driving field in used-car shopping, so we
+  // never invent one: a record with no price is dropped rather than shown with a
+  // fabricated figure a buyer might act on. (The curated fixtures carry real
+  // prices; FORD_PRICE_HINT is the fixture builder's per-line seed, not a
+  // live-feed backfill — see build-ford-fixtures.mjs.)
+  const price = num(raw?.price);
+  if (!price) return null;
+
+  const { origin } = brandConfig('ford');
+  const derivative = String(raw?.derivative || '');
+  const body = fordBody(line, derivative);
+  const fuel = fordFuel(raw?.fuel, line, derivative);
+  const zeroTo62 = trimZeroTo62Ford(spec.zeroTo62, line, derivative);
+  // EVs and PHEVs are scored on range; take the record's figure, else the spec's.
+  // The Kuga PHEV has no spec.evRange (that entry is the petrol Kuga), so it
+  // falls back to the model's official plug-in range rather than the EV default.
+  const phevFallback = line === 'Kuga' ? KUGA_PHEV_RANGE : DEFAULT_SPEC_FORD.evRange;
+  const evRange = (fuel === 'ev' || fuel === 'phev')
+    ? (num(raw?.range) || spec.evRange || phevFallback)
+    : undefined;
+  // A Focus/Mondeo estate carries more boot than the hatch base.
+  const boot = (body === 'estate') ? Math.max(spec.boot, 550) : spec.boot;
+
+  return {
+    id: String(raw?.id ?? raw?.reg ?? `${line}-${price}`),
+    name: fordDisplayName(raw?.title || line, derivative),
+    line,
+    body,
+    fuel,
+    priceMin: price,
+    priceMax: price,
+    sizeClass: spec.sizeClass,
+    seats: spec.seats,
+    boot,
+    zeroTo62,
+    styleLine: null,
+    doors: num(raw?.doors) === 3 ? 3 : null,
+    features: [],
+    transmission: transmissionFor(raw?.transmission),
+    // A combustion car needs a positive mpg for the economy axis; fall back to
+    // the model's WLTP combined figure when the record omits it. EVs leave mpg 0.
+    mpg: fuel === 'ev' ? num(raw?.mpg) : (num(raw?.mpg) || spec.mpg),
+    ...(evRange ? { evRange } : {}),
+    tags: fordTags(line, body, fuel, derivative),
+    blurb: fordBlurb(line, body, fuel, FORD_RETAILER_NAME, derivative),
+
+    // ---- display-only (surfaced by index.js publicCar) ----
+    mileage: num(raw?.mileage),
+    plate: raw?.reg || undefined,
+    photo: raw?.image || undefined,
+    retailerName: FORD_RETAILER_NAME,
+    retailerId: FORD_RETAILER_ID,
+    link: raw?.link || `${origin}/`,
+  };
+}
+
 /* ---------------------- per-brand derivation config -------------------- *
  * mapVehicle dispatches on brand through this table. BMW keeps its existing
  * model-aware derivations; MINI uses the simpler ones above. The engine

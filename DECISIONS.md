@@ -127,4 +127,94 @@ Format: **[area] decision** — why, and how to undo if you disagree.
   returns null; every shipped fixture is engine-valid; Honda tuning ranks a thrifty hatch
   top for a value buyer. These caught the two data gaps above before they reached a browser.
 
+## Ford (branch `vehicle-brand-ford-honda`)
+
+- **[ford-curated-not-scraped] Ford stock is curated, not scraped — the live feed is
+  unreachable from here.** `servicescache.ford.com` (the user's two approved-used endpoints)
+  sits behind an Akamai edge that drops the connection at the HTTP/2 layer regardless of
+  method, UA or headers (verified repeatedly: HTTP 000). So unlike Honda there is no raw
+  dump to replay. `scripts/build-ford-fixtures.mjs` synthesises a realistic flat-raw dataset
+  — a spread of derivatives per line with representative used prices, mileages and plates —
+  and projects it through `mapFordRaw`, the SAME flat-raw to mapped-car projection the live
+  adapter will use once it is reachable. 58 cars: petrol 28, diesel 15, ev 13, phev 2;
+  £8,900–£43,600 (median £21,050). Deterministic (mulberry32, no Date/Math.random), so the
+  committed JSON is stable across runs.
+
+- **[ford-flat-projection] Ford gets a dedicated `mapFordRaw`, like Honda, not a
+  `BRAND_MAPPERS` entry.** BMW/MINI share the Auto Trader feed shape `mapVehicle` reads; Ford
+  (like Honda) is a flat record (`title`, `derivative`, `fuel`, `price`, `mileage`, `reg`),
+  so it has its own projection emitting the identical mapped-car schema the fixtures loader
+  serves. When the live feed becomes reachable, the adapter hands `mapFordRaw` the same flat
+  shape — no engine or mapper change needed.
+
+- **[ford-no-invented-price] A record with no price is DROPPED, never shown with a
+  fabricated one.** An earlier draft backfilled a missing price from a per-line
+  `FORD_PRICE_HINT` table. Removed: price is the single most decision-driving field in
+  used-car shopping, and showing a buyer an invented figure they might act on is a worse
+  failure than a slightly thinner deck. `mapFordRaw` now returns null on a priceless record
+  (caller filters), matching Honda. The curated fixtures carry real prices from the builder's
+  per-line `priceBand`, so nothing is lost. Guarded by a `brand.test.js` null-on-priceless test.
+
+- **[ford-performance-halo] ST and GT trims get a 0-62 speed-up; ST-Line does NOT.**
+  Analogous to BMW's M-trim `trimZeroTo62`, `trimZeroTo62Ford` applies a per-line hot figure
+  (Fiesta ST 6.5s, Focus ST 5.7s, Puma ST 6.7s, Mustang GT 4.5s, Mach-E GT 3.7s) and tags the
+  car `drivers-car`. The exclusion matters for brand honesty: **ST-Line is a styling pack, not
+  the hot car**, so `fordIsPerformance` explicitly excludes it (`/\bst\b|\bgt\b/ && !st-line`).
+  A buyer told an ST-Line is a performance car would feel misled the moment they drove it.
+
+- **[ford-ev-phev-split] Ford keeps a real EV + PHEV split, unlike Honda's fold-to-petrol.**
+  Ford's used range has genuine plug-ins, so the fuel axis carries all four categories: the
+  Kuga PHEV maps to `phev` (with its own 42-mile WLTP electric range, since the Kuga spec
+  entry is the petrol car), and Puma Gen-E / Mustang Mach-E / Explorer / Capri map to `ev`
+  with real WLTP ranges. Mild-hybrid EcoBoost (mHEV) folds to `petrol` as with BMW/Honda —
+  it is not a plug-in. This is a deliberate divergence from Honda: Ford's plug-ins are a real
+  buying consideration, Honda's self-charging hybrids are not plug-ins.
+
+- **[ford-display-name] The display name carries the derivative so trims are
+  distinguishable.** `fordDisplayName(title, derivative)` appends the trim (regex-escaped,
+  only when it adds information) so a deck/knockout shows "Ford Focus 2.3 EcoBoost ST 5dr" vs
+  "Ford Focus 1.0 EcoBoost mHEV 125 Titanium 5dr" rather than two identical "Ford Focus"
+  cards. A spot-check that first read "no ST cars" turned out to be this: the halo fired
+  correctly all along, but the name had dropped the derivative, so the fix resolved a genuine
+  UX defect (indistinguishable listings) as well.
+
+- **[ford-body-derivation] Body is derived from line + derivative across the full range.**
+  `fordBody` reads estate (Focus/Mondeo "Estate"), convertible and coupe (Mustang), pickup
+  (Ranger "Double Cab"), MPV (Galaxy/S-Max/Tourneo), SUV (Puma/Kuga/EcoSport/Explorer/Capri/
+  Mach-E), else hatchback. This is the broadest body spread of any brand so far and each is
+  render-tested.
+
+- **[ford-spec-fill] Model-line spec tables fill what the listing omits (`MODEL_SPECS_FORD`).**
+  Boot, seats, 0-62, size class (1-5) and mpg/evRange fallbacks per line, reconciled against
+  carwow / Auto Express / Parkers by the research agents (~10 corrections applied). An estate
+  gets a boot floor of 550L over the hatch base. `DEFAULT_SPEC_FORD` covers any unlisted line.
+
+- **[ford-tuning] Ford tuning leans practicality + economy, lighter on image than BMW.**
+  Mainstream brand with a broad range: heavier practicality/economy/body-fit weights so a
+  roomy Kuga out-ranks a sporty-but-impractical Mustang for a family, in a plain Ford voice.
+
+- **[ford-theme] `.vm.vm-ford`: Ford Blue (#003478), host-brand-first.** All copy
+  em-dash-free from the start (the house rule).
+
+## Testing (Ford)
+
+- **[ford-render] Ford joins the render matrix by loading its REAL curated fixtures.** Like
+  Honda, `fordPool()` reads `fixtures/ford-cars.json` (what the loader serves) rather than
+  synthesising a feed, so the render test exercises the exact cars a browser sees, including
+  the ST/GT halo and the EV/PHEV split. All three modes mount, paint, theme and stay
+  em-dash-free for Ford.
+
+- **[ford-server-tests] Added server-side Ford tests to `brand.test.js`.** Config resolves as
+  a fixtures brand; `mapFordRaw` projects to a valid engine car; the ST/GT halo fires but not
+  on ST-Line; the EV/PHEV/petrol split is correct (Kuga PHEV → phev + 42mi, Mach-E GT → ev,
+  mHEV → petrol); body derivation covers estate/convertible/coupe/pickup/MPV; a priceless
+  record returns null; every shipped fixture is engine-valid (with em-dash guards on name and
+  blurb); Ford tuning ranks a practical family SUV over a fast coupe. Suite: 125 tests, all
+  green (94 at baseline, no BMW/MINI/Honda regression).
+
+- **[ford-blurb-grammar] Copy fix caught in review: the performance blurb read "Approved-used
+  the performance Ford Fiesta".** The `fordIsPerformance` prefix injected "the performance"
+  mid-sentence, breaking grammar. Changed to "performance " so it reads "Approved-used
+  performance Ford Fiesta hatchback". Fixtures rebuilt.
+
 <!-- Further decisions appended below as the run proceeds. -->

@@ -383,6 +383,104 @@
   box-shadow: inset 0 0 0 2px var(--vm-accent), inset 4px 0 0 var(--vm-accent-spot);
 }
 
+/* --------------------------------------------------------------------
+ * FORD THEME
+ * Applied when the block is configured Brand: Ford (the .vm-ford class,
+ * added in decorate). Ford UK's identity (per ford.co.uk): a confident,
+ * modern SANS look on white, with Ford Blue as the one signature accent
+ * (the oval blue, used far more assertively than BMW's blue). Like Honda
+ * it's sentence-case, medium-weight sans, but a touch crisper (smaller
+ * radius) and a fraction more energetic in motion, matching a brand that
+ * sells both a sensible Puma and a Mustang. It reads friendly, capable and
+ * plainly British.
+ *
+ * Fonts are the HOST SITE'S, host-first (same rule as MINI/Honda): a Ford
+ * dealer site declares Ford's own faces (FordF1 / Ford Antenna), and we ask
+ * for them by name with a neutral sans fallback for the standalone harness.
+ * We don't ship or self-host Ford's licensed webfonts.
+ * -------------------------------------------------------------------- */
+.vm.vm-ford {
+  /* Sans for both headings and body (Ford has no display serif). Host-first,
+     then a neutral system sans so the harness still renders cleanly. */
+  --vm-font-heading: var(--heading-font-family, 'FordF1', 'Ford Antenna', 'Helvetica Neue', arial, sans-serif);
+  --vm-font-body: var(--body-font-family, 'FordF1', 'Ford Antenna', 'Helvetica Neue', arial, sans-serif);
+  --vm-font-bold: var(--vm-font-body);
+
+  /* colour: dark-ink-on-white with Ford Blue as the primary accent. Blue is the
+     CTA/link/highlight colour and, like Honda's red, IS the button colour here. */
+  --vm-ink: #1a1a1a;
+  --vm-ink-strong: #00142e;      /* near-black Ford navy for strongest ink */
+  --vm-ink-muted: #57606a;
+  --vm-accent: #003478;          /* Ford Blue — primary CTA, links, highlights */
+  --vm-accent-ink: #ffffff;
+  --vm-accent-spot: var(--vm-accent);
+  --vm-accent-secondary: #1700f4; /* Ford's brighter digital blue — secondary spot */
+  --vm-accent-soft: rgba(0, 52, 120, 0.06);
+  --vm-line: #d5dae0;
+
+  /* geometry: lightly rounded, crisper than Honda's 8px (Ford's UI runs ~4px). */
+  --vm-radius: 4px;
+  --vm-radius-control: 4px;
+
+  /* motion: confident and clean, a touch more energetic than Honda's calm
+     ease-out (Ford sells a Mustang), but no MINI-style overshoot. */
+  --vm-ease: cubic-bezier(0.2, 0.75, 0.2, 1);
+  --vm-pop: 0.38s;
+}
+
+/* Ford headlines: sans, sentence-case (NOT uppercased like BMW/MINI), semibold,
+   in the navy strong-ink. As with Honda, overriding text-transform is the key
+   move — the base .vm-title uppercases, which is wrong for Ford's register. */
+.vm.vm-ford .vm-title,
+.vm.vm-ford .vm-question,
+.vm.vm-ford .vm-subhead,
+.vm.vm-ford .vm-preview-heading,
+.vm.vm-ford .vm-nearby-heading {
+  font-family: var(--vm-font-heading);
+  text-transform: none;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+/* Ford's lede is body copy in the sans (the base sets it in the heading font at
+   weight 300, which reads too thin for Ford's sans). */
+.vm.vm-ford .vm-lede {
+  font-family: var(--vm-font-body);
+  font-weight: 400;
+  text-transform: none;
+}
+
+/* Ford buttons: blue primary fill. The base .vm-btn-primary already uses the
+   accent, so the token override does most of the work; nudge the hover to a
+   deeper navy rather than the base's filter so it stays on-brand. */
+.vm.vm-ford .vm-btn-primary:not(:disabled):hover {
+  filter: none;
+  background: #00214d;
+  border-color: #00214d;
+}
+
+/* Ford spot-blue touches: progress bar, score badge, slider fill, focus ring
+   all carry the accent (the same blue, appearing on the small chrome the base
+   leaves neutral). */
+.vm.vm-ford .vm-progress-bar { background: var(--vm-accent-spot); }
+.vm.vm-ford .vm-score {
+  background: var(--vm-accent-spot);
+  border-color: var(--vm-accent-spot);
+  color: #fff;
+}
+.vm.vm-ford .vm-range-fill,
+.vm.vm-ford .vm-slider-input::-webkit-slider-thumb,
+.vm.vm-ford .vm-slider-input::-moz-range-thumb { background: var(--vm-accent-spot); }
+.vm.vm-ford button:focus-visible {
+  outline-color: var(--vm-accent-spot);
+  box-shadow: 0 0 0 3px rgba(0, 52, 120, 0.3);
+}
+/* Selected option: blue border with a subtle blue inner edge. */
+.vm.vm-ford .vm-option.is-selected {
+  box-shadow: inset 0 0 0 2px var(--vm-accent), inset 4px 0 0 var(--vm-accent-spot);
+}
+
 .vm-kicker {
   font-family: var(--vm-font-bold);
   font-weight: 700;
