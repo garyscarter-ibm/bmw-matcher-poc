@@ -27,6 +27,7 @@
  */
 
 import { createServer } from 'node:http';
+import { fileURLToPath } from 'node:url';
 
 import {
   matchCars, rankCars, budgetRange, unmetWants, TOP_MATCHES,
@@ -205,8 +206,13 @@ function readJsonBody(req) {
     req.on('data', (chunk) => {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
+        // Stop reading, but DON'T destroy the socket: a reset reaches the
+        // client as a generic "connection closed", indistinguishable from a
+        // network drop. Pausing lets the handler's 413 response flush first, so
+        // the block can actually see it's the payload that was refused. Ignore
+        // any further body — we've decided.
+        req.pause();
         reject(Object.assign(new Error('Payload too large'), { statusCode: 413 }));
-        req.destroy();
         return;
       }
       chunks.push(chunk);
@@ -268,7 +274,7 @@ async function readMatchRequest(req) {
  * the hero + "More at" tier without waiting on the slower national nearby
  * search, which the block now fetches separately via /api/nearby.
  */
-async function handleMatch(req, res) {
+async function handleMatch(req, res, deps) {
   const {
     answers, retailer, brand, error, status,
   } = await readMatchRequest(req);
@@ -279,7 +285,7 @@ async function handleMatch(req, res) {
   // retry UI handles it. No static fallback (this tool is honestly live-only).
   let cars;
   try {
-    cars = await fetchRetailerStock(brand, retailer);
+    cars = await deps.fetchRetailerStock(brand, retailer);
   } catch (err) {
     if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
@@ -312,7 +318,7 @@ async function handleMatch(req, res) {
   // originals in `listings`, so enriching one does NOT enrich the other. Both
   // have to be in this list, or a grouped card gets paint on its headline and
   // none on the listings behind it.
-  await enrichColours(brand, [
+  await deps.enrichColours(brand, [
     ...matches.map((m) => m.car),
     ...matches.flatMap((m) => m.listings || []),
     ...alternatives.map((m) => m.car),
@@ -363,7 +369,7 @@ async function handleMatch(req, res) {
  * cache and adds no upstream traffic. Requires a budget (readMatchRequest
  * enforces it) — the block only calls this once budget is set.
  */
-async function handlePreview(req, res) {
+async function handlePreview(req, res, deps) {
   const {
     answers, retailer, brand, error, status,
   } = await readMatchRequest(req);
@@ -371,7 +377,7 @@ async function handlePreview(req, res) {
 
   let cars;
   try {
-    cars = await fetchRetailerStock(brand, retailer);
+    cars = await deps.fetchRetailerStock(brand, retailer);
   } catch (err) {
     if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
@@ -402,7 +408,7 @@ async function handlePreview(req, res) {
   // back to a neutral swatch), and enrichment never throws, so a slow PDP can't
   // turn the "bonus" drawer into an error.
   try {
-    await enrichColours(brand, [
+    await deps.enrichColours(brand, [
       ...matches.map((m) => m.car),
       ...matches.flatMap((m) => m.listings || []),
     ]);
@@ -439,7 +445,7 @@ async function handlePreview(req, res) {
  * to a neutral swatch. Enrichment is best-effort and never throws, exactly as in
  * handlePreview.
  */
-async function handleField(req, res) {
+async function handleField(req, res, deps) {
   const {
     answers, retailer, brand, size, enrich, error, status,
   } = await readMatchRequest(req);
@@ -447,7 +453,7 @@ async function handleField(req, res) {
 
   let cars;
   try {
-    cars = await fetchRetailerStock(brand, retailer);
+    cars = await deps.fetchRetailerStock(brand, retailer);
   } catch (err) {
     if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
@@ -467,7 +473,7 @@ async function handleField(req, res) {
 
   if (enrich) {
     try {
-      await enrichColours(brand, [
+      await deps.enrichColours(brand, [
         ...matches.map((m) => m.car),
         ...matches.flatMap((m) => m.listings || []),
       ]);
@@ -499,7 +505,7 @@ async function handleField(req, res) {
  * to tell "nearby found nothing that fits" (a fact) apart from "we never
  * heard back from nearby" (an absence of facts, which claims nothing).
  */
-async function handleNearby(req, res) {
+async function handleNearby(req, res, deps) {
   const {
     answers, retailer, brand, error, status,
   } = await readMatchRequest(req);
@@ -508,7 +514,7 @@ async function handleNearby(req, res) {
   let nearby = [];
   let unmet = null;
   try {
-    const cars = await fetchNearbyStock(brand, retailer);
+    const cars = await deps.fetchNearbyStock(brand, retailer);
     const scored = applyBespokeAnswers(brand, answers);
     const ranked = rankCars(scored, cars, brandTuning(brand));
     nearby = ranked.slice(0, TOP_MATCHES);
@@ -542,68 +548,94 @@ async function handleNearby(req, res) {
   return sendJson(res, 200, { nearby: nearby.map(publicMatch), unmet });
 }
 
-const server = createServer(async (req, res) => {
-  const { pathname, searchParams } = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+/**
+ * Build the HTTP server. The stock source is injected (defaulting to the live
+ * stock.js functions) so tests can drive the whole routing + validation + handler
+ * surface against an in-memory fixture — no live feed, no port collisions (bind
+ * port 0). Production (see the main-module block below) calls this with the real
+ * deps. The handlers read `fetchRetailerStock`/`fetchNearbyStock`/`enrichColours`
+ * off this `deps` object rather than the module imports, which is the seam.
+ */
+export function buildServer(deps = {}) {
+  const resolved = {
+    fetchRetailerStock,
+    fetchNearbyStock,
+    enrichColours,
+    ...deps,
+  };
 
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204, CORS_HEADERS);
-    return res.end();
-  }
+  return createServer(async (req, res) => {
+    const { pathname, searchParams } = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
-  if (req.method === 'GET' && pathname === '/health') {
-    return sendJson(res, 200, { ok: true });
-  }
-
-  if (req.method === 'GET' && pathname === '/api/questions') {
-    // Brand comes on the query string (?brand=mini) for this GET; the question
-    // set's option list is filtered to what that brand sells. Defaults to BMW.
-    // topMatches ships too so the intro can say how many results it'll return
-    // without hardcoding it — see TOP_MATCHES, the value /api/match slices to.
-    const brand = normalizeBrand(searchParams.get('brand'));
-    return sendJson(res, 200, {
-      questions: publicQuestions(brand),
-      budgetBands: BUDGET_BANDS,
-      topMatches: TOP_MATCHES,
-    });
-  }
-
-  if (req.method === 'POST' && pathname === '/api/match') {
-    return handleMatch(req, res);
-  }
-
-  if (req.method === 'POST' && pathname === '/api/preview') {
-    return handlePreview(req, res);
-  }
-
-  if (req.method === 'POST' && pathname === '/api/field') {
-    return handleField(req, res);
-  }
-
-  if (req.method === 'POST' && pathname === '/api/nearby') {
-    return handleNearby(req, res);
-  }
-
-  return sendJson(res, 404, { error: 'Not found' });
-});
-
-server.listen(PORT, () => {
-  console.log(`Matcher API listening on http://localhost:${PORT}`);
-
-  // Keep live stock hot off the request path so the slow cold fetch (chiefly
-  // the nearby distance search) isn't paid by a user. Prime each brand's
-  // default retailer now so even the first visitor hits a warm cache; the
-  // warmer then keeps every served brand+retailer fresh. Failures are
-  // non-fatal — the request path still fetches on demand.
-  startStockWarmer();
-  Promise.allSettled([
-    fetchRetailerStock('bmw'), fetchNearbyStock('bmw'),
-    fetchRetailerStock('mini'), fetchNearbyStock('mini'),
-  ]).then((r) => {
-    const failed = r.filter((x) => x.status === 'rejected');
-    if (failed.length) {
-      console.warn(`[warmer] initial prime: ${failed.length}/${r.length} pools cold (will retry on demand)`);
-    } else {
-      console.log('[warmer] initial stock primed (BMW + MINI)');
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, CORS_HEADERS);
+      return res.end();
     }
+
+    if (req.method === 'GET' && pathname === '/health') {
+      return sendJson(res, 200, { ok: true });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/questions') {
+      // Brand comes on the query string (?brand=mini) for this GET; the question
+      // set's option list is filtered to what that brand sells. Defaults to BMW.
+      // topMatches ships too so the intro can say how many results it'll return
+      // without hardcoding it — see TOP_MATCHES, the value /api/match slices to.
+      const brand = normalizeBrand(searchParams.get('brand'));
+      return sendJson(res, 200, {
+        questions: publicQuestions(brand),
+        budgetBands: BUDGET_BANDS,
+        topMatches: TOP_MATCHES,
+      });
+    }
+
+    if (req.method === 'POST' && pathname === '/api/match') {
+      return handleMatch(req, res, resolved);
+    }
+
+    if (req.method === 'POST' && pathname === '/api/preview') {
+      return handlePreview(req, res, resolved);
+    }
+
+    if (req.method === 'POST' && pathname === '/api/field') {
+      return handleField(req, res, resolved);
+    }
+
+    if (req.method === 'POST' && pathname === '/api/nearby') {
+      return handleNearby(req, res, resolved);
+    }
+
+    return sendJson(res, 404, { error: 'Not found' });
   });
-});
+}
+
+// Constants worth asserting against in tests without hardcoding the numbers.
+export { PREVIEW_COUNT, FIELD_MAX, clampFieldSize };
+
+// Only bind a port + warm the cache when run as the entry point (`node index.js`
+// / `npm start`). Importing the module in a test gets buildServer with none of
+// these side effects — no socket, no live feed.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const server = buildServer();
+  server.listen(PORT, () => {
+    console.log(`Matcher API listening on http://localhost:${PORT}`);
+
+    // Keep live stock hot off the request path so the slow cold fetch (chiefly
+    // the nearby distance search) isn't paid by a user. Prime each brand's
+    // default retailer now so even the first visitor hits a warm cache; the
+    // warmer then keeps every served brand+retailer fresh. Failures are
+    // non-fatal — the request path still fetches on demand.
+    startStockWarmer();
+    Promise.allSettled([
+      fetchRetailerStock('bmw'), fetchNearbyStock('bmw'),
+      fetchRetailerStock('mini'), fetchNearbyStock('mini'),
+    ]).then((r) => {
+      const failed = r.filter((x) => x.status === 'rejected');
+      if (failed.length) {
+        console.warn(`[warmer] initial prime: ${failed.length}/${r.length} pools cold (will retry on demand)`);
+      } else {
+        console.log('[warmer] initial stock primed (BMW + MINI)');
+      }
+    });
+  });
+}
