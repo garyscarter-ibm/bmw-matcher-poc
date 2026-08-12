@@ -57,12 +57,22 @@ fresh local object (never on the shared `ctx`), so a re-mount from the switcher 
    `primaryUse` tiles sourced from `apiGetQuestions` (NOT local constants), then
    `apiField` scopes the field (see below). Budget is the engine's one hard filter, so the
    field is affordable from the first round.
-4. **Adaptive bracket size.** Snap the shuffled feasible pool DOWN to the largest power of
-   two it can fill (capped at 16; minimum 2) — 16 → 8 → 4 → 2, with no byes and no fabricated
-   cars. Both brands' live feeds are big (BMW ~38 eligible, MINI ~31), so a healthy budget
-   fills a full **Round of 16**; a tight budget or a genuinely thin pool snaps down cleanly
-   (8, then 4, then a lone Final). Below 2 feasible cars → the empty-pool nudge (widen the
-   budget). Round names adapt: a field of 8 opens on "Quarter-final", of 4 on "Semi-final".
+4. **Adaptive bracket size.** Shuffle the feasible pool, **float the photographed cars to
+   the front** (`photosFirst`, §3.5), then snap DOWN to the largest power of two it can fill
+   (capped at 16; minimum 2) — 16 → 8 → 4 → 2, with no byes and no fabricated cars. Both
+   brands' live feeds are big (BMW ~38 eligible, MINI ~31), so a healthy budget fills a full
+   **Round of 16**; a tight budget or a genuinely thin pool snaps down cleanly (8, then 4,
+   then a lone Final). Below 2 feasible cars → the empty-pool nudge (widen the budget). Round
+   names adapt: a field of 8 opens on "Quarter-final", of 4 on "Semi-final".
+
+   > **Photo-first field.** We over-fetch `MAX_FIELD = 16` and usually play 8, so there's
+   > slack to *drop* the weak-image cars before the snap. A contender with no photo — or a
+   > generic placeholder the feed hands out (a photo URL shared across several cars,
+   > recognised by counting duplicates in the field; no server flag distinguishes it) —
+   > doesn't read as a head-to-head, so `photosFirst` orders real photos ahead of
+   > placeholders ahead of no-photo, and the tail falls off when the snap trims the field.
+   > Only a thin or photo-poor pool lets a photo-less car onto the pitch, as filler. Same
+   > shared helper the swipe deck uses (`match-signal.js`).
 
    > **Why a dedicated `/api/field`, not `/api/preview`.** The field is fetched from
    > `POST /api/field` (via `apiField` in `engine.js`), a sibling to `/api/preview` over the
@@ -72,10 +82,22 @@ fresh local object (never on the shared `ctx`), so a re-mount from the switcher 
    > up to `FIELD_MAX = 16` ranked cars (server-clamped to [2, 16]) and skips paint by default.
    > This is the server half of the block's "one engine, an interface-shaped read each" seam;
    > `PREVIEW_COUNT` and the questions drawer are untouched.
-5. **Lean face-off UI.** Each matchup is two clean comparison cards side by side with a
-   "vs" between, plus a bracket progress rail (round name + "Match n of m") and the slim
-   **form indicator** (§3.8) beneath it. Minimal chrome, emphasis on the choice — a distinct
-   "versus" feel, not the swipe card stack.
+5. **Lean face-off UI — and it must read as a *versus*.** Each matchup is two clean
+   comparison cards, plus a bracket progress rail (round name + "Match n of m") and the
+   **per-tie verdict** tag (§3.8) beneath it after each pick. Minimal chrome, emphasis on the
+   choice — a distinct "versus" feel, not the swipe card stack. A first playtest didn't
+   register it as head-to-head at all (it read as a list), so three deliberate cues carry the
+   fight:
+   - **"VS", not "or".** The centre label is a bold, accent-ringed disc reading **VS** —
+     the loudest thing in the matchup — where it was a whisper-quiet lowercase "or" that read
+     as a menu choice. (Copy key `versus`, both brands.)
+   - **Always shoulder-to-shoulder.** The two cards stay side by side **even on the narrowest
+     screens** — they used to stack vertically on mobile, which is precisely what read as a
+     two-item list. The VS disc floats as an overlay centred on the seam between them, so the
+     cards sit edge-to-edge and don't lose a row to it.
+   - **Opposing corners (A / B).** A light-touch corner badge marks each side — restrained
+     outlined chip on BMW, filled brand-accent on MINI — the "two sides of a fight" framing.
+     `aria-hidden` (the button label already names the car); `←`/`→` still pick left/right.
 6. **Taste weighted by advancement.** Head-to-head picks still become engine answer keys
    (the point of the mode), but a car's voice scales with how far it advanced: champion
    heaviest, then finalist, semi-finalist, … first-round exit lightest. This is the mode's
@@ -90,18 +112,19 @@ fresh local object (never on the shared `ctx`), so a re-mount from the switcher 
    CTA — the climax earns the one extra tap, once. Under reduced motion (or a lone Final /
    ≤1 survivor edge case) the ceremony collapses straight to `startRound()`, so the round
    change is still legible but instant. Copy key: `roundAdvance({ round, survivors })`.
-8. **Surface the engine's own signal — the "form" indicator.** `/api/field` returns a
+8. **Surface the engine's own signal — the per-tie verdict.** `/api/field` returns a
    `score` per car that the mode used to discard when it mapped the field down to bare
-   `car` objects. Now `loadField` keeps it: `state.scoreById` (keyed by `idOf`) and
-   `state.bestScore` (the field's top score) are built *before* the shuffle. A slim
-   labelled bar in the progress rail (`renderForm` → `formPercent()`) shows the **average
-   engine-score of the cars still standing, normalised against the field's best**, so it
-   climbs as the player advances the cars the engine also rates and dips when they back an
-   underdog. It's honest — it's the engine's own number, not a fabricated meter — and it's
-   the "make the most of the engine" beat with **zero server change** (the score was
-   already in the response). Null-safe: an unscored field simply hides the bar.
-   `bracketToAnswers` is unaffected — it reads the winner/loser *cars*, which still carry
-   through unchanged.
+   `car` objects. Now `loadField` keeps it: `state.scoreById` (keyed by `idOf`) is built
+   *before* the shuffle. After each pick, `verdictFor(winner, loser)` compares the two
+   cars' engine scores and, on the *next* matchup, shows a small tag under the rail:
+   **"the form pick"** when the player backed the higher-rated car, **an upset** when an
+   underdog goes through. It's honest — it's the engine's own number, per head-to-head —
+   and a concrete beat a fan reads instantly. *(This replaced an earlier "form" meter — an
+   average-of-survivors bar — which was frozen within a round because `state.round` only
+   changes at round boundaries, so it never appeared to move.)* Null-safe: an unscored or
+   level pair simply shows no tag, and the first tie of a round has none (no prior pick).
+   Zero server change — the score was already in the response. `bracketToAnswers` is
+   unaffected — it reads the winner/loser *cars*, which still carry through unchanged.
 
 ## 4. Flow
 

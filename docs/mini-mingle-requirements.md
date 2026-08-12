@@ -258,13 +258,17 @@ can't dependably read**:
 
 The deck is fetched from **`POST /api/field`** via
 `apiField(base, answers, retailer, brandKey, size, enrich)` in `engine.js`, passing
-the **seed answers** from §4.1 (not an empty brief), a `size` of `DECK_TARGET`, and
+the **seed answers** from §4.1 (not an empty brief), a `size` of `DECK_POOL` (16), and
 `enrich: true`. That endpoint returns a roster of the retailer's **live** stock (up
 to `size`, server-clamped to `FIELD_MAX = 16`) as `{ matches: [...] }`, each match
 carrying public display fields **plus colour paint** (because the deck asked to be
 enriched — see below) — already filtered to the budget and skewed toward the use
 case. So from card one the deck is **affordable and sensible**; the swipes then
 refine taste within it.
+
+We ask for a **wider pool (`DECK_POOL = 16`) than we deal (`DECK_TARGET = 10`)** on
+purpose, so the photo ordering below has spares to drop rather than just re-ordering
+a fixed ten.
 
 > Why `/api/field` and not `/api/match` for the deck: `/api/match` returns the
 > narrow hero set (top 3) for a *completed* brief; `/api/field` returns a wider
@@ -286,6 +290,17 @@ refine taste within it.
   session shows the same cars in the same order — destroying the replay value a
   promo needs most. Randomise client-side each session. The engine still does the
   real ranking, but at the **result** (§5.3), not in the swipe order.
+- **Then float the photographed cars to the front (`photosFirst`).** A card with
+  no photo — or a generic "image coming soon" placeholder — is a weak swipe: it's
+  the Tinder profile with no picture, and a promo lives or dies on how good the
+  cards look. After the shuffle we re-order the pool into three tiers, best first —
+  a real per-car photo, then a *shared placeholder* (a photo URL the feed repeats
+  across several cars, recognised by counting duplicates within the field, since no
+  server flag distinguishes it), then no photo at all — each tier keeping its
+  shuffled order. Dealing the top `DECK_TARGET` off that then **drops** the
+  photo-less cars when the pool is healthy, and only falls back to them as filler
+  on a thin/photo-poor feed. Shared helper in `match-signal.js`, used by the
+  knockout field too, so the two games sink weak-image cars the same way.
 - **A wider pool than the final three, for variety.** A lucky-dip wants breadth
   and the odd wildcard. The deck asks `/api/field` for `DECK_TARGET` cars; the
   server clamps to `FIELD_MAX = 16` and returns however many the live feed fills.

@@ -33,13 +33,19 @@ import { el } from '../ui.js';
 import {
   WEAK_SCORE, SHADE_HEX, NEUTRAL_SWATCH,
   budgetBandsFromQuestion, useTilesFromQuestion,
-  shuffle, shadeOf, swatchFor, priceLabel, cap, gbpShort,
+  shuffle, photosFirst, shadeOf, swatchFor, priceLabel, cap, gbpShort,
   modal, rankByFrequency, swipesToAnswers, celebrate,
 } from './match-signal.js';
 
 /* How many cards make a good swipe session — enough to read a taste, few enough
- * not to become a chore (§4.2). We sample the preview pool down to this. */
+ * not to become a chore (§4.2). We sample the pool down to this. */
 const DECK_TARGET = 10;
+
+/* …but ask the field for a wider pool than we deal, so photosFirst has spares to
+ * drop: a photo-less car (or a shared-placeholder one) only reaches the deck when
+ * there aren't DECK_TARGET real-photo cars to fill it. Matches the knockout's
+ * MAX_FIELD, and stays small enough to pay the per-card colour paint on. */
+const DECK_POOL = 16;
 
 /* A player can bail to the result once they've swiped at least this many —
  * enough signal to match honestly, so the "Reveal my match" affordance appears
@@ -321,16 +327,20 @@ function mount(root, ctx) {
     // this is the swipe stage arriving.
     renderDeckSkeleton();
     // apiField resolves-empty (never throws), so no try/catch needed here. The
-    // swipe deck asks for DECK_TARGET cars WITH colour paint (enrich: true) —
+    // swipe deck asks for a DECK_POOL of cars WITH colour paint (enrich: true) —
     // card paint and the "Colour" bar read car.colour as a taste signal, and the
-    // deck is small enough to pay the per-card PDP fetch. (The knockout omits
+    // pool is small enough to pay the per-card PDP fetch. (The knockout omits
     // enrich; see knockout.js.)
-    const matches = await apiField(ctx.api, state.seed, ctx.retailer, ctx.brand, DECK_TARGET, true);
+    const matches = await apiField(ctx.api, state.seed, ctx.retailer, ctx.brand, DECK_POOL, true);
     if (!matches.length) {
       renderEmptyPool();
       return;
     }
-    state.deck = shuffle(matches).slice(0, DECK_TARGET);
+    // Shuffle for variety, then float the real-photo cars to the front (a
+    // photo-less or placeholder-photo card is a weak swipe — §5.1) before dealing
+    // the top DECK_TARGET. With a full pool the no-photo cars simply don't make
+    // the deck; on a thin feed they fill the tail rather than starving it.
+    state.deck = photosFirst(shuffle(matches), (m) => m.car?.photo).slice(0, DECK_TARGET);
     state.index = 0;
     state.kept = [];
     state.history = [];

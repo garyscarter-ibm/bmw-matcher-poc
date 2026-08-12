@@ -37,8 +37,8 @@ import { el } from '../ui.js';
 import {
   WEAK_SCORE,
   budgetBandsFromQuestion, useTilesFromQuestion,
-  shuffle, swatchFor, priceLabel, cap,
-  bracketToAnswers, idOf, averageScore, celebrate,
+  shuffle, photosFirst, swatchFor, priceLabel, cap,
+  bracketToAnswers, idOf, celebrate,
 } from './match-signal.js';
 
 /* The most cars we'll ever field, even when stock is deep — four rounds
@@ -71,9 +71,9 @@ const KNOCKOUT_COPY = {
     budgetLabel: 'How much are you looking to spend?',
     useLabel: 'And what’s it for?',
     seedCta: 'Kick it off',
-    // Rounds
-    versus: 'or',
-    pickHint: 'Tap the one you’re backing to go through.',
+    // Rounds. "VS" (not "or") so the two cars read as a fight, not a menu.
+    versus: 'VS',
+    pickHint: 'Two cars, one goes through — tap the one you’re backing.',
     roundKicker: ({ round }) => round,
     matchupProgress: ({ done, total }) => `Tie ${done} of ${total}`,
     // Between-round ceremony: a banner naming the round you’re entering, and a
@@ -83,9 +83,11 @@ const KNOCKOUT_COPY = {
     finalTitle: 'The Final.',
     finalLede: 'Two left on the pitch. One trophy. Back your winner.',
     finalCta: 'Bring it on',
-    // The engine "form" meter on the rail — surfaces the engine’s own score of
-    // the cars still in, climbing as strong picks advance.
-    formLabel: 'Form',
+    // The per-tie verdict from the engine's own score of the two cars — did the
+    // player back the form pick, or send an underdog through? One concrete beat
+    // per tie (replaced the abstract "form" meter, which didn't move within a round).
+    verdictForm: ({ model }) => `The ${model} was the form pick — good shout.`,
+    verdictUpset: ({ model }) => `The ${model} goes through — the underdog’s upset the odds!`,
     // Result — the champion is always the hero (decision: champion, engine validates)
     matchKicker: 'Your champion',
     matchTitle: ({ model }) => `The ${model} lifts the trophy.`,
@@ -122,8 +124,8 @@ const KNOCKOUT_COPY = {
     budgetLabel: 'Budget',
     useLabel: 'What’s it for?',
     seedCta: 'Seed the bracket',
-    versus: 'or',
-    pickHint: 'Pick the one you’d rather have.',
+    versus: 'VS',
+    pickHint: 'Two cars go head to head — pick the one you’d rather have.',
     roundKicker: ({ round }) => round,
     matchupProgress: ({ done, total }) => `Match ${done} of ${total}`,
     roundAdvance: ({ round, survivors }) => `${round} · ${survivors} remaining`,
@@ -131,7 +133,8 @@ const KNOCKOUT_COPY = {
     finalTitle: 'The Final.',
     finalLede: 'Two cars left. Pick the one you’d take.',
     finalCta: 'Continue',
-    formLabel: 'Fit',
+    verdictForm: ({ model }) => `The ${model} was the higher-rated of the two.`,
+    verdictUpset: ({ model }) => `The ${model} goes through — the lower-rated pick.`,
     matchKicker: 'Your winner',
     matchTitle: ({ model }) => `The ${model} takes it.`,
     matchLede: 'It beat every car you put against it.',
@@ -210,11 +213,12 @@ function mount(root, ctx) {
     roundIndex: 0, // 0 = first round
     // The engine's own per-card score (0–100) from /api/field, keyed by idOf.
     // The GAME plays with display cars (score is never a visible verdict), but
-    // we surface the AVERAGE score of the survivors as a "form" meter — the
-    // engine signal the mode used to discard. Normalised against the field's own
-    // top score so the meter reads as "how strong is what's left", not raw %.
+    // we use it for a per-tie beat: after each pick we compare the winner's score
+    // to the loser's and tell the player whether they backed the engine's form
+    // pick or sent an underdog through. This surfaces the engine signal the mode
+    // used to discard — as a concrete moment, not an abstract meter.
     scoreById: new Map(),
-    bestScore: 0, // the highest field score, for normalising the meter
+    lastVerdict: null, // { kind: 'form'|'upset', winner } — shown on the next paint, once
     busy: false, // pick lock while a matchup transitions out
   };
 
@@ -337,17 +341,20 @@ function mount(root, ctx) {
     // Field returns match objects { car, score, ... }; the game plays with the
     // display cars, exactly as the swipe game does with match.car — but we no
     // longer THROW AWAY the engine's per-car score. Stash it (keyed by stable
-    // identity) so the "form" meter can average the survivors' scores as the
-    // bracket narrows. This is the engine signal the mode used to discard.
+    // identity) so each tie can say whether the winner was the engine's form pick
+    // or an underdog. This is the engine signal the mode used to discard.
     state.scoreById = new Map();
-    state.bestScore = 0;
     for (const m of matches) {
       if (m?.car && typeof m.score === 'number') {
         state.scoreById.set(idOf(m.car), m.score);
-        if (m.score > state.bestScore) state.bestScore = m.score;
       }
     }
-    const cars = shuffle(matches.map((m) => m.car)).filter(Boolean);
+    // Shuffle for a fresh draw, then float the real-photo cars to the front (a
+    // photo-less or shared-placeholder contender doesn't read as a head-to-head —
+    // §3.5) before snapping to a power of two. We over-fetch MAX_FIELD and usually
+    // play 8, so the weak-image cars fall into the discarded tail; only a thin or
+    // photo-poor feed lets them onto the pitch as filler.
+    const cars = photosFirst(shuffle(matches.map((m) => m.car).filter(Boolean)), (c) => c?.photo);
     const size = largestPowerOfTwo(Math.min(cars.length, MAX_FIELD));
     if (size < MIN_FIELD) {
       renderEmptyPool();
@@ -404,34 +411,33 @@ function mount(root, ctx) {
   };
 
   /*
-   * The "form" meter, 0–100: the average engine score of the cars still standing
-   * this round, normalised against the field's own best score so a full field of
-   * merely-decent cars doesn't read as low. Returns null when we have no scores
-   * (an un-scored field), so the rail can hide the meter rather than show 0. As
-   * the player advances the cars the engine also rates, this climbs — an honest,
-   * zero-server surfacing of the signal the mode used to throw away.
+   * The per-tie verdict, from the engine's own scores: did the winner the player
+   * just picked out-rate the loser ('form' pick), or did an underdog go through
+   * ('upset')? Returns null when either car is unscored or they're level — no
+   * scored comparison to make, so we stay quiet rather than invent a verdict.
+   * This is the engine signal the mode used to discard, surfaced as one concrete
+   * beat per pick instead of an abstract meter.
    */
-  const formPercent = () => {
-    if (!state.bestScore) return null;
-    const standing = state.round.map((c) => state.scoreById.get(idOf(c))).filter((s) => typeof s === 'number');
-    const avg = averageScore(standing);
-    if (avg == null) return null;
-    return Math.max(0, Math.min(100, Math.round((avg / state.bestScore) * 100)));
+  const verdictFor = (winner, loser) => {
+    const w = state.scoreById.get(idOf(winner));
+    const l = state.scoreById.get(idOf(loser));
+    if (typeof w !== 'number' || typeof l !== 'number' || w === l) return null;
+    return { kind: w > l ? 'form' : 'upset', winner };
   };
 
-  // The slim engine-form indicator for the progress rail (a labelled climbing
-  // bar). Null form (un-scored field) → nothing, so the rail just omits it.
-  const renderForm = () => {
-    const pct = formPercent();
-    if (pct == null) return null;
-    const wrap = el('div', 'vm-knockout-form');
-    wrap.append(el('span', 'vm-knockout-form-label', copy.formLabel));
-    const track = el('div', 'vm-knockout-form-track');
-    const fill = el('div', 'vm-knockout-form-fill');
-    fill.style.width = `${pct}%`;
-    track.append(fill);
-    wrap.append(track);
-    return wrap;
+  // Render the verdict from the LAST pick as a small tag at the top of the next
+  // matchup (state.lastVerdict is set in pick(), cleared once shown). Null → the
+  // matchup just paints without one (first tie, or an unscored/level pair).
+  const renderVerdict = () => {
+    const v = state.lastVerdict;
+    state.lastVerdict = null;
+    if (!v) return null;
+    const model = v.winner?.name || 'your pick';
+    const tag = el('div', `vm-knockout-verdict vm-knockout-verdict-${v.kind}`);
+    tag.setAttribute('role', 'status');
+    tag.append(el('span', 'vm-knockout-verdict-text',
+      v.kind === 'form' ? copy.verdictForm({ model }) : copy.verdictUpset({ model })));
+    return tag;
   };
 
   const renderMatchup = () => {
@@ -441,15 +447,16 @@ function mount(root, ctx) {
 
     const screen = el('div', 'vm-screen vm-knockout-stage');
 
-    // Progress rail — where we are in the tournament (round name + match n of m),
-    // now with the engine "form" meter beneath it.
+    // Progress rail — where we are in the tournament (round name + match n of m).
     const rail = el('div', 'vm-knockout-rail');
     rail.append(el('span', 'vm-knockout-round', roundName(entrants)));
     rail.append(el('span', 'vm-knockout-count',
       copy.matchupProgress({ done: state.matchIndex + 1, total: state.pairings.length })));
     screen.append(rail);
-    const form = renderForm();
-    if (form) screen.append(form);
+    // The verdict from the tie the player just settled (engine's form pick, or an
+    // upset) — a concrete per-pick beat where the abstract "form" meter used to be.
+    const verdict = renderVerdict();
+    if (verdict) screen.append(verdict);
 
     screen.append(el('p', 'vm-lede vm-knockout-hint', copy.pickHint));
 
@@ -476,6 +483,13 @@ function mount(root, ctx) {
     card.type = 'button';
     card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
     card.append(el('div', 'vm-mingle-card-colour'));
+
+    // Corner side badge (A / B) — the light-touch "opposing corners" framing that
+    // helps the pair read as a versus, not a two-item list. Bold on MINI, quiet on
+    // BMW (both via CSS); aria-hidden, the button label already carries the model.
+    const badge = el('span', 'vm-knockout-corner', side === 'a' ? 'A' : 'B');
+    badge.setAttribute('aria-hidden', 'true');
+    card.append(badge);
 
     const media = el('div', 'vm-mingle-card-media');
     if (car.photo) {
@@ -515,6 +529,8 @@ function mount(root, ctx) {
 
     state.rounds.push({ roundIndex: state.roundIndex, winner, loser });
     state.winners.push(winner);
+    // Read the engine's take on the tie just settled, to show on the next paint.
+    state.lastVerdict = verdictFor(winner, loser);
 
     const advance = () => {
       state.busy = false;

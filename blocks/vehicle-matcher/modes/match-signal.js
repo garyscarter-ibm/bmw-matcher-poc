@@ -8,7 +8,7 @@
  * These helpers are the mode-agnostic, brand-safe pieces of that job:
  *   - display: SHADE_HEX / swatchFor / priceLabel / gbpShort / cap
  *   - deck:    shuffle
- *   - reading: modal / rankByFrequency / averageScore
+ *   - reading: modal / rankByFrequency
  *   - seed:    budgetBandsFromQuestion / useTilesFromQuestion
  *   - infer:   swipesToAnswers (swipe) / bracketToAnswers (knockout)
  *   - reveal:  celebrate (the shared confetti crescendo)
@@ -100,6 +100,54 @@ export function shuffle(list) {
   return a;
 }
 
+/*
+ * Sink the cars that don't show a real photo. Both games look better — and read
+ * more like the dating / head-to-head games they're pretending to be — when every
+ * card shows a genuine picture; a picture-less (or placeholder-picture) contender
+ * next to a photographed one is a weak matchup (user feedback: "I'm not matching
+ * with anyone who can't be arsed to upload their photo"). So order the field into
+ * three tiers, best first, each tier keeping its incoming (already-shuffled)
+ * order:
+ *
+ *   2  real photo   — car.photo is set AND unique to this car in the field
+ *   1  placeholder  — car.photo is set but SHARED by several cars in the field
+ *                     (a generic "image coming soon" graphic the feed hands out
+ *                     in place of a real shot reads as a photo to the renderer,
+ *                     but it isn't one — the user flagged exactly this)
+ *   0  no photo     — car.photo absent
+ *
+ * This is a STABLE re-order, not a filter: when the deck/bracket then slices to
+ * its target size, the weak-image cars fall off the end if there's enough supply,
+ * but still act as filler for a thin/photo-poor feed rather than starving the
+ * game. The placeholder tier is a within-field frequency signal (no server flag
+ * exists for "this URL is a placeholder"): a URL shared across cars can't be a
+ * per-car photo, and when every URL is unique — the common case — the middle tier
+ * is simply empty and this degrades to a plain photo/no-photo split.
+ *
+ * `photoOf` reads the photo URL off whatever the list holds — the swipe deck
+ * carries match objects ({ car }), the knockout field carries bare cars — so the
+ * caller passes the right accessor.
+ */
+export function photosFirst(list, photoOf) {
+  // Count each non-empty photo URL across the whole field, so a URL used by more
+  // than one car can be recognised as a shared placeholder rather than a photo.
+  const urlCounts = new Map();
+  for (const item of list) {
+    const url = photoOf(item);
+    if (url) urlCounts.set(url, (urlCounts.get(url) || 0) + 1);
+  }
+  const rank = (item) => {
+    const url = photoOf(item);
+    if (!url) return 0;
+    return urlCounts.get(url) > 1 ? 1 : 2;
+  };
+  // Stable partition into the three tiers, best (real photo) first. A plain
+  // filter into three arrays preserves each tier's incoming order.
+  const tiers = [[], [], []];
+  for (const item of list) tiers[rank(item)].push(item);
+  return [...tiers[2], ...tiers[1], ...tiers[0]];
+}
+
 /** The normalised shade for a car, or null. Prefers the structured shade the
  * enrichment set; falls back to lower-casing a marketing name's last word. */
 export function shadeOf(car) {
@@ -141,19 +189,6 @@ export function modal(values) {
     if (c > bestCount) { best = v; bestCount = c; }
   }
   return best == null ? null : { value: best, count: bestCount, share: bestCount / values.length };
-}
-
-/*
- * Mean of a list of engine scores (0–100), ignoring non-numbers, or null when
- * there's nothing to average. Used by the knockout's "form" indicator: the
- * average engine-score of the cars still standing, which climbs as the player
- * keeps advancing the cars the engine also rates. This surfaces the engine's own
- * per-card signal (from /api/field) that the game would otherwise discard.
- */
-export function averageScore(scores) {
-  const nums = scores.filter((s) => typeof s === 'number' && !Number.isNaN(s));
-  if (!nums.length) return null;
-  return nums.reduce((a, b) => a + b, 0) / nums.length;
 }
 
 /** Distinct values ranked by frequency: [{value, count}], most-kept first. */

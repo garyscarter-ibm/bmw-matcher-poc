@@ -2188,60 +2188,79 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-knockout-count { font-size: var(--vm-text-label); color: var(--vm-ink-muted); }
 .vm-knockout-hint { margin: 0 0 var(--vm-space-5); }
 
-/* Engine "form" meter — the average engine score of the cars still standing,
-   surfaced as a thin climbing bar under the rail. It's the signal the mode used
-   to discard; here it rises as strong cars advance. Sits between the rail and
-   the pick hint. Hidden by the JS when the field is unscored. */
-.vm-knockout-form {
+/* Per-tie verdict from the engine's own score — did the player back the form
+   pick, or send an underdog through? A small tag under the rail, shown on the
+   matchup that follows the pick. It's the signal the mode used to discard,
+   surfaced as one concrete beat per tie (the old "form" meter didn't move within
+   a round). Omitted by the JS when the pair was unscored or level. */
+.vm-knockout-verdict {
   display: flex;
   align-items: center;
-  gap: var(--vm-space-3);
+  gap: var(--vm-space-2);
   margin: 0 0 var(--vm-space-4);
-}
-.vm-knockout-form-label {
-  font-family: var(--vm-font-bold);
-  font-weight: 700;
-  font-size: var(--vm-text-eyebrow);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--vm-ink-muted);
-  flex: none;
-  min-width: 5em;
-}
-.vm-knockout-form-track {
-  flex: 1;
-  height: 6px;
+  padding: var(--vm-space-2) var(--vm-space-3);
+  border-radius: var(--vm-radius-control);
+  border-left: 3px solid var(--vm-ink);
   background: var(--vm-surface-alt);
-  border-radius: 999px;
-  overflow: hidden;
+  font-size: var(--vm-text-label);
+  animation: vm-knockout-verdict-in var(--vm-pop) var(--vm-ease) both;
 }
-.vm-knockout-form-fill {
-  height: 100%;
-  width: 0;
-  background: var(--vm-accent-spot);
-  border-radius: 999px;
-  transition: width var(--vm-pop) var(--vm-ease);
+.vm-knockout-verdict-text { color: var(--vm-ink); }
+/* The form pick reads "on the numbers" (accent-spot); the upset reads as a small
+   event (a warmer tint), so a fan can tell the two apart at a glance. */
+.vm-knockout-verdict-form { border-left-color: var(--vm-accent-spot); }
+.vm-knockout-verdict-upset { border-left-color: var(--vm-accent-secondary); }
+@keyframes vm-knockout-verdict-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* The face-off: two contenders with a "vs" between. Stacked on narrow screens
-   (the "or" sits between the rows), side-by-side from 560px. */
+/* The face-off: two contenders that sit SHOULDER TO SHOULDER — a fight, not a
+   list. Kept side-by-side even on the narrowest screens (a vertical stack read
+   as a two-item menu, which is exactly what threw the first playtest); the "VS"
+   badge is centred as an overlay chip on the seam between them, so the cards
+   stay edge-to-edge and don't lose a row to it. From 560px the columns simply
+   breathe wider. `position: relative` anchors the overlay badge. */
 .vm-knockout-faceoff {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   align-items: stretch;
-  gap: var(--vm-space-4);
-}
-.vm-knockout-vs {
-  align-self: center;
-  justify-self: center;
-  font-family: var(--vm-font-heading);
-  font-weight: 300;
-  font-size: var(--vm-text-h3);
-  color: var(--vm-ink-muted);
-  text-transform: lowercase;
+  gap: var(--vm-space-3);
 }
 @media (min-width: 560px) {
-  .vm-knockout-faceoff { grid-template-columns: 1fr auto 1fr; }
+  .vm-knockout-faceoff { gap: var(--vm-space-5); }
+}
+
+/* "VS" — a bold, accent-ringed disc, so the pairing reads as a versus at a
+   glance. Was a whisper-quiet lowercase "or"; now it's the loudest thing in the
+   matchup. The base rule is the badge LOOK (used both here and in the Final
+   interstitial's crest row); the faceoff below positions it as an overlay on the
+   seam between the two cards. */
+.vm-knockout-vs {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: var(--vm-surface);
+  border: 2px solid var(--vm-accent-spot);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
+  font-family: var(--vm-font-heading);
+  font-weight: 700;
+  font-size: var(--vm-text-body);
+  letter-spacing: 0.03em;
+  color: var(--vm-accent-spot);
+  text-transform: uppercase;
+}
+/* In the matchup, float the badge dead-centre over the gap so the two cards
+   sit edge-to-edge. */
+.vm-knockout-faceoff .vm-knockout-vs {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
 }
 
 /* A contender is a <button> wrapping the shared .vm-mingle-card-* interior, so
@@ -2269,6 +2288,32 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-knockout-card:focus-visible { outline: 2px solid var(--vm-accent-spot); outline-offset: 2px; }
 .vm-knockout-card .vm-mingle-card-media { aspect-ratio: 4 / 3; }
 .vm-knockout-card:disabled { cursor: default; }
+
+/* Corner badge (A / B) — the "opposing corners" framing that helps the pair
+   read as two sides of a fight. Restrained by default (a quiet outlined chip in
+   the top corner); MINI turns it up below. Positioned over the card, so the card
+   needs to be a containing block — it's a flex column, position it relative. */
+.vm-knockout-card { position: relative; }
+.vm-knockout-corner {
+  position: absolute;
+  top: var(--vm-space-2);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  line-height: 1;
+  color: var(--vm-ink-muted);
+}
+/* A hugs the left corner, B the right — they face each other across the seam. */
+.vm-knockout-card-a .vm-knockout-corner { left: var(--vm-space-2); }
+.vm-knockout-card-b .vm-knockout-corner { right: var(--vm-space-2); }
 
 /* Pick fly-out: the loser leaves in its side's direction, the winner lifts and
    fades as the round advances. ~0.3s, matched to the 300ms JS timer. Gated on
@@ -2384,6 +2429,14 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 /* --- MINI tweaks — accent + pill radius already inherit via .vm.vm-mini; the
    contender card just needs the softer MINI corner the deck cards get. --- */
 .vm.vm-mini .vm-knockout-card { border-radius: var(--vm-radius); }
+/* MINI turns the corner badge up: filled in the brand accent, so the two sides
+   pop as team colours rather than a quiet reference chip. BMW keeps the
+   restrained outlined version above. */
+.vm.vm-mini .vm-knockout-corner {
+  background: var(--vm-accent-spot);
+  border-color: var(--vm-accent-spot);
+  color: #fff;
+}
 
 /* --- reduced motion: no fly-out, no crown lift — the JS commits instantly.
    The Final interstitial still SHOWS (it's content — the round change must stay
@@ -2393,7 +2446,7 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   .vm-knockout-card.is-out-left,
   .vm-knockout-card.is-out-right { transform: none; opacity: 0; }
   .vm-knockout-card.is-crowned { box-shadow: none; }
-  .vm-knockout-form-fill { transition: none; }
+  .vm-knockout-verdict { animation: none; }
   .vm-knockout-sweep { animation: none; }
   .vm-knockout-interstitial.is-revealing { animation: none; }
   .vm-knockout-skel-card { animation: none; background-image: none; }
