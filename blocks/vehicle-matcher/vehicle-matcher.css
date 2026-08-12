@@ -1779,7 +1779,7 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-mingle-taste-empty { font-size: var(--vm-text-label); color: var(--vm-ink-muted); margin: 0; }
 .vm-mingle-kept { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--vm-space-1); }
 .vm-mingle-kept-item { font-size: var(--vm-text-label); }
-.vm-mingle-kept-item::before { content: '♥ '; color: var(--vm-accent-spot); }
+.vm-mingle-kept-item::before { content: '— '; color: var(--vm-accent-spot); }
 
 /* --- deck column: progress, stack, controls --- */
 .vm-mingle-deck { order: 1; display: flex; flex-direction: column; }
@@ -1993,7 +1993,6 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 .vm-mingle-swipe:active { transform: scale(0.96); }
-.vm-mingle-swipe-glyph { font-size: var(--vm-text-body-lg); line-height: 1; }
 .vm-mingle-pass:hover { border-color: var(--vm-ink); background: var(--vm-ink); color: var(--vm-surface); }
 .vm-mingle-keep {
   border-color: var(--vm-accent-spot);
@@ -2123,28 +2122,9 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-mingle-confetti-bit:nth-child(even) { background: var(--vm-accent-secondary); width: 7px; height: 7px; border-radius: 999px; }
 .vm-mingle-confetti-bit:nth-child(3n) { background: var(--vm-ink); }
 
-/* MINI deals hearts among the confetti (celebrate() sets .is-heart). They fall a
-   touch slower and sway, so the warm, playful character reads. BMW never gets
-   these — its burst stays plain rectangular confetti (measured, not cute). */
-.vm-mingle-confetti-bit.is-heart {
-  width: auto;
-  height: auto;
-  background: none;
-  color: var(--vm-accent-spot);
-  font-size: 16px;
-  line-height: 1;
-  animation: vm-mingle-heart-fall 1.9s ease-in forwards;
-}
-.vm-mingle-confetti-bit.is-heart:nth-child(6n) { color: #c0536a; }
-
 @keyframes vm-mingle-fall {
   from { transform: translateY(0) rotate(0); opacity: 0.95; }
   to { transform: translateY(420px) rotate(320deg); opacity: 0; }
-}
-@keyframes vm-mingle-heart-fall {
-  0% { transform: translateY(0) translateX(0) rotate(0); opacity: 0.95; }
-  50% { transform: translateY(210px) translateX(14px) rotate(12deg); opacity: 0.95; }
-  100% { transform: translateY(440px) translateX(-8px) rotate(-8deg); opacity: 0; }
 }
 
 /* --- MINI tweaks: pill controls + serif callback already inherit; nudge the

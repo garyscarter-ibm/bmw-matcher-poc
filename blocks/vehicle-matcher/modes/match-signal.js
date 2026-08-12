@@ -304,13 +304,14 @@ export function idOf(car) {
  * drift between them. Was a 24-bit copy in each mode; extracted and enriched
  * here into a denser, staggered burst with per-brand character:
  *
- *   - MINI leans warm and playful: more particles, a good share of them ♥
- *     hearts, in the brand's spot + secondary colours.
- *   - BMW stays measured: fewer, plainer chevron/confetti bits, monochrome-ish.
+ *   - MINI leans warm and playful: more particles, in the brand's spot +
+ *     secondary colours.
+ *   - BMW stays measured: fewer, plainer confetti bits, monochrome-ish.
  *
- * Character is carried by a `.vm-mini`/`.vm-bmw`-scoped CSS + the token
- * (--vm-ease / --vm-accent-spot), so the JS just varies the particle COUNT and
- * whether hearts are dealt; colour and easing are the stylesheet's job. The
+ * The bits are plain confetti — no glyphs (the earlier hearts were pulled with
+ * the rest of the Valentine's iconography). Character is carried by a
+ * `.vm-mini`/`.vm-bmw`-scoped CSS + the token (--vm-ease / --vm-accent-spot), so
+ * the JS just varies the particle COUNT; colour and easing are the stylesheet's job. The
  * caller gates this on prefers-reduced-motion (the CSS also hides it as a belt-
  * and-braces second guard). `host` should be position:relative so the absolutely
  * positioned layer fills it.
@@ -321,9 +322,9 @@ export function celebrate(host, { brand } = {}) {
   const layer = el('div', 'vm-mingle-confetti');
   layer.setAttribute('aria-hidden', 'true');
   for (let i = 0; i < count; i += 1) {
-    // Every third bit on MINI is a heart; BMW gets none (measured, not cute).
-    const isHeart = mini && i % 3 === 0;
-    const bit = el('span', `vm-mingle-confetti-bit${isHeart ? ' is-heart' : ''}`, isHeart ? '♥' : '');
+    // Plain confetti bits — no glyphs (the hearts went with the rest of the
+    // Valentine's iconography). Character is the count + the stylesheet's colour.
+    const bit = el('span', 'vm-mingle-confetti-bit');
     bit.style.left = `${(i / count) * 100}%`;
     // Stagger across a wider window than the old 6-step cycle, so the burst
     // rains rather than dropping in one sheet.

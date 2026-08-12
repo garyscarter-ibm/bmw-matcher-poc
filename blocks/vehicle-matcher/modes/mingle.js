@@ -64,7 +64,7 @@ const MINGLE_COPY = {
     seedLede: 'Two quick things and we’ll deal you a deck. Then just follow your heart.',
     budgetLabel: 'How much are you looking to spend?',
     useLabel: 'And what’s it for?',
-    seedCta: 'Start swiping ♥',
+    seedCta: 'Start swiping',
     // NB: the budget bands and the "what's it for" options are NOT copy — they
     // come from the engine per brand (apiGetQuestions → the `budget` and
     // `primaryUse` questions), so MINI's own labels and MINI-scale budget show
@@ -77,11 +77,11 @@ const MINGLE_COPY = {
     stampKeep: 'KEEP',
     stampPass: 'NOPE',
     undoLabel: '↩ Bring that one back',
-    revealLabel: 'Reveal my match ♥',
+    revealLabel: 'Reveal my match',
     progress: ({ done, total }) => `${done} of ${total}`,
     // Flirty card badges — flavour, never a scored verdict (§4.4). Warmer ones
     // are nudged toward higher-scoring cards, but nothing here is negative.
-    badgesWarm: ['🔥 Hot right now', '♥ Strong chemistry', 'Head-turner'],
+    badgesWarm: ['Hot right now', 'Strong chemistry', 'Head-turner'],
     badgesCool: ['Your type?', 'Plays hard to get', 'Bit of a charmer'],
     // Taste profile
     tasteHeading: 'Your type, so far',
@@ -91,28 +91,28 @@ const MINGLE_COPY = {
       fuel: 'Fuel', colour: 'Colour', budget: 'Budget', body: 'Body',
     },
     // Result
-    matchKicker: 'It’s a match! ♥',
+    matchKicker: 'It’s a match!',
     matchTitle: ({ model }) => `You and the ${model}.`,
     matchLede: 'Your heart’s made up its mind.',
     // The "why" — engine reasons wear a flirty coat; a swipe callback makes it
     // feel earned. reasons is the engine's real reasons[] (may be short).
     whyIntro: 'Why you two work:',
-    swipeCallback: ({ trait }) => `And it’s the ${trait} one you kept leaning toward ♥`,
+    swipeCallback: ({ trait }) => `And it’s the ${trait} one you kept leaning toward.`,
     // Thin signal (≤1 keep): matched on the seed alone, said playfully (§5.3).
     thinTitle: 'Playing it cool, then.',
     thinLede: 'You kept your cards close — so here’s the best fit for what you told us.',
     // Honest "not quite" note — the engine's own weak/unmet signal, in character
     // (§6.2). Reuses the concept behind the questions mode's weak/rescue copy.
     weakNote: 'Full disclosure, though — none of these *quite* nailed your taste. '
-      + 'Stock changes every week, so it’s worth another swipe soon. ♥',
+      + 'Stock changes every week, so it’s worth another swipe soon.',
     // CTAs + share
-    testDriveCta: '♥ Book a Valentine’s test drive',
+    testDriveCta: 'Book a Valentine’s test drive',
     detailsCta: 'See full details',
     shareCta: 'Share your match',
-    shareCopied: 'Link copied ♥',
+    shareCopied: 'Link copied',
     againCta: 'Swipe again',
     shareText: ({ model, retailer }) => `I matched with a ${model} at ${retailer}. `
-      + 'What’s your type? 💘',
+      + 'What’s your type?',
     // Empty pool at the seed (§4.2)
     emptyPoolTitle: 'Nothing in that range just now.',
     emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got anything under that at the `
@@ -460,11 +460,11 @@ function mount(root, ctx) {
     const passBtn = el('button', 'vm-mingle-swipe vm-mingle-pass');
     passBtn.type = 'button';
     passBtn.setAttribute('aria-label', copy.passLabel);
-    passBtn.append(el('span', 'vm-mingle-swipe-glyph', '✕'), el('span', 'vm-mingle-swipe-text', copy.passLabel));
+    passBtn.append(el('span', 'vm-mingle-swipe-text', copy.passLabel));
     const keepBtn = el('button', 'vm-mingle-swipe vm-mingle-keep');
     keepBtn.type = 'button';
     keepBtn.setAttribute('aria-label', copy.keepLabel);
-    keepBtn.append(el('span', 'vm-mingle-swipe-glyph', '♥'), el('span', 'vm-mingle-swipe-text', copy.keepLabel));
+    keepBtn.append(el('span', 'vm-mingle-swipe-text', copy.keepLabel));
     passBtn.addEventListener('click', () => doSwipe(false));
     keepBtn.addEventListener('click', () => doSwipe(true));
     controls.append(passBtn, keepBtn);

@@ -66,44 +66,44 @@ const KNOCKOUT_COPY = {
   mini: {
     wordmark: 'MINI Knockout',
     // Seed step (mirrors the swipe seed; the tiles themselves come from the engine)
-    seedTitle: 'Set up your bracket.',
-    seedLede: 'Two quick things and we’ll seed the field. Then it’s head-to-head until one’s left standing.',
+    seedTitle: 'Draw up your bracket.',
+    seedLede: 'Two quick things and we’ll seed the field. Then it’s head-to-head, all the way to the final whistle.',
     budgetLabel: 'How much are you looking to spend?',
     useLabel: 'And what’s it for?',
-    seedCta: 'Seed the bracket ♥',
+    seedCta: 'Kick it off',
     // Rounds
     versus: 'or',
-    pickHint: 'Tap the one you’d rather take home.',
+    pickHint: 'Tap the one you’re backing to go through.',
     roundKicker: ({ round }) => round,
-    matchupProgress: ({ done, total }) => `Match ${done} of ${total}`,
+    matchupProgress: ({ done, total }) => `Tie ${done} of ${total}`,
     // Between-round ceremony: a banner naming the round you’re entering, and a
     // bigger interstitial when you reach the Final.
-    roundAdvance: ({ round, survivors }) => `${round} · ${survivors} still standing ♥`,
-    finalKicker: 'It’s down to two',
+    roundAdvance: ({ round, survivors }) => `${round} · ${survivors} still in the running`,
+    finalKicker: 'Down to the last two',
     finalTitle: 'The Final.',
-    finalLede: 'Two left standing. One crown. Choose with your heart.',
-    finalCta: 'Bring it on ♥',
+    finalLede: 'Two left on the pitch. One trophy. Back your winner.',
+    finalCta: 'Bring it on',
     // The engine "form" meter on the rail — surfaces the engine’s own score of
     // the cars still in, climbing as strong picks advance.
-    formLabel: 'Chemistry',
+    formLabel: 'Form',
     // Result — the champion is always the hero (decision: champion, engine validates)
-    matchKicker: 'Your champion ♥',
-    matchTitle: ({ model }) => `You crowned the ${model}.`,
-    matchLede: 'Beat every rival you put in front of it.',
-    whyIntro: 'Why it’s a keeper:',
-    crownCallback: ({ beaten }) => `It saw off ${beaten} to take the crown ♥`,
+    matchKicker: 'Your champion',
+    matchTitle: ({ model }) => `The ${model} lifts the trophy.`,
+    matchLede: 'Saw off everything you put in its way.',
+    whyIntro: 'Why it went all the way:',
+    crownCallback: ({ beaten }) => `It knocked out ${beaten} on the run to the title.`,
     // When the engine can't fully back the crown (weak / not in the feasible set)
-    weakNote: 'Full disclosure, though — the numbers don’t *quite* crown this one. '
-      + 'Stock changes every week, so it’s worth another run soon. ♥',
-    alsoNote: ({ model }) => `If you’d be swayed, the numbers are also head-over-heels for the ${model}.`,
+    weakNote: 'For the record, though — the numbers don’t *quite* make this the standout. '
+      + 'Stock changes every week, so it’s worth another run soon.',
+    alsoNote: ({ model }) => `If you fancy a replay, the numbers make the ${model} the one to beat.`,
     // CTAs + share
-    testDriveCta: '♥ Book a Valentine’s test drive',
+    testDriveCta: 'Book a test drive',
     detailsCta: 'See full details',
     shareCta: 'Share your champion',
-    shareCopied: 'Link copied ♥',
+    shareCopied: 'Link copied',
     againCta: 'New tournament',
     shareText: ({ model, retailer }) => `My champion is a ${model} at ${retailer}. `
-      + 'Think you’d pick differently? 💘',
+      + 'Reckon you’d pick a different winner?',
     // Empty pool at the seed
     emptyPoolTitle: 'Not enough in that range for a bracket.',
     emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got enough under that to run a knockout — `
