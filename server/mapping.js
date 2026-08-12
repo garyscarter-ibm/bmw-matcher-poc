@@ -886,7 +886,8 @@ export function mapFordRaw(raw) {
  *   sizeClass -> engine/size band 1-5 (A2-friendly small .. big tourer), a
  *                licence-and-manageability proxy the size scorer reads as city..roadtrip
  *   zeroTo62  -> bike 0-62s (honest field; the SCALE is recalibrated in tuning)
- *   mpg       -> bike mpg (honest); fuel petrol, or ev for the CE 04 scooter
+ *   mpg       -> bike mpg (honest); fuel petrol, or ev for the electric scooters
+ *                (CE 04 / CE 02, any zero-cc model), keyed off the spec cc
  * Like Honda/Ford this is a FLAT-record projection (mapMotorradRaw), not a
  * BRAND_MAPPERS entry, emitting the identical schema the engine scores.
  * ====================================================================== */
@@ -896,31 +897,66 @@ export function mapFordRaw(raw) {
  * in the public BMW Motorrad UK range. Keyed by normalised model line. */
 const MODEL_SPECS_MOTORRAD = {
   // Roadster / naked
+  'R 1300 R': { category: 'roadster', cc: 1300, seats: 2, boot: 0, zeroTo62: 3.0, sizeClass: 4, mpg: 55 },
   'R 1250 R': { category: 'roadster', cc: 1254, seats: 2, boot: 0, zeroTo62: 3.2, sizeClass: 4, mpg: 55 },
+  'R 1200 R': { category: 'roadster', cc: 1170, seats: 2, boot: 0, zeroTo62: 3.4, sizeClass: 4, mpg: 55 },
+  'M 1000 R': { category: 'naked', cc: 999, seats: 2, boot: 0, zeroTo62: 3.0, sizeClass: 5, mpg: 44 },
   'S 1000 R': { category: 'naked', cc: 999, seats: 2, boot: 0, zeroTo62: 3.1, sizeClass: 4, mpg: 45 },
   'F 900 R': { category: 'roadster', cc: 895, seats: 2, boot: 0, zeroTo62: 3.7, sizeClass: 3, mpg: 62 },
+  'F 800 R': { category: 'roadster', cc: 798, seats: 2, boot: 0, zeroTo62: 4.0, sizeClass: 3, mpg: 60 },
   'G 310 R': { category: 'naked', cc: 313, seats: 2, boot: 0, zeroTo62: 7.5, sizeClass: 1, mpg: 85 },
-  // Adventure / GS
+  // Adventure / GS. The Adventure (GSA) variants carry a bigger tank and more
+  // luggage than the base GS, so they get their own keys and figures.
+  'R 1300 GS Adventure': { category: 'adventure', cc: 1300, seats: 2, boot: 75, zeroTo62: 3.1, sizeClass: 5, mpg: 56 },
   'R 1300 GS': { category: 'adventure', cc: 1300, seats: 2, boot: 68, zeroTo62: 3.0, sizeClass: 5, mpg: 57 },
+  'R 1250 GS Adventure': { category: 'adventure', cc: 1254, seats: 2, boot: 75, zeroTo62: 3.5, sizeClass: 5, mpg: 55 },
   'R 1250 GS': { category: 'adventure', cc: 1254, seats: 2, boot: 68, zeroTo62: 3.4, sizeClass: 5, mpg: 56 },
+  'R 1200 GS': { category: 'adventure', cc: 1170, seats: 2, boot: 68, zeroTo62: 3.6, sizeClass: 5, mpg: 56 },
   'F 900 GS': { category: 'adventure', cc: 895, seats: 2, boot: 45, zeroTo62: 4.0, sizeClass: 3, mpg: 60 },
   'F 850 GS': { category: 'adventure', cc: 853, seats: 2, boot: 45, zeroTo62: 4.4, sizeClass: 3, mpg: 61 },
+  // The F 750 GS shares the 853cc parallel-twin with the F 850 GS, detuned to
+  // 77hp with 19"/17" road-biased wheels — a lighter, road-first middleweight
+  // adventure bike (present in the live pool; without its own key it fell to the
+  // R 1250 GS loose fallback and read as a 1254cc big GS).
+  'F 750 GS': { category: 'adventure', cc: 853, seats: 2, boot: 45, zeroTo62: 4.6, sizeClass: 3, mpg: 62 },
+  'F 800 GS': { category: 'adventure', cc: 798, seats: 2, boot: 45, zeroTo62: 4.5, sizeClass: 3, mpg: 60 },
   'G 310 GS': { category: 'adventure', cc: 313, seats: 2, boot: 20, zeroTo62: 7.7, sizeClass: 1, mpg: 83 },
   // Sport
-  'S 1000 RR': { category: 'sport', cc: 999, seats: 1, boot: 0, zeroTo62: 2.9, sizeClass: 4, mpg: 42 },
   'M 1000 RR': { category: 'sport', cc: 999, seats: 1, boot: 0, zeroTo62: 2.8, sizeClass: 5, mpg: 40 },
+  'S 1000 RR': { category: 'sport', cc: 999, seats: 1, boot: 0, zeroTo62: 2.9, sizeClass: 4, mpg: 42 },
+  'M 1000 XR': { category: 'sport', cc: 999, seats: 2, boot: 32, zeroTo62: 3.1, sizeClass: 5, mpg: 46 },
   'S 1000 XR': { category: 'sport', cc: 999, seats: 2, boot: 32, zeroTo62: 3.2, sizeClass: 4, mpg: 48 },
   // Tourer
-  'R 1250 RT': { category: 'tourer', cc: 1254, seats: 2, boot: 94, zeroTo62: 3.6, sizeClass: 5, mpg: 54 },
-  'R 1300 RT': { category: 'tourer', cc: 1300, seats: 2, boot: 94, zeroTo62: 3.5, sizeClass: 5, mpg: 55 },
+  'K 1600 GTL': { category: 'tourer', cc: 1649, seats: 2, boot: 130, zeroTo62: 3.5, sizeClass: 5, mpg: 44 },
   'K 1600 GT': { category: 'tourer', cc: 1649, seats: 2, boot: 110, zeroTo62: 3.4, sizeClass: 5, mpg: 44 },
-  // Heritage
+  // The K 1600 Grand America is the bagger-styled full-dress K 1600 tourer
+  // (1649cc six, hard panniers + top box); present in the live pool and its own
+  // model, so it doesn't read as a plain roadster via the R 1250 R fallback.
+  'K 1600 Grand America': { category: 'tourer', cc: 1649, seats: 2, boot: 130, zeroTo62: 3.5, sizeClass: 5, mpg: 44 },
+  'K 1600 B': { category: 'tourer', cc: 1649, seats: 2, boot: 60, zeroTo62: 3.4, sizeClass: 5, mpg: 44 },
+  // The K 1300 S is the discontinued (2009-2016) 1293cc inline-four sport-tourer
+  // — a genuinely fast sports-touring bike, not a naked roadster. Rare in the
+  // pool but real, so it keeps its own spec rather than the R 1250 R fallback.
+  'K 1300 S': { category: 'sport', cc: 1293, seats: 2, boot: 0, zeroTo62: 3.0, sizeClass: 5, mpg: 42 },
+  'R 1300 RT': { category: 'tourer', cc: 1300, seats: 2, boot: 94, zeroTo62: 3.5, sizeClass: 5, mpg: 55 },
+  'R 1250 RT': { category: 'tourer', cc: 1254, seats: 2, boot: 94, zeroTo62: 3.6, sizeClass: 5, mpg: 54 },
+  // Heritage. The air-cooled R nineT family (1170cc, Option 719) is distinct
+  // from the new-gen liquid-... no: air/oil-cooled R 12 nineT (1170cc, 2024+).
+  // Both are 1170cc heritage roadsters; keep them as separate keys so a listing
+  // titled "R nineT" doesn't display as the newer "R 12 nineT".
   'R 12 nineT': { category: 'heritage', cc: 1170, seats: 2, boot: 0, zeroTo62: 3.5, sizeClass: 4, mpg: 52 },
+  'R 12': { category: 'heritage', cc: 1170, seats: 2, boot: 0, zeroTo62: 3.8, sizeClass: 4, mpg: 52 },
+  'R nineT': { category: 'heritage', cc: 1170, seats: 2, boot: 0, zeroTo62: 3.5, sizeClass: 4, mpg: 52 },
+  'R 18 Transcontinental': { category: 'tourer', cc: 1802, seats: 2, boot: 90, zeroTo62: 4.8, sizeClass: 5, mpg: 42 },
   'R 18': { category: 'heritage', cc: 1802, seats: 2, boot: 0, zeroTo62: 4.8, sizeClass: 5, mpg: 42 },
-  // Roadster midweight
+  // Roadster / sport midweight
   'F 900 XR': { category: 'sport', cc: 895, seats: 2, boot: 32, zeroTo62: 3.9, sizeClass: 3, mpg: 60 },
-  // Electric scooter
+  // Electric
   'CE 04': { category: 'scooter', cc: 0, seats: 2, boot: 30, zeroTo62: 3.5, sizeClass: 2, evRange: 80 },
+  'CE 02': { category: 'scooter', cc: 0, seats: 2, boot: 15, zeroTo62: 8.0, sizeClass: 1, evRange: 55 },
+  // Mid scooters (petrol) — the C 400 GT/X are the touring/urban maxi-scooters.
+  'C 400 GT': { category: 'scooter', cc: 350, seats: 2, boot: 30, zeroTo62: 9.5, sizeClass: 2, mpg: 80 },
+  'C 400 X': { category: 'scooter', cc: 350, seats: 2, boot: 30, zeroTo62: 9.5, sizeClass: 2, mpg: 80 },
 };
 const DEFAULT_SPEC_MOTORRAD = { category: 'naked', cc: 850, seats: 2, boot: 20, zeroTo62: 4.5, sizeClass: 3, mpg: 55 };
 
@@ -932,32 +968,56 @@ const MOTORRAD_RETAILER_NAME = 'BMW Motorrad Approved Used';
  *  R 1300 GS before R 1250 GS) so a title folds to the right entry. */
 function motorradLine(title = '') {
   const s = String(title).toUpperCase().replace(/\s+/g, ' ').trim();
-  // Exact-ish contains, ordered specific -> general.
+  // The heritage twins are both 1170cc "nineT" roadsters but different models:
+  // the new-gen "R 12 nineT" (2024+) and the older air/oil-cooled "R nineT"
+  // (Pure/Urban G/S/Racer, Option 719). Disambiguate BEFORE the contains-scan,
+  // since "R 12 NINET" and "R NINET" would otherwise race. "R 12 nineT" wins
+  // only when the title actually says "R 12"; a plain "R nineT …" is the older
+  // bike. "R 12 G/S" and bare "R 12" are the new roadster/scrambler siblings.
+  if (/\bR 12 NINET|R12 NINET/.test(s)) return 'R 12 nineT';
+  if (/\bR NINET|RNINET|R NINE T\b/.test(s)) return 'R nineT';
+  if (/\bR 12 G\/?S\b|\bR12 G\/?S\b/.test(s)) return 'R 12'; // R 12 G/S scrambler → R 12 family
+  // Exact-ish contains, ordered specific -> general so a longer code (R 1300 GS
+  // Adventure, M 1000 XR) is tested before the shorter one it contains.
+  // [uppercase probe tested against the title, canonical MODEL_SPECS key], most
+  // specific first so a longer code is tested before the shorter one it contains.
   const KEYS = [
-    'M 1000 RR', 'S 1000 RR', 'S 1000 XR', 'S 1000 R',
-    'R 1300 GS', 'R 1250 GS', 'F 900 GS', 'F 850 GS', 'G 310 GS',
-    'R 1300 RT', 'R 1250 RT', 'K 1600 GT',
-    'F 900 XR', 'F 900 R', 'G 310 R', 'R 1250 R',
-    'R 12 NINETY', 'R 12 NINET', 'R 18', 'CE 04',
+    ['M 1000 RR', 'M 1000 RR'], ['S 1000 RR', 'S 1000 RR'],
+    ['M 1000 XR', 'M 1000 XR'], ['S 1000 XR', 'S 1000 XR'],
+    ['M 1000 R', 'M 1000 R'], ['S 1000 R', 'S 1000 R'],
+    ['R 1300 GS ADVENTURE', 'R 1300 GS Adventure'], ['R 1300 GSA', 'R 1300 GS Adventure'],
+    ['R 1250 GS ADVENTURE', 'R 1250 GS Adventure'], ['R 1250 GSA', 'R 1250 GS Adventure'],
+    ['R 1300 GS', 'R 1300 GS'], ['R 1250 GS', 'R 1250 GS'], ['R 1200 GS', 'R 1200 GS'],
+    ['F 900 GSA', 'F 900 GS'], ['F 900 GS', 'F 900 GS'], ['F 850 GS', 'F 850 GS'],
+    ['F 800 GS', 'F 800 GS'], ['F 750 GS', 'F 750 GS'], ['G 310 GS', 'G 310 GS'],
+    ['K 1600 GRAND AMERICA', 'K 1600 Grand America'],
+    ['K 1600 GTL', 'K 1600 GTL'], ['K 1600 GT', 'K 1600 GT'], ['K 1600 B', 'K 1600 B'],
+    ['K 1300 S', 'K 1300 S'],
+    ['R 1300 RT', 'R 1300 RT'], ['R 1250 RT', 'R 1250 RT'],
+    ['R 1300 R', 'R 1300 R'], ['R 1250 R', 'R 1250 R'], ['R 1200 R', 'R 1200 R'],
+    ['F 900 XR', 'F 900 XR'], ['F 900 R', 'F 900 R'], ['F 800 R', 'F 800 R'],
+    ['G 310 R', 'G 310 R'],
+    ['R 18 TRANSCONTINENTAL', 'R 18 Transcontinental'], ['R 18', 'R 18'], ['R 12', 'R 12'],
+    ['C 400 GT', 'C 400 GT'], ['C 400 X', 'C 400 X'], ['CE 04', 'CE 04'], ['CE 02', 'CE 02'],
   ];
-  for (const k of KEYS) {
-    if (s.includes(k)) {
-      // Map the two heritage spellings back to the canonical key.
-      if (k.startsWith('R 12 NINET')) return 'R 12 nineT';
-      return k;
-    }
+  for (const [probe, key] of KEYS) {
+    if (s.includes(probe)) return key;
   }
   // Loose fallbacks by family so an unlisted variant still lands sensibly.
   if (/\bGS\b/.test(s)) return 'R 1250 GS';
   if (/\bRT\b/.test(s)) return 'R 1250 RT';
   if (/\bRR\b/.test(s)) return 'S 1000 RR';
-  if (/NINET|NINE T/.test(s)) return 'R 12 nineT';
+  if (/NINET|NINE T/.test(s)) return 'R nineT';
   return 'R 1250 R';
 }
 
-/** Bike fuel: electric only for the CE 04, else petrol. */
+/** Bike fuel: electric for any zero-cc (battery) model in the spec table or a
+ *  title the feed marks electric, else petrol. Gated on the spec's `cc === 0`
+ *  rather than a model name, so every electric bike (CE 04, CE 02, and any the
+ *  range adds later) is caught, not just one named model. */
 function motorradFuel(line, rawFuel) {
-  if (line === 'CE 04' || /electric/i.test(String(rawFuel || ''))) return 'ev';
+  const spec = MODEL_SPECS_MOTORRAD[line];
+  if ((spec && spec.cc === 0) || /electric/i.test(String(rawFuel || ''))) return 'ev';
   return 'petrol';
 }
 
@@ -975,8 +1035,9 @@ function motorradTags(category, sizeClass, fuel) {
 }
 
 // Full noun phrases so the blurb reads naturally ("an adventure bike", not
-// "a adventure"). scooter already carries "electric", so motorradBlurb doesn't
-// prefix it again.
+// "a adventure"). The category word never asserts a fuel: the scooter range is
+// mostly petrol (C 400 GT/X) plus the electric CE models, so "scooter" stays
+// power-neutral and motorradBlurb prefixes "electric" only for an actual EV.
 const CATEGORY_WORD = {
   naked: 'naked roadster',
   roadster: 'roadster',
@@ -984,7 +1045,7 @@ const CATEGORY_WORD = {
   tourer: 'tourer',
   sport: 'sports bike',
   heritage: 'heritage roadster',
-  scooter: 'electric scooter',
+  scooter: 'scooter',
 };
 
 /** "a" or "an" for the word that follows, by its leading sound. */
@@ -995,11 +1056,35 @@ function article(word = '') {
 /** A rider-facing blurb. Bikes "ride away", they don't "drive away". */
 function motorradBlurb(line, category, fuel, retailerName) {
   const cat = CATEGORY_WORD[category] || 'motorcycle';
-  // The scooter phrase already says "electric"; don't double it up.
-  const power = fuel === 'ev' && category !== 'scooter' ? 'electric ' : '';
+  // "electric" is driven by the actual fuel, so a petrol scooter reads "scooter"
+  // and an electric one (CE 04/CE 02) reads "electric scooter".
+  const power = fuel === 'ev' ? 'electric ' : '';
   const from = retailerName ? ` from ${retailerName}` : '';
   const kind = `${power}${cat}`;
   return `Approved-used BMW ${line}, ${article(kind)} ${kind}, ready to ride away${from}.`;
+}
+
+/**
+ * Motorrad display name: the real listing titles append dealer marketing to the
+ * model ("BMW R 1300 GS Ex Demo, Top Spec, Low Miles!", "… TE 2 YEAR BMW
+ * WARRANTY"). Keep the model and its genuine trim/spec pack, drop the sales tail
+ * so the card reads as a bike, not an advert. We cut at the first comma (every
+ * marketing clause here begins one) and strip trailing warranty/condition
+ * phrases. Falls back to "BMW <line>" when there's no usable title.
+ */
+function motorradDisplayName(title, line) {
+  const raw = String(title || '').trim();
+  if (!raw) return `BMW ${line}`;
+  let name = /^bmw/i.test(raw) ? raw : `BMW ${raw}`;
+  // Everything from the first comma on is marketing ("…, Top Spec, Low Miles!").
+  name = name.split(',')[0];
+  // Strip trailing sales phrases even when not comma-separated ("… TE 2 YEAR
+  // BMW WARRANTY", "… GS Ex Demo"). Anchored at the tail, applied repeatedly.
+  const TAIL = /\s+(?:\d+\s*YEARS?\s*(?:BMW\s*)?WARRANTY|BMW\s*WARRANTY|WARRANTY|EX[-\s]?DEMO|DEMO|TOP\s*SPEC|LOW\s*MILES?|LOW\s*MILEAGE|FULL\s*S(?:ERVICE\s*)?HISTORY|FSH|ONE\s*OWNER|1\s*OWNER|IMMACULATE|STUNNING|FINANCE\s*AVAILABLE|SOLD|RESERVED)\s*!*$/i;
+  let prev;
+  do { prev = name; name = name.replace(TAIL, ''); } while (name !== prev);
+  name = name.replace(/[\s!]+$/, '').trim();
+  return name || `BMW ${line}`;
 }
 
 /**
@@ -1021,8 +1106,8 @@ export function mapMotorradRaw(raw) {
 
   return {
     id: String(raw?.id ?? raw?.reg ?? `${line}-${price}`),
-    // The title already reads "BMW <model>"; keep it, else compose one.
-    name: /^bmw/i.test(String(raw?.title || '')) ? String(raw.title) : `BMW ${line}`,
+    // Keep the model + genuine trim, minus the dealer sales tail (see helper).
+    name: motorradDisplayName(raw?.title, line),
     line,
     body: spec.category, // bike category stands in for car body style
     fuel,

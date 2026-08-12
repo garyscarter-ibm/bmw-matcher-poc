@@ -293,9 +293,12 @@ BRAND_COPY.honda = {
   name: 'Honda',
   title: 'Find the right Honda for you.',
   cta: 'Find my Honda',
-  lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
-    + 'your miles and your budget. We’ll match you with the approved-used '
-    + `Hondas at ${retailer} that fit you best, and tell you why.`,
+  // Honda's plain, practical register: no superlative ("best"), lead on the
+  // sensible fit (life, running, budget) and the reassurance of approved-used.
+  // See docs/tone-style-guide.md (Honda).
+  lede: ({ questions, retailer }) => `${questions} quick questions about your days, `
+    + 'your mileage and what you want to spend. We’ll find the approved-used '
+    + `Hondas at ${retailer} that genuinely suit how you live, and show our working.`,
   unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
     + 'These are the closest to everything else you told us.',
   tiedTitle: ({ count }) => `${cardinal(count)} of these fit you just as well.`,
@@ -363,9 +366,12 @@ BRAND_COPY.ford = {
   name: 'Ford',
   title: 'Find the right Ford for you.',
   cta: 'Find my Ford',
+  // Ford's confident, friendly, plainly-British register: upbeat and direct,
+  // proud of being the sensible, well-priced choice with room for the spirited
+  // side. See docs/tone-style-guide.md (Ford).
   lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
-    + 'your miles and your budget. We’ll match you with the approved-used '
-    + `Fords at ${retailer} that fit you best, and tell you why.`,
+    + 'your miles and your money. We’ll line up the approved-used '
+    + `Fords at ${retailer} that are right for you, and tell you exactly why.`,
   unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
     + 'These are the closest to everything else you told us.',
   tiedTitle: ({ count }) => `${cardinal(count)} of these fit you just as well.`,
@@ -436,9 +442,12 @@ BRAND_COPY.motorrad = {
   name: 'BMW Motorrad',
   title: 'Find your perfect BMW Motorrad.',
   cta: 'Find my bike',
+  // Motorrad's rider-first, technical, adrenaline-forward register ("Make Life
+  // a Ride"): lead on the riding, not "your life", and on the machine under you
+  // rather than a soft "suit you best". See docs/tone-style-guide.md (Motorrad).
   lede: ({ questions, retailer }) => `${questions} quick questions about your riding, `
-    + 'your miles and your budget. We’ll match you with the approved-used '
-    + `bikes at ${retailer} that suit you best, and tell you why.`,
+    + 'your licence and your budget. We’ll match you to the approved-used '
+    + `BMW Motorrad bikes at ${retailer} built for the road you ride, and tell you why.`,
   unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
     + 'These are the closest matches to everything else you asked for.',
   refineStatus: ({ shown, wants }) => (shown === 1

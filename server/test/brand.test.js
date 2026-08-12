@@ -9,8 +9,9 @@ import {
 import { questionsForBrand, applyBespokeAnswers } from '../questions.js';
 import { normalizeBrand, brandConfig, brandTuning } from '../brands.js';
 import { rankCars } from '../engine.js';
-import { motorradRowsFromEnvelope, motorradRowToRaw } from '../stock.js';
+import { motorradRowsFromEnvelope, motorradRowToRaw, parseMotorradSid } from '../stock.js';
 import { parseListingHtml, parseCard, listingUrl } from '../honda-listing.js';
+import { parseResTable, parseRow, splitRows } from '../motorrad-listing.js';
 
 /* Feed-shaped fixtures (the fields mapVehicle actually reads). */
 const bmwVehicle = {
@@ -878,7 +879,7 @@ test('ford tuning ranks a practical family SUV a real Ford buyer would pick', ()
  * every field carries a bike meaning: `body` is the riding category
  * (adventure/tourer/sport/naked/roadster/heritage/scooter), `boot` is
  * luggage litres, `seats` is pillion capability, `sizeClass` is a
- * licence-and-manageability band, and only the CE 04 is electric. The
+ * licence-and-manageability band, and the CE scooters are electric. The
  * live feed is a session-gated SPA (unreachable here), so fixtures are
  * curated and projected by mapMotorradRaw. See the Motorrad section of
  * DECISIONS.md for the full field-by-field axis map and the tuning
@@ -896,9 +897,12 @@ const motorradRaw = (overrides = {}) => ({
   ...overrides,
 });
 
-test('brand config: motorrad is a fixtures-source brand serving a bikes file', () => {
+test('brand config: motorrad runs live with a bikes-file fixtures fallback', () => {
   const cfg = brandConfig('motorrad');
-  assert.equal(cfg.source, 'fixtures', 'motorrad serves from fixtures, not the live feed');
+  // Motorrad fetches its live approved-used pool (source: 'live-motorrad') and
+  // degrades to the committed snapshot on any failure. The fallback file is the
+  // bike file, not <brand>-cars.json.
+  assert.equal(cfg.source, 'live-motorrad', 'motorrad serves live, degrading to fixtures');
   assert.equal(cfg.fixturesFile, 'motorrad-bikes.json', 'motorrad reads the bikes file, not <brand>-cars.json');
   assert.match(cfg.origin, /bmw-motorrad\.co\.uk/);
   assert.equal(normalizeBrand('Motorrad'), 'motorrad');
@@ -932,6 +936,7 @@ test('mapMotorradRaw derives the category (body) from the model across the range
     ['BMW R 1250 R', 'roadster'],
     ['BMW R 18', 'heritage'],
     ['BMW CE 04', 'scooter'],
+    ['BMW C 400 GT', 'scooter'],
   ];
   for (const [title, category] of cases) {
     const bike = mapMotorradRaw(motorradRaw({ title }));
@@ -940,14 +945,44 @@ test('mapMotorradRaw derives the category (body) from the model across the range
   }
 });
 
-test('mapMotorradRaw makes only the CE 04 electric; everything else is petrol', () => {
-  const ce04 = mapMotorradRaw(motorradRaw({ title: 'BMW CE 04', price: 11000 }));
-  assert.equal(ce04.fuel, 'ev', 'the CE 04 is the one electric bike in the range');
-  assert.ok(ce04.evRange > 0, 'an electric bike needs a range for the economy axis');
-  assert.ok(!ce04.mpg, 'an EV carries no mpg (scored on range instead)');
-  assert.equal(ce04.body, 'scooter');
-  // The scooter blurb already says "electric"; it must not double it up.
-  assert.ok(!/electric electric/i.test(ce04.blurb), 'the scooter blurb does not double "electric"');
+test('mapMotorradRaw resolves the cross-family lines that used to mislabel (F 750, K 1600 Grand America, K 1300 S)', () => {
+  // Regression: these three real titles once fell through motorradLine to a
+  // completely wrong family (F 750 -> R 1250 GS, the two K lines -> R 1250 R),
+  // so 9 of 963 bikes wore the wrong badge and spec. Each must now resolve to
+  // its own line AND pull that line's cc, or the honesty of the deck breaks.
+  const cases = [
+    ['BMW F 750 GS TE', 'F 750 GS', 853, 'adventure'],
+    ['BMW K 1600 Grand America', 'K 1600 Grand America', 1649, 'tourer'],
+    ['BMW K 1300 S HP', 'K 1300 S', 1293, 'sport'],
+  ];
+  for (const [title, line, cc, category] of cases) {
+    const bike = mapMotorradRaw(motorradRaw({ title, price: 9995 }));
+    assert.equal(bike.line, line, `${title} resolves to its own line, not a foreign family`);
+    assert.equal(bike.cc, cc, `${title} carries the ${line} engine (${cc}cc)`);
+    assert.equal(bike.body, category, `${title} maps to the ${category} category`);
+  }
+});
+
+test('mapMotorradRaw makes EVERY zero-cc scooter electric (not just one named model)', () => {
+  // Fuel is gated on the spec cc, so every electric model is caught. This pins
+  // the CE 02 fix: it was silently mapped to petrol when only "CE 04" was named.
+  for (const title of ['BMW CE 04', 'BMW CE 02']) {
+    const ev = mapMotorradRaw(motorradRaw({ title, price: 9000 }));
+    assert.equal(ev.fuel, 'ev', `${title} is an electric scooter`);
+    assert.ok(ev.evRange > 0, `${title} needs a range for the economy axis`);
+    assert.ok(!ev.mpg, `${title} is an EV, so it carries no mpg`);
+    assert.equal(ev.body, 'scooter');
+    assert.match(ev.blurb, /electric scooter/i, `${title} reads as an electric scooter`);
+    assert.ok(!/electric electric/i.test(ev.blurb), 'the blurb does not double "electric"');
+  }
+
+  // A PETROL scooter (C 400 GT/X, 350cc) is petrol, and its blurb must NOT claim
+  // "electric" — the bug that made the whole scooter category read electric.
+  const c400 = mapMotorradRaw(motorradRaw({ title: 'BMW C 400 GT', price: 6500 }));
+  assert.equal(c400.fuel, 'petrol', 'the C 400 is a petrol scooter');
+  assert.ok(c400.mpg > 0, 'a combustion scooter is scored on mpg');
+  assert.equal(c400.body, 'scooter');
+  assert.doesNotMatch(c400.blurb, /electric/i, 'a petrol scooter is never called electric');
 
   const gs = mapMotorradRaw(motorradRaw());
   assert.equal(gs.fuel, 'petrol');
@@ -960,10 +995,18 @@ test('mapMotorradRaw returns null for a priceless record (never invents a price)
   assert.equal(mapMotorradRaw(motorradRaw({ price: undefined })), null);
 });
 
-test('every Motorrad fixture is engine-valid (the curated bikes the app serves)', () => {
+test('the Motorrad fallback snapshot is the whole real deck, every bike with a real photo', () => {
+  // The snapshot is the live feed's own output, captured (see
+  // scripts/fetch-motorrad-all-pages.mjs): it's the fallback the live adapter
+  // degrades to, so it must be indistinguishable from live — the full ~963-bike
+  // pool, and crucially every bike carrying its real listing photo (the whole
+  // point of the missing-images fix). A rebuild that shrank the deck or dropped
+  // photos should fail here, loudly.
   const path = fileURLToPath(new URL('../../fixtures/motorrad-bikes.json', import.meta.url));
   const bikes = JSON.parse(readFileSync(path, 'utf8'));
-  assert.ok(bikes.length > 0, 'motorrad fixtures are not empty');
+  assert.ok(bikes.length >= 500, `the fallback is the real deck, not a sample (got ${bikes.length})`);
+  const ids = new Set(bikes.map((b) => b.id));
+  assert.equal(ids.size, bikes.length, 'no duplicate offers in the snapshot');
   for (const bike of bikes) {
     for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
       assert.ok(bike[field] !== undefined, `${bike.name || bike.id} missing ${field}`);
@@ -971,6 +1014,7 @@ test('every Motorrad fixture is engine-valid (the curated bikes the app serves)'
     assert.ok(bike.priceMin <= bike.priceMax, `${bike.name} price range inverted`);
     if (bike.fuel === 'ev') assert.ok(bike.evRange > 0, `${bike.name} (ev) needs evRange`);
     else assert.ok(bike.mpg > 0, `${bike.name} needs mpg`);
+    assert.match(bike.photo || '', /GetImg\?imgId=/, `${bike.name} carries its real listing photo`);
     assert.ok(!bike.blurb.includes('—'), `${bike.name} blurb has an em dash`);
     assert.ok(!bike.name.includes('—'), `${bike.name} name has an em dash`);
   }
@@ -1035,46 +1079,138 @@ test('motorrad tuning surfaces a go-anywhere GS for an adventure rider, over a s
   assert.equal(ranked[0].car.id, 'gs', 'the GS tops for an adventure rider under Motorrad tuning');
 });
 
-/* ---- Motorrad live-feed adapter (dormant until hosted, but guarded) ---- */
+/* ------------------------------------------------------------------ *
+ * Motorrad live-feed adapter (motorrad-listing.js). The feed's ResTable
+ * is NOT a JSON array of vehicles — it's a server-rendered HTML <table>
+ * string, one <tr> per bike, each with a real per-vehicle photo. That is
+ * why the earlier synthetic fixtures had no images: nothing in the feed
+ * was ever an image URL field. These pin the real shape against a captured
+ * live response (test/fixtures/motorrad-restable.html), the same way the
+ * Honda card is pinned. The gate on the live endpoint is a session/IP one
+ * (GMB-SID), so the fetch itself can't run unattended from here, but the
+ * parse — the fragile seam — is fully exercised. See DECISIONS.md.
+ * ------------------------------------------------------------------ */
 
-test('motorradRowsFromEnvelope reads both envelope shapes and null-safes the rest', () => {
-  const rows = [{ id: 1 }, { id: 2 }];
-  // The documented nested shape: SearchFilter.ResOverviewData.ResTable.Items.
-  assert.deepEqual(
-    motorradRowsFromEnvelope({ SearchFilter: { ResOverviewData: { ResTable: { Items: rows } } } }),
-    rows,
-    'reads the nested ResOverviewData.ResTable shape',
-  );
-  // The flatter capture some responses use: SearchFilter.ResTable.items.
-  assert.deepEqual(
-    motorradRowsFromEnvelope({ SearchFilter: { ResTable: { items: rows } } }),
-    rows,
-    'reads the flatter ResTable shape',
-  );
+const resTableHtml = () => readFileSync(
+  fileURLToPath(new URL('./fixtures/motorrad-restable.html', import.meta.url)), 'utf8',
+);
+
+test('splitRows isolates the result <tr> blocks and drops the header row', () => {
+  const rows = splitRows(resTableHtml());
+  assert.equal(rows.length, 5, 'five real vehicle rows, header <tr> excluded');
+});
+
+test('parseRow reads one real ResTable <tr> into the flat raw bike record', () => {
+  const [first] = splitRows(resTableHtml());
+  const raw = parseRow(first);
+  assert.ok(raw, 'a real vehicle row parses');
+  assert.match(raw.title, /^BMW R nineT Urban G\/S/);
+  assert.equal(raw.price, 8995, 'the cash price is read off the row');
+  assert.equal(raw.cc, 1170, 'capacity (ccm) is carried through as a display extra');
+  assert.equal(raw.powerKw, 81, 'power reads the leading kW, not a fused 81109');
+  assert.match(raw.image, /GetImg\?imgId=/, 'the real per-vehicle photo is captured');
+  assert.match(raw.link, /^https:\/\/approvedused\.bmw-motorrad\.co\.uk\/uk\/detail\.cshtml\?on=577260/);
+});
+
+test('parseResTable turns the whole HTML table into raw bikes, every one with a real photo', () => {
+  const raws = parseResTable(resTableHtml());
+  assert.equal(raws.length, 5);
+  for (const raw of raws) {
+    assert.ok(raw.title, 'each row has a title');
+    assert.ok(raw.price > 0, 'each row has a price');
+    assert.match(raw.image, /^https:\/\/approvedused\.bmw-motorrad\.co\.uk\/api\/Image\/GetImg/,
+      `every bike carries a real listing photo (${raw.title})`);
+  }
+});
+
+test('motorradRowsFromEnvelope parses the real HTML ResTable string at either envelope depth', () => {
+  const html = resTableHtml();
+  // The real shape: ResTable is an HTML string, under SearchFilter.
+  assert.equal(motorradRowsFromEnvelope({ SearchFilter: { ResTable: html } }).length, 5);
+  // Also read at the envelope root (older/flatter captures).
+  assert.equal(motorradRowsFromEnvelope({ ResTable: html }).length, 5);
   // The null envelope a session-less request gets back — no rows, no throw.
   assert.deepEqual(motorradRowsFromEnvelope({ SearchFilter: null, ResTable: null }), []);
   assert.deepEqual(motorradRowsFromEnvelope(null), [], 'a null body is empty, not a crash');
   assert.deepEqual(motorradRowsFromEnvelope({}), [], 'an unknown shape degrades to empty');
 });
 
-test('a live Motorrad row projects and maps to the same engine schema as a fixture', () => {
-  // Prove the adapter feeds mapMotorradRaw the shape it expects: a live row, read
-  // by motorradRowToRaw, then mapped, lands as a valid engine bike identical in
-  // shape to a fixture. When the real field names arrive, only the row->raw step
-  // changes; this test pins the contract between the two.
-  const liveRow = {
-    Id: 'LIVE-1', Title: 'BMW R 1250 GS', Price: 14250, Mileage: 6100,
-    Registration: '23 BMW', FuelType: 'Petrol',
-  };
-  const raw = motorradRowToRaw(liveRow);
-  assert.equal(raw.id, 'LIVE-1');
+test('motorradRowsFromEnvelope still accepts a pre-parsed JSON array (resilience fallback)', () => {
+  // If the feed ever grows a JSON variant, array rows project through
+  // motorradRowToRaw rather than crashing the HTML path.
+  const rows = [{ Id: 1, Title: 'BMW R 1250 GS', Price: 14250 }];
+  const [raw] = motorradRowsFromEnvelope({ SearchFilter: { ResTable: { Items: rows } } });
+  assert.equal(raw.id, 1);
   assert.equal(raw.title, 'BMW R 1250 GS');
   assert.equal(raw.price, 14250);
+});
 
-  const bike = mapMotorradRaw(raw);
-  for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
-    assert.ok(bike[field] !== undefined, `mapped live bike missing ${field}`);
+test('parseMotorradSid reads the self-issued session out of the landing page', () => {
+  // The whole live chain hinges on this: the feed's GMB-SID is not minted by JS,
+  // it is embedded in the results page as a hidden #hfSID field, so a plain GET
+  // of the landing page yields a fresh session. This is the exact markup the
+  // real page serves (a base64 of "<ip>;<guid>").
+  const sid = 'OAA2AC4AMQA0ADQALgAxADIAOQAuADIANAAwADsAZgA3ADkAMwBkADcAMwBmAC0AOQBiADMANQAtADQANgBjADcALQA4AGQAZAA5AC0ANABlADIAMgA5ADAAOAAyADcAZAA5ADEA';
+  const html = `<form><input type="hidden" id="hfSID" name="hfSID" value="${sid}" /></form>`;
+  assert.equal(parseMotorradSid(html), sid, 'the #hfSID value is the session token');
+  // It decodes to the "<ip>;<guid>" the server bound to this caller.
+  assert.match(Buffer.from(parseMotorradSid(html), 'base64').toString('utf16le'),
+    /^\d+\.\d+\.\d+\.\d+;[0-9a-f-]{36}$/, 'the token is ip;guid');
+  // A page without the field (shape changed / not the results page) is null, not
+  // a crash — the adapter turns that into a clean StockUnavailableError.
+  assert.equal(parseMotorradSid('<html><body>no session here</body></html>'), null);
+  assert.equal(parseMotorradSid(''), null);
+});
+
+test('every parsed live bike maps to the same engine schema as a fixture, photo intact', () => {
+  // The seam that matters: whatever the live parse produces must satisfy the
+  // same projection the committed fixtures went through, and the real photo
+  // must survive into the mapped bike so the deck can paint it.
+  const raws = parseResTable(resTableHtml());
+  for (const raw of raws) {
+    const bike = mapMotorradRaw(raw);
+    assert.ok(bike, `${raw.title} maps to a bike`);
+    for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
+      assert.ok(bike[field] !== undefined, `mapped live bike missing ${field}`);
+    }
+    assert.match(bike.photo, /GetImg\?imgId=/, `the real photo survives into ${bike.name}`);
+    assert.ok(!bike.blurb.includes('—'), `no em dash in a live-derived blurb (${bike.name})`);
   }
-  assert.equal(bike.body, 'adventure');
-  assert.equal(bike.priceMin, 14250);
+});
+
+test('the display name keeps the model + genuine trim but drops the dealer sales tail', () => {
+  const nameOf = (title) => mapMotorradRaw({ title, price: 9999 }).name;
+  // Real captured titles: marketing clauses and warranty/condition tails go,
+  // the model and its genuine trim/spec pack stay.
+  assert.equal(nameOf('BMW R nineT Urban G/S Option 719 Gold, Alarm System'),
+    'BMW R nineT Urban G/S Option 719 Gold');
+  assert.equal(nameOf('BMW R 1250 GS Adventure TE 2 YEAR BMW WARRANTY'),
+    'BMW R 1250 GS Adventure TE');
+  assert.equal(nameOf('BMW R 1300 GS Ex Demo, Top Spec, Low Miles!'), 'BMW R 1300 GS');
+  // A clean title is left untouched; a marque-less title is prefixed.
+  assert.equal(nameOf('BMW R 1300 R SE'), 'BMW R 1300 R SE');
+  assert.equal(nameOf('R 1300 R SE'), 'BMW R 1300 R SE');
+});
+
+test('the captured rows resolve to the right model lines and honest categories', () => {
+  // Line resolution is the mapper subtlety the capture exposed: nineT must not
+  // collapse to R 12 nineT, GS Adventure must not fall through to a naked
+  // default. Pin the five real rows to the lines they must resolve to.
+  const byTitle = Object.fromEntries(
+    parseResTable(resTableHtml()).map((r) => [r.title, mapMotorradRaw(r)]),
+  );
+  const expect = [
+    ['BMW R nineT Urban G/S Option 719 Gold, Alarm System', 'R nineT', 'heritage', 1170],
+    ['BMW R 1250 GS Adventure TE 2 YEAR BMW WARRANTY', 'R 1250 GS Adventure', 'adventure', 1254],
+    ['BMW R 1300 R SE', 'R 1300 R', 'roadster', 1300],
+    ['BMW S 1000 XR Sport SE', 'S 1000 XR', 'sport', 999],
+    ['BMW R 1300 GS Ex Demo, Top Spec, Low Miles!', 'R 1300 GS', 'adventure', 1300],
+  ];
+  for (const [title, line, body, cc] of expect) {
+    const bike = byTitle[title];
+    assert.ok(bike, `row present: ${title}`);
+    assert.equal(bike.line, line, `${title} -> line`);
+    assert.equal(bike.body, body, `${title} -> category`);
+    assert.equal(bike.cc, cc, `${title} -> capacity`);
+  }
 });

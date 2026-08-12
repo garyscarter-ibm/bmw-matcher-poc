@@ -606,13 +606,15 @@ export const BRANDS = {
     // approved-used is a national programme, treated as one pool like Honda/Ford.
     origin: 'https://approvedused.bmw-motorrad.co.uk',
     defaultRetailer: 'motorrad-approved', // matches MOTORRAD_RETAILER_ID in mapping.js
-    // The live feed (ResultOverview/ShowResultsFilterChanged) is a session-gated,
-    // cross-origin, iframe-embedded ASP.NET app that returns a null envelope to any
-    // scripted request (see DECISIONS.md). The real adapter is wired in stock.js
-    // against the discovered contract and goes live from an allowed session
-    // origin; until then Motorrad serves curated fixtures/motorrad-bikes.json,
-    // already mapped via mapMotorradRaw. No network needed.
-    source: 'fixtures',
+    // Motorrad runs genuinely live. The feed (POST ResultOverview/ShowResults) is
+    // session-gated, but the server embeds a fresh GMB-SID in the results landing
+    // page's #hfSID field, so stock.js self-issues a session (no browser), walks
+    // every page of the ~963-bike pool, and maps the HTML ResTable rows through
+    // mapMotorradRaw. It degrades to the committed fixtures/motorrad-bikes.json
+    // snapshot (963 real bikes, all with real listing photos) on any fetch
+    // failure, so the deck is never blank. See the Motorrad-live section of
+    // DECISIONS.md.
+    source: 'live-motorrad',
     // Motorrad stock is bikes, not cars, so the snapshot is <brand>-bikes.json.
     // The fixtures loader defaults to <brand>-cars.json; this override points it
     // at the bike file. (The blueprint documents this as the one field a
@@ -630,7 +632,8 @@ export const BRANDS = {
      * untouched (the same mechanism MINI's trim question uses).
      *
      *  drop — car-only questions:
-     *    `charging` (only one electric bike, the CE 04; not worth a screen),
+     *    `charging` (only a couple of electric scooters, the CE models; not
+     *    worth a screen),
      *    `people` (a bike carries a rider + maybe a pillion, never a "crew" —
      *    pillion capability is captured by `ridingStyle` below instead),
      *    `style` (comfort<->sporty is folded into `ridingStyle`).

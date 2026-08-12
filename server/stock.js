@@ -28,6 +28,7 @@ import { lookupDealer } from './dealers.js';
 import { mapVehicle, mapMotorradRaw, mapHondaRaw } from './mapping.js';
 import { brandConfig, normalizeBrand } from './brands.js';
 import { parseListingHtml, listingUrl } from './honda-listing.js';
+import { parseResTable } from './motorrad-listing.js';
 
 // Repo root, from this module's location (server/ → ..). Used to resolve the
 // fixtures directory for fixtures-backed brands without depending on cwd.
@@ -377,74 +378,116 @@ async function hondaLiveStock(opts = {}) {
 }
 
 /* --------------------------- live Motorrad feed ----------------------- *
- * Motorrad's approved-used stock is served by a session-gated ASP.NET app
- * behind ResultOverview/ShowResultsFilterChanged: a POST endpoint that takes a
- * filter body and returns the result set inside a SearchFilter envelope. It is
- * cross-origin and iframe-embedded, and returns a NULL envelope to any request
- * without a live GMB session (see the Motorrad section of DECISIONS.md), so it
- * cannot be reached from this environment — which is why Motorrad ships on
- * curated fixtures today.
+ * Motorrad's approved-used stock is served by a session-gated AngularJS app
+ * (ng-app="GMBApp") behind POST /api/ResultOverview/ShowResults: it takes a
+ * compact filter body and returns a SearchFilter envelope whose `ResTable` is a
+ * server-rendered HTML <table> string, one <tr> per bike (see motorrad-listing.js
+ * for the parse). The feed authenticates with a `GMB-SID` request header and
+ * answers a request without one with a NULL envelope.
  *
- * This is the real adapter, wired against that discovered contract. It stays
- * dormant while the registry says `source: 'fixtures'`; flip Motorrad to
- * `source: 'live-motorrad'` (and run from an origin that carries a session, or
- * pass MOTORRAD_SESSION) and it lights up with NO other change. It reuses the
- * same map-then-filter path and the same StockUnavailableError contract as the
- * BMW/MINI feed, so a caller can't tell a live brand from a fixtures one.
+ * The breakthrough (confirmed live 2026-08-12): that GMB-SID is NOT minted by JS
+ * or a bootstrap endpoint — the server embeds a fresh one in the results landing
+ * page as a hidden field <input id="hfSID" value="…"> (base64 of
+ * "<caller-ip>;<guid>", UTF-16LE), and the app just reads it with
+ * $("#hfSID").val(). So this environment can self-issue a session with no browser:
+ * GET the landing page, scrape #hfSID, send it as GMB-SID. Proven cold end to end
+ * (scripts/motorrad-live-probe.mjs) and used to build the committed 963-bike
+ * snapshot (scripts/fetch-motorrad-all-pages.mjs). See the Motorrad-live section
+ * of DECISIONS.md.
+ *
+ * This adapter walks every page (the feed is 20/page against ~963 bikes),
+ * concatenating and de-duping the HTML rows, then maps them through the SAME
+ * mapMotorradRaw the fixtures use. It stays dormant while the registry says
+ * `source: 'fixtures'`; flip Motorrad to `source: 'live-motorrad'` and it lights
+ * up with no other change, degrading to the snapshot on any failure so the deck
+ * is never blank. It reuses the same cache/warm/StockUnavailableError contract as
+ * the BMW/MINI feed, so a caller can't tell a live brand from a fixtures one.
  * --------------------------------------------------------------------- */
 
-// The result-overview endpoint, relative to the brand origin. Confirmed live
-// this session: the app's own bundle builds it as `<ApplPath>api/` + route (see
-// ServiceCallResOV.showResOverviewFilterChanged), and ApplPath on the UK site is
-// "/", so the JSON route is /api/ResultOverview/ShowResultsFilterChanged. The
-// older /UK/... path returns the HTML shell, not JSON. Kept here (not in the
-// registry) because it's an implementation detail of this adapter.
-const MOTORRAD_FEED_PATH = '/api/ResultOverview/ShowResultsFilterChanged';
+// The results feed and the landing page that issues the session, relative to the
+// brand origin. ShowResults is the working JSON route (the older
+// ShowResultsFilterChanged answers but is not what the paged grid calls);
+// ergebnisse.cshtml is the results shell that embeds #hfSID. Kept here (not the
+// registry) because they're implementation details of this adapter.
+const MOTORRAD_FEED_PATH = '/api/ResultOverview/ShowResults';
+const MOTORRAD_LANDING_PATH = '/UK/ergebnisse.cshtml';
 
-// The GMB session id. The endpoint authenticates with a `GMB-SID` REQUEST HEADER
-// (the bundle reads it from the page's hidden #hfSID field: a base64 of
-// "<caller-ip>;<guid>" the server issues per session and binds to that browser).
-// With the correct route + header the endpoint returns real JSON; without the
-// SID it returns a null envelope. The SID is issued to a live browser session,
-// so it's supplied out-of-band by the host (never invented here).
+// An explicit session override. Normally the adapter self-issues a GMB-SID by
+// scraping #hfSID from the landing page (mintMotorradSid), so this stays empty;
+// set it only to force a specific captured session (e.g. debugging from a fixed
+// IP). When set it skips the mint step.
 const MOTORRAD_SESSION = process.env.MOTORRAD_SESSION || '';
 
-// The filter body the endpoint expects. Confirmed this session: MarktId (2 for
-// the UK market, from the page's #hfMarktID) is required, and InitFilter:true
-// asks for the unfiltered result set (all approved-used bikes); the matcher does
-// its own scoring downstream, so we pull the whole pool once rather than
-// round-tripping the site's own facets. The market/culture fields mirror the
-// page's hidden inputs. Extra facets can be merged in later without touching the
-// plumbing.
+// Safety cap on pagination. The real deck is ~963 bikes at 20/page (~49 pages);
+// this bounds a runaway loop if the feed never runs dry, well above the real
+// page count. Lower it to shrink the live deck (and cold-fetch latency).
+const MOTORRAD_PAGE_LIMIT = Number(process.env.MOTORRAD_PAGE_LIMIT) || 60;
+const MOTORRAD_PAGE_SIZE = 20; // the feed's fixed pagingSize
+
+// Pages fetched at once. Sequential paging over ~49 pages took ~90s cold — far
+// too slow for a user on a cold cache. The pages are independent once we hold a
+// session, so we fetch them in batches: each batch's pages go out concurrently,
+// and we stop requesting batches as soon as one comes back short/dry. 8 keeps us
+// a polite guest (not 49 sockets at once) while cutting cold latency ~8x.
+const MOTORRAD_PAGE_BATCH = Number(process.env.MOTORRAD_PAGE_BATCH) || 8;
+
+// The filter body the ShowResults endpoint expects — the compact request object
+// the app's paged grid posts (captured from a live session). Marke:10 is BMW
+// Motorrad and the empty facet arrays mean "no filter" (the whole approved-used
+// pool); the matcher does its own scoring downstream, so we pull everything and
+// page through it. `selectedPage` is rewritten per request; everything else is
+// constant. Extra facets can be merged in later without touching the plumbing.
 const MOTORRAD_FILTER_BODY = {
-  InitFilter: true, MarktId: 2, MarktISO2: 'UK', RC: 'en-gb',
+  InitFilter: false, IsFirstCall: false, MarktId: '2', BuNo: '', Culture: 'en-gb',
+  Segment: [], FuelType: [], Marke: 10, Modell: [], Fahrzeugart: 0, Antrieb: 0,
+  EZV: 0, EZB: 0, PreisVon: '', PreisBis: '', KMVon: '', KMBis: '', KWVon: '', KWBis: '',
+  PowerUnit: 'HP', Farbe1Auswahl: [], Merkmale: '', Umkreis: 1, UmkreisPLZ: '',
+  AngebotsNo: '', DetailAngebotsNo: '', Sonderausstattung: '', isSondermodell: false,
+  Pakete: '', FilterHMFAChanged: false, FilterEZChanged: 0, FilterColorChanged: false,
+  ResOverviewData: {
+    pagingSize: MOTORRAD_PAGE_SIZE, currResultCountToShow: MOTORRAD_PAGE_SIZE,
+    selectedPage: 1, totalItemCount: 0, tableSortColumn: 16, tableSortDirection: 0,
+    pageItemsToShow: 9,
+  },
+  DetailData: { RowNumber: 0 }, currRequest: 1,
 };
 
 /**
- * Dig the vehicle rows out of the SearchFilter envelope. The contract nests the
- * rows under SearchFilter.ResOverviewData.ResTable (with a totalItemCount
- * alongside); older captures put them directly under ResTable. We accept either
- * and normalise to a flat array, so a shape drift on their side degrades to
- * "empty" (a clean StockUnavailableError) rather than a crash.
+ * Dig the vehicle rows out of the SearchFilter envelope, as FLAT raw records
+ * ready for mapMotorradRaw.
+ *
+ * The real feed (confirmed against a captured live response) does NOT return a
+ * JSON array of vehicle objects — it returns `ResTable` as a server-rendered
+ * HTML <table> string, one <tr> per bike, each with a real per-vehicle photo.
+ * So we parse that HTML (motorrad-listing.js) rather than reading array fields.
+ * `ResTable` may sit at the envelope root or under SearchFilter; accept either.
+ *
+ * For resilience we still accept a pre-parsed array (a future JSON feed, or a
+ * capture already reduced to rows): if `ResTable` is an array we pass it through
+ * motorradRowToRaw; if it's an HTML string we parse it. Anything else → empty
+ * (a clean StockUnavailableError upstream) rather than a crash.
  */
 export function motorradRowsFromEnvelope(env) {
   const sf = env?.SearchFilter ?? env;
-  const table = sf?.ResOverviewData?.ResTable ?? sf?.ResTable ?? env?.ResTable;
+  const table = env?.ResTable ?? sf?.ResTable ?? sf?.ResOverviewData?.ResTable;
+  if (typeof table === 'string') return parseResTable(table); // the real shape
   const rows = table?.Items ?? table?.items ?? (Array.isArray(table) ? table : []);
-  return Array.isArray(rows) ? rows : [];
+  return Array.isArray(rows) ? rows.map(motorradRowToRaw) : [];
 }
 
 /**
- * Project one live result row into the flat shape mapMotorradRaw consumes. The
- * live field names aren't confirmable from here (the endpoint won't answer
- * without a session), so this reads a spread of plausible keys and leaves the
- * canonical projection (category, cc, licence band, blurb) to mapMotorradRaw —
- * the same mapper the fixtures go through. When the real field names land, only
- * this adapter changes; mapMotorradRaw and everything downstream stay put.
+ * Project one JSON result row into the flat shape mapMotorradRaw consumes.
+ *
+ * The live feed returns HTML rows (handled by parseResTable), not JSON objects,
+ * so this is only reached if the feed ever grows a JSON array variant. It reads
+ * a spread of plausible keys and leaves the canonical projection (category, cc,
+ * licence band, blurb) to mapMotorradRaw — the same mapper the HTML rows and the
+ * fixtures go through. A record already in flat shape (id/title/price/image)
+ * passes straight through.
  */
 export function motorradRowToRaw(row = {}) {
-  // sliderImageLinks/ImageLinks are arrays of photo URLs (the app binds the first
-  // to the overview thumbnail via item.ImageSrc); take the first as the card photo.
+  // Already a flat parsed record? Pass it through untouched.
+  if (row.title !== undefined && row.price !== undefined) return row;
   const firstImage = (v) => (Array.isArray(v) ? v.find(Boolean) : v) || undefined;
   return {
     id: row.Id ?? row.id ?? row.AngebotsNo ?? row.StockNumber ?? row.VehicleId,
@@ -453,37 +496,68 @@ export function motorradRowToRaw(row = {}) {
     mileage: row.Mileage ?? row.KM ?? row.Odometer ?? row.Miles,
     reg: row.Registration ?? row.Reg ?? row.NumberPlate,
     fuel: row.Fuel ?? row.FuelType ?? row.Antrieb,
-    // Overview rows carry ImageSrc; detail/slider rows carry sliderImageLinks /
-    // ImageLinks arrays. Accept all, first URL wins. (Field names confirmed from
-    // the site's own Angular bundle this session.)
     image: firstImage(row.ImageSrc ?? row.sliderImageLinks ?? row.ImageLinks
       ?? row.ThumbnailLinks ?? row.ImageUrl ?? row.Image ?? row.MainImage),
     link: row.DetailUrl ?? row.Url ?? row.Link,
   };
 }
 
-/** Fetch and map the whole live Motorrad pool. Throws StockUnavailableError on
- *  any failure (no session, non-200, null envelope, non-JSON, empty result), so
- *  it drops into the same degrade-to-fixtures/error path as the BMW/MINI feed. */
-async function motorradLiveStock(origin) {
-  const url = `${origin}${MOTORRAD_FEED_PATH}`;
-  const headers = {
-    Referer: `${origin}/UK/Home.cshtml?id=UK&RC=en-gb`,
-    Accept: 'application/json, text/plain, */*',
-  };
-  // The endpoint authenticates with a GMB-SID request header (the value the site
-  // embeds in #hfSID). Forward one if the host supplied it. Without it the
-  // endpoint answers 200 but with a null envelope (no live session).
-  if (MOTORRAD_SESSION) headers['GMB-SID'] = MOTORRAD_SESSION;
+/**
+ * Read the GMB-SID the server embeds in the results landing page.
+ *
+ * The page carries `<input id="hfSID" value="<base64>">`; that value IS the
+ * session the feed wants as its GMB-SID header (base64 of "<caller-ip>;<guid>").
+ * A cold GET of the landing page mints a fresh one bound to this caller, so no
+ * browser or out-of-band capture is needed. Returns the raw base64 value, or
+ * throws StockUnavailableError if the field is absent (page shape changed).
+ */
+export function parseMotorradSid(html) {
+  return (String(html).match(/id="hfSID"[^>]*value="([^"]*)"/) || [])[1] || null;
+}
 
+async function mintMotorradSid(origin) {
   let res;
   try {
-    res = await httpsPostJson(url, MOTORRAD_FILTER_BODY, headers);
+    res = await httpsGet(`${origin}${MOTORRAD_LANDING_PATH}`, { Accept: 'text/html' });
   } catch (cause) {
-    throw new StockUnavailableError('Motorrad live feed request failed', { cause });
+    throw new StockUnavailableError('Motorrad landing page fetch failed', { cause });
   }
   if (res.status !== 200) {
-    throw new StockUnavailableError(`Motorrad feed returned HTTP ${res.status}`);
+    throw new StockUnavailableError(`Motorrad landing page returned HTTP ${res.status}`);
+  }
+  const sid = parseMotorradSid(res.body);
+  if (!sid) {
+    throw new StockUnavailableError('Motorrad landing page had no #hfSID session field');
+  }
+  return sid;
+}
+
+/** The filter body with `selectedPage` set to n (deep-copied so the constant
+ *  template is never mutated). */
+function motorradBodyForPage(n) {
+  return {
+    ...MOTORRAD_FILTER_BODY,
+    ResOverviewData: { ...MOTORRAD_FILTER_BODY.ResOverviewData, selectedPage: n },
+  };
+}
+
+/** POST one page of the feed with the session header. Returns the parsed
+ *  envelope, or throws StockUnavailableError (non-200, non-JSON, null envelope). */
+async function motorradFetchPage(origin, sid, page) {
+  const headers = {
+    'GMB-SID': sid,
+    Origin: origin,
+    Referer: `${origin}${MOTORRAD_LANDING_PATH}`,
+    Accept: 'application/json, text/plain, */*',
+  };
+  let res;
+  try {
+    res = await httpsPostJson(`${origin}${MOTORRAD_FEED_PATH}`, motorradBodyForPage(page), headers);
+  } catch (cause) {
+    throw new StockUnavailableError(`Motorrad feed request failed on page ${page}`, { cause });
+  }
+  if (res.status !== 200) {
+    throw new StockUnavailableError(`Motorrad feed returned HTTP ${res.status} on page ${page}`);
   }
   let env;
   try {
@@ -491,16 +565,83 @@ async function motorradLiveStock(origin) {
   } catch (cause) {
     throw new StockUnavailableError('Motorrad feed returned non-JSON', { cause });
   }
-  // A null SearchFilter is the signature of a request with no live session.
-  if (env?.SearchFilter === null && env?.ResTable == null) {
+  // A null ResTable is the signature of a request with no live session.
+  if (env?.ResTable == null) {
     throw new StockUnavailableError(
-      'Motorrad feed returned a null envelope (no live session)',
+      `Motorrad feed returned a null envelope on page ${page} (session not accepted)`,
     );
   }
-  const bikes = motorradRowsFromEnvelope(env)
-    .map(motorradRowToRaw)
-    .map(mapMotorradRaw)
-    .filter(Boolean);
+  return env;
+}
+
+/**
+ * Fetch and map the WHOLE live Motorrad pool.
+ *
+ * Self-issues a session (mintMotorradSid, unless MOTORRAD_SESSION overrides),
+ * then walks the paged feed until it runs dry. Each ResTable is parsed to flat
+ * rows and de-duped by offer id, and the rows map through the shared
+ * mapMotorradRaw — the identical projection the snapshot uses, so a live bike is
+ * indistinguishable from a fixture one.
+ *
+ * Why walk-until-dry rather than trust a total: the feed does NOT compute
+ * totalItemCount server-side — it echoes back whatever the request body sends (a
+ * fresh request with totalItemCount:0 gets 0 back), so the count can't drive the
+ * loop. Instead we fetch pages in concurrent batches and stop once a batch runs
+ * dry — a page comes back short (fewer than a full page of rows) or adds no new
+ * bikes (the feed clamps to the last page past the end) — bounded by
+ * MOTORRAD_PAGE_LIMIT. Self-correcting: it reads the real number of pages without
+ * hardcoding the inventory size, and the batching keeps cold latency low.
+ *
+ * Throws StockUnavailableError on any failure (no session, non-200, null
+ * envelope, empty result) so it drops into the same degrade-to-fixtures path as
+ * the BMW/MINI feed. A first-page failure is fatal (nothing to serve); a
+ * later-page failure ends pagination with what we have, so a session that
+ * expires mid-walk still yields a usable partial deck rather than nothing.
+ */
+async function motorradLiveStock(origin) {
+  const sid = MOTORRAD_SESSION || (await mintMotorradSid(origin));
+
+  const byId = new Map();
+  let done = false;
+  let firstError = null;
+
+  // Fetch pages in concurrent batches. Within a batch the requests overlap; we
+  // fold results in page order so the "short/dry page" stop is deterministic
+  // regardless of which request settled first.
+  for (let start = 1; start <= MOTORRAD_PAGE_LIMIT && !done; start += MOTORRAD_PAGE_BATCH) {
+    const pageNums = [];
+    for (let p = start; p < start + MOTORRAD_PAGE_BATCH && p <= MOTORRAD_PAGE_LIMIT; p += 1) {
+      pageNums.push(p);
+    }
+    // eslint-disable-next-line no-await-in-loop
+    const settled = await Promise.all(
+      pageNums.map((p) =>
+        motorradFetchPage(origin, sid, p).then(
+          (env) => ({ p, rows: parseResTable(env.ResTable) }),
+          (err) => ({ p, err }),
+        )),
+    );
+    for (const { p, rows, err } of settled) {
+      if (err) {
+        // A first-page failure is fatal; a later-page failure ends the walk with
+        // what we have. Record it and stop folding further pages.
+        if (p === 1) firstError = err;
+        // eslint-disable-next-line no-console
+        else console.warn(`[motorrad] page ${p} failed, stopping with ${byId.size} rows: ${err?.message}`);
+        done = true;
+        break;
+      }
+      let added = 0;
+      for (const row of rows) {
+        if (row?.id && !byId.has(row.id)) { byId.set(row.id, row); added += 1; }
+      }
+      if (rows.length < MOTORRAD_PAGE_SIZE || added === 0) { done = true; break; }
+    }
+  }
+
+  if (firstError) throw firstError;
+
+  const bikes = [...byId.values()].map(mapMotorradRaw).filter(Boolean);
   if (bikes.length === 0) {
     throw new StockUnavailableError('Motorrad feed returned no usable bikes');
   }

@@ -19,9 +19,14 @@ name: Sync vehicle-matcher block to the EDS site
 # 1. The block reads its backend URL from an authored "API" row, NOT from a
 #    data-api attribute (authored EDS content can't set attributes). If that
 #    wiring isn't in apiBase yet, the deployed block falls back to localhost.
-# 2. The block ships NO font files: it names the host site's own licensed
-#    families (verified resolving on the live BMW and MINI pages), so there is
-#    nothing font-related to copy or license here.
+# 2. The block SHIPS its BMW and MINI fonts, under blocks/vehicle-matcher/fonts/
+#    (declared via @font-face in vehicle-matcher.css). The mirror step below is
+#    a full recursive copy, so those files sync to the EDS site automatically —
+#    no extra step. They are the proprietary BMW Type Next / MINI Serif / MINI
+#    Sans faces, so this deployment must stay within a licence that permits
+#    self-hosting them (confirm before syncing to a public production site).
+#    Ford and Honda are NOT packaged: those remain host-first (the dealer site
+#    supplies its own faces), so nothing to copy for them.
 
 on:
   # Manual: Actions tab → this workflow → Run workflow. The Run button appears

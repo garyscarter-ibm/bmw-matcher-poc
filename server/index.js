@@ -626,15 +626,24 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     // warmer then keeps every served brand+retailer fresh. Failures are
     // non-fatal — the request path still fetches on demand.
     startStockWarmer();
+    // Prime every brand's main pool, and the nearby carousel for the two feed
+    // brands that have one (BMW/MINI). Priming a brand also enrols it in the
+    // background warmer (it tracks brands once served), so Motorrad's ~40s live
+    // paged fetch and Honda's live scrape are both paid at boot and kept fresh
+    // off the request path — the first visitor to any brand hits a warm cache.
+    // Ford is fixtures (instant); priming it is harmless and keeps it enrolled.
     Promise.allSettled([
       fetchRetailerStock('bmw'), fetchNearbyStock('bmw'),
       fetchRetailerStock('mini'), fetchNearbyStock('mini'),
+      fetchRetailerStock('honda'),
+      fetchRetailerStock('ford'),
+      fetchRetailerStock('motorrad'),
     ]).then((r) => {
       const failed = r.filter((x) => x.status === 'rejected');
       if (failed.length) {
         console.warn(`[warmer] initial prime: ${failed.length}/${r.length} pools cold (will retry on demand)`);
       } else {
-        console.log('[warmer] initial stock primed (BMW + MINI)');
+        console.log('[warmer] initial stock primed (BMW + MINI + Honda + Ford + Motorrad)');
       }
     });
   });

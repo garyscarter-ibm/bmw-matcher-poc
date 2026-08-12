@@ -7,25 +7,111 @@
  *
  * Reskinned to the BMW / Grassick's design system — see docs/design-tokens.md.
  * Light, sharp, editorial: BMW Blue accent, flat no-radius cards, the
- * BMWTypeNext family (referenced by name; the retailer site loads it site-wide,
- * and we fall through to a neutral geometric system stack in the preview
- * harness where the proprietary font isn't available).
- */
+ * BMW Type Next family.
+ *
+ * -------------------------------------------------------------------------
+ * Packaged brand fonts (@font-face below).
+ *
+ * BMW and MINI use proprietary typefaces (BMW Type Next, MINI Serif, MINI
+ * Sans). Earlier revisions of this block were *host-first only*: the tokens
+ * named the host page's font variables and fell through to Helvetica in the
+ * standalone harness (index.html / GitHub Pages), where there is no host to
+ * inherit from. That is why the fonts didn't render outside an EDS site.
+ *
+ * We now SHIP the fonts with the block (see ./fonts/), so it renders in the
+ * brand typeface everywhere it's embedded — host page or not. Each typeface is
+ * declared ONCE as a single family with real weights (Thin/Light/Regular/Bold
+ * for BMW; Regular/Bold for the MINI faces); weight is carried by font-weight,
+ * never by a per-weight family name. That is the fix for the older bug where
+ * the CSS named families like 'BMWTypeNextLatin-Light' that no host declared,
+ * so every rule silently fell back to Helvetica.
+ *
+ * The files are the exact woff/woff2 the live BMW and MINI retailer sites load.
+ * font-display: swap so text paints immediately in the fallback and swaps to
+ * the brand face when it arrives.
+ * ------------------------------------------------------------------------- */
+
+/* BMW Type Next — shared by BMW cars and BMW Motorrad. woff2 only. */
+@font-face {
+  font-family: 'BMW Type Next';
+  src: url('./fonts/BMWTypeNextLatin-Thin.woff2') format('woff2');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'BMW Type Next';
+  src: url('./fonts/BMWTypeNextLatin-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'BMW Type Next';
+  src: url('./fonts/BMWTypeNextLatin-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'BMW Type Next';
+  src: url('./fonts/BMWTypeNextLatin-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* MINI Serif — display/headline face. woff only (no woff2 published).
+   Note the "bold" file is MINI's Black cut (internal usWeightClass 900); we map
+   it to the 700 the CSS requests so `font-weight: 700` titles resolve to it
+   exactly rather than the browser synthesising bold from the 400 regular. */
+@font-face {
+  font-family: 'MINI Serif';
+  src: url('./fonts/mini_serif-regular-web.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'MINI Serif';
+  src: url('./fonts/mini_serif-bold-web.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* MINI Sans — body/UI face. woff only. The "regular" file is MINI's Medium cut
+   (usWeightClass 500) and the "bold" is a Black (900); both are mapped to the
+   400/700 the CSS asks for so matching is exact. */
+@font-face {
+  font-family: 'MINI Sans';
+  src: url('./fonts/mini_sans_serif-regular-web.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'MINI Sans';
+  src: url('./fonts/mini_sans_serif-bold-web.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 .vm {
   /* --- font ---
-     Host-first. An EDS site declares its own typography in
-     --heading-font-family / --body-font-family, so the block adopts the page's
-     typeface rather than naming families the host has never heard of.
-     That mattered: these used to ask for 'BMWTypeNextLatin-Light/-Regular/
-     -Bold', three families that don't exist on the live dealer site — it
-     declares ONE family, BMWTypeNextLatin, with weights 300/400/700. Every
-     rule silently fell through, so the whole block rendered in Helvetica next
-     to real BMWTypeNext. The literal names are kept as fallbacks for the
-     standalone harness; weight is carried by font-weight, as it should be. */
-  --vm-font-heading: var(--heading-font-family, 'BMWTypeNextLatin', 'BMWTypeNextLatin-Light', 'Helvetica Neue', arial, sans-serif);
-  --vm-font-body: var(--body-font-family, 'BMWTypeNextLatin', 'BMWTypeNextLatin-Regular', 'Helvetica Neue', arial, sans-serif);
-  --vm-font-bold: var(--body-font-family, 'BMWTypeNextLatin', 'BMWTypeNextLatin-Bold', 'Helvetica Neue', arial, sans-serif);
+     Packaged-first. 'BMW Type Next' is declared via @font-face at the top of
+     this file and shipped with the block (./fonts/), so it renders in the BMW
+     typeface everywhere — inside an EDS host AND in the standalone harness,
+     which has no host typography to inherit. One family, real weights: 300
+     Light for headings, 400 Regular for body, 700 Bold for emphasis; weight is
+     carried by font-weight, never by a per-weight family name (naming families
+     like 'BMWTypeNextLatin-Light' is what silently fell through to Helvetica
+     before). The host var is kept as a bridge and the system stack as the last
+     resort if the woff2 fails to load. */
+  --vm-font-heading: 'BMW Type Next', var(--heading-font-family, 'Helvetica Neue'), arial, sans-serif;
+  --vm-font-body: 'BMW Type Next', var(--body-font-family, 'Helvetica Neue'), arial, sans-serif;
+  --vm-font-bold: 'BMW Type Next', var(--body-font-family, 'Helvetica Neue'), arial, sans-serif;
 
   /* --- colour (light theme) --- */
   --vm-ink: #262626;          /* primary text */
@@ -171,27 +257,23 @@
  * button colour. Serif UPPERCASE headlines with tight leading. Everything is a
  * token override + a few MINI-scoped rules — no structural change to the base.
  *
- * Fonts are the HOST SITE'S. A MINI dealer site already declares and licenses
- * MINI's web faces (the live one declares MINISerif-Regular), so the block
- * asks for those by name instead of shipping its own. The four .woff files
- * that used to live in ./fonts were removed with this change: self-hosting
- * them was fine for a private demo but they were publicly served the moment
- * the block was deployed to a real site, which the licence doesn't cover.
- *
- * Consequence to know about: on a host that provides no MINI sans face, body
- * copy falls back to the neutral sans below rather than MINI Sans. Headings,
- * which carry most of the brand character, still resolve from the host.
+ * Fonts are PACKAGED with the block: 'MINI Serif' and 'MINI Sans' are declared
+ * via @font-face at the top of this file and shipped from ./fonts (the exact
+ * .woff files the live MINI retailer site loads). The block therefore renders
+ * in MINI's own faces everywhere it's embedded, host page or standalone
+ * harness alike — it no longer depends on the host declaring them.
  * -------------------------------------------------------------------- */
 
 .vm.vm-mini {
-  /* fonts: serif headings, sans body. Named host-first; weight comes from
-     font-weight (MINI titles set 700 below), not from a per-weight family. */
-  --vm-font-heading: 'MINISerif-Regular', 'MINISerif-Bold', Georgia, 'Times New Roman', serif;
-  /* Bold names the SAME family as body and lets font-weight: 700 do the work.
-     Naming a separate '-Bold' family is what broke BMW: if the host doesn't
-     declare that exact name the whole stack falls through to Helvetica, which
-     is measurably what happened to MINI's buttons and eyebrow labels. */
-  --vm-font-body: 'MINISans', 'MINISansSerif-Regular', 'MINISansSerif-Bold', 'Helvetica Neue', arial, sans-serif;
+  /* fonts: serif headings, sans body. Both are PACKAGED with the block
+     (@font-face at the top of this file: 'MINI Serif' and 'MINI Sans', the
+     exact woff files the live MINI retailer site loads), so they render on a
+     host page and in the standalone harness alike. One family per typeface,
+     weight carried by font-weight (MINI titles set 700 below) — never a
+     per-weight family name, which is what silently fell through to Helvetica
+     before and left MINI's buttons and eyebrow labels un-branded. */
+  --vm-font-heading: 'MINI Serif', Georgia, 'Times New Roman', serif;
+  --vm-font-body: 'MINI Sans', 'Helvetica Neue', arial, sans-serif;
   --vm-font-bold: var(--vm-font-body);
 
   /* colour: black-on-white. The "accent" (primary button fill, selected-state
@@ -295,10 +377,11 @@
  * softly rounded corners and calm, honest motion — no bounce. It reads as
  * plain, practical and trustworthy, which is the brand and the voice.
  *
- * Fonts are the HOST SITE'S, host-first (same rule as MINI): a Honda dealer
- * site declares Honda's own faces, and we ask for them by name with a neutral
- * sans fallback for the standalone harness. We don't ship or self-host Honda's
- * licensed webfonts.
+ * Fonts are the HOST SITE'S, host-first: a Honda dealer site declares Honda's
+ * own faces, and we ask for them by name with a neutral sans fallback for the
+ * standalone harness. We don't ship or self-host Honda's licensed webfonts.
+ * (BMW and MINI ARE packaged from ./fonts — see the @font-face block up top —
+ * because those were the two the brief called for; Honda/Ford weren't.)
  * -------------------------------------------------------------------- */
 .vm.vm-honda {
   /* Sans for both headings and body (Honda has no display serif). Host-first,
@@ -394,10 +477,11 @@
  * sells both a sensible Puma and a Mustang. It reads friendly, capable and
  * plainly British.
  *
- * Fonts are the HOST SITE'S, host-first (same rule as MINI/Honda): a Ford
- * dealer site declares Ford's own faces (FordF1 / Ford Antenna), and we ask
- * for them by name with a neutral sans fallback for the standalone harness.
- * We don't ship or self-host Ford's licensed webfonts.
+ * Fonts are the HOST SITE'S, host-first (same rule as Honda): a Ford dealer
+ * site declares Ford's own faces (FordF1 / Ford Antenna), and we ask for them
+ * by name with a neutral sans fallback for the standalone harness. We don't
+ * ship or self-host Ford's licensed webfonts (BMW and MINI ARE packaged; those
+ * were the two the brief asked for).
  * -------------------------------------------------------------------- */
 .vm.vm-ford {
   /* Sans for both headings and body (Ford has no display serif). Host-first,
@@ -490,10 +574,12 @@
  * marketing sets model names and headlines in caps. Accent is Motorrad blue;
  * the motorsport red is the secondary spot that appears on small highlights. */
 .vm.vm-motorrad {
-  /* Host-first, then a neutral system sans. Motorrad uses the same BMWType
-     family as BMW, so fall through to it, then to a system sans. */
-  --vm-font-heading: var(--heading-font-family, 'BMWMotorrad', 'BMWTypeNextLatin', 'Helvetica Neue', arial, sans-serif);
-  --vm-font-body: var(--body-font-family, 'BMWMotorrad', 'BMWTypeNextLatin', 'Helvetica Neue', arial, sans-serif);
+  /* Motorrad uses the SAME BMW Type Next family as BMW cars, packaged with the
+     block (@font-face at the top of this file), so it inherits the base .vm
+     stack. Redeclared here for clarity: packaged family first, then a neutral
+     system sans if the woff2 fails to load. */
+  --vm-font-heading: 'BMW Type Next', 'Helvetica Neue', arial, sans-serif;
+  --vm-font-body: 'BMW Type Next', 'Helvetica Neue', arial, sans-serif;
   --vm-font-bold: var(--vm-font-body);
 
   /* colour: darker and more assertive than BMW cars. Strong near-black ink, a
@@ -519,18 +605,32 @@
   --vm-pop: 0.36s;
 }
 
-/* Motorrad primary button: Motorrad blue fill, deeper blue on hover (not the
-   base filter). The red is reserved for spot chrome, so the main CTA stays blue
-   and legible. */
+/* Motorrad buttons: BLACK primary fill with UPPERCASE labels — the marque's
+   signature CTA treatment (bmw-motorrad.com). Blue is a LINK/accent colour here,
+   not the button fill, and red stays the spot colour (progress/score/slider), so
+   neither doubles as the primary button. The base .vm-btn-primary fills with
+   --vm-accent (blue for Motorrad), so we override it to black explicitly.
+   The uppercasing lives on .vm-btn below, not the base, so only Motorrad's
+   buttons shout while BMW/MINI/Honda/Ford keep their own casing. */
+.vm.vm-motorrad .vm-btn {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 .vm.vm-motorrad .vm-btn-primary {
-  background: var(--vm-accent);
-  border-color: var(--vm-accent);
-  color: var(--vm-accent-ink);
+  background: var(--vm-ink-strong); /* near-black #0a0a0a */
+  border-color: var(--vm-ink-strong);
+  color: #fff;
 }
 .vm.vm-motorrad .vm-btn-primary:not(:disabled):hover {
   filter: none;
-  background: #004f8a;
-  border-color: #004f8a;
+  background: #000;
+  border-color: #000;
+}
+/* Ghost/secondary keeps the black outline treatment and inherits the uppercase
+   from .vm-btn above; its label colour stays the strong ink. */
+.vm.vm-motorrad .vm-btn-ghost {
+  border-color: var(--vm-ink-strong);
+  color: var(--vm-ink-strong);
 }
 
 /* Motorsport-red spot touches: progress bar, score badge, slider fill and focus
@@ -554,6 +654,26 @@
    selection reads with the sub-brand's motorsport spark. */
 .vm.vm-motorrad .vm-option.is-selected {
   box-shadow: inset 0 0 0 2px var(--vm-accent), inset 4px 0 0 var(--vm-accent-spot);
+}
+
+/* Motorrad headlines: BOLD, tight, uppercase — NOT the base .vm-title's light
+   300. That weight is BMW *cars'* airy editorial register; Motorrad's is the
+   opposite ("tougher, more technical", per the theme note above): its marketing
+   sets model names and headlines heavy and condensed-feeling. Motorrad shares
+   BMW's UPPERCASE treatment but not its lightness, so we keep text-transform
+   (inherited) and override the weight to 700 with tighter tracking. Without this
+   the block rendered Motorrad headlines in thin Light Type Next, reading like a
+   7 Series ad rather than a GS one. Mirror the MINI title override's shape. */
+.vm.vm-motorrad .vm-title,
+.vm.vm-motorrad .vm-question,
+.vm.vm-motorrad .vm-subhead,
+.vm.vm-motorrad .vm-preview-heading,
+.vm.vm-motorrad .vm-nearby-heading {
+  font-family: var(--vm-font-heading);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  line-height: 1.1;
 }
 
 .vm-kicker {

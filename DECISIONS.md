@@ -371,10 +371,12 @@ a deliberate, reversible call.
   and it lights up. **On any failure it degrades to the curated fixtures rather than blanking the
   deck** (the "decide and keep moving" rule), and — like all fixtures brands — it serves no "near
   you" carousel and fetches no colour PDPs.
-  _Superseded on contract detail by [motorrad-images-real-source] / [motorrad-images-gate]: the
-  JSON route is `/api/ResultOverview/...` (not `/UK/...`), auth is a `GMB-SID` **header** (not a
-  cookie), and the body needs `MarktId: 2`. The adapter in `stock.js` was corrected to match; this
-  entry's high-level shape (dormant, degrade-to-fixtures, shared mapper) still holds._
+  _Superseded on contract detail by [motorrad-images-real-source] / [motorrad-images-gate] and then
+  [motorrad-restable-is-html]: the JSON route is `/api/ResultOverview/...` (not `/UK/...`), auth is a
+  `GMB-SID` **header** (not a cookie), the body needs `MarktId: 2`, and — the key correction — the
+  envelope's `ResTable` is an HTML table string parsed by `motorrad-listing.js`, not a JSON array
+  read by field name. The adapter in `stock.js` was corrected to match. This entry's high-level shape
+  (dormant, degrade-to-fixtures, shared mapper) still holds._
 
 ## Testing (Motorrad)
 
@@ -386,12 +388,19 @@ a deliberate, reversible call.
   relies on, with em-dash checks on name and blurb), the bespoke drop/add question shape, the
   `ridingStyle` scoresAs fold, and — the keystone — **the adventure/roadtrips tuning test that
   proves a GS out-ranks an S 1000 RR for an adventure rider**, end to end through the real
-  `applyBespokeAnswers` and `rankCars`. The two adapter tests guard the envelope parser (both
-  shapes + null-safety) and the row→raw→`mapMotorradRaw` contract. Motorrad is also in the
+  `applyBespokeAnswers` and `rankCars`. The live-listing adapter tests (updated for the real HTML
+  shape, see [motorrad-restable-is-html]) pin the parser against a captured `ResTable`
+  (`test/fixtures/motorrad-restable.html`): `splitRows` isolating the result rows, `parseRow`/
+  `parseResTable` field extraction (price, cc, leading-kW power, real `GetImg` photo, detail link),
+  `motorradRowsFromEnvelope` routing a string `ResTable` at either envelope depth (plus the JSON-array
+  resilience fallback and null-safety), the parse→`mapMotorradRaw` contract asserting every bike is
+  engine-valid **with its real photo intact and no em dash in the blurb**, the model-line/category
+  resolution for the five captured rows (nineT not collapsing to R 12 nineT; GS Adventure not
+  defaulting to naked), and the `motorradDisplayName` sales-tail trim. Motorrad is also in the
   headless render matrix (`render.test.js`): all three modes mount and paint for bikes, carry the
   `vm-motorrad` theme class, show the "BMW Motorrad" wordmark on the questions intro, and paint no
-  em dashes. Full suite: **144 green, no BMW/MINI regression** (was 94 at the start of the run; the
-  four added since are the Honda live-listing adapter tests, see [honda-live-tests]).
+  em dashes. Full suite: **150 green, no BMW/MINI/Ford/Honda regression** (was 94 at the start of the
+  run).
 
 - **[motorrad-test-gap] Known gap, logged not closed: the live adapter's NETWORK path is untested.**
   The endpoint won't answer without a live session from this environment, so the POST/handshake/
@@ -399,6 +408,10 @@ a deliberate, reversible call.
   ARE tested (exported for exactly that); the network round-trip and the degrade-on-failure branch
   should get an integration test the first time the adapter runs from an allowed origin (or against
   a recorded session capture). Noted here so it isn't mistaken for covered.
+  _Update (see [motorrad-self-issuing-session]): the network path is now proven live from this
+  environment via the self-issuing session, `parseMotorradSid` (the handshake seam) has a unit test,
+  and `scripts/motorrad-live-probe.mjs` exercises the full cold round-trip. The remaining untested
+  branch is the degrade-to-fixtures-on-failure path, which is still worth a hermetic integration test._
 
 ## Honda goes live
 
@@ -463,6 +476,9 @@ a deliberate, reversible call.
   `ImageSrc` (overview) / `sliderImageLinks` / `ImageLinks` arrays. Verified live: with the correct
   route + header the endpoint returns real `application/json` (was HTML before), proving the
   contract.
+  _Corrected by [motorrad-restable-is-html]: the JSON envelope's `ResTable` is itself an HTML table
+  string, and the per-row photo is a `GetImg` URL on the `ChildImg` anchor — there are no
+  `ImageSrc`/`sliderImageLinks`/`ImageLinks` array fields. The route/header/session findings hold._
 
 - **[motorrad-images-gate] But the rows themselves are gated behind a live browser session.** Even
   with the correct route, a freshly-scraped SID (whose embedded IP matches our egress IP), the
@@ -495,5 +511,111 @@ a deliberate, reversible call.
   the image and adds `.no-photo`. `photosFirst` sinks photo-less cars to the back of the field. So
   the Motorrad deck looks flatter than the photo-bearing brands but shows no broken-image icons and
   no empty media boxes.
+
+## Motorrad images: the capture landed, and the real shape was not what we assumed
+
+- **[motorrad-restable-is-html] Correction: `ResTable` is a server-rendered HTML table, NOT a JSON
+  array of vehicle objects.** A real feed response, captured from a live browser session, settled
+  the shape. The `SearchFilter` envelope's `ResTable` field is a `<table>` string — one `<tr
+  class="… ergebnissColor">` per bike — with `totalItemCount: 963` alongside. Each row carries the
+  real per-vehicle photo as `https://approvedused.bmw-motorrad.co.uk/api/Image/GetImg?imgId=<guid>`
+  on the `ChildImg` anchor, plus cash price, mileage, first-registration, power (`kW (HP)`),
+  capacity (`ccm`), colour and dealer. This **supersedes the field-name detail in
+  [motorrad-images-real-source]** (there is no `ImageSrc`/`sliderImageLinks`/`ImageLinks` array —
+  that was inferred from the Angular bundle and was wrong) and **corrects the earlier premise that
+  the feed "returns no rows"**: it does return real rows, just as HTML. The session gate in
+  [motorrad-images-gate] stands — a scripted request from here still gets the null envelope — but it
+  is a session/auth gate, not a "no data" one. This is exactly why the old fixtures had no images:
+  the synthetic builder never set `image`, AND the reverse-engineered adapter looked for a JSON array
+  that does not exist.
+
+- **[motorrad-html-parser] Built `server/motorrad-listing.js`: a pure HTML parser, mirroring
+  `honda-listing.js`.** Honda taught us the pattern — the site renders its listing server-side, so it
+  is as scrapeable as Honda's. `parseResTable(html)` → `splitRows` (slice on `ergebnissColor`) →
+  `parseRow` → a flat raw record (`{id, title, price, mileage, powerKw, cc, firstReg, year, image,
+  link}`), the exact shape `mapMotorradRaw` consumes. Regexes anchor on stable class names so a
+  cosmetic change degrades a field to null rather than crashing. `stock.js`
+  `motorradRowsFromEnvelope` now detects a **string** `ResTable` and routes it through the parser (a
+  pre-parsed JSON array still projects through `motorradRowToRaw` as a resilience fallback). Two
+  parser bugs found and fixed against real data: power `"81 kW (109 HP)"` was fusing into `81109`
+  (fixed: take the leading kW), and the model-line map had gaps (`R nineT` collapsing to `R 12
+  nineT`, `R 1250 GS Adventure` falling through to a naked default) — fixed by expanding
+  `MODEL_SPECS_MOTORRAD` to the real range and rewriting `motorradLine` with nineT disambiguation
+  first and specific→general canonical-key matching.
+
+- **[motorrad-images-shipped] The deck now ships with real listing photos.** This **supersedes
+  [motorrad-images-decision] and [motorrad-images-degrade]** on the "ships photo-less" state. The
+  user captured the feed and provided it; `scripts/build-motorrad-fixtures-from-capture.mjs` (now
+  accepting a bare `ResTable` HTML fragment as well as a JSON/HAR envelope) rebuilt
+  `fixtures/motorrad-bikes.json` through the same production path the live adapter uses. Result:
+  **5/5 bikes carry a genuine `GetImg` listing photo** (was 0/49), verified end-to-end through
+  `/api/field` — each match's `car.photo` is a real per-vehicle URL, with correct category, honest
+  specs, real mileage and a real detail link. The photo-less degrade path in
+  [motorrad-images-degrade] remains as a safety net for any future row that lacks an image; it is
+  simply not exercised by the current deck. Honesty rule from [motorrad-images-decision] is kept:
+  every photo is the real used-listing image, never a model/press render.
+
+- **[motorrad-deck-size] The deck shrank from 49 synthetic bikes to 5 real ones, on purpose.** The
+  captured response held five visible rows (the full result set is 963, but only the first page's
+  rows were in the capture). The call: a small deck of real, photo-bearing, correctly-specced bikes
+  beats a large deck of synthetic photo-less ones — it fixes the reported bug (no images) and keeps
+  every card honest. When a fuller capture lands (more of the 963), the same one-step rebuild grows
+  the deck with no code change. Logged as a known trade-off, not a silent truncation.
+
+- **[motorrad-display-name] The card heading trims the dealer sales tail off the real title.** Real
+  titles append marketing to the model ("… Ex Demo, Top Spec, Low Miles!", "… TE 2 YEAR BMW
+  WARRANTY"). `motorradDisplayName` keeps the model and its genuine trim/spec pack (Option 719 Gold,
+  Adventure TE, Sport SE) but cuts at the first comma and strips trailing warranty/condition phrases,
+  so a card reads as a bike, not an advert. Follows Honda's precedent of tidying scraped-title
+  artefacts while preserving the trim. Pinned by a test.
+
+## Motorrad goes genuinely live: the session is self-issuing, no browser needed
+
+- **[motorrad-live-endpoint] The real feed is `POST /api/ResultOverview/ShowResults`.** The user
+  captured the browser's own feed request as a cURL; replaying it proved the endpoint. Body is a
+  compact JSON filter envelope (`MarktId:'2'`, `Marke:10` = BMW Motorrad), paged by
+  `ResOverviewData.selectedPage` at `pagingSize:20`. The response is
+  `{ ResOverviewData, ResTable, ErrMsg }` where `ResTable` is the server-rendered HTML table already
+  parsed by `server/motorrad-listing.js` (see [motorrad-restable-is-html]). ~963 bikes, ~49 pages.
+
+- **[motorrad-self-issuing-session] The GMB-SID session token is embedded in the landing page, so a
+  plain server GET self-issues a session — the browser gate from [motorrad-images-gate] is gone.**
+  The cold `ShowResults` POST returns a null envelope because it needs a `GMB-SID` header. That token
+  is NOT minted by JS or a bootstrap endpoint; the AngularJS app reads it via `$("#hfSID").val()`,
+  and the server embeds a fresh one in the results landing page (`/UK/ergebnisse.cshtml`) as
+  `<input id="hfSID" value="…">` (base64 of UTF-16LE `<caller-ip>;<guid>`). So `mintMotorradSid()`
+  does a server-side GET of the landing page, scrapes `#hfSID` (via the exported `parseMotorradSid`),
+  and uses it to authorise the feed POST. Proven cold, end-to-end, no browser
+  (`scripts/motorrad-live-probe.mjs`). This **supersedes [motorrad-images-gate] and the capture-only
+  posture of [motorrad-images-decision]/[motorrad-deck-size]**: Motorrad now runs live like BMW/MINI.
+
+- **[motorrad-totalcount-echo] The feed does NOT compute `totalItemCount` — it echoes back whatever
+  the request body sends.** Send `totalItemCount:0`, get `0` back, so `Math.ceil(0/20)=1` page and
+  the loop stops after page 1 (the captured cURL only worked because its body had `963` baked in).
+  Fix: `motorradLiveStock` **walks until dry** — it keeps paging until a page returns fewer than
+  `pagingSize` rows or adds nothing new, never trusting the echoed total. Documented in the function.
+
+- **[motorrad-batched-paging] Paging is batched 8-wide, not sequential, and warmed at boot.** 49
+  sequential round-trips took ~93s; `MOTORRAD_PAGE_BATCH=8` concurrent requests (folded in page order
+  for a deterministic dry-page stop) cut it to ~38s. `server/index.js` boot-primes Motorrad alongside
+  BMW/MINI/Honda/Ford, so the ~38s cold walk happens once at startup and no user ever pays it. The
+  live path reuses the existing `cachedFetch` single-flight + TTL cache and background warmer; a live
+  failure degrades to `fixtures/motorrad-bikes.json` via `StockUnavailableError`, same as every brand.
+
+- **[motorrad-deck-963] The committed fallback deck is now the full 963 real bikes, all with real
+  photos.** `scripts/fetch-motorrad-all-pages.mjs` replays a captured cURL across every page, dedupes
+  by offer id, projects through the SAME production path (`mapMotorradRaw`), and writes the fixture.
+  Result: 963/963 carry a real `GetImg?imgId=` listing photo, 0 duplicates, 0 invalid. This
+  **supersedes [motorrad-deck-size]** (the 5-bike capture-only deck): the fallback is now the whole
+  approved-used pool, and the live path serves the same pool fresh.
+
+- **[motorrad-line-honesty] Fixed 9 of 963 bikes that resolved to the wrong model family.** An
+  end-to-end audit caught `F 750 GS` titles resolving to `R 1250 GS` (×6), `K 1600 Grand America` to
+  `R 1250 R` (×2), and `K 1300 S` to `R 1250 R` (×1) — wrong badge, wrong cc, wrong category. Root
+  cause: `MODEL_SPECS_MOTORRAD` lacked those three lines and `motorradLine` had no probes for them,
+  so each fell through to a loose family fallback. Added the three spec entries (F 750 GS 853cc
+  adventure; K 1600 Grand America 1649cc tourer; K 1300 S 1293cc sport) and the matching probes in
+  correct specificity order. Cross-family mismatches now 0/963, pinned by a regression test. Follows
+  the standing "stay as real and live as possible" honesty rule: a card must wear its own badge.
 
 <!-- Further decisions appended below as the run proceeds. -->

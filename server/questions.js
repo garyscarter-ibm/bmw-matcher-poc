@@ -60,7 +60,7 @@ export const QUESTIONS = [
       { value: 'roadster', label: 'Roadster', sub: 'Naked, everyday', brands: ['motorrad'] },
       { value: 'naked', label: 'Naked', sub: 'Stripped-back street bike', brands: ['motorrad'] },
       { value: 'heritage', label: 'Heritage', sub: 'Classic boxer character', brands: ['motorrad'] },
-      { value: 'scooter', label: 'Electric scooter', sub: 'Twist-and-go, silent', brands: ['motorrad'] },
+      { value: 'scooter', label: 'Scooter / maxi-scooter', sub: 'Twist-and-go, petrol or electric', brands: ['motorrad'] },
       { value: 'any', label: 'No preference', sub: 'Open to any style' },
     ],
   },
@@ -69,9 +69,10 @@ export const QUESTIONS = [
     title: 'What fuel types suit you?',
     help: 'Pick as many as you like, or let us help you decide.',
     multi: true,
-    // `phev` is gated to the car brands: BMW Motorrad sells petrol bikes plus one
-    // electric (CE 04), no plug-in hybrid, so a rider never sees it. `petrol`,
-    // `ev` and `open` carry no `brands` marker, so they show for every brand.
+    // `phev` is gated to the car brands: BMW Motorrad sells petrol bikes plus a
+    // few electric scooters (the CE models), no plug-in hybrid, so a rider never
+    // sees it. `petrol`, `ev` and `open` carry no `brands` marker, so they show
+    // for every brand.
     options: [
       { value: 'petrol', label: 'Petrol' },
       { value: 'diesel', label: 'Diesel', sub: 'Higher miles, more torque', brands: ['bmw'] },
@@ -207,7 +208,7 @@ const BRAND_COPY = {
     },
     fuel: {
       title: 'Petrol or electric?',
-      help: 'Most of the range is petrol; the CE 04 is fully electric.',
+      help: 'Most of the range is petrol; the CE electric scooters are fully electric.',
       options: {
         petrol: { label: 'Petrol' },
         ev: { label: 'Fully electric', sub: 'Silent, instant torque' },
