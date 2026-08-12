@@ -1,0 +1,283 @@
+/*
+ * Shared "signal" helpers for the game modes (Swipe / MINI Mingle and the
+ * Head-to-head / MINI Knockout championship). Both modes do the same core job:
+ * they let a player express taste over a deck of real stock, then turn that taste
+ * into the SAME answer keys the questions mode produces and hand them to the real
+ * engine. The engine — not the game — picks the match (see the mode docs).
+ *
+ * These helpers are the mode-agnostic, brand-safe pieces of that job:
+ *   - display: SHADE_HEX / swatchFor / priceLabel / gbpShort / cap
+ *   - deck:    shuffle
+ *   - reading: modal / rankByFrequency
+ *   - seed:    budgetBandsFromQuestion / useTilesFromQuestion
+ *   - infer:   swipesToAnswers (swipe) / bracketToAnswers (knockout)
+ *
+ * They were originally private to mingle.js; extracted here so the two game modes
+ * share ONE tuning surface for how taste becomes answers, rather than a drifting
+ * copy. Nothing here is brand-specific: the inference only ever emits values it
+ * actually observed on real cards, so it can never emit a value the brand's engine
+ * would reject (MINI has no saloon/coupe/mpv/diesel — those are brands:['bmw']).
+ */
+
+import { gbp } from '../ui.js';
+
+/*
+ * Below this the engine stops calling its leader a match at all — the client's
+ * "we don't really have this" threshold. Mirror of WEAK_SCORE in
+ * ../vehicle-matcher.js and scripts/persona-check.mjs; kept client-side because
+ * it's a presentation decision, not a server value. When a result's leader
+ * crosses it, the celebration still fires but adds one honest note.
+ */
+export const WEAK_SCORE = 68;
+
+/*
+ * Colour shade → swatch hex, for the card colour bar/tint and the "Colour" taste
+ * bar (§11.4). Brand-neutral and keyed by the NORMALISED shade the feed returns
+ * (car.colour.colour), not marketing names — so it survives "Chili Red" vs
+ * "Rooftop Grey" naming. Unknown shades fall back to a neutral swatch. This is a
+ * small display table, deliberately not the prototype's five hard-coded hexes.
+ */
+export const SHADE_HEX = {
+  red: '#c0392b', orange: '#d35400', yellow: '#e2b100', green: '#1e8449',
+  blue: '#2563a8', purple: '#6c3483', pink: '#c0536a', brown: '#7b5033',
+  beige: '#c9b79c', white: '#f4f4f4', silver: '#c8ccce', grey: '#8a8f93',
+  gray: '#8a8f93', black: '#2a2a2a',
+};
+export const NEUTRAL_SWATCH = '#c8ccce';
+
+/**
+ * Budget tiles for the seed step, derived from the engine's `budget` question
+ * so the range is per-brand (MINI caps ~£50k where BMW reaches £150k+). The
+ * quiz uses a dual-thumb slider; the games want a few tap targets, so we
+ * quantise the engine's `max` into round "up to £Xk" bands plus an open-top
+ * "£Xk plus". Each band is the [min, max] pair the engine expects (see
+ * budgetRange in server/engine.js), so no answer shape changes — only the
+ * control does. Falls back to a sane MINI-ish ladder if the question is missing.
+ *
+ * Returns [{ label, range: [min, max] }]. The last band is open-topped at the
+ * slider max, so a MINI player never sees a £70k tile and a BMW player does.
+ */
+export function budgetBandsFromQuestion(budgetQ) {
+  const max = Number(budgetQ?.max) || 50000;
+  // Round ceilings up to `max`. Steps scale with the range so BMW doesn't get
+  // eight tiles and MINI two: ~£10k steps under £50k, ~£25k above.
+  const step = max <= 50000 ? 10000 : 25000;
+  const tops = [];
+  for (let top = step; top < max; top += step) tops.push(top);
+  const bands = tops.map((top, i) => ({
+    label: i === 0 ? `Under ${gbpShort(top)}` : `Up to ${gbpShort(top)}`,
+    range: [0, top],
+  }));
+  // Open-topped final band, from the last ceiling to the engine's max.
+  const floor = tops.length ? tops[tops.length - 1] : 0;
+  bands.push({ label: `${gbpShort(floor)} plus`, range: [floor, max] });
+  return bands;
+}
+
+/** "£20k", "£150k" — compact money for the budget tiles. */
+export const gbpShort = (n) => (n % 1000 === 0 ? `£${n / 1000}k` : gbp(n));
+
+/**
+ * The `primaryUse` options as the seed's "what's it for" tiles, taken straight
+ * from the engine so the labels/subs are the brand's own (MINI's "Nipping round
+ * town", BMW's "City driving") and any brand-excluded option is already gone.
+ * Returns [{ value, label, sub }]. Falls back to an empty list if the question
+ * is missing — the caller guards on that.
+ */
+export function useTilesFromQuestion(useQ) {
+  return (useQ?.options || []).map((o) => ({ value: o.value, label: o.label, sub: o.sub }));
+}
+
+/** In-place Fisher–Yates. Math.random is fine — this is the game surface, not
+ * the reproducible engine (§4.2 build note). */
+export function shuffle(list) {
+  const a = list.slice();
+  for (let i = a.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** The normalised shade for a car, or null. Prefers the structured shade the
+ * enrichment set; falls back to lower-casing a marketing name's last word. */
+export function shadeOf(car) {
+  const shade = car.colour?.colour;
+  if (shade && SHADE_HEX[shade.toLowerCase()]) return shade.toLowerCase();
+  const name = car.colour?.manufacturerColour || (car.colours && car.colours[0]);
+  if (!name) return null;
+  // Marketing names end in the shade more often than not ("Chili Red").
+  const last = String(name).trim().split(/\s+/).pop().toLowerCase();
+  return SHADE_HEX[last] ? last : null;
+}
+
+/** Swatch hex for a card (neutral when the shade is unknown/unenriched). */
+export const swatchFor = (car) => SHADE_HEX[shadeOf(car)] || NEUTRAL_SWATCH;
+
+/** Price line for a card: single used price, or a grouped range. */
+export function priceLabel(car) {
+  if (car.listingCount > 1 && car.priceFrom !== car.priceTo) return `from ${gbp(car.priceFrom)}`;
+  if (car.priceMin === car.priceMax) return gbp(car.priceMin);
+  return `${gbp(car.priceMin)}–${gbp(car.priceMax)}`;
+}
+
+/** Cap-first a value for display ("electric" → "Electric"). */
+export const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+/*
+ * The modal value in a list, with its share of the total. Used for the taste
+ * bars: {value, count, share} where share is 0–1. Ties break to first seen.
+ */
+export function modal(values) {
+  const counts = new Map();
+  for (const v of values) {
+    if (v == null) continue;
+    counts.set(v, (counts.get(v) || 0) + 1);
+  }
+  let best = null;
+  let bestCount = 0;
+  for (const [v, c] of counts) {
+    if (c > bestCount) { best = v; bestCount = c; }
+  }
+  return best == null ? null : { value: best, count: bestCount, share: bestCount / values.length };
+}
+
+/** Distinct values ranked by frequency: [{value, count}], most-kept first. */
+export function rankByFrequency(values) {
+  const counts = new Map();
+  for (const v of values) {
+    if (v == null) continue;
+    counts.set(v, (counts.get(v) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([value, count]) => ({ value, count }));
+}
+
+/*
+ * Turn a WEIGHTED bag of liked cars (plus the seed answers) into the engine's
+ * answer object — the whole point of the game modes. The result is the SAME shape
+ * the questions mode builds; it goes straight to /api/match.
+ *
+ * `liked` is a flat list of cars where a car appears once per unit of preference:
+ * the swipe game passes each kept car once; the knockout passes each car `weight`
+ * times (how far it advanced), so a crowned car speaks louder than a first-round
+ * exit. Either way the reading below is just frequency over that bag.
+ *
+ * Principle: infer only the *taste* keys, and err toward OMITTING a key over
+ * guessing it — an omitted key lets the engine use its own default, which is
+ * safer than a wrong inference. budget + primaryUse come from the seed and are
+ * never touched here.
+ *
+ * Brand safety: MINI has no saloon/coupe/mpv body or diesel fuel (those options
+ * are brands:['bmw'] in server/questions.js). We only ever emit values we
+ * actually observed on real cards, so we can't emit a value the engine rejects.
+ */
+export function likesToAnswers(liked, seed) {
+  const answers = { ...seed };
+  if (liked.length === 0) return answers;
+
+  // Body / fuel: the distinct values seen among liked cars, most-liked first. Only
+  // keep a preference once at least two "votes" agree, so a single stray like
+  // isn't read as a want (thin data → omit).
+  const bodyByFreq = rankByFrequency(liked.map((c) => c.body));
+  const fuelByFreq = rankByFrequency(liked.map((c) => c.fuel));
+  if (liked.length >= 2) {
+    const bodies = bodyByFreq.filter((b) => b.count >= 2).map((b) => b.value);
+    const fuels = fuelByFreq.filter((f) => f.count >= 2).map((f) => f.value);
+    if (bodies.length) answers.bodyStyles = bodies;
+    if (fuels.length) answers.fuel = fuels;
+  }
+
+  // Style (1–5, sent as a STRING per server/questions.js). Sporty skew → 4/5 if
+  // liked cars lean to sporty bodies or hot trims; else leave the engine's
+  // default rather than asserting "balanced".
+  const sportyBodies = liked.filter((c) => /coupe|convertible|roadster/i.test(c.body || '')).length;
+  const sportyTrims = liked.filter((c) => /\b(jcw|cooper s|m\d|competition|gts?)\b/i.test(
+    `${c.name || ''} ${c.line || ''}`,
+  )).length;
+  const sportyShare = (sportyBodies + sportyTrims) / liked.length;
+  if (sportyShare >= 0.5) answers.style = '5';
+  else if (sportyShare >= 0.25) answers.style = '4';
+
+  // Priorities (max 2). Derive from the pattern, not from a form:
+  //  - consistent colour/body → they're buying with their eyes → image
+  //  - economical fuel liked → economy
+  //  - sporty skew → performance
+  const priorities = [];
+  const colourModal = modal(liked.map((c) => shadeOf(c)).filter(Boolean));
+  const bodyModal = bodyByFreq[0];
+  const looksLed = (colourModal && colourModal.share >= 0.5)
+    || (bodyModal && bodyModal.count / liked.length >= 0.6);
+  if (looksLed) priorities.push('image');
+  const economical = liked.filter((c) => c.fuel === 'ev' || c.fuel === 'phev').length;
+  if (economical / liked.length >= 0.5) priorities.push('economy');
+  if (sportyShare >= 0.5 && !priorities.includes('performance')) priorities.push('performance');
+  if (priorities.length) answers.priorities = priorities.slice(0, 2);
+
+  // Charging is only a real question if the inferred fuel leans electric — and
+  // then we say "open to it" rather than guessing where they'd charge.
+  const fuels = answers.fuel || [];
+  if (fuels.includes('ev') || fuels.includes('phev')) answers.charging = 'either';
+
+  // people: derived from the seed use case, not from taste (a player can fancy a
+  // two-seater and still need to seat a family — §4.1).
+  if (seed.primaryUse === 'family') answers.people = 'family';
+
+  // mileage is deliberately omitted — the game can't read annual miles; the
+  // engine's own default stands.
+  return answers;
+}
+
+/*
+ * Swipe game's inference (§5.3): each KEPT car is one unit of preference. A thin
+ * wrapper over likesToAnswers so the swipe mode keeps its familiar name.
+ */
+export function swipesToAnswers(kept, seed) {
+  return likesToAnswers(kept, seed);
+}
+
+/*
+ * Knockout championship's inference: advancement-weighted taste → engine answers.
+ *
+ * Same discipline as the swipe game (err toward OMITTING; only emit observed,
+ * brand-safe values), but a car's voice scales with how far it advanced. We
+ * express that by REPEATING each car `weight` times into the liked bag, where
+ * weight = the number of rounds the car survived (a first-round loser = 1, a
+ * semi-finalist = 2, the champion = the round count). Feeding that weighted bag
+ * through the SAME likesToAnswers machinery means there is one inference idiom,
+ * not two — the knockout just votes with heavier ballots for cars the player kept
+ * choosing.
+ *
+ * `rounds` is the bracket log: an array (indexed by round, 0 = first round) of
+ * matchups { winner, loser } — the mode records one per head-to-head. The
+ * champion is the winner of the last round.
+ */
+export function bracketToAnswers(rounds, seed) {
+  const totalRounds = rounds.length ? Math.max(...rounds.map((r) => r.roundIndex)) + 1 : 0;
+  // survived[carId] = how many rounds this car won (0 if it lost its first).
+  const survived = new Map();
+  const carById = new Map();
+  for (const m of rounds) {
+    carById.set(idOf(m.winner), m.winner);
+    carById.set(idOf(m.loser), m.loser);
+    survived.set(idOf(m.winner), (survived.get(idOf(m.winner)) || 0) + 1);
+    // A loser that never appears as a winner keeps weight 1 (see below).
+    if (!survived.has(idOf(m.loser))) survived.set(idOf(m.loser), 0);
+  }
+  // Weight = wins + 1, so every car that played gets at least one ballot and the
+  // champion (won `totalRounds` matchups) gets the heaviest. Clamp defensively.
+  const liked = [];
+  for (const [id, wins] of survived) {
+    const car = carById.get(id);
+    const weight = Math.max(1, Math.min(wins + 1, totalRounds + 1));
+    for (let i = 0; i < weight; i += 1) liked.push(car);
+  }
+  return likesToAnswers(liked, seed);
+}
+
+/** Stable-ish identity for a preview car: the PDP link is unique per listing;
+ * fall back to name+price so a feed without links still de-dupes sanely. */
+export function idOf(car) {
+  return car?.link || `${car?.name || ''}|${car?.priceMin ?? ''}`;
+}

@@ -20,8 +20,9 @@
 
 import questions from './questions.js';
 import mingle from './mingle.js';
+import knockout from './knockout.js';
 
-export const MODES = [questions, mingle];
+export const MODES = [questions, mingle, knockout];
 
 export const DEFAULT_MODE = MODES[0];
 

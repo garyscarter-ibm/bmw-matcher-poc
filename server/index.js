@@ -48,6 +48,24 @@ const MAX_BODY_BYTES = 16 * 1024; // quiz answers are tiny; reject anything bigg
 // the block renders however many come back.
 const PREVIEW_COUNT = 9;
 
+// The game modes (swipe deck, knockout bracket) ask /api/field for a *roster* of
+// real stock, not a shortlist — a bracket wants a full field. This is the ceiling
+// on that roster (a Round-of-16 bracket, or a deck): a brand with a big feed like
+// BMW fills it; a thinner feed like MINI returns fewer and the mode adapts down.
+// It does NOT change what the engine scores (still the whole feed via rankCars) —
+// only how many of the ranked cars enter the game. Kept separate from
+// PREVIEW_COUNT so the questions drawer's tuned top-9 is untouched.
+const FIELD_MAX = 16;
+
+/** Clamp a client-supplied roster size into [2, FIELD_MAX]; default to the cap
+ * when it's absent or not a positive number. Two is the smallest playable field
+ * (a single final); above the cap we just return the cap rather than error. */
+function clampFieldSize(raw) {
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n) || n < 2) return FIELD_MAX;
+  return Math.min(n, FIELD_MAX);
+}
+
 const CORS_HEADERS = {
   // Public, read-only tool — responses carry no secrets. Tighten to the EDS
   // origin here if you want to lock it down later.
@@ -206,10 +224,11 @@ function readJsonBody(req) {
 }
 
 /**
- * Parse + validate the { answers, retailer } POST body shared by /api/match
- * and /api/nearby. Returns { answers, retailer } on success, or { error,
- * status } for the caller to send. Kept in one place so both endpoints
- * validate identically.
+ * Parse + validate the { answers, retailer } POST body shared by /api/match,
+ * /api/nearby and /api/field. Returns { answers, retailer, brand, size, enrich }
+ * on success, or { error, status } for the caller to send. Kept in one place so
+ * every endpoint validates identically. `size`/`enrich` are only meaningful to
+ * /api/field (the game-mode roster); the match/nearby handlers ignore them.
  */
 async function readMatchRequest(req) {
   let body;
@@ -232,7 +251,15 @@ async function readMatchRequest(req) {
   // Brand selects the feed (BMW vs MINI). normalizeBrand defaults unknown/absent
   // to BMW, so old clients that don't send a brand keep working.
   const brand = normalizeBrand(body.brand);
-  return { answers, retailer, brand };
+  // Game-mode roster controls (see handleField). A client asking for a bigger
+  // field than FIELD_MAX is clamped, not rejected; absent/garbage falls back to
+  // the cap. `enrich` opts a caller into per-card paint (swipe wants it; the
+  // knockout doesn't pay for 16 PDP fetches on round-one losers).
+  const size = clampFieldSize(body.size);
+  const enrich = body.enrich === true;
+  return {
+    answers, retailer, brand, size, enrich,
+  };
 }
 
 /**
@@ -397,6 +424,69 @@ async function handlePreview(req, res) {
 }
 
 /**
+ * The game modes' roster — the field a swipe deck or a knockout bracket plays.
+ * Same engine, same (cached) retailer stock as /api/match and /api/preview, but
+ * a different *read* of it: a wider slice (up to `size`, capped at FIELD_MAX)
+ * because a bracket wants a full field, not a top-few shortlist. This is the
+ * server half of the client's "one engine, many interfaces" seam — a sibling to
+ * /api/preview, not a replacement: /api/preview stays tuned to the questions
+ * drawer's top-9-with-paint, this serves the games.
+ *
+ * Colour paint is opt-in (`enrich: true`). The swipe deck reads car.colour as a
+ * taste signal so it asks for it (its deck is small — ~10 PDP fetches). The
+ * knockout doesn't: painting all 16 entrants would fetch a PDP for cars that
+ * lose in round one, so it takes the field unpainted and the face-off falls back
+ * to a neutral swatch. Enrichment is best-effort and never throws, exactly as in
+ * handlePreview.
+ */
+async function handleField(req, res) {
+  const {
+    answers, retailer, brand, size, enrich, error, status,
+  } = await readMatchRequest(req);
+  if (error) return sendJson(res, status, { error });
+
+  let cars;
+  try {
+    cars = await fetchRetailerStock(brand, retailer);
+  } catch (err) {
+    if (err instanceof StockUnavailableError) {
+      return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
+    }
+    return sendJson(res, 500, { error: 'Something went wrong finding matches' });
+  }
+
+  // Score the whole feed, then take the roster off the top. Guarded like the
+  // preview: a partial answer set must degrade to "no field yet" (empty, 200),
+  // never take the process down.
+  let matches = [];
+  try {
+    matches = rankCars(applyBespokeAnswers(brand, answers), cars, brandTuning(brand)).slice(0, size);
+  } catch (err) {
+    console.warn('[field] ranking failed:', err?.message);
+  }
+
+  if (enrich) {
+    try {
+      await enrichColours(brand, [
+        ...matches.map((m) => m.car),
+        ...matches.flatMap((m) => m.listings || []),
+      ]);
+      for (const m of matches) {
+        if (m.listings?.length > 1) {
+          m.car.colours = [...new Set(m.listings
+            .map((c) => c.colour?.manufacturerColour || c.colour?.colour)
+            .filter(Boolean))];
+        }
+      }
+    } catch (err) {
+      console.warn('[field] colour enrichment failed:', err?.message);
+    }
+  }
+
+  return sendJson(res, 200, { matches: matches.map(publicMatch) });
+}
+
+/**
  * Cars at OTHER nearby retailers — the slow path (a national, distance-sorted
  * search over several extra pages). Split out from /api/match so its latency
  * never blocks the hero matches. This section is a bonus, so any failure
@@ -483,6 +573,10 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'POST' && pathname === '/api/preview') {
     return handlePreview(req, res);
+  }
+
+  if (req.method === 'POST' && pathname === '/api/field') {
+    return handleField(req, res);
   }
 
   if (req.method === 'POST' && pathname === '/api/nearby') {

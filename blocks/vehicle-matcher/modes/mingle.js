@@ -28,17 +28,14 @@
  * fields the API returns.
  */
 
-import { apiGetQuestions, apiPreview, apiMatch } from '../engine.js';
-import { el, gbp } from '../ui.js';
-
-/*
- * Below this the engine stops calling its leader a match at all — the client's
- * "we don't really have this" threshold. Mirror of WEAK_SCORE in
- * ../vehicle-matcher.js and scripts/persona-check.mjs; kept local because it's a
- * client-side presentation decision, not a server value. When it crosses this
- * at the result, the celebration still fires but adds one honest note (§6.2).
- */
-const WEAK_SCORE = 68;
+import { apiGetQuestions, apiField, apiMatch } from '../engine.js';
+import { el } from '../ui.js';
+import {
+  WEAK_SCORE, SHADE_HEX, NEUTRAL_SWATCH,
+  budgetBandsFromQuestion, useTilesFromQuestion,
+  shuffle, shadeOf, swatchFor, priceLabel, cap, gbpShort,
+  modal, rankByFrequency, swipesToAnswers,
+} from './match-signal.js';
 
 /* How many cards make a good swipe session — enough to read a taste, few enough
  * not to become a chore (§4.2). We sample the preview pool down to this. */
@@ -175,204 +172,17 @@ const MINGLE_COPY = {
 };
 
 /*
- * Colour shade → swatch hex, for the card colour bar/tint and the "Colour" taste
- * bar (§11.4). Brand-neutral and keyed by the NORMALISED shade the feed returns
- * (car.colour.colour), not marketing names — so it survives "Chili Red" vs
- * "Rooftop Grey" naming. Unknown shades fall back to a neutral swatch. This is a
- * small display table, deliberately not the prototype's five hard-coded hexes.
+ * The colour table (SHADE_HEX/NEUTRAL_SWATCH), the seed helpers, the deck/shade/
+ * price/format helpers and the swipe→answers inference all live in
+ * ./match-signal.js now — shared with the knockout mode so the two games read
+ * taste and build the engine brief the same way. This file keeps only the
+ * swipe-specific copy, state and rendering.
  */
-const SHADE_HEX = {
-  red: '#c0392b', orange: '#d35400', yellow: '#e2b100', green: '#1e8449',
-  blue: '#2563a8', purple: '#6c3483', pink: '#c0536a', brown: '#7b5033',
-  beige: '#c9b79c', white: '#f4f4f4', silver: '#c8ccce', grey: '#8a8f93',
-  gray: '#8a8f93', black: '#2a2a2a',
-};
-const NEUTRAL_SWATCH = '#c8ccce';
 
 /* ------------------------------ helpers ------------------------------ */
 
 /** Copy for the active brand, BMW as the fallback (matches ctx.brand shape). */
 const copyFor = (brand) => MINGLE_COPY[brand] || MINGLE_COPY.bmw;
-
-/**
- * Budget tiles for the seed step, derived from the engine's `budget` question
- * so the range is per-brand (MINI caps ~£50k where BMW reaches £150k+). The
- * quiz uses a dual-thumb slider; the swipe game wants a few tap targets, so we
- * quantise the engine's `max` into round "up to £Xk" bands plus an open-top
- * "£Xk plus". Each band is the [min, max] pair the engine expects (see
- * budgetRange in server/engine.js), so no answer shape changes — only the
- * control does. Falls back to a sane MINI-ish ladder if the question is missing.
- *
- * Returns [{ label, range: [min, max] }]. The last band is open-topped at the
- * slider max, so a MINI player never sees a £70k tile and a BMW player does.
- */
-function budgetBandsFromQuestion(budgetQ) {
-  const max = Number(budgetQ?.max) || 50000;
-  // Round ceilings up to `max`. Steps scale with the range so BMW doesn't get
-  // eight tiles and MINI two: ~£10k steps under £50k, ~£25k above.
-  const step = max <= 50000 ? 10000 : 25000;
-  const tops = [];
-  for (let top = step; top < max; top += step) tops.push(top);
-  const bands = tops.map((top, i) => ({
-    label: i === 0 ? `Under ${gbpShort(top)}` : `Up to ${gbpShort(top)}`,
-    range: [0, top],
-  }));
-  // Open-topped final band, from the last ceiling to the engine's max.
-  const floor = tops.length ? tops[tops.length - 1] : 0;
-  bands.push({ label: `${gbpShort(floor)} plus`, range: [floor, max] });
-  return bands;
-}
-
-/** "£20k", "£150k" — compact money for the budget tiles. */
-const gbpShort = (n) => (n % 1000 === 0 ? `£${n / 1000}k` : gbp(n));
-
-/**
- * The `primaryUse` options as the seed's "what's it for" tiles, taken straight
- * from the engine so the labels/subs are the brand's own (MINI's "Nipping round
- * town", BMW's "City driving") and any brand-excluded option is already gone.
- * Returns [{ value, label, sub }]. Falls back to an empty list if the question
- * is missing — the caller guards on that.
- */
-function useTilesFromQuestion(useQ) {
-  return (useQ?.options || []).map((o) => ({ value: o.value, label: o.label, sub: o.sub }));
-}
-
-/** In-place Fisher–Yates. Math.random is fine — this is the game surface, not
- * the reproducible engine (§4.2 build note). */
-function shuffle(list) {
-  const a = list.slice();
-  for (let i = a.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-/** The normalised shade for a car, or null. Prefers the structured shade the
- * enrichment set; falls back to lower-casing a marketing name's last word. */
-function shadeOf(car) {
-  const shade = car.colour?.colour;
-  if (shade && SHADE_HEX[shade.toLowerCase()]) return shade.toLowerCase();
-  const name = car.colour?.manufacturerColour || (car.colours && car.colours[0]);
-  if (!name) return null;
-  // Marketing names end in the shade more often than not ("Chili Red").
-  const last = String(name).trim().split(/\s+/).pop().toLowerCase();
-  return SHADE_HEX[last] ? last : null;
-}
-
-/** Swatch hex for a card (neutral when the shade is unknown/unenriched). */
-const swatchFor = (car) => SHADE_HEX[shadeOf(car)] || NEUTRAL_SWATCH;
-
-/** Price line for a card: single used price, or a grouped range. */
-function priceLabel(car) {
-  if (car.listingCount > 1 && car.priceFrom !== car.priceTo) return `from ${gbp(car.priceFrom)}`;
-  if (car.priceMin === car.priceMax) return gbp(car.priceMin);
-  return `${gbp(car.priceMin)}–${gbp(car.priceMax)}`;
-}
-
-/** Cap-first a value for display ("electric" → "Electric"). */
-const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-
-/*
- * The modal value in a list, with its share of the total. Used for the taste
- * bars: {value, count, share} where share is 0–1. Ties break to first seen.
- */
-function modal(values) {
-  const counts = new Map();
-  for (const v of values) {
-    if (v == null) continue;
-    counts.set(v, (counts.get(v) || 0) + 1);
-  }
-  let best = null;
-  let bestCount = 0;
-  for (const [v, c] of counts) {
-    if (c > bestCount) { best = v; bestCount = c; }
-  }
-  return best == null ? null : { value: best, count: bestCount, share: bestCount / values.length };
-}
-
-/*
- * Turn the KEPT cars (plus the seed answers) into the engine's answer object —
- * the whole point of the mode (§5.3). The result is the SAME shape the questions
- * mode builds; it goes straight to /api/match.
- *
- * Principle: infer only the *taste* keys, and err toward OMITTING a key over
- * guessing it — an omitted key lets the engine use its own default, which is
- * safer than a wrong inference. budget + primaryUse come from the seed and are
- * never touched here.
- *
- * Brand safety: MINI has no saloon/coupe/mpv body or diesel fuel (those options
- * are brands:['bmw'] in server/questions.js). We only ever emit values we
- * actually observed on real cards in this brand's deck, so we can't emit a value
- * the brand's engine would reject.
- */
-function swipesToAnswers(kept, seed) {
-  const answers = { ...seed };
-  if (kept.length === 0) return answers;
-
-  // Body / fuel: the distinct values seen among kept cars, most-kept first. Only
-  // keep a preference once at least two cards agree, so a single stray keep
-  // isn't read as a want (thin data → omit).
-  const bodyByFreq = rankByFrequency(kept.map((c) => c.body));
-  const fuelByFreq = rankByFrequency(kept.map((c) => c.fuel));
-  if (kept.length >= 2) {
-    const bodies = bodyByFreq.filter((b) => b.count >= 2).map((b) => b.value);
-    const fuels = fuelByFreq.filter((f) => f.count >= 2).map((f) => f.value);
-    if (bodies.length) answers.bodyStyles = bodies;
-    if (fuels.length) answers.fuel = fuels;
-  }
-
-  // Style (1–5, sent as a STRING per server/questions.js). Sporty skew → 4/5 if
-  // kept cars lean to sporty bodies or hot trims; else leave the engine's
-  // default rather than asserting "balanced".
-  const sportyBodies = kept.filter((c) => /coupe|convertible|roadster/i.test(c.body || '')).length;
-  const sportyTrims = kept.filter((c) => /\b(jcw|cooper s|m\d|competition|gts?)\b/i.test(
-    `${c.name || ''} ${c.line || ''}`,
-  )).length;
-  const sportyShare = (sportyBodies + sportyTrims) / kept.length;
-  if (sportyShare >= 0.5) answers.style = '5';
-  else if (sportyShare >= 0.25) answers.style = '4';
-
-  // Priorities (max 2). Derive from the pattern, not from a form:
-  //  - consistent colour/body → they're buying with their eyes → image
-  //  - economical fuel kept → economy
-  //  - sporty skew → performance
-  const priorities = [];
-  const colourModal = modal(kept.map((c) => shadeOf(c)).filter(Boolean));
-  const bodyModal = bodyByFreq[0];
-  const looksLed = (colourModal && colourModal.share >= 0.5)
-    || (bodyModal && bodyModal.count / kept.length >= 0.6);
-  if (looksLed) priorities.push('image');
-  const economical = kept.filter((c) => c.fuel === 'ev' || c.fuel === 'phev').length;
-  if (economical / kept.length >= 0.5) priorities.push('economy');
-  if (sportyShare >= 0.5 && !priorities.includes('performance')) priorities.push('performance');
-  if (priorities.length) answers.priorities = priorities.slice(0, 2);
-
-  // Charging is only a real question if the inferred fuel leans electric — and
-  // then we say "open to it" rather than guessing where they'd charge.
-  const fuels = answers.fuel || [];
-  if (fuels.includes('ev') || fuels.includes('phev')) answers.charging = 'either';
-
-  // people: derived from the seed use case, not from swipes (a swiper can fancy a
-  // two-seater and still need to seat a family — §4.1).
-  if (seed.primaryUse === 'family') answers.people = 'family';
-
-  // mileage is deliberately omitted — swiping can't read annual miles; the
-  // engine's own default stands.
-  return answers;
-}
-
-/** Distinct values ranked by frequency: [{value, count}], most-kept first. */
-function rankByFrequency(values) {
-  const counts = new Map();
-  for (const v of values) {
-    if (v == null) continue;
-    counts.set(v, (counts.get(v) || 0) + 1);
-  }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([value, count]) => ({ value, count }));
-}
 
 /* ------------------------------ mount ------------------------------ */
 
@@ -502,11 +312,15 @@ function mount(root, ctx) {
 
   /* --------------------------- deck loading --------------------------- */
   const loadDeck = async () => {
-    // Skeleton the deck panel while /api/preview is in flight. Not the seed —
+    // Skeleton the deck panel while /api/field is in flight. Not the seed —
     // this is the swipe stage arriving.
     renderDeckSkeleton();
-    // apiPreview resolves-empty (never throws), so no try/catch needed here.
-    const matches = await apiPreview(ctx.api, state.seed, ctx.retailer, ctx.brand);
+    // apiField resolves-empty (never throws), so no try/catch needed here. The
+    // swipe deck asks for DECK_TARGET cars WITH colour paint (enrich: true) —
+    // card paint and the "Colour" bar read car.colour as a taste signal, and the
+    // deck is small enough to pay the per-card PDP fetch. (The knockout omits
+    // enrich; see knockout.js.)
+    const matches = await apiField(ctx.api, state.seed, ctx.retailer, ctx.brand, DECK_TARGET, true);
     if (!matches.length) {
       renderEmptyPool();
       return;

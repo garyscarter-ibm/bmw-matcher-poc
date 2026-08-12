@@ -45,7 +45,8 @@ architecture we don't have:
 
 Everything the PRD says about the *questionnaire*, *Your Match* page and *This or
 That* knockout is **out of scope here** — the questionnaire already exists as the
-`questions` mode; "This or That" will be its own mode, spec'd separately.
+`questions` mode; "This or That" is now its own mode, the `knockout` championship
+("Head to head"), spec'd in [`mini-knockout-requirements.md`](./mini-knockout-requirements.md).
 
 ### 1.0 What this is — the core idea
 
@@ -120,7 +121,7 @@ blocks/vehicle-matcher/
     index.js        # + import mingle;  MODES = [questions, mingle]
     questions.js    # unchanged
     mingle.js       # NEW — everything in this document
-  engine.js         # reused as-is (apiPreview drives the deck; apiMatch the result)
+  engine.js         # apiField drives the deck (roster read); apiMatch the result
   ui.js             # reused (el, cardinal, gbp); add shared helpers only if a 3rd mode needs them
   vehicle-matcher.css # + a .vm-mingle-* section (scoped, brand-themed via tokens)
 ```
@@ -255,19 +256,29 @@ can't dependably read**:
 
 ### 4.2 The deck — real stock, scoped by the seed
 
-The deck is fetched from **`POST /api/preview`** via the existing
-`apiPreview(base, answers, retailer, brandKey)` in `engine.js`, passing the
-**seed answers** from §4.1 (not an empty brief). That endpoint returns a slice of
-the retailer's **live** stock (`PREVIEW_COUNT = 9` today, server-owned) as
-`{ matches: [...] }`, each match carrying only public display fields — already
-filtered to the budget and skewed toward the use case. So from card one the deck
-is **affordable and sensible**; the swipes then refine taste within it.
+The deck is fetched from **`POST /api/field`** via
+`apiField(base, answers, retailer, brandKey, size, enrich)` in `engine.js`, passing
+the **seed answers** from §4.1 (not an empty brief), a `size` of `DECK_TARGET`, and
+`enrich: true`. That endpoint returns a roster of the retailer's **live** stock (up
+to `size`, server-clamped to `FIELD_MAX = 16`) as `{ matches: [...] }`, each match
+carrying public display fields **plus colour paint** (because the deck asked to be
+enriched — see below) — already filtered to the budget and skewed toward the use
+case. So from card one the deck is **affordable and sensible**; the swipes then
+refine taste within it.
 
-> Why `/api/preview` and not `/api/match` for the deck: `/api/match` returns the
-> narrow hero set (top 3) for a *completed* brief; `/api/preview` returns a wider
-> slice and tolerates a **partial** brief (here: budget + use, taste still
+> Why `/api/field` and not `/api/match` for the deck: `/api/match` returns the
+> narrow hero set (top 3) for a *completed* brief; `/api/field` returns a wider
+> roster and tolerates a **partial** brief (here: budget + use, taste still
 > unknown). A swipe deck wants breadth around the seed, not the final three.
 > `/api/match` comes later, once the swipes have filled in the taste (§5.3).
+>
+> Why `/api/field` and not `/api/preview`: `/api/preview` is the *questions-mode*
+> "best guess" drawer — capped at `PREVIEW_COUNT = 9` and always paint-enriched.
+> The games (this deck, the knockout bracket) want a controllable **roster**, so
+> they read the sibling `/api/field` (same engine, same cached stock) which takes a
+> `size` and an opt-in `enrich` flag. The swipe deck passes `enrich: true` because a
+> card's paint is a first-class taste signal (§5.2) and the deck is small; the
+> knockout omits it so a 16-car field doesn't fetch a PDP per round-one loser.
 
 - **Shuffle the deck — do NOT swipe in rank order.** Within the seed-scoped pool,
   order is a *game* concern, not a ranking one. A deck sorted best-to-worst kills
@@ -276,10 +287,10 @@ is **affordable and sensible**; the swipes then refine taste within it.
   promo needs most. Randomise client-side each session. The engine still does the
   real ranking, but at the **result** (§5.3), not in the swipe order.
 - **A wider pool than the final three, for variety.** A lucky-dip wants breadth
-  and the odd wildcard. `PREVIEW_COUNT = 9` is a reasonable start; if the deck
-  feels thin, raise `PREVIEW_COUNT` server-side or add a dedicated wider slice —
-  the mode reads whatever it's sent and must **not** assume a fixed count. (This
-  is the one small server-side lever worth flagging; it isn't required for v1.)
+  and the odd wildcard. The deck asks `/api/field` for `DECK_TARGET` cars; the
+  server clamps to `FIELD_MAX = 16` and returns however many the live feed fills.
+  The mode reads whatever it's sent and must **not** assume a fixed count. (To
+  widen or narrow the deck, change `DECK_TARGET` client-side — no server change.)
 - **Deck size = whatever the mode decides from what it's sent** (0…N). Never
   hard-code 10 (the PRD's number). Drive the progress counter and dot row off the
   live deck length. A good swipe session is ~8–12 cards; sample down to that if
@@ -723,8 +734,8 @@ tail is polish that can be cut under time pressure (§6.3).
    questions (labels + slider `max`), NOT local constants → a starting `answers`
    object (`budget` + `primaryUse`, real keys from `server/questions.js`).
    Empty-pool guard before swiping (§4.2).
-3. `mount`: skeleton → after the seed, `apiPreview(ctx.api, base, seedAnswers,
-   ctx.retailer, ctx.brand)` → **shuffle + sample** to an ~8–12-card deck (§4.2);
+3. `mount`: skeleton → after the seed, `apiField(ctx.api, seedAnswers,
+   ctx.retailer, ctx.brand, DECK_TARGET, true)` → **shuffle + sample** to an ~8–12-card deck (§4.2);
    never await before returning.
 4. Card renderer from `publicCar` fields (§4.3): real `car.photo`, `gbp()` price,
    fuel/body pills, colour bar/tint (§11.4), **flirty badge** (§4.4 — no scored

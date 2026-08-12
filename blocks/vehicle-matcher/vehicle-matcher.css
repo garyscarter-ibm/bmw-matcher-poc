@@ -2079,3 +2079,113 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   .vm-mingle-skel-card,
   .vm-mingle-skel-hero { animation: none; background-image: none; }
 }
+
+/* ======================================================================
+   MINI Knockout (the `knockout` / "Head to head" mode)
+   ----------------------------------------------------------------------
+   The championship "This or That". It shares the swipe game's card, hero, why,
+   CTA, confetti and seed vocabulary (the .vm-mingle-* classes above) so the two
+   games look of a piece; the classes below are ONLY the structure that's new to
+   a knockout — the two-up face-off, the bracket progress rail, and the pick
+   fly-out. All tokens, no hex; MINI tweaks fold in under .vm.vm-mini at the end.
+   ====================================================================== */
+
+.vm-knockout-stage { padding: var(--vm-space-6) var(--vm-space-1) var(--vm-space-8); }
+
+/* Progress rail — round name on the left, "Match n of m" on the right. Doubles
+   as the "where am I in the tournament" cue that a full bracket tree would give,
+   without drawing one (out of scope v1). */
+.vm-knockout-rail {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--vm-space-3);
+  margin-bottom: var(--vm-space-3);
+}
+.vm-knockout-round {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--vm-accent-spot);
+}
+.vm-knockout-count { font-size: var(--vm-text-label); color: var(--vm-ink-muted); }
+.vm-knockout-hint { margin: 0 0 var(--vm-space-5); }
+
+/* The face-off: two contenders with a "vs" between. Stacked on narrow screens
+   (the "or" sits between the rows), side-by-side from 560px. */
+.vm-knockout-faceoff {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: var(--vm-space-4);
+}
+.vm-knockout-vs {
+  align-self: center;
+  justify-self: center;
+  font-family: var(--vm-font-heading);
+  font-weight: 300;
+  font-size: var(--vm-text-h3);
+  color: var(--vm-ink-muted);
+  text-transform: lowercase;
+}
+@media (min-width: 560px) {
+  .vm-knockout-faceoff { grid-template-columns: 1fr auto 1fr; }
+}
+
+/* A contender is a <button> wrapping the shared .vm-mingle-card-* interior, so
+   the whole card is one big tap target. Reset the button, then frame it like a
+   deck card. */
+.vm-knockout-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+  background: var(--vm-surface);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+.vm-knockout-card:hover {
+  border-color: var(--vm-ink-muted);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+.vm-knockout-card:focus-visible { outline: 2px solid var(--vm-accent-spot); outline-offset: 2px; }
+.vm-knockout-card .vm-mingle-card-media { aspect-ratio: 4 / 3; }
+.vm-knockout-card:disabled { cursor: default; }
+
+/* Pick fly-out: the loser leaves in its side's direction, the winner lifts and
+   fades as the round advances. ~0.3s, matched to the 300ms JS timer. Gated on
+   reduced-motion below. */
+.vm-knockout-card.is-out-left { transform: translateX(-60%) rotate(-8deg); opacity: 0; }
+.vm-knockout-card.is-out-right { transform: translateX(60%) rotate(8deg); opacity: 0; }
+.vm-knockout-card.is-crowned {
+  border-color: var(--vm-accent-spot);
+  box-shadow: 0 0 0 2px var(--vm-accent-spot);
+}
+
+/* Field-loading skeletons — two blank contender cards. */
+.vm-knockout-skel-card { aspect-ratio: 4 / 3; width: 100%; }
+
+/* Result: the champion reveal reuses .vm-mingle-result/-hero/-why/-ctas wholesale.
+   The only knockout-specific note is the "engine also loves" supportive aside. */
+.vm-knockout-also { font-style: italic; }
+
+/* --- MINI tweaks — accent + pill radius already inherit via .vm.vm-mini; the
+   contender card just needs the softer MINI corner the deck cards get. --- */
+.vm.vm-mini .vm-knockout-card { border-radius: var(--vm-radius); }
+
+/* --- reduced motion: no fly-out, no crown lift — the JS commits instantly. --- */
+@media (prefers-reduced-motion: reduce) {
+  .vm-knockout-card { transition: none; }
+  .vm-knockout-card.is-out-left,
+  .vm-knockout-card.is-out-right { transform: none; opacity: 0; }
+  .vm-knockout-card.is-crowned { box-shadow: none; }
+  .vm-knockout-skel-card { animation: none; background-image: none; }
+}

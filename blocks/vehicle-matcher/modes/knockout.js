@@ -1,0 +1,682 @@
+/*
+ * MINI Knockout — the matcher, played as a championship "This or That".
+ *
+ * One of several interchangeable interface "modes" over the shared engine (see
+ * ../modes/index.js and the shell in ../vehicle-matcher.js). Its premise is the
+ * same as the swipe game's, in one line: the head-to-head picks silently answer
+ * the same questionnaire the `questions` mode asks, and the REAL engine does the
+ * matching. See docs/mini-knockout-requirements.md.
+ *
+ * The flow:
+ *   1. A tiny "set your bracket" SEED step (budget + what's it for) — identical to
+ *      the swipe game's seed: the two answers a game can't read, and budget is the
+ *      engine's one hard filter, so the field is affordable from the first round.
+ *   2. A FIELD of the retailer's real stock (POST /api/preview, scoped by the
+ *      seed), shuffled and snapped to the largest power of two it can fill (16 → 8
+ *      → 4). The field plays a knockout bracket: lean two-card head-to-heads
+ *      whittle it to a single champion. Each pick nudges the *taste* answer keys,
+ *      weighted by how far a car advances (bracketToAnswers()).
+ *   3. A RESULT: the assembled brief goes to the real /api/match (the identical
+ *      call the questions mode makes). The player's CHAMPION is the hero of the
+ *      reveal — always honoured — and the engine supplies its real "why" and the
+ *      honest note when the numbers don't back the crown ("champion, engine
+ *      validates"). So the celebration is the player's; the truth is the engine's.
+ *
+ * This mode owns its own copy, cards and state. It shares only the signal helpers
+ * (./match-signal.js) with the swipe game and el/gbp (../ui.js) — the two games
+ * read taste and build the engine brief the same way, but look and read
+ * differently (a versus, not a swipe stack).
+ *
+ * The scoring engine and car dataset live behind an API (see server/ and
+ * ../engine.js); this mode never sees the dataset — only the public display
+ * fields the API returns.
+ */
+
+import { apiGetQuestions, apiField, apiMatch } from '../engine.js';
+import { el } from '../ui.js';
+import {
+  WEAK_SCORE,
+  budgetBandsFromQuestion, useTilesFromQuestion,
+  shuffle, swatchFor, priceLabel, cap,
+  bracketToAnswers, idOf,
+} from './match-signal.js';
+
+/* The most cars we'll ever field, even when stock is deep — four rounds
+ * (16 → 8 → 4 → 2 → 1) is already a long-ish sitting for a promo. The field is
+ * snapped DOWN to the largest power of two ≤ min(pool, this). */
+const MAX_FIELD = 16;
+
+/* Below this many feasible cars there isn't a game — treat as an empty pool and
+ * send the player back to the seed to widen the budget. Exactly two still makes a
+ * one-match "final", which is a legitimate (if short) tournament. */
+const MIN_FIELD = 2;
+
+/* ------------------------------ copy ------------------------------ */
+
+/*
+ * Display copy, keyed by brand with a `bmw` fallback (every read is
+ * KNOCKOUT_COPY[brand] || KNOCKOUT_COPY.bmw). MINI is the primary, fully written
+ * voice — this is a MINI campaign; the BMW register is a lighter fallback so a
+ * future skin isn't blank. Functions take a single args object, matching the
+ * questions- and swipe-mode copy convention. Round names are computed from the
+ * live field size (roundName), not written here, so an adaptive bracket labels
+ * itself correctly whether it starts at 16, 8 or 4.
+ */
+const KNOCKOUT_COPY = {
+  mini: {
+    wordmark: 'MINI Knockout',
+    // Seed step (mirrors the swipe seed; the tiles themselves come from the engine)
+    seedTitle: 'Set up your bracket.',
+    seedLede: 'Two quick things and we’ll seed the field. Then it’s head-to-head until one’s left standing.',
+    budgetLabel: 'How much are you looking to spend?',
+    useLabel: 'And what’s it for?',
+    seedCta: 'Seed the bracket ♥',
+    // Rounds
+    versus: 'or',
+    pickHint: 'Tap the one you’d rather take home.',
+    roundKicker: ({ round }) => round,
+    matchupProgress: ({ done, total }) => `Match ${done} of ${total}`,
+    // Result — the champion is always the hero (decision: champion, engine validates)
+    matchKicker: 'Your champion ♥',
+    matchTitle: ({ model }) => `You crowned the ${model}.`,
+    matchLede: 'Beat every rival you put in front of it.',
+    whyIntro: 'Why it’s a keeper:',
+    crownCallback: ({ beaten }) => `It saw off ${beaten} to take the crown ♥`,
+    // When the engine can't fully back the crown (weak / not in the feasible set)
+    weakNote: 'Full disclosure, though — the numbers don’t *quite* crown this one. '
+      + 'Stock changes every week, so it’s worth another run soon. ♥',
+    alsoNote: ({ model }) => `If you’d be swayed, the numbers are also head-over-heels for the ${model}.`,
+    // CTAs + share
+    testDriveCta: '♥ Book a Valentine’s test drive',
+    detailsCta: 'See full details',
+    shareCta: 'Share your champion',
+    shareCopied: 'Link copied ♥',
+    againCta: 'New tournament',
+    shareText: ({ model, retailer }) => `My champion is a ${model} at ${retailer}. `
+      + 'Think you’d pick differently? 💘',
+    // Empty pool at the seed
+    emptyPoolTitle: 'Not enough in that range for a bracket.',
+    emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got enough under that to run a knockout — `
+      + 'nudge your budget up and we’ll seed a fresh field.',
+    emptyPoolCta: 'Adjust budget',
+    // Errors
+    errKicker: 'Sorry',
+    errTitle: 'We couldn’t reach the matcher',
+    errLede: 'The matching service didn’t respond. Check your connection and try again.',
+    retryLabel: 'Try again',
+  },
+  bmw: {
+    wordmark: 'Head to Head',
+    seedTitle: 'Set up your bracket.',
+    seedLede: 'Two quick things and we’ll seed the field, then it’s head-to-head to a winner.',
+    budgetLabel: 'Budget',
+    useLabel: 'What’s it for?',
+    seedCta: 'Seed the bracket',
+    versus: 'or',
+    pickHint: 'Pick the one you’d rather have.',
+    roundKicker: ({ round }) => round,
+    matchupProgress: ({ done, total }) => `Match ${done} of ${total}`,
+    matchKicker: 'Your winner',
+    matchTitle: ({ model }) => `The ${model} takes it.`,
+    matchLede: 'It beat every car you put against it.',
+    whyIntro: 'Why it stands out:',
+    crownCallback: ({ beaten }) => `It saw off ${beaten} to win the bracket.`,
+    weakNote: 'For the record, the numbers don’t fully back this one — stock changes '
+      + 'weekly, so it’s worth another run soon.',
+    alsoNote: ({ model }) => `On the numbers, the ${model} is the closest fit if you’d reconsider.`,
+    testDriveCta: 'Book a test drive',
+    detailsCta: 'See full details',
+    shareCta: 'Share this winner',
+    shareCopied: 'Link copied',
+    againCta: 'New tournament',
+    shareText: ({ model, retailer }) => `My pick is a ${model} at ${retailer}.`,
+    emptyPoolTitle: 'Not enough in that range for a bracket.',
+    emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got enough under that to run a knockout — `
+      + 'raise your budget and we’ll seed a fresh field.',
+    emptyPoolCta: 'Adjust budget',
+    errKicker: 'Sorry',
+    errTitle: 'We couldn’t reach the matcher',
+    errLede: 'The matching service didn’t respond. Check your connection and try again.',
+    retryLabel: 'Try again',
+  },
+};
+
+/* ------------------------------ helpers ------------------------------ */
+
+/** Copy for the active brand, BMW as the fallback (matches ctx.brand shape). */
+const copyFor = (brand) => KNOCKOUT_COPY[brand] || KNOCKOUT_COPY.bmw;
+
+/** Largest power of two ≤ n (0 for n < 1). Used to snap the shuffled pool to a
+ * clean bracket size so every round is a full set of pairings, no byes. */
+function largestPowerOfTwo(n) {
+  let p = 1;
+  while (p * 2 <= n) p *= 2;
+  return n >= 1 ? p : 0;
+}
+
+/** Human name for a round given how many cars ENTER it: 2 → Final, 4 → Semi-
+ * final, 8 → Quarter-final, else "Round of N". Adaptive: a bracket that starts
+ * at 4 opens on "Semi-final", one that starts at 16 opens on "Round of 16". */
+function roundName(entrants) {
+  if (entrants <= 2) return 'The Final';
+  if (entrants <= 4) return 'Semi-final';
+  if (entrants <= 8) return 'Quarter-final';
+  return `Round of ${entrants}`;
+}
+
+/** Pair a flat list into [[a,b],[c,d],...]. Assumes an even length (the field is
+ * snapped to a power of two before this); a stray odd tail car is dropped by the
+ * caller, never faked into a bye. */
+function pairUp(list) {
+  const pairs = [];
+  for (let i = 0; i + 1 < list.length; i += 2) pairs.push([list[i], list[i + 1]]);
+  return pairs;
+}
+
+/* ------------------------------ mount ------------------------------ */
+
+function mount(root, ctx) {
+  const copy = copyFor(ctx.brand);
+
+  // Per-run state — a fresh local object, NOT hung on the shared ctx, so a mode
+  // swap and re-mount (the switcher re-calls mount with the same ctx) starts
+  // clean. The mode owns its own state and its own hash key.
+  const state = {
+    questions: [], // the engine's per-brand questions (seeds the budget/use tiles)
+    seed: null, // { budget, primaryUse }
+    // Bracket:
+    round: [], // cars entering the CURRENT round (a power of two, then halving)
+    pairings: [], // pairUp(round) — the current round's matchups
+    matchIndex: 0, // which matchup in `pairings` is on screen
+    winners: [], // winners collected so far THIS round (seed the next round)
+    rounds: [], // bracket log: { roundIndex, winner, loser } per head-to-head
+    fieldSize: 0, // the starting field size (for round naming + weighting)
+    roundIndex: 0, // 0 = first round
+    busy: false, // pick lock while a matchup transitions out
+  };
+
+  const reducedMotion = window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- error screen (local reimplementation of the renderStatus pattern) ---- */
+  const showError = (onRetry) => {
+    root.replaceChildren();
+    const screen = el('div', 'vm-screen vm-status');
+    screen.append(
+      el('p', 'vm-kicker', copy.errKicker),
+      el('h2', 'vm-title', copy.errTitle),
+      el('p', 'vm-lede', copy.errLede),
+    );
+    const retry = el('button', 'vm-btn vm-btn-primary', copy.retryLabel);
+    retry.type = 'button';
+    retry.addEventListener('click', onRetry);
+    screen.append(retry);
+    root.append(screen);
+  };
+
+  /* --------------------------- seed skeleton --------------------------- */
+  // Painted synchronously by mount() while apiGetQuestions is in flight (reuses
+  // the swipe seed's skeleton/tile classes — the seed step is deliberately
+  // identical between the two games).
+  const renderSeedSkeleton = () => {
+    root.replaceChildren();
+    const screen = el('div', 'vm-screen vm-mingle-seed');
+    screen.setAttribute('aria-busy', 'true');
+    screen.setAttribute('aria-label', 'Loading');
+    screen.append(
+      el('div', 'vm-skel vm-skel-kicker'),
+      el('div', 'vm-skel vm-skel-title'),
+      el('div', 'vm-skel vm-skel-lede'),
+      el('div', 'vm-skel vm-mingle-skel-tiles'),
+      el('div', 'vm-skel vm-mingle-skel-tiles'),
+    );
+    root.append(screen);
+  };
+
+  /* ---------------------------- seed step ----------------------------
+   * Identical in shape to the swipe game's seed: budget (the engine's hard
+   * filter) + what the car's for, both built from the engine's own per-brand
+   * questions (state.questions), never local copy. Reuses the .vm-mingle-seed /
+   * .vm-mingle-tile classes so the two games' seed steps look the same. */
+  const renderSeed = (preset) => {
+    root.replaceChildren();
+    const screen = el('div', 'vm-screen vm-mingle-seed vm-knockout-seed');
+    screen.append(el('p', 'vm-kicker vm-mingle-wordmark', copy.wordmark));
+    screen.append(el('h2', 'vm-title', copy.seedTitle));
+    screen.append(el('p', 'vm-lede', copy.seedLede));
+
+    const budgetQ = state.questions.find((q) => q.id === 'budget');
+    const useQ = state.questions.find((q) => q.id === 'primaryUse');
+    const budgetBands = budgetBandsFromQuestion(budgetQ);
+    const useTiles = useTilesFromQuestion(useQ);
+
+    const chosen = { budget: preset?.budget || null, primaryUse: preset?.primaryUse || null };
+    const cta = el('button', 'vm-btn vm-btn-primary vm-mingle-seed-cta', copy.seedCta);
+    cta.type = 'button';
+    const refreshCta = () => { cta.disabled = !(chosen.budget && chosen.primaryUse); };
+
+    // Budget bands — ceilings and open-top scale to the brand's slider max.
+    screen.append(el('p', 'vm-mingle-seed-label', budgetQ?.title || copy.budgetLabel));
+    const budgetRow = el('div', 'vm-mingle-tiles vm-mingle-tiles-budget');
+    budgetBands.forEach(({ label, range }) => {
+      const tile = el('button', 'vm-mingle-tile', label);
+      tile.type = 'button';
+      const isSel = chosen.budget && chosen.budget[0] === range[0] && chosen.budget[1] === range[1];
+      if (isSel) tile.classList.add('is-selected');
+      tile.addEventListener('click', () => {
+        chosen.budget = range;
+        budgetRow.querySelectorAll('.vm-mingle-tile').forEach((t) => t.classList.remove('is-selected'));
+        tile.classList.add('is-selected');
+        refreshCta();
+      });
+      budgetRow.append(tile);
+    });
+    screen.append(budgetRow);
+
+    // What's it for — the engine's primaryUse options, brand labels + subs.
+    screen.append(el('p', 'vm-mingle-seed-label', useQ?.title || copy.useLabel));
+    const useRow = el('div', 'vm-mingle-tiles vm-mingle-tiles-use');
+    useTiles.forEach(({ value, label, sub }) => {
+      const tile = el('button', 'vm-mingle-tile vm-mingle-tile-use');
+      tile.type = 'button';
+      tile.append(el('span', 'vm-mingle-tile-label', label));
+      if (sub) tile.append(el('span', 'vm-mingle-tile-hint', sub));
+      if (chosen.primaryUse === value) tile.classList.add('is-selected');
+      tile.addEventListener('click', () => {
+        chosen.primaryUse = value;
+        useRow.querySelectorAll('.vm-mingle-tile').forEach((t) => t.classList.remove('is-selected'));
+        tile.classList.add('is-selected');
+        refreshCta();
+      });
+      useRow.append(tile);
+    });
+    screen.append(useRow);
+
+    refreshCta();
+    cta.addEventListener('click', () => {
+      state.seed = { budget: chosen.budget, primaryUse: chosen.primaryUse };
+      loadField();
+    });
+    screen.append(cta);
+    root.append(screen);
+  };
+
+  /* --------------------------- field loading --------------------------- */
+  const loadField = async () => {
+    renderFieldSkeleton();
+    // apiField resolves-empty (never throws), so no try/catch needed here. We
+    // ask for a full MAX_FIELD roster (up to 16) rather than the questions
+    // drawer's top-9 shortlist — a big-range brand like BMW fills a Round of 16,
+    // a thinner one like MINI returns fewer and largestPowerOfTwo snaps down. No
+    // enrich: painting all 16 would fetch a PDP per round-one loser, so the
+    // face-off card falls back to a neutral swatch (swatchFor handles absent colour).
+    const matches = await apiField(ctx.api, state.seed, ctx.retailer, ctx.brand, MAX_FIELD);
+    // Field returns match objects { car, score, ... }; the game plays with the
+    // display cars, exactly as the swipe game does with match.car.
+    const cars = shuffle(matches.map((m) => m.car)).filter(Boolean);
+    const size = largestPowerOfTwo(Math.min(cars.length, MAX_FIELD));
+    if (size < MIN_FIELD) {
+      renderEmptyPool();
+      return;
+    }
+    // Seed the field: take the snapped power-of-two off the top of the shuffle.
+    state.fieldSize = size;
+    state.round = cars.slice(0, size);
+    state.roundIndex = 0;
+    state.winners = [];
+    state.rounds = [];
+    startRound();
+  };
+
+  const renderFieldSkeleton = () => {
+    root.replaceChildren();
+    const screen = el('div', 'vm-screen vm-knockout-stage');
+    screen.setAttribute('aria-busy', 'true');
+    screen.setAttribute('aria-label', 'Seeding the bracket');
+    const faceoff = el('div', 'vm-knockout-faceoff');
+    faceoff.append(
+      el('div', 'vm-skel vm-knockout-skel-card'),
+      el('div', 'vm-skel vm-knockout-skel-card'),
+    );
+    screen.append(faceoff);
+    root.append(screen);
+  };
+
+  const renderEmptyPool = () => {
+    root.replaceChildren();
+    const screen = el('div', 'vm-screen vm-status');
+    screen.append(
+      el('h2', 'vm-title', copy.emptyPoolTitle),
+      el('p', 'vm-lede', copy.emptyPoolLede({ retailer: ctx.retailerLabel || 'this retailer' })),
+    );
+    const back = el('button', 'vm-btn vm-btn-primary', copy.emptyPoolCta);
+    back.type = 'button';
+    back.addEventListener('click', () => renderSeed(state.seed));
+    screen.append(back);
+    root.append(screen);
+  };
+
+  /* ----------------------------- rounds ----------------------------- */
+  // Begin a round from state.round (the entrants). One entrant → champion.
+  const startRound = () => {
+    if (state.round.length <= 1) {
+      showResult(state.round[0]);
+      return;
+    }
+    state.pairings = pairUp(state.round);
+    state.matchIndex = 0;
+    state.winners = [];
+    renderMatchup();
+  };
+
+  const renderMatchup = () => {
+    root.replaceChildren();
+    const [a, b] = state.pairings[state.matchIndex];
+    const entrants = state.round.length;
+
+    const screen = el('div', 'vm-screen vm-knockout-stage');
+
+    // Progress rail — where we are in the tournament (round name + match n of m).
+    const rail = el('div', 'vm-knockout-rail');
+    rail.append(el('span', 'vm-knockout-round', roundName(entrants)));
+    rail.append(el('span', 'vm-knockout-count',
+      copy.matchupProgress({ done: state.matchIndex + 1, total: state.pairings.length })));
+    screen.append(rail);
+
+    screen.append(el('p', 'vm-lede vm-knockout-hint', copy.pickHint));
+
+    const faceoff = el('div', 'vm-knockout-faceoff');
+    faceoff.append(buildContender(a, 'a'));
+    faceoff.append(el('div', 'vm-knockout-vs', copy.versus));
+    faceoff.append(buildContender(b, 'b'));
+    screen.append(faceoff);
+
+    root.append(screen);
+
+    // Arrow-key a11y: ← picks the left contender, → the right.
+    screen.tabIndex = -1;
+    screen.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); pick(a, b, 'a'); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); pick(b, a, 'b'); }
+    });
+  };
+
+  // One contender card — a lean face-off card (not the swipe stack). `side` is
+  // 'a'|'b' for the fly-out direction of the loser.
+  const buildContender = (car, side) => {
+    const card = el('button', `vm-knockout-card vm-knockout-card-${side}`);
+    card.type = 'button';
+    card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
+    card.append(el('div', 'vm-mingle-card-colour'));
+
+    const media = el('div', 'vm-mingle-card-media');
+    if (car.photo) {
+      const img = el('img', 'vm-mingle-card-photo');
+      img.src = car.photo; img.alt = car.name || ''; img.loading = 'lazy';
+      img.addEventListener('error', () => { img.remove(); media.classList.add('no-photo'); });
+      media.append(img);
+    } else {
+      media.classList.add('no-photo');
+      media.append(el('span', 'vm-mingle-card-initial', (car.name || '?').charAt(0)));
+    }
+    card.append(media);
+
+    const body = el('div', 'vm-mingle-card-body');
+    if (car.name) body.append(el('h3', 'vm-mingle-card-name', car.name));
+    if (car.line) body.append(el('p', 'vm-mingle-card-spec', car.line));
+    body.append(el('p', 'vm-mingle-card-price', priceLabel(car)));
+    const pills = el('div', 'vm-mingle-pills');
+    if (car.fuel) pills.append(el('span', 'vm-mingle-pill', cap(car.fuel)));
+    if (car.body) pills.append(el('span', 'vm-mingle-pill', cap(car.body)));
+    body.append(pills);
+    card.append(body);
+
+    // Clicking the card picks it; the OTHER card is the loser.
+    const [pa, pb] = state.pairings[state.matchIndex];
+    const other = car === pa ? pb : pa;
+    card.addEventListener('click', () => pick(car, other, side));
+    return card;
+  };
+
+  // Record a pick: winner advances, loser is logged (for the advancement-weighted
+  // inference), the losing card flies out (gated on reduced-motion), and we move
+  // to the next matchup or round. `busy` blocks a double-pick mid-transition.
+  const pick = (winner, loser, side) => {
+    if (state.busy) return;
+    state.busy = true;
+
+    state.rounds.push({ roundIndex: state.roundIndex, winner, loser });
+    state.winners.push(winner);
+
+    const advance = () => {
+      state.busy = false;
+      if (state.matchIndex + 1 < state.pairings.length) {
+        state.matchIndex += 1;
+        renderMatchup();
+      } else {
+        // Round complete — the winners become the next round's entrants.
+        state.round = state.winners;
+        state.roundIndex += 1;
+        startRound();
+      }
+    };
+
+    if (reducedMotion) { advance(); return; }
+    // Fly the loser's card out; the winner's card lifts. Loser side is the
+    // opposite of the winner's side (the winner is `side`).
+    const cards = root.querySelectorAll('.vm-knockout-card');
+    const loserSel = side === 'a' ? '.vm-knockout-card-b' : '.vm-knockout-card-a';
+    const winnerSel = side === 'a' ? '.vm-knockout-card-a' : '.vm-knockout-card-b';
+    root.querySelector(loserSel)?.classList.add(side === 'a' ? 'is-out-right' : 'is-out-left');
+    root.querySelector(winnerSel)?.classList.add('is-crowned');
+    cards.forEach((c) => { c.disabled = true; });
+    setTimeout(advance, 300);
+  };
+
+  /* --------------------------- result --------------------------- */
+  // The champion is the lone survivor of the bracket. We STILL call the real
+  // engine (the same call the questions mode makes) — not to pick the hero (the
+  // champion is always the hero, decision "champion, engine validates") but to
+  // attach its real "why" reasons and to know when to add the honest note.
+  const showResult = async (champion) => {
+    renderResultSkeleton();
+    const answers = bracketToAnswers(state.rounds, state.seed);
+    let result;
+    try {
+      result = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand);
+    } catch {
+      showError(() => showResult(champion));
+      return;
+    }
+    renderResult(champion, result);
+  };
+
+  const renderResultSkeleton = () => {
+    root.replaceChildren();
+    const screen = el('div', 'vm-screen vm-mingle-result');
+    screen.setAttribute('aria-busy', 'true');
+    screen.setAttribute('aria-label', 'Crowning your champion');
+    screen.append(
+      el('div', 'vm-skel vm-skel-title'),
+      el('div', 'vm-skel vm-mingle-skel-hero'),
+    );
+    root.append(screen);
+  };
+
+  const renderResult = (champion, result) => {
+    root.replaceChildren();
+    const matches = result.matches || [];
+
+    // Find the champion in the engine's feasible set (by stable identity) to
+    // borrow its real reasons/score. If it isn't there, the engine didn't rank it
+    // feasible for the assembled brief — that's precisely the honest-note case.
+    const engineMatch = matches.find((m) => idOf(m.car) === idOf(champion));
+    const reasons = engineMatch?.reasons || [];
+    const weak = !engineMatch
+      || (typeof engineMatch.score === 'number' && engineMatch.score < WEAK_SCORE)
+      || hasUnmet(result.unmet);
+
+    const screen = el('div', 'vm-screen vm-mingle-result vm-knockout-result');
+    if (!reducedMotion) confetti(screen);
+
+    screen.append(el('p', 'vm-kicker vm-mingle-match-kicker', copy.matchKicker));
+    screen.append(el('h2', 'vm-title', copy.matchTitle({ model: champion.name })));
+    screen.append(el('p', 'vm-lede', copy.matchLede));
+
+    // Hero card — always the CHAMPION the player crowned (never swapped out).
+    screen.append(buildHero(champion));
+
+    // Why — the engine's real reasons for the champion, flirtily introduced, with
+    // a crown callback. Only shown when the engine actually returned reasons.
+    if (reasons.length) {
+      const why = el('div', 'vm-mingle-why');
+      why.append(el('p', 'vm-mingle-why-intro', copy.whyIntro));
+      const list = el('ul', 'vm-mingle-why-list');
+      reasons.forEach((r) => list.append(el('li', 'vm-mingle-why-item', r)));
+      why.append(list);
+      const beaten = beatenLabel();
+      if (beaten) why.append(el('p', 'vm-mingle-callback', copy.crownCallback({ beaten })));
+      screen.append(why);
+    }
+
+    // The one honest beat — when the engine can't fully back the crown (§6.2
+    // pattern). Celebrate anyway; add a soft note, and (if there's a different
+    // engine favourite) name it as a supportive aside, without swapping the hero.
+    if (weak) {
+      screen.append(el('p', 'vm-mingle-weak-note', copy.weakNote.replace(/\*(.+?)\*/g, '$1')));
+      const top = matches[0];
+      if (top && idOf(top.car) !== idOf(champion) && top.car?.name) {
+        screen.append(el('p', 'vm-mingle-weak-note vm-knockout-also', copy.alsoNote({ model: top.car.name })));
+      }
+    }
+
+    screen.append(buildResultCtas(champion));
+    root.append(screen);
+  };
+
+  // A short human phrase for who the champion beat — "three rivals", or the name
+  // of the finalist if we can read it. Powers the crown callback in the "why".
+  const beatenLabel = () => {
+    const wins = state.rounds.filter((r) => idOf(r.winner) === championId()).length;
+    if (wins <= 0) return null;
+    if (wins === 1) {
+      const final = state.rounds[state.rounds.length - 1];
+      const loserName = final?.loser?.name;
+      return loserName ? `the ${loserName}` : 'its rival';
+    }
+    const words = ['', 'one rival', 'two rivals', 'three rivals', 'four rivals'];
+    return words[wins] || `${wins} rivals`;
+  };
+  const championId = () => {
+    const final = state.rounds[state.rounds.length - 1];
+    return final ? idOf(final.winner) : null;
+  };
+
+  const hasUnmet = (unmet) => unmet && Object.values(unmet).some((v) => Array.isArray(v) && v.length);
+
+  const buildHero = (car) => {
+    const card = el('article', 'vm-mingle-hero');
+    card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
+    card.append(el('div', 'vm-mingle-card-colour'));
+    const media = el('div', 'vm-mingle-card-media');
+    if (car.photo) {
+      const img = el('img', 'vm-mingle-card-photo');
+      img.src = car.photo; img.alt = car.name || ''; img.loading = 'lazy';
+      img.addEventListener('error', () => { img.remove(); media.classList.add('no-photo'); });
+      media.append(img);
+    } else {
+      media.classList.add('no-photo');
+      media.append(el('span', 'vm-mingle-card-initial', (car.name || '?').charAt(0)));
+    }
+    card.append(media);
+    const body = el('div', 'vm-mingle-card-body');
+    body.append(el('h3', 'vm-mingle-card-name', car.name));
+    if (car.line) body.append(el('p', 'vm-mingle-card-spec', car.line));
+    body.append(el('p', 'vm-mingle-card-price', priceLabel(car)));
+    const pills = el('div', 'vm-mingle-pills');
+    if (car.fuel) pills.append(el('span', 'vm-mingle-pill', cap(car.fuel)));
+    if (car.body) pills.append(el('span', 'vm-mingle-pill', cap(car.body)));
+    const shade = car.colour?.manufacturerColour;
+    if (shade) pills.append(el('span', 'vm-mingle-pill', shade));
+    body.append(pills);
+    card.append(body);
+    return card;
+  };
+
+  const buildResultCtas = (champion) => {
+    const wrap = el('div', 'vm-mingle-ctas');
+    const drive = el('a', 'vm-btn vm-btn-primary vm-mingle-drive', copy.testDriveCta);
+    if (champion.link) { drive.href = champion.link; drive.target = '_blank'; drive.rel = 'noopener'; }
+    wrap.append(drive);
+
+    const details = el('a', 'vm-btn vm-btn-ghost', copy.detailsCta);
+    if (champion.link) { details.href = champion.link; details.target = '_blank'; details.rel = 'noopener'; }
+    wrap.append(details);
+
+    const share = el('button', 'vm-btn vm-btn-ghost vm-mingle-share', copy.shareCta);
+    share.type = 'button';
+    share.addEventListener('click', () => doShare(champion, share));
+    wrap.append(share);
+
+    const again = el('button', 'vm-mingle-link vm-mingle-again', copy.againCta);
+    again.type = 'button';
+    again.addEventListener('click', () => loadField()); // fresh reshuffled field, same seed
+    wrap.append(again);
+    return wrap;
+  };
+
+  const doShare = async (champion, btn) => {
+    const text = copy.shareText({ model: champion.name, retailer: ctx.retailerLabel || 'MINI' });
+    const url = `${window.location.origin}${window.location.pathname}${window.location.search}#knockout=1`;
+    if (navigator.share) {
+      try { await navigator.share({ text, url }); } catch { /* user dismissed — no-op */ }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      btn.textContent = copy.shareCopied;
+    } catch { /* clipboard blocked — leave the label */ }
+  };
+
+  /* A small, self-contained confetti burst on the champion reveal. Particle
+   * colour from --vm-accent-spot so a brand skin re-tints it. Gated on
+   * reduced-motion by the caller. Mirrors the swipe game's confetti. */
+  const confetti = (host) => {
+    const layer = el('div', 'vm-mingle-confetti');
+    layer.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 24; i += 1) {
+      const bit = el('span', 'vm-mingle-confetti-bit');
+      bit.style.left = `${(i / 24) * 100}%`;
+      bit.style.animationDelay = `${(i % 6) * 0.06}s`;
+      layer.append(bit);
+    }
+    host.append(layer);
+  };
+
+  /* ------------------------------ boot ------------------------------
+   * Same shape as the swipe game: the seed's tiles are per-brand and live behind
+   * apiGetQuestions, so fetch that first. mount stays synchronous — it paints the
+   * seed skeleton now and does the fetch in this detached boot(), so the shell
+   * never awaits a cold backend. apiGetQuestions THROWS on failure, so guard it
+   * and offer a retry that re-boots. */
+  const boot = async () => {
+    try {
+      const { questions } = await apiGetQuestions(ctx.api, ctx.retailer, ctx.brand);
+      state.questions = Array.isArray(questions) ? questions : [];
+    } catch {
+      showError(boot);
+      return;
+    }
+    renderSeed(state.seed);
+  };
+
+  renderSeedSkeleton();
+  boot();
+}
+
+// The switcher tab is brand-agnostic shell UI, so its label is neutral —
+// "Head to head", not "MINI Knockout". The campaign name lives as the wordmark
+// INSIDE the stage (KNOCKOUT_COPY[brand].wordmark), where it can vary by brand;
+// the mode's static `label` can't. key stays 'knockout' — the ?mode= and authored
+// "Mode" value.
+export default { key: 'knockout', label: 'Head to head', mount };

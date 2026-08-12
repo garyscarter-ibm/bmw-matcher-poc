@@ -88,3 +88,34 @@ export async function apiPreview(base, answers, retailer, brandKey) {
     return [];
   }
 }
+
+/**
+ * The game modes' field — the roster a swipe deck or a knockout bracket plays.
+ * Sibling to apiPreview, not a replacement: it reads the SAME engine over the
+ * SAME retailer stock, but asks for a wider slice (`size`, up to the server's
+ * FIELD_MAX) because a bracket wants a full field, not a top-few shortlist.
+ * That's why the games use this and the questions drawer keeps apiPreview — one
+ * engine, an interface-shaped read each.
+ *
+ * `size` is the roster the caller wants (the server clamps it to [2, FIELD_MAX]).
+ * `enrich` opts into per-card colour paint: the swipe deck reads car.colour as a
+ * taste signal so it passes true; the knockout omits it so a 16-car field doesn't
+ * fetch a PDP for every round-one loser. Like apiPreview it NEVER throws — a
+ * failed field must not break the game around it, so any error resolves to [].
+ */
+export async function apiField(base, answers, retailer, brandKey, size, enrich = false) {
+  try {
+    const res = await fetch(`${base}/api/field`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        answers, retailer, brand: brandKey, size, enrich,
+      }),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.matches) ? data.matches : [];
+  } catch {
+    return [];
+  }
+}
