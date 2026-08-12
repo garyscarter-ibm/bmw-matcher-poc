@@ -282,6 +282,9 @@ the engine**:
       in modes/questions.js (+ mingle/knockout if shipped) spreads the BMW base and overrides
       the marque/register lines — else the intro/results silently show BMW's "cars at
       Grassicks BMW".
+- [ ] Intro `lede` (and `title`/`cta`, `tasteLede`/`tiedLede`, `working*`) actually rewritten
+      in the brand's voice, not the BMW sentence with the noun swapped. Read all brands' ledes
+      side by side (Section 6 step 7): indistinguishable-but-for-the-noun means not done.
 - [ ] Demo harness (Section 4c): `BRAND_RETAILER_NAMES[<brand>]` added in index.html so
       `?brand=<key>` shows the brand's own retailer, not "Grassicks BMW".
 - [ ] Fuel detection keys on a spec property, not a model name; every EV in the spec table
