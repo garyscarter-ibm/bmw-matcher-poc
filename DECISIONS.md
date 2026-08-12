@@ -217,4 +217,30 @@ Format: **[area] decision** — why, and how to undo if you disagree.
   mid-sentence, breaking grammar. Changed to "performance " so it reads "Approved-used
   performance Ford Fiesta hatchback". Fixtures rebuilt.
 
+## Em-dash sweep (house rule) + a guard that covers every screen
+
+- **[emdash-sweep] Removed every user-facing em dash from the existing BMW/MINI game-mode
+  copy.** The house rule (no em dashes in on-screen copy; comments and docs may keep them)
+  predated this copy, so the mingle and knockout modes still had them on later-flow screens:
+  deck instructions, per-tie verdicts (form/upset), weak/thin notes and empty-deck ledes, for
+  both BMW and MINI. Each was rephrased to read naturally (a period, a colon, or "so"/"and"),
+  not mechanically swapped to a hyphen. Questions mode, match-signal, server copy and the new
+  Ford/Honda copy were already clean.
+
+- **[emdash-glyphs] Two decorative dash glyphs also went.** The mingle "Caught your eye" list
+  used a leading em-dash bullet (`content: '— '`) and the taste-profile "no value yet" cell
+  used an em dash; both render on screen. The bullet became a middot (`·`, already the house
+  separator in roundAdvance) and the empty cell became an en dash (`–`, the standard
+  "no data" mark, and explicitly not an em dash). This keeps the rule literal without leaving
+  a bare hyphen that would read as a typo.
+
+- **[emdash-guard] Added a source-scan test so the rule holds on every screen, not just the
+  painted one.** `render.test.js` already had "no em dashes in painted copy", but that only
+  sees each mode's FIRST screen — which is exactly why the mingle/knockout violations (all on
+  result/verdict/empty screens) survived. Simulating a full playthrough to reach those screens
+  is fragile; instead the new test scans each client source file for an em dash inside a string
+  literal, skipping pure-comment lines and dev-only console diagnostics (author-facing, out of
+  scope). It covers all screens at once and blocks any future reintroduction. Suite: 126 tests
+  green.
+
 <!-- Further decisions appended below as the run proceeds. -->

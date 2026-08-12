@@ -76,7 +76,7 @@ const MINGLE_COPY = {
     // `primaryUse` questions), so MINI's own labels and MINI-scale budget show
     // without duplicating the source of truth. Only the seed's framing lives here.
     // Deck
-    deckInstruction: 'Drag right for yes, left for no — or tap. Keep the ones that catch your eye.',
+    deckInstruction: 'Drag right for yes, left for no, or tap. Keep the ones that catch your eye.',
     passLabel: 'Pass',
     keepLabel: 'Keep',
     // Drag stamps — the big word that lands on the card as you pull it.
@@ -91,7 +91,7 @@ const MINGLE_COPY = {
     badgesCool: ['Your type?', 'Plays hard to get', 'Bit of a charmer'],
     // Taste profile
     tasteHeading: 'Your type, so far',
-    tasteEmpty: 'Nothing yet — start swiping.',
+    tasteEmpty: 'Nothing yet. Start swiping.',
     keptHeading: 'Caught your eye',
     barLabels: {
       fuel: 'Fuel', colour: 'Colour', budget: 'Budget', body: 'Body',
@@ -106,10 +106,10 @@ const MINGLE_COPY = {
     swipeCallback: ({ trait }) => `And it’s the ${trait} one you kept leaning toward.`,
     // Thin signal (≤1 keep): matched on the seed alone, said playfully (§5.3).
     thinTitle: 'Playing it cool, then.',
-    thinLede: 'You kept your cards close — so here’s the best fit for what you told us.',
+    thinLede: 'You kept your cards close, so here’s the best fit for what you told us.',
     // Honest "not quite" note — the engine's own weak/unmet signal, in character
     // (§6.2). Reuses the concept behind the questions mode's weak/rescue copy.
-    weakNote: 'Full disclosure, though — none of these *quite* nailed your taste. '
+    weakNote: 'Full disclosure, though: none of these *quite* nailed your taste. '
       + 'Stock changes every week, so it’s worth another swipe soon.',
     // CTAs + share
     testDriveCta: 'Book a Valentine’s test drive',
@@ -122,7 +122,7 @@ const MINGLE_COPY = {
     // Empty pool at the seed (§4.2)
     emptyPoolTitle: 'Nothing in that range just now.',
     emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got anything under that at the `
-      + 'moment — nudge your budget up and we’ll deal a fresh deck.',
+      + 'moment. Nudge your budget up and we’ll deal a fresh deck.',
     emptyPoolCta: 'Adjust budget',
     // Errors
     errKicker: 'Sorry',
@@ -140,7 +140,7 @@ const MINGLE_COPY = {
     seedCta: 'Start swiping',
     // Budget bands + "what's it for" options come from the engine per brand
     // (see the MINI note above), not from copy.
-    deckInstruction: 'Drag right to keep, left to pass — or use the buttons.',
+    deckInstruction: 'Drag right to keep, left to pass, or use the buttons.',
     passLabel: 'Pass',
     keepLabel: 'Keep',
     stampKeep: 'KEEP',
@@ -151,7 +151,7 @@ const MINGLE_COPY = {
     badgesWarm: ['Strong match', 'Well suited', 'Worth a look'],
     badgesCool: ['Your type?', 'One to consider', 'In the running'],
     tasteHeading: 'Your taste, so far',
-    tasteEmpty: 'Nothing yet — start swiping.',
+    tasteEmpty: 'Nothing yet. Start swiping.',
     keptHeading: 'Kept',
     barLabels: {
       fuel: 'Fuel', colour: 'Colour', budget: 'Budget', body: 'Body',
@@ -162,8 +162,8 @@ const MINGLE_COPY = {
     whyIntro: 'Why it suits you:',
     swipeCallback: ({ trait }) => `It’s the ${trait} one you kept coming back to.`,
     thinTitle: 'Not much to go on.',
-    thinLede: 'You kept your options open — so here’s the best fit for what you told us.',
-    weakNote: 'That said — none of these quite matched your taste. Stock changes '
+    thinLede: 'You kept your options open, so here’s the best fit for what you told us.',
+    weakNote: 'That said: none of these quite matched your taste. Stock changes '
       + 'weekly, so it’s worth another look soon.',
     testDriveCta: 'Book a test drive',
     detailsCta: 'See full details',
@@ -173,7 +173,7 @@ const MINGLE_COPY = {
     shareText: ({ model, retailer }) => `I matched with a ${model} at ${retailer}.`,
     emptyPoolTitle: 'Nothing in that range just now.',
     emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got anything under that at the `
-      + 'moment — raise your budget and we’ll build a fresh deck.',
+      + 'moment. Raise your budget and we’ll build a fresh deck.',
     emptyPoolCta: 'Adjust budget',
     errKicker: 'Sorry',
     errTitle: 'We couldn’t reach the matcher',
@@ -498,7 +498,7 @@ function mount(root, ctx) {
       if (key === 'colour' && m) fill.style.background = SHADE_HEX[m.value] || NEUTRAL_SWATCH;
       track.append(fill);
       row.append(track);
-      row.append(el('span', 'vm-mingle-bar-val', m ? valueLabel(m.value) : '—'));
+      row.append(el('span', 'vm-mingle-bar-val', m ? valueLabel(m.value) : '–'));
       return row;
     };
     bars.append(

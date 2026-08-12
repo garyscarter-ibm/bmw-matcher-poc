@@ -1974,7 +1974,7 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-mingle-taste-empty { font-size: var(--vm-text-label); color: var(--vm-ink-muted); margin: 0; }
 .vm-mingle-kept { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--vm-space-1); }
 .vm-mingle-kept-item { font-size: var(--vm-text-label); }
-.vm-mingle-kept-item::before { content: '— '; color: var(--vm-accent-spot); }
+.vm-mingle-kept-item::before { content: '· '; color: var(--vm-accent-spot); }
 
 /* --- deck column: progress, stack, controls --- */
 .vm-mingle-deck { order: 1; display: flex; flex-direction: column; }

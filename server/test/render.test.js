@@ -20,6 +20,8 @@
 
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import {
   installDom, resetDom, startModeServer, loadMode, mountMode, settle,
@@ -133,4 +135,49 @@ test('no em dashes in painted copy', async () => {
       );
     }
   }
+});
+
+// The painted-copy test above only sees the FIRST screen of each mode. The house
+// rule (no em dashes in user-facing copy) also has to hold on the later-flow
+// screens a render test can't cheaply reach without a full playthrough: deck
+// instructions, per-tie verdicts, weak/thin notes, empty-deck ledes, result CTAs.
+// Those all live in static copy tables in the mode source, so we guard them at
+// the source: scan each client file for an em dash inside a string literal. This
+// caught real violations in the BMW/MINI mingle + knockout copy that the painted
+// check never reached (they only appear on the result/verdict/empty screens), and
+// it stops any future edit from reintroducing one on any screen.
+//
+// Comments and dev-only console diagnostics are out of scope (the rule is about
+// on-screen copy), so pure-comment lines are skipped and CSS/JS content strings
+// are the target. This is a source scan, not a runtime paint, so it needs no
+// server or DOM — it stands alone.
+test('no em dashes in any string literal across the client copy surface', () => {
+  const CLIENT_FILES = [
+    'modes/questions.js', 'modes/mingle.js', 'modes/knockout.js',
+    'modes/match-signal.js', 'vehicle-matcher.js', 'quiz-meta.js',
+    'vehicle-matcher.css',
+  ];
+  const blockDir = new URL('../../blocks/vehicle-matcher/', import.meta.url);
+  const offenders = [];
+  for (const rel of CLIENT_FILES) {
+    const path = fileURLToPath(new URL(rel, blockDir));
+    const src = readFileSync(path, 'utf8');
+    src.split(/\r?\n/).forEach((line, i) => {
+      const t = line.trim();
+      // Skip pure-comment lines (JS // and /* */ bodies, CSS /* */). A code line
+      // with a trailing comment is still scanned — but only its string literals
+      // are inspected, so the trailing comment can't cause a false positive.
+      if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return;
+      // Dev-only console diagnostics are author-facing, not on-screen copy.
+      if (/\bconsole\.(warn|error|info|log|debug)\b/.test(line)) return;
+      const strings = line.match(/([`'"])(?:\\.|(?!\1).)*\1/g) || [];
+      for (const s of strings) {
+        if (s.includes('—')) offenders.push(`${rel}:${i + 1}  ${s}`);
+      }
+    });
+  }
+  assert.equal(
+    offenders.length, 0,
+    `em dash in user-facing copy (house rule):\n${offenders.join('\n')}`,
+  );
 });

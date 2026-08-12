@@ -73,7 +73,7 @@ const KNOCKOUT_COPY = {
     seedCta: 'Kick it off',
     // Rounds. "VS" (not "or") so the two cars read as a fight, not a menu.
     versus: 'VS',
-    pickHint: 'Two cars, one goes through — tap the one you’re backing.',
+    pickHint: 'Two cars, one goes through. Tap the one you’re backing.',
     roundKicker: ({ round }) => round,
     matchupProgress: ({ done, total }) => `Tie ${done} of ${total}`,
     // Between-round ceremony: a banner naming the round you’re entering, and a
@@ -86,8 +86,8 @@ const KNOCKOUT_COPY = {
     // The per-tie verdict from the engine's own score of the two cars — did the
     // player back the form pick, or send an underdog through? One concrete beat
     // per tie (replaced the abstract "form" meter, which didn't move within a round).
-    verdictForm: ({ model }) => `The ${model} was the form pick — good shout.`,
-    verdictUpset: ({ model }) => `The ${model} goes through — the underdog’s upset the odds!`,
+    verdictForm: ({ model }) => `The ${model} was the form pick. Good shout.`,
+    verdictUpset: ({ model }) => `The ${model} goes through. The underdog’s upset the odds!`,
     // Result — the champion is always the hero (decision: champion, engine validates)
     matchKicker: 'Your champion',
     matchTitle: ({ model }) => `The ${model} lifts the trophy.`,
@@ -95,7 +95,7 @@ const KNOCKOUT_COPY = {
     whyIntro: 'Why it went all the way:',
     crownCallback: ({ beaten }) => `It knocked out ${beaten} on the run to the title.`,
     // When the engine can't fully back the crown (weak / not in the feasible set)
-    weakNote: 'For the record, though — the numbers don’t *quite* make this the standout. '
+    weakNote: 'For the record, though: the numbers don’t *quite* make this the standout. '
       + 'Stock changes every week, so it’s worth another run soon.',
     alsoNote: ({ model }) => `If you fancy a replay, the numbers make the ${model} the one to beat.`,
     // CTAs + share
@@ -108,8 +108,8 @@ const KNOCKOUT_COPY = {
       + 'Reckon you’d pick a different winner?',
     // Empty pool at the seed
     emptyPoolTitle: 'Not enough in that range for a bracket.',
-    emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got enough under that to run a knockout — `
-      + 'nudge your budget up and we’ll seed a fresh field.',
+    emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got enough under that to run a knockout. `
+      + 'Nudge your budget up and we’ll seed a fresh field.',
     emptyPoolCta: 'Adjust budget',
     // Errors
     errKicker: 'Sorry',
@@ -125,7 +125,7 @@ const KNOCKOUT_COPY = {
     useLabel: 'What’s it for?',
     seedCta: 'Seed the bracket',
     versus: 'VS',
-    pickHint: 'Two cars go head to head — pick the one you’d rather have.',
+    pickHint: 'Two cars go head to head. Pick the one you’d rather have.',
     roundKicker: ({ round }) => round,
     matchupProgress: ({ done, total }) => `Match ${done} of ${total}`,
     roundAdvance: ({ round, survivors }) => `${round} · ${survivors} remaining`,
@@ -134,13 +134,13 @@ const KNOCKOUT_COPY = {
     finalLede: 'Two cars left. Pick the one you’d take.',
     finalCta: 'Continue',
     verdictForm: ({ model }) => `The ${model} was the higher-rated of the two.`,
-    verdictUpset: ({ model }) => `The ${model} goes through — the lower-rated pick.`,
+    verdictUpset: ({ model }) => `The ${model} goes through. The lower-rated pick.`,
     matchKicker: 'Your winner',
     matchTitle: ({ model }) => `The ${model} takes it.`,
     matchLede: 'It beat every car you put against it.',
     whyIntro: 'Why it stands out:',
     crownCallback: ({ beaten }) => `It saw off ${beaten} to win the bracket.`,
-    weakNote: 'For the record, the numbers don’t fully back this one — stock changes '
+    weakNote: 'For the record, the numbers don’t fully back this one. Stock changes '
       + 'weekly, so it’s worth another run soon.',
     alsoNote: ({ model }) => `On the numbers, the ${model} is the closest fit if you’d reconsider.`,
     testDriveCta: 'Book a test drive',
@@ -150,8 +150,8 @@ const KNOCKOUT_COPY = {
     againCta: 'New tournament',
     shareText: ({ model, retailer }) => `My pick is a ${model} at ${retailer}.`,
     emptyPoolTitle: 'Not enough in that range for a bracket.',
-    emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got enough under that to run a knockout — `
-      + 'raise your budget and we’ll seed a fresh field.',
+    emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got enough under that to run a knockout. `
+      + 'Raise your budget and we’ll seed a fresh field.',
     emptyPoolCta: 'Adjust budget',
     errKicker: 'Sorry',
     errTitle: 'We couldn’t reach the matcher',
