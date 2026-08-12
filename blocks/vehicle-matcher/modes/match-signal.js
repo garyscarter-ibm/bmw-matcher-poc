@@ -334,26 +334,43 @@ export function idOf(car) {
 /* ------------------------------ reveal ------------------------------ */
 
 /*
+ * Per-brand celebration character. The JS owns one dial only — particle COUNT,
+ * i.e. how exuberant the burst is; colour and easing are the stylesheet's job
+ * via each brand's .vm-<brand> scope (--vm-ease / --vm-accent-spot). This map is
+ * the single place a brand's exuberance lives, so onboarding a brand is one
+ * entry here (plus its CSS token block), never an edit to celebrate() itself.
+ *
+ *   - restrained (BMW, Ford): measured, fewer plainer bits.
+ *   - lively (MINI, Honda, Motorrad): warm and playful, denser burst.
+ *
+ * A brand not listed falls back to the restrained default, so a new brand is
+ * never broken here — it just starts understated until it opts into warmth.
+ */
+const BRAND_CELEBRATION = {
+  bmw: { count: 26 },
+  ford: { count: 26 },
+  mini: { count: 40 },
+  honda: { count: 36 },
+  motorrad: { count: 36 },
+};
+const DEFAULT_CELEBRATION = { count: 26 };
+
+/*
  * The shared celebration burst on a result reveal — one implementation for both
  * games (the swipe match and the knockout champion), so the crescendo can't
  * drift between them. Was a 24-bit copy in each mode; extracted and enriched
- * here into a denser, staggered burst with per-brand character:
- *
- *   - MINI leans warm and playful: more particles, in the brand's spot +
- *     secondary colours.
- *   - BMW stays measured: fewer, plainer confetti bits, monochrome-ish.
+ * here into a denser, staggered burst with per-brand character (BRAND_CELEBRATION).
  *
  * The bits are plain confetti — no glyphs (the earlier hearts were pulled with
  * the rest of the Valentine's iconography). Character is carried by a
- * `.vm-mini`/`.vm-bmw`-scoped CSS + the token (--vm-ease / --vm-accent-spot), so
- * the JS just varies the particle COUNT; colour and easing are the stylesheet's job. The
+ * `.vm-<brand>`-scoped CSS + the token (--vm-ease / --vm-accent-spot), so the JS
+ * just varies the particle COUNT; colour and easing are the stylesheet's job. The
  * caller gates this on prefers-reduced-motion (the CSS also hides it as a belt-
  * and-braces second guard). `host` should be position:relative so the absolutely
  * positioned layer fills it.
  */
 export function celebrate(host, { brand } = {}) {
-  const mini = brand === 'mini';
-  const count = mini ? 40 : 26;
+  const { count } = BRAND_CELEBRATION[brand] || DEFAULT_CELEBRATION;
   const layer = el('div', 'vm-mingle-confetti');
   layer.setAttribute('aria-hidden', 'true');
   for (let i = 0; i < count; i += 1) {

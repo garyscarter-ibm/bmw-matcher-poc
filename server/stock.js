@@ -20,10 +20,17 @@
  */
 
 import { request } from 'node:https';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 import { lookupDealer } from './dealers.js';
 import { mapVehicle } from './mapping.js';
 import { brandConfig, normalizeBrand } from './brands.js';
+
+// Repo root, from this module's location (server/ → ..). Used to resolve the
+// fixtures directory for fixtures-backed brands without depending on cwd.
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // The stock platform is shared by BMW and MINI; only the origin and the
 // default retailer differ per brand (see brands.js). Everything below is
@@ -213,22 +220,77 @@ function cachedFetch(cache, key, load) {
   return inflight;
 }
 
+/* ---------------------------- fixtures source ------------------------- *
+ * Some brands' live feeds aren't reachable yet (a bot-walled edge, or an SPA
+ * whose API we can't replay), so their stock is seeded into a committed
+ * snapshot at fixtures/<brand>-cars.json — the SAME already-mapped car shape
+ * mapVehicle produces, so the engine, modes and every downstream fetcher treat
+ * it identically to live stock. A brand opts into this with `source: 'fixtures'`
+ * on its registry entry; BMW and MINI stay `source: 'feed'` and never touch
+ * this code. The real fetch adapter can be wired later and the brand flipped
+ * back to 'feed' with no other change.
+ * --------------------------------------------------------------------- */
+
+// brand -> parsed fixtures array. Read once per process (the file is static for
+// a run); cars are already mapped so there's no per-request work to cache.
+const fixturesByBrand = new Map();
+
+/** Load and cache a brand's fixtures snapshot. Throws StockUnavailableError with
+ *  a clear message if the file is missing or unusable, so a mis-seeded brand
+ *  fails loudly rather than serving an empty pool. */
+function loadFixtures(brand) {
+  if (fixturesByBrand.has(brand)) return fixturesByBrand.get(brand);
+  const path = join(REPO_ROOT, 'fixtures', `${brand}-cars.json`);
+  let cars;
+  try {
+    cars = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (cause) {
+    throw new StockUnavailableError(
+      `Fixtures source for "${brand}" could not be read at ${path}`,
+      { cause },
+    );
+  }
+  if (!Array.isArray(cars) || cars.length === 0) {
+    throw new StockUnavailableError(`Fixtures for "${brand}" are empty or malformed`);
+  }
+  fixturesByBrand.set(brand, cars);
+  return cars;
+}
+
+/** All of a fixtures-backed brand's stock for a retailer. The snapshot is a
+ *  single retailer's inventory (or a curated set), so we return the whole pool;
+ *  if the caller named a specific retailerSite, narrow to it when the cars carry
+ *  one, else serve everything (a curated showcase set may not tag a retailer). */
+function fixturesRetailerStock(brand, retailerSite) {
+  const cars = loadFixtures(brand);
+  if (retailerSite == null) return cars;
+  const site = String(retailerSite);
+  const narrowed = cars.filter((c) => c?.retailerId != null && String(c.retailerId) === site);
+  return narrowed.length ? narrowed : cars;
+}
+
 /* ------------------------------ public API ---------------------------- */
 
 /**
- * Fetch a retailer's full live stock for a brand, mapped to the engine's car
- * schema. Cached per brand+retailer for STOCK_TTL_MS. Throws
- * StockUnavailableError if the live feed can't be reached (no static fallback —
- * this tool is honestly live-only).
+ * Fetch a retailer's full stock for a brand, mapped to the engine's car schema.
+ * For `source: 'feed'` brands (BMW, MINI) this is the live Auto Trader platform,
+ * cached per brand+retailer for STOCK_TTL_MS. For `source: 'fixtures'` brands it
+ * reads the committed snapshot (no network). Throws StockUnavailableError if the
+ * chosen source can't be reached.
  *
- * @param {string} [brand] 'bmw' | 'mini' (defaults to bmw)
+ * @param {string} [brand] brand key (defaults to bmw)
  * @param {string} [retailerSite] retailer_site ID; defaults to the brand's default
  * @returns {Promise<Array>} mapped car objects (mapping.js shape)
  */
 export async function fetchRetailerStock(brand = 'bmw', retailerSite) {
   const b = normalizeBrand(brand);
-  const { origin, defaultRetailer } = brandConfig(b);
+  const { origin, defaultRetailer, source } = brandConfig(b);
   const site = retailerSite || defaultRetailer;
+
+  // Fixtures-backed brands never touch the network or the TTL cache — the
+  // snapshot is static for the run and the cars are already mapped.
+  if (source === 'fixtures') return fixturesRetailerStock(b, site);
+
   const key = keyFor(b, site);
   seenRetailers.set(key, { brand: b, retailerSite: site });
   return cachedFetch(cacheByRetailer, key, async () => {
@@ -314,8 +376,15 @@ async function resolveRetailerPostcode(origin, brand, retailerSite) {
  */
 export async function fetchNearbyStock(brand = 'bmw', retailerSite) {
   const b = normalizeBrand(brand);
-  const { origin, defaultRetailer } = brandConfig(b);
+  const { origin, defaultRetailer, source } = brandConfig(b);
   const site = retailerSite || defaultRetailer;
+
+  // Fixtures-backed brands have no distance API and no per-car geo, so there is
+  // no honest "near you" pool to build. Return empty: callers treat a throw or
+  // empty as "no carousel", and the hero matches never depend on it. (When a
+  // real feed is wired and the brand flips to 'feed', this lights up for free.)
+  if (source === 'fixtures') return [];
+
   const key = keyFor(b, site);
   seenRetailers.set(key, { brand: b, retailerSite: site });
   return cachedFetch(cacheNearby, key, async () => {
@@ -527,7 +596,12 @@ function fetchColour(origin, advertId) {
  * @param {Array} cars mapped car objects to enrich in place
  */
 export async function enrichColours(brand, cars, budgetMs = COLOUR_BUDGET_MS) {
-  const { origin } = brandConfig(normalizeBrand(brand));
+  const { origin, source } = brandConfig(normalizeBrand(brand));
+  // Colour comes from the live platform's PDPs. A fixtures-backed brand has no
+  // such PDPs to scrape (its links point at the real brand site, not this
+  // origin), so any paint it shows must already be baked into the snapshot.
+  // Skip the network entirely rather than fetching against the wrong origin.
+  if (source === 'fixtures') return cars;
   const queue = cars.filter((c) => c?.id);
   const deadline = Date.now() + budgetMs;
   for (let i = 0; i < queue.length; i += COLOUR_CONCURRENCY) {

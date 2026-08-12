@@ -111,14 +111,23 @@ function retailerName(block) {
   return name;
 }
 
-/** Brand for this block instance: authored "Brand" config row ("BMW" | "MINI"),
- * lower-cased. Defaults to 'bmw'. Drives both the visual theme (a body class)
- * and which live feed the server queries. Brand is authored data, not baked in —
- * the app is brand-agnostic; BMW is just the default when no row is set. */
+/** The brand keys this block knows how to theme. The server registry
+ * (server/brands.js) is the source of truth for behaviour; this list is the
+ * client mirror the shell needs to pick a theme class and reject typos. Keep it
+ * in step when a brand is onboarded — one line per brand, no other client edit.
+ * DEFAULT_BRAND is the fallback when no (or an unknown) "Brand" row is set. */
+const KNOWN_BRANDS = ['bmw', 'mini', 'ford', 'honda', 'motorrad'];
+const DEFAULT_BRAND = 'bmw';
+
+/** Brand for this block instance: authored "Brand" config row, lower-cased,
+ * validated against KNOWN_BRANDS. Defaults to bmw. Drives both the visual theme
+ * (a body class) and which live feed the server queries. Brand is authored data,
+ * not baked in — the app is brand-agnostic; bmw is just the default when no row
+ * is set or the row names a brand the block doesn't know. */
 function brand(block) {
   const config = readBlockConfig(block);
   const b = (config.brand || '').toLowerCase();
-  return b === 'mini' ? 'mini' : 'bmw';
+  return KNOWN_BRANDS.includes(b) ? b : DEFAULT_BRAND;
 }
 
 /**
@@ -188,8 +197,9 @@ export default async function decorate(block) {
   const { mode, locked } = resolveMode(block);
 
   block.replaceChildren();
-  // Base class + brand theme class ('vm-bmw' | 'vm-mini'). The MINI theme
-  // (vehicle-matcher.css) overrides the design tokens under .vm-mini.
+  // Base class + brand theme class ('vm-bmw' | 'vm-mini' | 'vm-ford' | …). Each
+  // brand's theme (vehicle-matcher.css) overrides the design tokens under its
+  // own .vm-<brand> scope; the base .vm block is the BMW-default look.
   block.classList.add('vm', `vm-${brandKey}`);
 
   // The context every mode receives. Config the shell resolved once; each mode

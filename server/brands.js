@@ -241,6 +241,11 @@ export const BRANDS = {
     label: 'BMW',
     origin: 'https://usedcars.bmw.co.uk',
     defaultRetailer: '96', // Grassicks Garage, Perth
+    // Where stock comes from. 'feed' = the live Auto Trader/Django platform
+    // (stock.js does the CSRF fetch); 'fixtures' = read fixtures/<brand>-cars.json
+    // (already-mapped cars, no network) for brands whose live feed we can't reach
+    // yet. BMW and MINI are live.
+    source: 'feed',
     // Budget slider bounds. BMW used stock genuinely reaches £100k+, so the
     // full £0–150k range is right. (This is the base defined in questions.js.)
     budget: { max: 150000, default: [40000, 75000] },
@@ -250,6 +255,7 @@ export const BRANDS = {
     label: 'MINI',
     origin: 'https://approvedusedminis.co.uk',
     defaultRetailer: '92', // Sytner Luton MINI
+    source: 'feed',
     // MINI used stock runs ~£10k–£40k nationally (median ~£24.5k; nothing over
     // £40k in the feed), so a £150k slider leaves both thumbs bunched at the far
     // left. Cap at £50k with a default bracket around the median.
