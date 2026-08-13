@@ -1250,9 +1250,9 @@ const ferrariRaw = (overrides = {}) => ({
   ...overrides,
 });
 
-test('brand config: ferrari is a fixtures-source brand with a Ferrari origin', () => {
+test('brand config: ferrari serves its listing live with a Ferrari origin', () => {
   const cfg = brandConfig('ferrari');
-  assert.equal(cfg.source, 'fixtures', 'ferrari serves from the baked snapshot, not a live feed');
+  assert.equal(cfg.source, 'live-ferrari', 'ferrari fetches its listing live (both cars and cover photos are cold-fetchable), degrading to StockUnavailableError, never a silent fixture fallback');
   assert.match(cfg.origin, /ferrari\.com/);
   assert.equal(cfg.defaultRetailer, 'ferrari-approved');
   assert.equal(normalizeBrand('Ferrari'), 'ferrari');

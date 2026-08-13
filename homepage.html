@@ -147,10 +147,29 @@
           + 'is not an official BMW Motorrad site and is not affiliated with or '
           + 'endorsed by BMW Motorrad.',
       },
+      // Ferrari's voice is Italian, romantic and heritage-led: a Ferrarista
+      // joining a bloodline, not a shopper. It leads on the drive and the feeling,
+      // names the official "Ferrari Approved" programme, and stays warm and
+      // unhurried (see BRAND_COPY.ferrari in modes/questions.js). No em dashes.
+      ferrari: {
+        label: 'Ferrari',
+        origin: 'preowned.ferrari.com',
+        navLinks: ['Range', 'Ferrari Approved', 'The Marque', 'Find a Dealer'],
+        heroKicker: 'Ferrari Approved',
+        heroTitle: 'The one that was made for you.',
+        heroSub: 'Every approved-used Ferrari, matched to the way you drive and '
+          + 'the roads you love.',
+        heroCta: 'Start matching',
+        footerLinks: ['Legal', 'Privacy', 'Cookies', 'Contact'],
+        footerNote: 'Internal demonstration only. This is a prototype of the '
+          + 'vehicle-matcher tool shown inside representative brand furniture. It '
+          + 'is not an official Ferrari site and is not affiliated with or '
+          + 'endorsed by Ferrari.',
+      },
     };
 
-    // Picker tile order (BMW, MINI, Ford, Honda, Motorrad).
-    const PICKER_ORDER = ['bmw', 'mini', 'ford', 'honda', 'motorrad'];
+    // Picker tile order (BMW, MINI, Ford, Honda, Motorrad, Ferrari).
+    const PICKER_ORDER = ['bmw', 'mini', 'ford', 'honda', 'motorrad', 'ferrari'];
 
     // ---- carried over verbatim from index.html ------------------------------
     // Each brand's default demo retailer name, so switching brand alone doesn't

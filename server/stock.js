@@ -392,16 +392,21 @@ async function hondaLiveStock(opts = {}) {
  * self-issued-session adapter does, and map every ad through the SAME
  * mapFerrariRaw the committed snapshot was built with.
  *
- * Dormant while the registry says `source: 'fixtures'`. It ships fixtures for
- * one reason only: the CAR data is cold-fetchable but the PHOTOS are not — the
- * card images are Thron DAM galleries resolved solely through the site's runtime
- * Thron SDK session, which a cold script can't turn into an image URL. Both
- * paths (live and snapshot) therefore serve photo-less cards that degrade
- * cleanly; the snapshot avoids hammering Ferrari's production site with 15 GETs
- * per cache-miss for data that doesn't change hour to hour. Flip Ferrari to
- * `source: 'live-ferrari'` and this fetches live with the identical mapper and
- * the same StockUnavailableError contract as every other live brand. See the
- * Ferrari section of DECISIONS.md.
+ * Dormant while the registry says `source: 'fixtures'`. BOTH halves of the data
+ * are cold-fetchable, no token (verified 2026-08-13): the CAR records come from
+ * the public __NEXT_DATA__ blob, and the card COVER PHOTO is a Thron DAM asset on
+ * the token-free /delivery/public/ path (the site hardcodes clientId `ferrari`
+ * and sessId `3zayf6` as plain public constants, so a gallery id resolves to a
+ * real JPEG with no SDK session — see thronCardImage in ferrari-listing.js). The
+ * snapshot therefore ships 148/148 real cover photos, not photo-less cards.
+ * (The one genuinely session-gated asset is the detail-page multi-image gallery,
+ * same client-issued-token class as Ford's x-eusl-k — do not forge it; a card
+ * shows one real cover, which reads fine.) It ships fixtures purely to avoid
+ * hammering Ferrari's production site with ~15 GETs per cache-miss for data that
+ * barely changes hour to hour. Flip Ferrari to `source: 'live-ferrari'` and this
+ * fetches live with the identical mapper (a live car is indistinguishable from a
+ * fixture car) and the same StockUnavailableError contract as every other live
+ * brand. See the Ferrari section of DECISIONS.md.
  * --------------------------------------------------------------------- */
 
 // Safety cap on pagination. The real pool is ~159 cars at ~11/page (~15 pages);

@@ -57,17 +57,18 @@ Format: **[area] decision** — why, and how to undo if you disagree.
   The response envelope is now known (`SearchFilter.ResOverviewData.totalItemCount`, `ResTable`),
   which shaped both the adapter and the fixture schema.
 
-- **[ferrari-data] Ferrari uses a real baked snapshot: the CARS and the card PHOTOS are both
+- **[ferrari-data] Ferrari runs live: the CARS and the card PHOTOS are both
   cold-fetchable (verified 2026-08-13).** `preowned.ferrari.com` is a Next.js app that
   server-renders its full stock into a public `__NEXT_DATA__` JSON blob — no token, no session,
-  plainly `curl`-able (148 real cars: names, prices, mileage, real per-listing power/cc, gearbox,
-  engine string). Ferrari serves `fixtures/ferrari-cars.json`, a one-off real snapshot baked from
-  the `__NEXT_DATA__` records through `mapFerrariRaw` by `scripts/build-ferrari-fixtures.mjs`.
-  Every per-listing fact (price, mileage, power, cc) is genuine; per-model figures
-  (boot/seats/0-62/mpg/sizeClass) come from `MODEL_SPECS_FERRARI`. The live adapter
-  (`ferrariLiveStock` in `stock.js`, `source: 'live-ferrari'`) is wired against the discovered
-  `__NEXT_DATA__` contract; the registry ships `source: 'fixtures'`. To refresh: re-run the builder
-  against a fresh page fetch.
+  plainly `curl`-able with a browser UA (148 real cars: names, prices, mileage, real per-listing
+  power/cc, gearbox, engine string). The registry ships `source: 'live-ferrari'`: the live adapter
+  (`ferrariLiveStock` in `stock.js`) walks every result page in real time and maps each record
+  through `mapFerrariRaw`, throwing `StockUnavailableError` on failure with no silent fallback —
+  the same live-feed contract as Honda/Motorrad. Every per-listing fact (price, mileage, power, cc)
+  is genuine; per-model figures (boot/seats/0-62/mpg/sizeClass) come from `MODEL_SPECS_FERRARI`. A
+  baked snapshot (`fixtures/ferrari-cars.json`, built by `scripts/build-ferrari-fixtures.mjs`
+  through the same `mapFerrariRaw`) remains for offline/dev use — set `source: 'fixtures'` to serve
+  it; to refresh it, re-run the builder against a fresh page fetch.
 
   **CORRECTION (2026-08-13):** the original claim that the PHOTOS are "NOT cold-scriptable /
   gallery-gated / deliberately empty" was WRONG for the card image. The card cover photo is a

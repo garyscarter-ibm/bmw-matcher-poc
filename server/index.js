@@ -694,18 +694,22 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     // paged fetch and Honda's live scrape are both paid at boot and kept fresh
     // off the request path — the first visitor to any brand hits a warm cache.
     // Ford is fixtures (instant); priming it is harmless and keeps it enrolled.
+    // Ferrari runs live too (its cold ~15-page walk is ~50s), so it's primed at
+    // boot for the same reason as Motorrad: the first Ferrari visitor must not
+    // pay that walk on the request path.
     Promise.allSettled([
       fetchRetailerStock('bmw'), fetchNearbyStock('bmw'),
       fetchRetailerStock('mini'), fetchNearbyStock('mini'),
       fetchRetailerStock('honda'),
       fetchRetailerStock('ford'),
       fetchRetailerStock('motorrad'),
+      fetchRetailerStock('ferrari'),
     ]).then((r) => {
       const failed = r.filter((x) => x.status === 'rejected');
       if (failed.length) {
         console.warn(`[warmer] initial prime: ${failed.length}/${r.length} pools cold (will retry on demand)`);
       } else {
-        console.log('[warmer] initial stock primed (BMW + MINI + Honda + Ford + Motorrad)');
+        console.log('[warmer] initial stock primed (BMW + MINI + Honda + Ford + Motorrad + Ferrari)');
       }
     });
   });
