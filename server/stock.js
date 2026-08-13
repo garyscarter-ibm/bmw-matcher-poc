@@ -397,11 +397,11 @@ async function hondaLiveStock(opts = {}) {
  *
  * This adapter walks every page (the feed is 20/page against ~963 bikes),
  * concatenating and de-duping the HTML rows, then maps them through the SAME
- * mapMotorradRaw the fixtures use. It stays dormant while the registry says
- * `source: 'fixtures'`; flip Motorrad to `source: 'live-motorrad'` and it lights
- * up with no other change, degrading to the snapshot on any failure so the deck
- * is never blank. It reuses the same cache/warm/StockUnavailableError contract as
- * the BMW/MINI feed, so a caller can't tell a live brand from a fixtures one.
+ * mapMotorradRaw the committed snapshot was built with. It reuses the same
+ * cache/warm/StockUnavailableError contract as the BMW/MINI feed, so a caller
+ * can't tell one live brand from another. The live feed is the single source of
+ * truth: a fetch failure throws StockUnavailableError (→ 502 at the API), no
+ * silent fallback to the snapshot.
  * --------------------------------------------------------------------- */
 
 // The results feed and the landing page that issues the session, relative to the
@@ -672,34 +672,26 @@ export async function fetchRetailerStock(brand = 'bmw', retailerSite) {
 
   // Honda's live feed, when the registry opts into it. The listing is
   // server-rendered HTML (not JSON), so it has its own adapter; it's cached like
-  // the BMW/MINI feed and degrades to the snapshot on any failure so the deck is
-  // never blank. Honda filters by location (postcode + radius), not dealer id —
-  // fetchNearbyStock handles the "near you" narrowing; here we pull the pool.
+  // the BMW/MINI feed. A fetch failure throws StockUnavailableError, which the
+  // API turns into a clean 502 — the live feed is the single source of truth, so
+  // we surface its outage rather than paper over it with stale stock. Honda
+  // filters by location (postcode + radius), not dealer id — fetchNearbyStock
+  // handles the "near you" narrowing; here we pull the pool.
   if (source === 'live-honda') {
     const key = keyFor(b, site);
     seenRetailers.set(key, { brand: b, retailerSite: site });
-    return cachedFetch(cacheByRetailer, key, () =>
-      hondaLiveStock().catch((err) => {
-        // eslint-disable-next-line no-console
-        console.warn(`[honda] live feed unavailable, serving fixtures: ${err?.message}`);
-        return fixturesRetailerStock(b, site);
-      }));
+    return cachedFetch(cacheByRetailer, key, () => hondaLiveStock());
   }
 
-  // Motorrad's live feed, when the registry opts into it. It's cached per
-  // brand+retailer exactly like the BMW/MINI feed; on any failure (typically no
-  // live session in this environment) it degrades to the curated snapshot
-  // rather than blanking the deck — the "decide and keep moving" rule. Flip the
-  // registry back to 'fixtures' to disable it entirely.
+  // Motorrad's live feed, when the registry opts into it. Cached per
+  // brand+retailer exactly like the BMW/MINI feed; on any failure it throws
+  // StockUnavailableError (→ 502 at the API) rather than serving a stale
+  // snapshot. Same source-of-truth rule as Honda and BMW/MINI: one live feed,
+  // no silent fallback.
   if (source === 'live-motorrad') {
     const key = keyFor(b, site);
     seenRetailers.set(key, { brand: b, retailerSite: site });
-    return cachedFetch(cacheByRetailer, key, () =>
-      motorradLiveStock(origin).catch((err) => {
-        // eslint-disable-next-line no-console
-        console.warn(`[motorrad] live feed unavailable, serving fixtures: ${err?.message}`);
-        return fixturesRetailerStock(b, site);
-      }));
+    return cachedFetch(cacheByRetailer, key, () => motorradLiveStock(origin));
   }
 
   const key = keyFor(b, site);

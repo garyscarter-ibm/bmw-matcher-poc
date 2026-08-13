@@ -1,10 +1,18 @@
 /*
- * Build fixtures/ford-cars.json — curated, not scraped.
+ * Build fixtures/ford-cars.json — SYNTHETIC deterministic deck (superseded).
  *
- * Ford's live approved-used feed (servicescache.ford.com) is behind an Akamai
- * edge that drops the connection from this environment (verified repeatedly:
- * HTTP 000 regardless of method/UA/headers), so unlike Honda there is no raw
- * dump to replay. Instead this script SYNTHESISES a realistic flat-raw dataset
+ * NOTE (2026-08-13): the committed fixtures/ford-cars.json is now a REAL one-off
+ * capture, built by scripts/build-ford-fixtures-from-capture.mjs — Ford's live
+ * feed turned out to be reachable (the "Akamai HTTP 000 block" below was a missing
+ * header block, not an edge drop). This synthetic builder is kept only for a
+ * deterministic, network-free dev deck; running it will OVERWRITE the real snapshot
+ * with synthesised cars (no photos, homepage links). Prefer the from-capture builder.
+ *
+ * The historical rationale, left for context:
+ * Ford's live approved-used feed (servicescache.ford.com) was believed to be behind
+ * an Akamai edge that drops the connection from this environment (HTTP 000 regardless
+ * of method/UA/headers), so unlike Honda there was no raw dump to replay. Instead this
+ * script SYNTHESISES a realistic flat-raw dataset
  * — a spread of derivatives per model line, with representative used prices,
  * mileages and plates — and projects it through mapFordRaw(), the same flat-raw
  * → mapped-car projection the live adapter will use once it is reachable. So the

@@ -727,9 +727,10 @@ test('listingUrl carries the approved-used programme and the location facet, pag
 
 /* ================================================================== *
  * Ford — the second fixtures-source brand, and the broadest range we
- * carry. Its live feed is Akamai-blocked here, so fixtures are curated
- * and projected by mapFordRaw (a flat-raw → mapped-car projection, the
- * same shape the live adapter will feed). Ford's mapper is richer than
+ * carry. Its live feed IS reachable but token-gated, so rather than run a
+ * live adapter the fixtures are a one-off real snapshot, projected by
+ * mapFordRaw (a flat-raw → mapped-car projection, the same shape a live
+ * adapter would feed). Ford's mapper is richer than
  * Honda's: a real performance halo (ST/GT speed-up), a genuine EV+PHEV
  * split, and body derivation across estate/convertible/pickup/mpv. These
  * prove all of that, plus the same engine-validity guard the render test
@@ -897,13 +898,15 @@ const motorradRaw = (overrides = {}) => ({
   ...overrides,
 });
 
-test('brand config: motorrad runs live with a bikes-file fixtures fallback', () => {
+test('brand config: motorrad runs live, naming its bikes-file offline pool', () => {
   const cfg = brandConfig('motorrad');
-  // Motorrad fetches its live approved-used pool (source: 'live-motorrad') and
-  // degrades to the committed snapshot on any failure. The fallback file is the
-  // bike file, not <brand>-cars.json.
-  assert.equal(cfg.source, 'live-motorrad', 'motorrad serves live, degrading to fixtures');
-  assert.equal(cfg.fixturesFile, 'motorrad-bikes.json', 'motorrad reads the bikes file, not <brand>-cars.json');
+  // Motorrad fetches its live approved-used pool (source: 'live-motorrad') and,
+  // like every live brand, surfaces a fetch failure as a 502 rather than serving
+  // a stale snapshot (no runtime fallback). The committed snapshot survives only
+  // as the offline test pool, and fixturesFile records where it lives — the bike
+  // file, not <brand>-cars.json.
+  assert.equal(cfg.source, 'live-motorrad', 'motorrad serves live, no silent fallback');
+  assert.equal(cfg.fixturesFile, 'motorrad-bikes.json', 'motorrad names the bikes file, not <brand>-cars.json');
   assert.match(cfg.origin, /bmw-motorrad\.co\.uk/);
   assert.equal(normalizeBrand('Motorrad'), 'motorrad');
   assert.equal(normalizeBrand('MOTORRAD'), 'motorrad');
@@ -995,16 +998,17 @@ test('mapMotorradRaw returns null for a priceless record (never invents a price)
   assert.equal(mapMotorradRaw(motorradRaw({ price: undefined })), null);
 });
 
-test('the Motorrad fallback snapshot is the whole real deck, every bike with a real photo', () => {
+test('the Motorrad offline pool is the whole real deck, every bike with a real photo', () => {
   // The snapshot is the live feed's own output, captured (see
-  // scripts/fetch-motorrad-all-pages.mjs): it's the fallback the live adapter
-  // degrades to, so it must be indistinguishable from live — the full ~963-bike
-  // pool, and crucially every bike carrying its real listing photo (the whole
-  // point of the missing-images fix). A rebuild that shrank the deck or dropped
-  // photos should fail here, loudly.
+  // scripts/fetch-motorrad-all-pages.mjs). It's no longer a runtime fallback,
+  // but it IS the offline test pool the render tests mount against, so it must
+  // stay indistinguishable from live — the full ~963-bike pool, and crucially
+  // every bike carrying its real listing photo (the whole point of the
+  // missing-images fix). A rebuild that shrank the deck or dropped photos should
+  // fail here, loudly.
   const path = fileURLToPath(new URL('../../fixtures/motorrad-bikes.json', import.meta.url));
   const bikes = JSON.parse(readFileSync(path, 'utf8'));
-  assert.ok(bikes.length >= 500, `the fallback is the real deck, not a sample (got ${bikes.length})`);
+  assert.ok(bikes.length >= 500, `the pool is the real deck, not a sample (got ${bikes.length})`);
   const ids = new Set(bikes.map((b) => b.id));
   assert.equal(ids.size, bikes.length, 'no duplicate offers in the snapshot');
   for (const bike of bikes) {

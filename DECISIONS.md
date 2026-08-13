@@ -21,6 +21,17 @@ Format: **[area] decision** — why, and how to undo if you disagree.
   modes validate end to end. To undo: run the server from an allowed network and flip
   Ford's registry `source` back to `feed`.
 
+  **CORRECTION (2026-08-13):** the "HTTP 000 / Akamai block" was WRONG — it was a
+  missing browser header block, not an edge drop. With the full header set plus the
+  `x-eusl-consumer: b-gux_approved_used-prod` and `x-eusl-k` pair, `searchVehicles`
+  returns real listings with real, resolvable per-listing photos. We still do NOT run
+  a live Ford adapter, because `x-eusl-k` is minted client-side and expires and we do
+  not forge it. Instead `fixtures/ford-cars.json` is now a ONE-OFF REAL snapshot (65
+  cars, real prices/mileages/plates/registration months and real photos), baked via
+  `scripts/build-ford-fixtures-from-capture.mjs` — every per-listing fact is genuine;
+  only the per-model figures (boot/seats/0-62/mpg) stay generic. See the
+  `[ford-feed-is-live-reachable]` memo for the exact call recipe.
+
 - **[honda-data] Honda uses real stock.** The server-rendered listing HTML at
   `usedcars.honda.co.uk` is fully scrapeable (1,368 vehicles: model, derivative, price,
   detail link, pagination), and the provided `soap/kfz/?gw=search_form` returns clean
@@ -145,16 +156,28 @@ Format: **[area] decision** — why, and how to undo if you disagree.
 
 ## Ford (branch `vehicle-brand-ford-honda`)
 
-- **[ford-curated-not-scraped] Ford stock is curated, not scraped — the live feed is
-  unreachable from here.** `servicescache.ford.com` (the user's two approved-used endpoints)
-  sits behind an Akamai edge that drops the connection at the HTTP/2 layer regardless of
-  method, UA or headers (verified repeatedly: HTTP 000). So unlike Honda there is no raw
-  dump to replay. `scripts/build-ford-fixtures.mjs` synthesises a realistic flat-raw dataset
-  — a spread of derivatives per line with representative used prices, mileages and plates —
-  and projects it through `mapFordRaw`, the SAME flat-raw to mapped-car projection the live
-  adapter will use once it is reachable. 58 cars: petrol 28, diesel 15, ev 13, phev 2;
-  £8,900–£43,600 (median £21,050). Deterministic (mulberry32, no Date/Math.random), so the
-  committed JSON is stable across runs.
+- **[ford-curated-not-scraped] Ford stock is a real snapshot, not scraped live — SUPERSEDED
+  by [ford-real-snapshot] below.** Originally: `servicescache.ford.com` was believed to sit
+  behind an Akamai edge dropping the connection (HTTP 000), so `scripts/build-ford-fixtures.mjs`
+  synthesised a realistic flat-raw dataset (58 cars, deterministic mulberry32) projected
+  through `mapFordRaw`. That "block" was later found to be a missing header block, not an edge
+  drop (see below); the synthetic builder is kept for a deterministic offline dev deck, but the
+  committed fixtures are now a real capture.
+
+- **[ford-real-snapshot] Ford's live feed IS reachable; the committed fixtures are now a real
+  one-off capture (2026-08-13).** With the full browser header block plus
+  `x-eusl-consumer: b-gux_approved_used-prod` and an `x-eusl-k` token, `POST
+  .../v1/searchVehicles` returns real listings with real, resolvable photos (three dealer
+  CDNs: googleapis, lookers, coxautoinc). We do NOT run a live adapter: `x-eusl-k` is minted
+  client-side and expires, and we do not forge it. `scripts/build-ford-fixtures-from-capture.mjs`
+  bakes a captured response into `fixtures/ford-cars.json` by projecting each nested API record
+  through the SAME `mapFordRaw`. 65 real cars: petrol 31, phev 25, ev 9; £18,995–£36,750
+  (median £26,250); every car carries a real photo + registration month. Per-model figures
+  (boot/seats/0-62/mpg) stay honest-but-generic. Real-data gotcha the capture exposed: an
+  electric car can name only the base line ("PUMA", not "PUMA Gen-E"), so `mapFordRaw` now
+  promotes an EV to its EV-sibling line (Puma→Puma Gen-E, Mustang→Mustang Mach-E) to score on
+  the real WLTP range. To refresh: recapture `searchVehicles` with a fresh token and re-run the
+  builder (see the `[ford-feed-is-live-reachable]` memo for the recipe).
 
 - **[ford-flat-projection] Ford gets a dedicated `mapFordRaw`, like Honda, not a
   `BRAND_MAPPERS` entry.** BMW/MINI share the Auto Trader feed shape `mapVehicle` reads; Ford

@@ -560,9 +560,11 @@ export const BRANDS = {
     // Honda's live stock has no clean feed API, but its server-rendered listing
     // pages ARE fetchable from this environment, so Honda runs genuinely live:
     // stock.js fetches usedcars.honda.co.uk on demand (shared parser in
-    // honda-listing.js, mapped via mapHondaRaw) and degrades to the committed
-    // fixtures/honda-cars.json snapshot on any fetch failure, so the deck is
-    // never blank. See the Honda-live section of DECISIONS.md.
+    // honda-listing.js, mapped via mapHondaRaw). The live feed is the single
+    // source of truth: a fetch failure surfaces as a 502 rather than serving a
+    // stale snapshot (no silent fallback, matching BMW/MINI). The committed
+    // fixtures/honda-cars.json is kept only as the offline test pool. See the
+    // Honda-live section of DECISIONS.md.
     source: 'live-honda',
     // Honda used stock runs ~£8.5k–£22.5k in the scraped pool (median ~£19k), so
     // a £150k slider would bunch both thumbs at the far left. Cap at £30k with a
@@ -610,15 +612,15 @@ export const BRANDS = {
     // session-gated, but the server embeds a fresh GMB-SID in the results landing
     // page's #hfSID field, so stock.js self-issues a session (no browser), walks
     // every page of the ~963-bike pool, and maps the HTML ResTable rows through
-    // mapMotorradRaw. It degrades to the committed fixtures/motorrad-bikes.json
-    // snapshot (963 real bikes, all with real listing photos) on any fetch
-    // failure, so the deck is never blank. See the Motorrad-live section of
-    // DECISIONS.md.
+    // mapMotorradRaw. The live feed is the single source of truth: a fetch
+    // failure surfaces as a 502, no silent fallback (matching Honda and
+    // BMW/MINI). See the Motorrad-live section of DECISIONS.md.
     source: 'live-motorrad',
-    // Motorrad stock is bikes, not cars, so the snapshot is <brand>-bikes.json.
-    // The fixtures loader defaults to <brand>-cars.json; this override points it
-    // at the bike file. (The blueprint documents this as the one field a
-    // non-car brand adds.)
+    // Motorrad stock is bikes, not cars, so its committed snapshot is
+    // <brand>-bikes.json rather than the loader's default <brand>-cars.json.
+    // The snapshot is no longer a runtime fallback; it survives only as the
+    // offline test pool (render.test.js / brand.test.js load it by path), and
+    // this field records where that pool lives.
     fixturesFile: 'motorrad-bikes.json',
     // BMW Motorrad used bikes run ~£4k (a used G 310) to ~£25k (a nearly-new
     // K 1600 GT / M 1000 RR). Cap at £30k with a default around the volume

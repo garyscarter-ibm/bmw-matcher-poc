@@ -640,13 +640,19 @@ export function mapHondaRaw(raw) {
 }
 
 /* ======================================================================= *
- * FORD — the second fixtures-source brand (curated, not scraped).
+ * FORD — the second fixtures-source brand (a real snapshot, not scraped live).
  *
- * Ford's live approved-used feed (servicescache.ford.com) is behind an Akamai
- * edge that drops the connection from this environment, so fixtures/ford-cars.json
- * is curated from public Ford UK spec data. It uses the SAME flat-raw → mapped-car
- * projection as Honda (mapFordRaw), so when the real feed becomes reachable its
- * adapter can hand the same flat records straight in. See DECISIONS.md.
+ * Ford's live approved-used feed (servicescache.ford.com/api/eUsed/v1) IS
+ * reachable — the old "Akamai HTTP 000 block" was a missing browser header block,
+ * not a hard edge drop. But its request is signed with an x-eusl-k token minted
+ * client-side that expires (we do not forge it), so we do not run a live adapter.
+ * Instead fixtures/ford-cars.json is a ONE-OFF real capture: every per-listing
+ * fact (price, mileage, reg, registration month, photo) is genuine feed data,
+ * baked in via scripts/build-ford-fixtures-from-capture.mjs, which projects each
+ * nested API record through this same mapFordRaw. The per-MODEL figures below
+ * (boot/seats/0-62/sizeClass/mpg) stay honest-but-generic. Same flat-raw →
+ * mapped-car projection as Honda, so a live adapter could feed it directly.
+ * See DECISIONS.md and the [ford-feed-is-live-reachable] memo.
  *
  * Ford's range is the broadest we carry: a Ka city car through a Mustang and a
  * Mach-E, every body from supermini to pickup, every fuel from petrol-mHEV to EV.
@@ -820,7 +826,16 @@ const FORD_RETAILER_NAME = 'Ford Approved Used';
  * mapHondaRaw() produce. Returns null (caller filters) if there's no price.
  */
 export function mapFordRaw(raw) {
-  const line = fordLine(raw?.title, raw?.derivative);
+  const derivative = String(raw?.derivative || '');
+  let line = fordLine(raw?.title, raw?.derivative);
+  const fuel = fordFuel(raw?.fuel, line, derivative);
+  // An electric car can name only the base line ("PUMA", not "PUMA Gen-E") in the
+  // live feed's model field, so it folds to the combustion spec and lands on the
+  // generic EV-range default. When the fuel says electric and the base line has a
+  // dedicated EV sibling, prefer the sibling so it scores on the model's real WLTP
+  // range, not 250. (Focus/Kuga have no EV sibling, so they are left alone.)
+  const EV_SIBLING = { Puma: 'Puma Gen-E', Mustang: 'Mustang Mach-E' };
+  if (fuel === 'ev' && EV_SIBLING[line]) line = EV_SIBLING[line];
   const spec = MODEL_SPECS_FORD[line] || DEFAULT_SPEC_FORD;
   // Price is the single most decision-driving field in used-car shopping, so we
   // never invent one: a record with no price is dropped rather than shown with a
@@ -831,9 +846,7 @@ export function mapFordRaw(raw) {
   if (!price) return null;
 
   const { origin } = brandConfig('ford');
-  const derivative = String(raw?.derivative || '');
   const body = fordBody(line, derivative);
-  const fuel = fordFuel(raw?.fuel, line, derivative);
   const zeroTo62 = trimZeroTo62Ford(spec.zeroTo62, line, derivative);
   // EVs and PHEVs are scored on range; take the record's figure, else the spec's.
   // The Kuga PHEV has no spec.evRange (that entry is the petrol Kuga), so it
@@ -847,7 +860,12 @@ export function mapFordRaw(raw) {
 
   return {
     id: String(raw?.id ?? raw?.reg ?? `${line}-${price}`),
-    name: fordDisplayName(raw?.title || line, derivative),
+    // Build the display name from the normalised `line`, not the raw title: the
+    // live feed sends the model all-caps ("PUMA"), and fordLine already canonises
+    // it ("Puma", "Puma Gen-E"), so this both fixes the caps and names the right
+    // line. The synthetic fixtures pass a proper-case "Ford <line>" title, which
+    // fordLine folds to the same `line`, so their names are unchanged.
+    name: fordDisplayName(line, derivative),
     line,
     body,
     fuel,
@@ -871,6 +889,13 @@ export function mapFordRaw(raw) {
     // ---- display-only (surfaced by index.js publicCar) ----
     mileage: num(raw?.mileage),
     plate: raw?.reg || undefined,
+    // Age source for the swipe card's dating frame. Ford's live feed dates a
+    // registration to the month ("Apr 2025"); the fixtures builder hands that in
+    // as firstReg "01/mm/yyyy" (first of the month, an honest midpoint that beats
+    // the year-only fallback), with year as backup. See ageInYears in
+    // match-signal.js for the derivation order.
+    firstReg: raw?.firstReg || undefined,
+    year: raw?.year || undefined,
     photo: raw?.image || undefined,
     retailerName: FORD_RETAILER_NAME,
     retailerId: FORD_RETAILER_ID,
