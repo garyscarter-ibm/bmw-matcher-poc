@@ -422,6 +422,11 @@ const BRAND_CELEBRATION = {
   mini: { count: 40 },
   honda: { count: 36 },
   motorrad: { count: 36 },
+  // Ferrari: a measured, slightly-raised burst. Finding one is a genuine event,
+  // so a touch above BMW's restraint, but the brand is understated luxury, not
+  // confetti-cannon exuberance — the sparkle comes from the red spot and the
+  // composed --vm-ease, so the count stays dignified.
+  ferrari: { count: 30 },
 };
 const DEFAULT_CELEBRATION = { count: 26 };
 

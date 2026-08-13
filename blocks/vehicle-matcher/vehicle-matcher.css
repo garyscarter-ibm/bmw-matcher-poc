@@ -180,6 +180,34 @@
   font-display: swap;
 }
 
+/* Ferrari — Ferrari Sans, the face preowned.ferrari.com actually serves (its
+   CSS aliases it as "Title-Font"/"Body-Font" but the woff files are
+   Ferrari-SansRegular / Ferrari-SansMedium, lifted from that site). It is a
+   brand-owned corporate face (like BMW/Ford, unlike Honda's licensed Proxima),
+   so self-hosting sits on the BMW footing; recorded in DECISIONS.md.
+   The family ships only Regular (usWeightClass 400) and Medium (also stamped
+   400 internally, a heavier design at the same nominal weight) — there is NO
+   bold cut, and Ferrari's own site uses Medium as its title/emphasis weight.
+   So we declare Regular at 400 and map the Medium woff to BOTH 500 and 700:
+   an emphasis or heading request resolves to the real Medium face rather than
+   letting the browser synthesise a fake bold or fall through to Helvetica.
+   NotoSans (the fallback family the site pairs it with) is left to the system
+   stack in the token below. */
+@font-face {
+  font-family: 'Ferrari Sans';
+  src: url('./fonts/Ferrari-SansRegular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ferrari Sans';
+  src: url('./fonts/Ferrari-SansMedium.woff') format('woff');
+  font-weight: 500 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 .vm {
   /* --- font ---
      Packaged-first. 'BMW Type Next' is declared via @font-face at the top of
@@ -763,6 +791,114 @@
   font-weight: 700;
   letter-spacing: 0.005em;
   line-height: 1.1;
+}
+
+/* --------------------------------------------------------------------
+ * FERRARI THEME
+ * Applied when the block is configured Brand: Ferrari (the .vm-ferrari class,
+ * added in decorate). Ferrari's identity (per ferrari.com and
+ * preowned.ferrari.com): a restrained, luxurious near-black-on-white base
+ * with Ferrari red as the single, sparing signature. The register is the
+ * opposite of a supermarket forecourt: quiet, editorial, confident that the
+ * cars sell themselves. So NOT BMW/MINI/Motorrad's shouted uppercase; Ferrari
+ * sets headings in generous SENTENCE CASE with a lot of air, in its own
+ * Ferrari Sans. Red is the CTA and the one accent; the shield yellow is a rare
+ * secondary that never becomes a button. Crisp, small-radius geometry (the
+ * cars are precise machines) and calm, unhurried motion (no MINI bounce).
+ *
+ * Colours are the site's own tokens: red #da291c (1186 uses in its CSS),
+ * ink #181818, muted #8f8f8f, band #f6f7f8, hairline #d0dddd. Fonts are
+ * PACKAGED from ./fonts (Ferrari Sans, see the @font-face block up top) — a
+ * brand-owned face, self-hosted on the BMW footing. See DECISIONS.md.
+ * -------------------------------------------------------------------- */
+.vm.vm-ferrari {
+  /* Ferrari Sans for both headings and body (there is no display serif).
+     Packaged family first so the standalone harness renders, then the host
+     bridge, then Noto/​system sans — the same fallback family the site pairs
+     it with. Bold requests resolve to the Medium woff (see @font-face note). */
+  --vm-font-heading: 'Ferrari Sans', var(--heading-font-family, 'Noto Sans'), 'Helvetica Neue', arial, sans-serif;
+  --vm-font-body: 'Ferrari Sans', var(--body-font-family, 'Noto Sans'), 'Helvetica Neue', arial, sans-serif;
+  --vm-font-bold: var(--vm-font-body);
+
+  /* colour: near-black ink on white with Ferrari red as the sole accent. Red
+     IS the button colour here (like Honda red / Ford blue), used sparingly. */
+  --vm-ink: #181818;
+  --vm-ink-strong: #000000;
+  --vm-ink-muted: #8f8f8f;
+  --vm-surface: #ffffff;
+  --vm-surface-alt: #f6f7f8;      /* the site's own section band */
+  --vm-accent: #da291c;           /* Ferrari red — primary CTA, links, highlights */
+  --vm-accent-ink: #ffffff;
+  --vm-accent-spot: var(--vm-accent);
+  --vm-accent-secondary: #ffde00; /* Ferrari shield yellow — rare secondary spot */
+  --vm-accent-soft: rgba(218, 41, 28, 0.06);
+  --vm-line: #d0dddd;
+
+  /* geometry: crisp, lightly softened (2px). Sharper than Ford/Honda but not
+     the hard 0px of BMW/Motorrad — Ferrari's web UI runs a small radius. */
+  --vm-radius: 2px;
+  --vm-radius-control: 2px;
+
+  /* motion: composed and unhurried. A clean ease-out, a fraction slower than
+     Ford, no overshoot — luxury moves calmly, it doesn't bounce. */
+  --vm-ease: cubic-bezier(0.22, 0.61, 0.24, 1);
+  --vm-pop: 0.46s;
+}
+
+/* Ferrari headlines: sans, SENTENCE CASE (not uppercased like BMW/MINI/
+   Motorrad), in the strong ink. Overriding text-transform is the key move; the
+   base .vm-title uppercases, which is wrong for Ferrari's restrained editorial
+   register. Weight 500 pulls the Ferrari Sans Medium cut (the site's own title
+   weight), a touch heavier than body without shouting. */
+.vm.vm-ferrari .vm-title,
+.vm.vm-ferrari .vm-question,
+.vm.vm-ferrari .vm-subhead,
+.vm.vm-ferrari .vm-preview-heading,
+.vm.vm-ferrari .vm-nearby-heading {
+  font-family: var(--vm-font-heading);
+  text-transform: none;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+/* Ferrari's lede is body copy in the sans (the base sets it in the heading font
+   at weight 300, which reads too thin for Ferrari Sans). */
+.vm.vm-ferrari .vm-lede {
+  font-family: var(--vm-font-body);
+  font-weight: 400;
+  text-transform: none;
+}
+
+/* Ferrari buttons: red primary fill. The base .vm-btn-primary already uses the
+   accent, so the token override does most of the work; nudge the hover to a
+   deeper red rather than the base's filter so it stays on-brand. */
+.vm.vm-ferrari .vm-btn-primary:not(:disabled):hover {
+  filter: none;
+  background: #b31f14;
+  border-color: #b31f14;
+}
+
+/* Ferrari red spot touches: progress bar, score badge, slider fill and focus
+   ring all carry the accent (the one red, appearing on the small chrome the
+   base leaves neutral). */
+.vm.vm-ferrari .vm-progress-bar { background: var(--vm-accent-spot); }
+.vm.vm-ferrari .vm-score {
+  background: var(--vm-accent-spot);
+  border-color: var(--vm-accent-spot);
+  color: #fff;
+}
+.vm.vm-ferrari .vm-range-fill,
+.vm.vm-ferrari .vm-slider-input::-webkit-slider-thumb,
+.vm.vm-ferrari .vm-slider-input::-moz-range-thumb { background: var(--vm-accent-spot); }
+.vm.vm-ferrari button:focus-visible,
+.vm.vm-ferrari .vm-slider-input:focus-visible::-webkit-slider-thumb {
+  outline-color: var(--vm-accent-spot);
+  box-shadow: 0 0 0 3px rgba(218, 41, 28, 0.3);
+}
+/* Selected option: red border with a subtle red inner edge. */
+.vm.vm-ferrari .vm-option.is-selected {
+  box-shadow: inset 0 0 0 2px var(--vm-accent), inset 4px 0 0 var(--vm-accent-spot);
 }
 
 .vm-kicker {

@@ -27,7 +27,7 @@ import {
   installDom, resetDom, startModeServer, loadMode, mountMode, settle,
 } from './dom-harness.js';
 import {
-  bmwPool, miniPool, hondaPool, fordPool, motorradPool,
+  bmwPool, miniPool, hondaPool, fordPool, motorradPool, ferrariPool,
 } from './helpers.js';
 
 // Brands under render test, each with a stock pool and the marque name. The
@@ -46,6 +46,7 @@ const BRANDS = [
   { key: 'honda', pool: () => hondaPool(20), name: /Honda/i },
   { key: 'ford', pool: () => fordPool(20), name: /Ford/i },
   { key: 'motorrad', pool: () => motorradPool(20), name: /Motorrad/i },
+  { key: 'ferrari', pool: () => ferrariPool(20), name: /Ferrari/i },
 ];
 
 const MODES = ['questions', 'mingle', 'knockout'];

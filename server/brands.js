@@ -440,6 +440,89 @@ const MOTORRAD_TUNING = {
   },
 };
 
+/*
+ * Ferrari overrides. The mirror image of the mainstream brands: nobody
+ * cross-shops a Ferrari on running costs, so the axes a value buyer leans on
+ * (economy, budget-as-frugality, everyday practicality) fall right back, and the
+ * axes that actually separate one Ferrari from another (how it drives, its
+ * character, its shape) carry the weight. Two recalibrations are load-bearing —
+ * the 0-62 curve (every Ferrari is fast, so BMW's curve would peg them all at
+ * 1.0 and the axis would die) and the hard-filter floors (most Ferraris are
+ * two-seaters, so the car-oriented seat/boot gates must not wipe the deck).
+ */
+const FERRARI_TUNING = {
+  weights: {
+    // Character and performance lead — they're what a buyer is actually choosing
+    // between (a 296 vs an 812 vs a Roma is a question of feel and shape, not
+    // value). Body stays high (coupe / open-top / the Purosangue SUV is a real
+    // fork). Economy is nearly dead (a Ferrari is never bought to save money) and
+    // fuel is light (the pool is petrol plus a handful of plug-in hybrids, so it
+    // barely separates them). Budget stays meaningful — the pool runs £90k to
+    // £3.3m, so price still sorts hard within it.
+    budget: 3.0, body: 4.5, fuel: 1.0, practicality: 1.2,
+    performance: 2.6, economy: 0.6, size: 1.0, character: 2.6,
+  },
+  priorityBoosts: {
+    // A performance-first buyer is the default here, so the boost is the
+    // strongest of any brand. "economy" barely means anything on a Ferrari;
+    // comfort/image lean on character (the GT vs the mid-engined feel).
+    economy: { economy: 1.0, budget: 0.5 },
+    performance: { performance: 2.0, character: 0.7 },
+    comfort: { character: 1.1, size: 0.5 },
+    tech: { character: 1.0 },
+    image: { character: 1.2 },
+  },
+  // THE critical recalibration. The pool spans ~2.5s (SF90) to ~6s (a 275 GTB
+  // classic). On BMW's car curve (10.5s->0, 4.5s->1) every modern Ferrari pegs
+  // at 1.0 and the axis carries no signal. Re-point it to the Ferrari range: a
+  // ~6s classic sits near the bottom, a ~2.5s SF90 at the top, and the current
+  // range (2.9s-3.6s) spreads meaningfully between — a 296 reads quicker than a
+  // Roma reads quicker than a California. (6.0s -> 0, 2.5s -> 1.)
+  performance: { zeroBase: 6.0, span: 3.5 },
+  practicality: {
+    // "boot" here is a Ferrari's usable luggage: 74L (SF90) to 473L (Purosangue).
+    // The need scale matches that range, so a Purosangue/GT satisfies "big" and a
+    // mid-engined two-seater isn't crushed for "medium". A buyer choosing a
+    // Ferrari on outright practicality is rare, but the Purosangue and the 2+2
+    // GTs should still win it when it's asked for.
+    bootNeed: { small: 0, medium: 200, big: 400 },
+    // Most Ferraris are two-seaters; don't mark them down for it. Floor at 2 so a
+    // two-seater is a "full house", and the four-seat 2+2s/Purosangue read as the
+    // roomy end rather than the crew bonus (unreachable, like Motorrad's).
+    seatsFloor: 2,
+    crewBonusSeats: 99,
+  },
+  // A "road trip" Ferrari is a front-engined GT or the Purosangue (size band 3+);
+  // the mid-engined cars are class 2. cityDivisor stays gentle — nobody buys a
+  // Ferrari as a city car, but a compact 458/488 is the closest thing.
+  size: { roadtripMinClass: 3, cityDivisor: 5 },
+  // Never hard-exclude a Ferrari for "seats"/"boot": a two-seat mid-engined car
+  // is the norm, not a disqualification. Drop the crew/family gates so the
+  // car-oriented hard filters can't wipe the deck (the Purosangue and the 2+2s
+  // still score higher on those needs through the soft practicality axis).
+  hardFilter: { crewBoot: 0, crewSeats: 2, familySeats: 2 },
+  /*
+   * Reasons in Ferrari's register: spare, exact, and emotional only where the
+   * car earns it. Numbers and honesty match the base; only the temperature
+   * changes. `tags` merges key-by-key in engine.js, so any tag left alone keeps
+   * the BMW wording.
+   */
+  reasons: {
+    roadtrip: () => 'A front-engined grand tourer, built to devour a continent',
+    city: () => 'Compact for what it is, and usable enough for real roads',
+    tags: {
+      'drivers-car': 'Bred for the drive above all else, the way a Ferrari should be',
+      image: 'A car that stops the street, which is rather the point of it',
+      practical: 'The usable end of the range, with the seats and boot to prove it',
+      family: 'Four real seats, the rarest thing a Ferrari can offer',
+      lifestyle: 'Roof down, the engine behind you, the best seat in the house',
+      efficient: 'The plug-in hybrid drivetrain, silent to the end of the drive',
+      tech: 'The current hybrid-era car, not the outgoing one',
+      collectable: 'A modern classic, the kind values tend to follow',
+    },
+  },
+};
+
 /** Deep-merge a brand's overrides onto the BMW base so partial tuning works. */
 function mergeTuning(overrides) {
   const out = { ...BMW_TUNING };
@@ -725,6 +808,46 @@ export const BRANDS = {
           ],
         },
       ],
+    },
+  },
+  ferrari: {
+    label: 'Ferrari',
+    // The public approved-used site (PDP links + origin fallback). Ferrari
+    // Approved is a factory programme; individual dealers exist (Meridien Modena,
+    // Graypaul, JCT600 …) and the feed names the real one per listing, but the
+    // showcase treats the programme as one pool like Honda/Ford.
+    origin: 'https://preowned.ferrari.com',
+    // Synthetic single-retailer id — matches FERRARI_RETAILER_ID in mapping.js so
+    // a retailer-scoped request resolves to the full pool (the fixtures loader
+    // narrows by it, else serves everything).
+    defaultRetailer: 'ferrari-approved',
+    // Ferrari's listing is server-rendered Next.js: the whole result set is
+    // PUBLIC JSON in __NEXT_DATA__, so the CARS are cold-fetchable with no token
+    // (the live adapter in stock.js walks all ~15 pages). It ships fixtures for
+    // one reason: the PHOTOS are Thron DAM galleries resolved only through the
+    // site's runtime SDK session, which a cold script can't turn into an image
+    // URL. So this brand bakes the real 148-car snapshot (real prices, years,
+    // mileages, colours, engines, per-listing power and displacement, real
+    // dealer) and serves photo-less cards that degrade cleanly. Flip to
+    // `source: 'live-ferrari'` and the wired adapter goes live with the identical
+    // mapper. See the Ferrari section of DECISIONS.md.
+    source: 'fixtures',
+    // Ferrari approved-used runs from a ~£90k California T to a seven-figure
+    // classic (a £3.3m 275 GTB in the current pool). Cap at £750k (headroom for a
+    // 458 Speciale / Pista Spider without letting a single classic distort the
+    // budget slider), with a default bracket around the volume modern cars
+    // (Roma / Portofino / 296, ~£150k-£300k).
+    budget: { max: 750000, default: [150000, 300000] },
+    tuning: mergeTuning(FERRARI_TUNING),
+    // Ferrari's range sells the full spread of bodies (coupe, open-top, the
+    // Purosangue SUV) and both petrol and plug-in-hybrid, so the standard
+    // questions fit as-is, with ONE removal: `charging` asks whether you could
+    // charge a car at home or work, a running-cost decision that doesn't apply to
+    // how anyone buys a plug-in-hybrid supercar (the electric range is a
+    // characteristic, not an economy lever). The fuel question still lets a buyer
+    // ask for the hybrids; the engine reads `charging` if a legacy value arrives.
+    questions: {
+      drop: ['charging'],
     },
   },
 };
