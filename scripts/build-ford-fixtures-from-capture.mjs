@@ -88,6 +88,19 @@ function toFlatRaw(item) {
   const image = ((cfg.Appearance?.ImageRef || [])[0]?.value || '').replace(/\?$/, '') || undefined;
   const history = v.History || {};
   const year = parseInt(history.YearOfProduction, 10);
+  // Real per-listing colour. The feed carries a rich marketing name
+  // (Appearance.ExteriorColor.ShortDescription, e.g. "Solar Silver (metallic)")
+  // on some records and a coarse token (ExteriorColor.Code.value, e.g. "WHITE")
+  // on all of them; prefer the rich name, fall back to a tidied token so every
+  // real listing surfaces its own paint. Both are captured values, not invented.
+  const ec = cfg.Appearance?.ExteriorColor || {};
+  const colourShort = String(ec.ShortDescription || '').trim();
+  const colourToken = String(ec.Code?.value || '').trim();
+  const colour = colourShort
+    || (colourToken
+      ? colourToken.charAt(0).toUpperCase() + colourToken.slice(1).toLowerCase()
+      : undefined);
+  const previousOwners = parseInt(history.NumberOfPreviousOwners, 10);
 
   return {
     // Ford's internal vehicle ID is stable and unique across the pool.
@@ -105,6 +118,17 @@ function toFlatRaw(item) {
     firstReg: firstRegFrom(history.DateOfRegistration),
     year: Number.isFinite(year) ? year : undefined,
     image,
+    // Real per-listing exterior colour (see derivation above).
+    colour,
+    // Real per-listing full-service-history flag, the string "Yes"/"No" straight
+    // from the feed (present on every captured record); the renderer interprets it.
+    fullServiceHistory: history.FullServiceHistory || undefined,
+    // Real per-listing previous-owner count; absent on some records, so leave it
+    // undefined there rather than default to a number.
+    previousOwners: Number.isFinite(previousOwners) ? previousOwners : undefined,
+    // Real per-listing dealer name (VendorInformation.VendorName, e.g. "Lawtons of
+    // Tadcaster") — the actual retailer holding this car, not the Ford-wide constant.
+    dealer: vi.VendorName || undefined,
     // The feed carries no per-listing detail URL (the real pages live on
     // individual dealer sites, not derivable from this payload), so mapFordRaw
     // defaults link to the Ford homepage rather than fabricate a deep link.

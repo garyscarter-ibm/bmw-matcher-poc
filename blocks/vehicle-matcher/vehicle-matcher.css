@@ -2495,6 +2495,52 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   color: var(--vm-ink-muted);
 }
 
+/* Hero flags row: the per-brand hero spec (engine size / bhp / character tag)
+   and Ford's full-service-history badge, sitting just under the fuel/body pills.
+   Only rendered by the JS when there's something to say (a null hero and a
+   non-FSH car paint nothing), so this never leaves an empty band. */
+.vm-mingle-hero-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--vm-space-2);
+  margin-top: var(--vm-space-3);
+}
+/* The hero spec is the loud, brand-defining chip: solid accent-spot fill so it
+   reads as the card's headline detail, one per card. */
+.vm-mingle-hero-spec {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px var(--vm-space-3);
+  border-radius: var(--vm-radius-control);
+  background: var(--vm-accent-spot);
+  color: var(--vm-accent-ink);
+}
+/* Full-service-history badge (Ford): a quiet positive trust chip, outlined in
+   the accent so it reads as reassurance rather than a spec. */
+.vm-mingle-fsh {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vm-space-1);
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 3px var(--vm-space-3);
+  border: var(--vm-border-width) solid var(--vm-accent-spot);
+  border-radius: var(--vm-radius-control);
+  color: var(--vm-accent-spot);
+}
+.vm-mingle-fsh::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vm-accent-spot);
+}
+
 /* --- swipe controls: Pass / Keep --- */
 .vm-mingle-controls { display: flex; justify-content: center; gap: var(--vm-space-5); margin-bottom: var(--vm-space-4); }
 .vm-mingle-swipe {
@@ -2735,6 +2781,51 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Head-to-head stat row: ONE real, brand-appropriate metric compared across the
+   two contenders, sitting under the face-off. Three cells in a row that line up
+   with the two cards (value, centred label, value); the winning side is
+   emphasised so the duel shows a reason at a glance. Only painted when the
+   per-brand statRow hook returns a comparable metric, so it never appears empty
+   or half-filled. */
+.vm-knockout-stat {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--vm-space-2);
+  margin-top: var(--vm-space-3);
+  padding: var(--vm-space-3) var(--vm-space-2);
+  border-top: var(--vm-border-width) solid var(--vm-line);
+}
+.vm-knockout-stat-side {
+  display: flex;
+  min-width: 0;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+}
+.vm-knockout-stat-a { justify-content: flex-start; text-align: left; }
+.vm-knockout-stat-b { justify-content: flex-end; text-align: right; }
+.vm-knockout-stat-val {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The centred metric name, quiet uppercase between the two values. */
+.vm-knockout-stat-label {
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--vm-ink-muted);
+  white-space: nowrap;
+}
+/* Winner highlight: the better side goes bold and inks up in the brand accent,
+   so the edge is obvious without a second glance. A tie highlights neither. */
+.vm-knockout-stat-side.is-winner {
+  color: var(--vm-accent-spot);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+}
+.vm-knockout-stat-side.is-winner .vm-knockout-stat-val { overflow: visible; }
 
 /* The face-off: two contenders that sit SHOULDER TO SHOULDER — a fight, not a
    list. Kept side-by-side even on the narrowest screens (a vertical stack read

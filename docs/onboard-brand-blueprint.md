@@ -365,3 +365,23 @@ the engine**:
   buttons instead of its signature black, and thin headlines instead of bold — both passed
   every test because tests don't assert rendered typography. Eyeball the real brand site's
   CTAs and headlines and override fill, weight and casing on purpose (see Layer 4).
+- **A fixture is a snapshot of the mapper, and it does NOT re-run itself.** Every
+  fixtures-source brand ships a *mapped* JSON (`fixtures/<brand>-cars.json`), baked once from
+  raw by a builder. Change the mapper (`map<Brand>Raw`) to surface a new field and the served
+  fixture is instantly stale — it still holds the old shape, so the field is missing on every
+  card even though the mapper is correct and the tests pass. After ANY mapper change, re-run
+  that brand's builder to re-bake the fixture, then re-run the suite. (This bit us surfacing
+  Honda colour/power/cc and Motorrad real cc/power: the mapper was right, the fixtures were a
+  build behind.) Builders: `build-honda-fixtures.mjs` (from `honda-raw.json`),
+  `build-ford-fixtures-from-capture.mjs` (from a capture), `fetch-motorrad-all-pages-cold.mjs`.
+- **A field only reaches a card if it clears all three gates.** Mapper writes it →
+  `publicCar` (`server/index.js`) allowlists it → the card renderer reads it. A value can be
+  mapped and baked into the fixture and STILL never appear because `publicCar` drops it — that
+  allowlist is a hard projection, not a passthrough. Motorrad's `cc` was mapped for months but
+  absent from `publicCar`, so no card ever saw it. When adding display data, edit all three.
+- **Motorrad self-issues its session; it does NOT need a browser or a pasted cURL.** The feed
+  is GMB-SID gated, but the server embeds a fresh SID in the landing page (`#hfSID`), so the
+  whole chain runs cold: GET the landing page, scrape the SID, POST `ShowResults` per page.
+  `server/stock.js` (`mintMotorradSid`) does this live, and `fetch-motorrad-all-pages-cold.mjs`
+  does it for a full-deck re-bake. Older notes/scripts that say "capture a cURL from the
+  browser" predate this and are superseded — reach for the cold self-mint path first.

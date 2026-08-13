@@ -625,6 +625,14 @@ export function mapHondaRaw(raw) {
     // ---- display-only (surfaced by index.js publicCar) ----
     mileage: num(raw.mileage),
     plate: raw.reg || undefined,
+    // Real per-listing detail the scrape captured for this exact car (unlike the
+    // generic MODEL_SPECS figures above): the advertised exterior colour, engine
+    // power in bhp, and engine capacity in cc. Surfaced verbatim from the feed
+    // (odd casing/typos in the source colour strings are left as-is here; the
+    // card layer handles display), so a card can state them as the car's own.
+    colour: raw.colour || undefined,
+    power: num(raw.bhp) || undefined,
+    cc: num(raw.cc) || undefined,
     // Registration year/date power the swipe card's "N years old" frame; where
     // present they're more accurate than decoding the age code off the plate,
     // so ageInYears prefers them (see match-signal.js).
@@ -897,7 +905,17 @@ export function mapFordRaw(raw) {
     firstReg: raw?.firstReg || undefined,
     year: raw?.year || undefined,
     photo: raw?.image || undefined,
-    retailerName: FORD_RETAILER_NAME,
+    // Real per-listing facts recovered from the capture (publicCar surfaces them):
+    // the car's own exterior colour, its full-service-history flag ("Yes"/"No"
+    // string), and previous-owner count. Each describes THIS car, not the model,
+    // and is only set when the source carried it — no invented defaults.
+    colour: raw?.colour || undefined,
+    fullServiceHistory: raw?.fullServiceHistory || undefined,
+    previousOwners: raw?.previousOwners || undefined,
+    // Prefer the REAL per-listing dealer (VendorName, e.g. "Lawtons of Tadcaster")
+    // when the record carries one; synthetic-path records with no dealer fall back
+    // to the Ford-wide constant.
+    retailerName: raw?.dealer || FORD_RETAILER_NAME,
     retailerId: FORD_RETAILER_ID,
     link: raw?.link || `${origin}/`,
   };
@@ -1156,7 +1174,14 @@ export function mapMotorradRaw(raw) {
     mpg: fuel === 'ev' ? undefined : (num(raw?.mpg) || spec.mpg),
     ...(evRange ? { evRange } : {}),
     // Bike-specific display extras (harmless to the engine, surfaced on cards).
-    cc: spec.cc,
+    // Prefer the REAL per-listing capacity the parser read off the row ("1170
+    // ccm"); the generic model-spec cc is only a fallback when the listing
+    // omitted it. Never let the spec value overwrite a real one.
+    cc: num(raw?.cc) || spec.cc,
+    // Real per-listing power in kW, read from the leading kW of the row's
+    // "81 kW (109 HP)". Unit is kW for bikes (Honda's power field is bhp); the
+    // card layer keys the unit off the brand.
+    power: num(raw?.powerKw) || undefined,
     tags: motorradTags(spec.category, spec.sizeClass, fuel),
     blurb: motorradBlurb(line, spec.category, fuel, MOTORRAD_RETAILER_NAME),
 

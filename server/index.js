@@ -153,6 +153,14 @@ function publicCar(car) {
     features: car.features,
     transmission: car.transmission,
     colour: car.colour,
+    // Per-listing detail recovered from the raw feeds, for the card layer.
+    // cc/power are real for Honda (bhp) and Motorrad (kW); fullServiceHistory and
+    // previousOwners are real per-listing for Ford. Each describes the individual
+    // car (not the model), so a card may state them as the listing's own.
+    cc: car.cc,
+    power: car.power,
+    fullServiceHistory: car.fullServiceHistory,
+    previousOwners: car.previousOwners,
     // Set when repeat listings of the same car were grouped (see
     // groupListings): how many the retailer has, the price spread and the
     // colours they come in, so one card can speak for all of them.

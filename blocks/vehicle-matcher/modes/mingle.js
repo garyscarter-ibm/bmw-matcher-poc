@@ -93,6 +93,10 @@ const MINGLE_COPY = {
     // of the age range (very new / a bit older); null → fall back to the score
     // pool above. Flavour only, never a verdict (§4.4).
     ageBadge: (years) => (years <= 1 ? 'Barely driven' : years >= 6 ? 'Seen a few B-roads' : null),
+    // Hero spec — the one brand-defining detail on the swipe card. MINI leads on
+    // character, not numbers (there are no honest per-car figures to show): a
+    // short, fixed brand tag. Returns null for nothing to add.
+    hero: () => 'Go-kart feel',
     // Taste profile
     tasteHeading: 'Your type, so far',
     tasteEmpty: 'Nothing yet. Start swiping.',
@@ -156,6 +160,9 @@ const MINGLE_COPY = {
     badgesCool: ['Your type?', 'One to consider', 'In the running'],
     // Age-aware badge, BMW-restrained; null falls back to the score pool.
     ageBadge: (years) => (years <= 1 ? 'As new' : years >= 6 ? 'Nicely run in' : null),
+    // Hero spec — BMW leads on character over numbers (no honest per-car figure
+    // in the feed): a short, fixed brand tag rather than a fake stat.
+    hero: () => 'Rear-wheel drive',
     tasteHeading: 'Your taste, so far',
     tasteEmpty: 'Nothing yet. Start swiping.',
     keptHeading: 'Kept',
@@ -209,6 +216,10 @@ const MINGLE_COPY = {
     badgesCool: ['Your type?', 'One to consider', 'In the running'],
     // Age-aware badge, Honda's plain-warm register; null falls back to the pool.
     ageBadge: (years) => (years <= 1 ? 'Nearly new' : years >= 6 ? 'Been around' : null),
+    // Hero spec — Honda's power is a REAL per-listing figure (bhp), so the card
+    // can state it as this car's own. Labelled bhp (never a bare number, never
+    // the wrong unit); null when the listing didn't carry a power figure.
+    hero: (car) => (Number.isFinite(car?.power) ? `${car.power} bhp` : null),
     tasteHeading: 'Your taste, so far',
     tasteEmpty: 'Nothing yet, start swiping.',
     keptHeading: 'Kept',
@@ -262,6 +273,14 @@ const MINGLE_COPY = {
     badgesCool: ['Your type?', 'One to consider', 'In the running'],
     // Age-aware badge, Ford's friendly-plain register; null falls back to the pool.
     ageBadge: (years) => (years <= 1 ? 'Barely driven' : years >= 6 ? 'Plenty of miles in it' : null),
+    // Hero spec — Ford's halo cars (ST, Mustang, Mach-E GT) earn a performance
+    // tag. It's a MODEL trait, framed as one ("Performance"), NOT a per-car
+    // 0-62 (zeroTo62 is generic per-model, so it would be dishonest to state as
+    // measured for this listing). Non-halo Fords return null here and instead
+    // show the real full-service-history badge (see buildCard).
+    hero: (car) => (/\bST\b|\bST-Line\b|Mustang|Mach-E GT|\bGT\b/i.test(
+      `${car?.name || ''} ${car?.line || ''}`,
+    ) ? 'Performance' : null),
     tasteHeading: 'Your taste, so far',
     tasteEmpty: 'Nothing yet, start swiping.',
     keptHeading: 'Kept',
@@ -316,6 +335,11 @@ const MINGLE_COPY = {
     badgesCool: ['Your kind of ride?', 'One to consider', 'In the running'],
     // Age-aware badge, Motorrad's rider register; null falls back to the pool.
     ageBadge: (years) => (years <= 1 ? 'Barely run in' : years >= 6 ? 'Well ridden' : null),
+    // Hero spec — engine size is the most Motorrad thing we can show, e.g.
+    // "1250cc". Displacement is a model constant (it reads as the bike's engine
+    // size, not a measured individual figure), so it's honest even where the
+    // server fell back to the model spec for cc. null when no cc is carried.
+    hero: (car) => (Number.isFinite(car?.cc) ? `${car.cc}cc` : null),
     tasteHeading: 'Your taste, so far',
     tasteEmpty: 'Nothing yet, start swiping.',
     keptHeading: 'Kept',
@@ -360,6 +384,31 @@ const MINGLE_COPY = {
 
 /** Copy for the active brand, BMW as the fallback (matches ctx.brand shape). */
 const copyFor = (brand) => MINGLE_COPY[brand] || MINGLE_COPY.bmw;
+
+/*
+ * The car's advertised colour NAME for display, or null. `car.colour` arrives in
+ * two shapes across brands: an object { colour, manufacturerColour } for BMW/MINI
+ * (see server/stock.js) and a plain marketing string for Honda/Ford (mapping.js
+ * passes the feed's colour through verbatim). Motorrad carries none yet. This
+ * reads the readable marketing name out of either shape and returns null when
+ * absent, so a card never fabricates a colour it wasn't given.
+ */
+const colourName = (car) => {
+  const c = car?.colour;
+  if (!c) return null;
+  if (typeof c === 'string') return c.trim() || null;
+  const name = c.manufacturerColour || c.colour;
+  return (typeof name === 'string' && name.trim()) ? name.trim() : null;
+};
+
+/*
+ * Light presentational Title-Casing for a colour name, applied only to display.
+ * Some feed colour strings arrive with odd casing verbatim ("Brilliant sporty
+ * blu"); this only touches the FIRST letter of each word, so it tidies casing
+ * without "correcting" (and so mangling) the feed's own spelling. Safe on
+ * already-titled names ("Frozen White" stays "Frozen White").
+ */
+const titleCaseColour = (s) => s.replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
 
 /* ------------------------------ mount ------------------------------ */
 
@@ -771,13 +820,34 @@ function mount(root, ctx) {
     // the plate stands rather than printing a guessed age.
     const age = ageLabel(car);
     const miles = car.mileage ? `${car.mileage.toLocaleString('en-GB')} miles under the belt` : null;
-    const spec = [age, miles].filter(Boolean).join(' · ');
+    // Colour name closes the spec line ("3 years old · 24,000 miles under the
+    // belt · Frozen White"). Real per-listing, so it's the car's own fact; light
+    // Title-Casing tidies odd feed casing without correcting spelling. Absent →
+    // nothing appended (never a fabricated colour).
+    const colour = colourName(car);
+    const spec = [age, miles, colour ? titleCaseColour(colour) : null].filter(Boolean).join(' · ');
     if (spec) body.append(el('p', 'vm-mingle-card-spec', spec));
     body.append(el('p', 'vm-mingle-card-price', priceLabel(car)));
     const pills = el('div', 'vm-mingle-pills');
     if (car.fuel) pills.append(el('span', 'vm-mingle-pill', cap(car.fuel)));
     if (car.body) pills.append(el('span', 'vm-mingle-pill', cap(car.body)));
     body.append(pills);
+
+    // Per-brand hero spec + Ford's full-service-history badge — the small
+    // brand-defining beat below the pills. The hero is a copy-object hook so each
+    // brand controls its own line (engine size for Motorrad, real bhp for Honda,
+    // a performance/character tag for Ford/BMW/MINI); it renders only when the
+    // hook returns a non-null string, so a brand or a car without the datum shows
+    // nothing rather than an empty element. The FSH pill is real per-listing
+    // (Ford only) and a strong trust signal, so it sits alongside the hero.
+    const heroText = copy.hero ? copy.hero(car) : null;
+    const fsh = car.fullServiceHistory === 'Yes';
+    if (heroText || fsh) {
+      const flags = el('div', 'vm-mingle-hero-flags');
+      if (heroText) flags.append(el('span', 'vm-mingle-hero-spec', heroText));
+      if (fsh) flags.append(el('span', 'vm-mingle-fsh', 'Full service history'));
+      body.append(flags);
+    }
     card.append(body);
     return card;
   };
