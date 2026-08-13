@@ -38,7 +38,7 @@ import {
   WEAK_SCORE,
   budgetBandsFromQuestion, useTilesFromQuestion,
   shuffle, photosFirst, swatchFor, priceLabel, cap,
-  bracketToAnswers, idOf, celebrate,
+  bracketToAnswers, idOf, celebrate, ageInYears,
 } from './match-signal.js';
 
 /* The most cars we'll ever field, even when stock is deep — four rounds
@@ -88,10 +88,18 @@ const KNOCKOUT_COPY = {
     // per tie (replaced the abstract "form" meter, which didn't move within a round).
     verdictForm: ({ model }) => `The ${model} was the form pick. Good shout.`,
     verdictUpset: ({ model }) => `The ${model} goes through. The underdog’s upset the odds!`,
-    // Head-to-head stat row — MINI has no honest per-car performance figure, so
-    // the duel is on mileage (real per-listing, lower is the fresher car). null
-    // when either car has no mileage, so no broken row paints.
-    statRow: (a, b) => lowerBetterRow('Mileage', a, b, mileageOf, milesText),
+    // Tale of the tape — MINI has no honest per-car performance figure, so the
+    // listing rows are mileage + age (both real per-listing; the fresher, newer
+    // car wins), with 0-62 as a labelled model supporting row and engine cc
+    // where the feed carried it. Each row nulls out when its metric is missing,
+    // so a thin listing simply shows fewer rows.
+    taleTitle: 'Tale of the tape',
+    statRows: (a, b) => [
+      lowerBetterRow('Mileage', a, b, mileageOf, milesText),
+      ageRow(a, b),
+      higherBetterRow('Engine', a, b, ccOf, (n) => `${n.toLocaleString('en-GB')}cc`),
+      zeroTo62Row(a, b),
+    ],
     // Result — the champion is always the hero (decision: champion, engine validates)
     matchKicker: 'Your champion',
     matchTitle: ({ model }) => `The ${model} lifts the trophy.`,
@@ -139,10 +147,16 @@ const KNOCKOUT_COPY = {
     finalCta: 'Continue',
     verdictForm: ({ model }) => `The ${model} was the higher-rated of the two.`,
     verdictUpset: ({ model }) => `The ${model} goes through. The lower-rated pick.`,
-    // Head-to-head stat row — mileage (real per-listing, lower wins). zeroTo62 is
-    // generic per-model, so it isn't used here. null when either car lacks a
-    // mileage figure.
-    statRow: (a, b) => lowerBetterRow('Mileage', a, b, mileageOf, milesText),
+    // Tale of the tape — mileage + age lead (real per-listing; fresher and newer
+    // win), engine cc where the feed carried it, and 0-62 as a labelled model
+    // supporting row. Each nulls out when absent, so a thin listing shows fewer.
+    taleTitle: 'Tale of the tape',
+    statRows: (a, b) => [
+      lowerBetterRow('Mileage', a, b, mileageOf, milesText),
+      ageRow(a, b),
+      higherBetterRow('Engine', a, b, ccOf, (n) => `${n.toLocaleString('en-GB')}cc`),
+      zeroTo62Row(a, b),
+    ],
     matchKicker: 'Your winner',
     matchTitle: ({ model }) => `The ${model} takes it.`,
     matchLede: 'It beat every car you put against it.',
@@ -187,11 +201,15 @@ const KNOCKOUT_COPY = {
     finalCta: 'Continue',
     verdictForm: ({ model }) => `The ${model} was the higher-rated of the two.`,
     verdictUpset: ({ model }) => `The ${model} goes through, the lower-rated pick.`,
-    // Head-to-head stat row - mileage (real per-listing, lower wins); if both
-    // cars are level on mileage, fall back to power in bhp (real per-listing,
-    // higher wins). null when neither metric is present on both cars.
-    statRow: (a, b) => lowerBetterRow('Mileage', a, b, mileageOf, milesText)
-      || higherBetterRow('Power', a, b, powerOf, (n) => `${n} bhp`),
+    // Tale of the tape - mileage + power (bhp) + age, all real per-listing (Honda
+    // carries a genuine per-car bhp and reg year). Each nulls out when its metric
+    // is missing, so a thin listing shows fewer rows.
+    taleTitle: 'Tale of the tape',
+    statRows: (a, b) => [
+      lowerBetterRow('Mileage', a, b, mileageOf, milesText),
+      higherBetterRow('Power', a, b, powerOf, (n) => `${n} bhp`),
+      ageRow(a, b),
+    ],
     matchKicker: 'Your winner',
     matchTitle: ({ model }) => `The ${model} takes it.`,
     matchLede: 'It beat every car you put against it.',
@@ -236,10 +254,17 @@ const KNOCKOUT_COPY = {
     finalCta: 'Continue',
     verdictForm: ({ model }) => `The ${model} was the higher-rated of the two.`,
     verdictUpset: ({ model }) => `The ${model} goes through, the lower-rated pick.`,
-    // Head-to-head stat row - the full-service-history trust duel (real per-
-    // listing, Ford only). A documented history beats a partial/absent one; if
-    // both match, fall back to mileage (lower wins). null when neither is present.
-    statRow: (a, b) => fshRow(a, b) || lowerBetterRow('Mileage', a, b, mileageOf, milesText),
+    // Tale of the tape - the full-service-history trust duel leads (real per-
+    // listing, Ford only: a documented history beats a partial/absent one, and
+    // it nulls when the two are level so it never crowds a non-verdict), then
+    // mileage + age. Ford carries no per-listing power/cc, so those rows aren't
+    // offered. Each nulls out when absent.
+    taleTitle: 'Tale of the tape',
+    statRows: (a, b) => [
+      fshRow(a, b),
+      lowerBetterRow('Mileage', a, b, mileageOf, milesText),
+      ageRow(a, b),
+    ],
     matchKicker: 'Your winner',
     matchTitle: ({ model }) => `The ${model} takes it.`,
     matchLede: 'It beat every car you put against it.',
@@ -285,11 +310,16 @@ const KNOCKOUT_COPY = {
     finalCta: 'Continue',
     verdictForm: ({ model }) => `The ${model} was the higher-rated of the two.`,
     verdictUpset: ({ model }) => `The ${model} goes through, the lower-rated pick.`,
-    // Head-to-head stat row - power in kW (real per-listing, the more bike wins);
-    // where a listing carries no power, fall back to engine size in cc. Labelled
-    // kW (never a bare number). null when neither is present on both bikes.
-    statRow: (a, b) => higherBetterRow('Power', a, b, powerOf, (n) => `${n} kW`)
-      || higherBetterRow('Engine', a, b, ccOf, (n) => `${n}cc`),
+    // Tale of the tape - power in kW + engine size in cc + age, all real per-
+    // listing (Motorrad carries a genuine per-bike kW, cc and reg year). Power is
+    // labelled kW (never a bare number). Each row nulls out when its metric is
+    // missing, so a thin listing shows fewer rows.
+    taleTitle: 'Tale of the tape',
+    statRows: (a, b) => [
+      higherBetterRow('Power', a, b, powerOf, (n) => `${n} kW`),
+      higherBetterRow('Engine', a, b, ccOf, (n) => `${n.toLocaleString('en-GB')}cc`),
+      ageRow(a, b),
+    ],
     matchKicker: 'Your winner',
     matchTitle: ({ model }) => `The ${model} takes it.`,
     matchLede: 'It beat every bike you put against it.',
@@ -307,6 +337,64 @@ const KNOCKOUT_COPY = {
     emptyPoolTitle: 'Not enough in that range for a bracket.',
     emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got enough under that to run a knockout. `
       + 'Raise your budget and we’ll seed a fresh field.',
+    emptyPoolCta: 'Adjust budget',
+    errKicker: 'Sorry',
+    errTitle: 'We couldn’t reach the matcher',
+    errLede: 'The matching service didn’t respond. Check your connection and try again.',
+    retryLabel: 'Try again',
+  },
+  // Ferrari's register: a thoroughbred face-off, spare and reverent, never
+  // shouty. The bracket becomes a grid: cars line up, the quicker and more
+  // storied goes through. This is the brand with the richest per-listing data
+  // (real bhp, cc, and, on a fresh capture, top speed), so its tale of the tape
+  // leads on the numbers that actually separate two Ferraris. No em dashes
+  // (house rule). Its own wordmark so the mode reads as Ferrari's.
+  ferrari: {
+    wordmark: 'Head to Head',
+    seedTitle: 'Set your grid.',
+    seedLede: 'Two quick things and we’ll line up the field, then it’s a straight fight to the flag.',
+    budgetLabel: 'Budget',
+    useLabel: 'What’s it for?',
+    seedCta: 'Line them up',
+    versus: 'VS',
+    pickHint: 'Two cars on the grid. Send the one you’d drive through.',
+    roundKicker: ({ round }) => round,
+    matchupProgress: ({ done, total }) => `Duel ${done} of ${total}`,
+    roundAdvance: ({ round, survivors }) => `${round} · ${survivors} still in it`,
+    finalKicker: 'Down to two',
+    finalTitle: 'The Final.',
+    finalLede: 'Two thoroughbreds left. Pick the one you’d take home.',
+    finalCta: 'Bring it on',
+    verdictForm: ({ model }) => `The ${model} was the form car. Well judged.`,
+    verdictUpset: ({ model }) => `The ${model} goes through, the outside bet.`,
+    // Tale of the tape - power (bhp), engine size (cc) and top speed (mph) are
+    // real per-listing here, so they lead; 0-62 rounds it out as a labelled model
+    // row. Top speed only paints once a fresh capture carries it (the mapper
+    // surfaces it, the row nulls out until then). Every row real, every row honest.
+    taleTitle: 'Tale of the tape',
+    statRows: (a, b) => [
+      higherBetterRow('Power', a, b, powerOf, (n) => `${n} bhp`),
+      higherBetterRow('Engine', a, b, ccOf, (n) => `${n.toLocaleString('en-GB')}cc`),
+      higherBetterRow('Top speed', a, b, topSpeedOf, (n) => `${n} mph`),
+      zeroTo62Row(a, b),
+    ],
+    matchKicker: 'Your winner',
+    matchTitle: ({ model }) => `The ${model} takes the flag.`,
+    matchLede: 'It saw off everything you lined up against it.',
+    whyIntro: 'Why it stands out:',
+    crownCallback: ({ beaten }) => `It saw off ${beaten} on the way to the win.`,
+    weakNote: 'For the record, the numbers don’t quite make this the standout. Stock '
+      + 'moves fast at this level, so it’s worth another run soon.',
+    alsoNote: ({ model }) => `On the numbers, the ${model} is the one to beat if you’d reconsider.`,
+    testDriveCta: 'Book a test drive',
+    detailsCta: 'See full details',
+    shareCta: 'Share this winner',
+    shareCopied: 'Link copied',
+    againCta: 'New tournament',
+    shareText: ({ model, retailer }) => `My pick is a ${model} at ${retailer}.`,
+    emptyPoolTitle: 'Not enough in that range for a grid.',
+    emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got enough under that to line up a field. `
+      + 'Raise your budget and we’ll set a fresh grid.',
     emptyPoolCta: 'Adjust budget',
     errKicker: 'Sorry',
     errTitle: 'We couldn’t reach the matcher',
@@ -350,44 +438,96 @@ function pairUp(list) {
 /* ------------------------- stat-row helpers ------------------------- */
 
 /*
- * A head-to-head stat row on the face-off: ONE brand-appropriate REAL metric,
- * with the better value highlighted, so the duel shows WHY one car might edge it
- * rather than being a pure look-and-price pick. Kept to a single row (a duel, not
- * a spreadsheet). The per-brand statRow(a, b) hook below returns the shape:
- *   { label, aText, bText, winner: 'a' | 'b' | null }   (or null to render nothing)
- * winner names the side to highlight; null means "no winner / tie" (both plain).
- * A hook returns null whenever the metric is missing on EITHER car, so a broken
- * or half-empty row never paints.
+ * The head-to-head "tale of the tape": up to THREE brand-appropriate REAL
+ * metrics compared across the two contenders, the better value highlighted, so
+ * the duel shows WHY one car might edge it rather than being a pure look-and-
+ * price pick. Still a duel, not a spreadsheet — buildStatPanel caps it at three.
  *
- * These small builders keep each brand's hook to one line and guarantee the same
- * honest discipline (real per-listing values only; return null when absent).
+ * Each brand's statRows(a, b) hook returns an ARRAY of row objects, in priority
+ * order; buildStatPanel drops the nulls and keeps the first three that survive.
+ * A row is:
+ *   { label, aText, bText, winner: 'a' | 'b' | null, tier: 'listing' | 'model' }
+ * winner names the side to highlight; null means "no winner / tie" (both plain).
+ * A row builder returns null whenever its metric is missing on EITHER car, so a
+ * broken or half-empty row never paints.
+ *
+ * tier records whether the figure describes the individual LISTING (mileage,
+ * power, cc, age — the honest default) or the MODEL (0-62, shared by every
+ * listing of a line). Model rows are allowed only as SUPPORTING rows: they carry
+ * an unambiguous label ("0 to 62") and buildStatPanel drops them if no listing
+ * row survives, so a matchup is never described purely by a model figure.
+ *
+ * These small builders keep each brand's hook terse and guarantee the same
+ * honest discipline (return null when a value is absent on either car).
  */
 
-/** A "lower is better" numeric duel (mileage). null if either value is missing. */
-function lowerBetterRow(label, a, b, valueOf, fmt) {
+/** A "lower is better" numeric duel (mileage). null if either value is missing.
+ *  `opts` may carry { tier } (defaults to 'listing'). */
+function lowerBetterRow(label, a, b, valueOf, fmt, opts = {}) {
   const av = valueOf(a);
   const bv = valueOf(b);
   if (!Number.isFinite(av) || !Number.isFinite(bv)) return null;
   const winner = av === bv ? null : (av < bv ? 'a' : 'b');
-  return { label, aText: fmt(av), bText: fmt(bv), winner };
+  return {
+    label, aText: fmt(av), bText: fmt(bv), winner, tier: opts.tier || 'listing',
+  };
 }
 
-/** A "higher is better" numeric duel (power, cc). null if either is missing. */
-function higherBetterRow(label, a, b, valueOf, fmt) {
+/** A "higher is better" numeric duel (power, cc). null if either is missing.
+ *  `opts` may carry { tier } (defaults to 'listing'). */
+function higherBetterRow(label, a, b, valueOf, fmt, opts = {}) {
   const av = valueOf(a);
   const bv = valueOf(b);
   if (!Number.isFinite(av) || !Number.isFinite(bv)) return null;
   const winner = av === bv ? null : (av > bv ? 'a' : 'b');
-  return { label, aText: fmt(av), bText: fmt(bv), winner };
+  return {
+    label, aText: fmt(av), bText: fmt(bv), winner, tier: opts.tier || 'listing',
+  };
+}
+
+/*
+ * The one permitted MODEL-level row: 0-62, lower (quicker) wins. Always labelled
+ * so it reads as the model's figure, and always tier:'model' so buildStatPanel
+ * treats it as supporting-only (dropped when no listing row survives). Wraps
+ * lowerBetterRow so the compare/format logic stays in one place.
+ */
+function zeroTo62Row(a, b) {
+  return lowerBetterRow('0 to 62', a, b, zeroTo62Of, secsText, { tier: 'model' });
+}
+
+/*
+ * A per-listing AGE duel: the younger car wins. Reads whatever registration
+ * signal the listing carries (year / firstReg / plate) via the shared
+ * ageInYears helper, so it is real per-listing across every brand. null when
+ * either car's age can't be decoded, so it never guesses. `now` is injectable
+ * for testing.
+ */
+function ageRow(a, b, now = new Date()) {
+  const av = ageInYears(a, now);
+  const bv = ageInYears(b, now);
+  if (!Number.isFinite(av) || !Number.isFinite(bv)) return null;
+  const winner = av === bv ? null : (av < bv ? 'a' : 'b');
+  return {
+    label: 'Age', aText: ageText(av), bText: ageText(bv), winner, tier: 'listing',
+  };
 }
 
 /** UK-grouped mileage text, e.g. "24,000 miles". */
 const milesText = (n) => `${n.toLocaleString('en-GB')} miles`;
+/** 0-62 seconds, e.g. "3.5s". */
+const secsText = (n) => `${n}s`;
+/** Whole-year age, e.g. "3 yrs"; under a year reads plainly, no em dash. */
+const ageText = (n) => (n <= 0 ? 'Under a year' : `${n} ${n === 1 ? 'yr' : 'yrs'}`);
 const mileageOf = (car) => (Number.isFinite(car?.mileage) ? car.mileage : NaN);
 /** Real per-listing engine figures. The UNIT is the caller's job (bhp for Honda,
  * kW for Motorrad), so these only read the raw number; NaN when absent. */
 const powerOf = (car) => (Number.isFinite(car?.power) ? car.power : NaN);
 const ccOf = (car) => (Number.isFinite(car?.cc) ? car.cc : NaN);
+/** Real per-listing top speed (mph), Ferrari only; NaN when absent. */
+const topSpeedOf = (car) => (Number.isFinite(car?.topSpeed) ? car.topSpeed : NaN);
+/** Model-level 0-62 (seconds), from MODEL_SPECS; near-universal but describes
+ * the line, not the listing — hence its rows are always tier:'model'. */
+const zeroTo62Of = (car) => (Number.isFinite(car?.zeroTo62) ? car.zeroTo62 : NaN);
 
 /*
  * Ford's full-service-history duel (real per-listing, Ford only). "Full service
@@ -406,8 +546,18 @@ function fshRow(a, b) {
   if (av === bv) return null; // level on history — let the caller fall back
   const text = (car) => (yes(car) ? 'Full service history' : 'Partial or none');
   return {
-    label: 'History', aText: text(a), bText: text(b), winner: av ? 'a' : 'b',
+    label: 'History', aText: text(a), bText: text(b), winner: av ? 'a' : 'b', tier: 'listing',
   };
+}
+
+/* A short filter helper: keep the first `n` non-null rows from a list. */
+function firstRows(rows, n) {
+  const out = [];
+  for (const r of rows) {
+    if (r) out.push(r);
+    if (out.length >= n) break;
+  }
+  return out;
 }
 
 /* ------------------------------ mount ------------------------------ */
@@ -684,13 +834,14 @@ function mount(root, ctx) {
     faceoff.append(buildContender(b, 'b'));
     screen.append(faceoff);
 
-    // The one head-to-head stat row — a single REAL, brand-appropriate metric,
-    // the better value highlighted, so the duel shows a reason rather than being
-    // pure looks-and-price. Driven by the per-brand statRow(a, b) hook; when it
-    // returns null (metric missing on either car) nothing paints, so a broken or
-    // empty row can never appear.
-    const stat = buildStatRow(a, b);
-    if (stat) screen.append(stat);
+    // The "tale of the tape" panel — up to three REAL, brand-appropriate metrics
+    // compared side by side, the better value highlighted, so the duel shows a
+    // reason rather than being pure looks-and-price. Driven by the per-brand
+    // statRows(a, b) hook; when nothing honest survives (metrics missing on
+    // either car) it returns null and nothing paints, so a broken or empty panel
+    // can never appear.
+    const tale = buildStatPanel(a, b);
+    if (tale) screen.append(tale);
 
     root.append(screen);
 
@@ -746,33 +897,79 @@ function mount(root, ctx) {
     return card;
   };
 
-  // The single head-to-head stat row for the current pair, from the per-brand
-  // statRow(a, b) hook. Returns a DOM element or null (nothing to show). Shape:
-  // { label, aText, bText, winner: 'a' | 'b' | null }; the winning side gets the
-  // is-winner class the CSS highlights. A tie or a missing metric means winner
-  // null / a null hook result, so no side is falsely crowned and no empty row
-  // paints. Guarded so a hook that throws or returns a malformed row is ignored.
-  const buildStatRow = (a, b) => {
-    if (typeof copy.statRow !== 'function') return null;
-    let stat;
+  // The "tale of the tape" panel for the current pair, from the per-brand
+  // statRows(a, b) hook. Returns a framed DOM panel or null (nothing to show).
+  // The hook returns an array of row objects, in priority order:
+  //   { label, aText, bText, winner: 'a' | 'b' | null, tier: 'listing' | 'model' }
+  // buildStatPanel is the honest-data gatekeeper for the whole panel:
+  //   1. call the hook under a throw guard (a bad hook shows nothing, never crashes);
+  //   2. keep only well-formed rows (label + both texts present);
+  //   3. enforce the model-tier rule: a tier:'model' row (0-62, shared by every
+  //      listing of a line) may only SUPPORT a real per-listing row, so if no
+  //      listing row survives the model rows are dropped and the panel with them;
+  //   4. cap at the first three survivors (a duel, not a spec sheet);
+  //   5. tally how many rows each side wins, for the "A wins N of M" chip.
+  // Each row's winning side gets the is-winner class the CSS highlights; a tie
+  // (winner null) leaves both plain, so no side is ever falsely crowned.
+  const buildStatPanel = (a, b) => {
+    if (typeof copy.statRows !== 'function') return null;
+    let rows;
     try {
-      stat = copy.statRow(a, b);
+      rows = copy.statRows(a, b);
     } catch {
       return null;
     }
-    if (!stat || !stat.label || stat.aText == null || stat.bText == null) return null;
-    const row = el('div', 'vm-knockout-stat');
-    row.setAttribute('aria-label', `${stat.label} head to head`);
-    const sideEl = (text, side) => {
+    // Tolerate a hook that returns a single row object instead of an array.
+    if (rows && !Array.isArray(rows)) rows = [rows];
+    if (!Array.isArray(rows)) return null;
+
+    const valid = rows.filter((r) => r && r.label && r.aText != null && r.bText != null);
+    // Model rows are supporting-only: drop them all if no real per-listing row
+    // survives, so a matchup is never described purely by a shared model figure.
+    const hasListing = valid.some((r) => r.tier !== 'model');
+    const kept = firstRows(hasListing ? valid : valid.filter((r) => r.tier !== 'model'), 3);
+    if (kept.length === 0) return null;
+
+    const wins = { a: 0, b: 0 };
+    for (const r of kept) if (r.winner === 'a' || r.winner === 'b') wins[r.winner] += 1;
+
+    const panel = el('div', 'vm-knockout-tale');
+    panel.setAttribute('role', 'group');
+    panel.setAttribute('aria-label', copy.taleTitle || 'Tale of the tape');
+
+    const head = el('div', 'vm-knockout-tale-head');
+    head.append(el('span', 'vm-knockout-tale-title', copy.taleTitle || 'Tale of the tape'));
+    // Tally chip: only when there's a clear leader across at least two rows, so a
+    // single-row panel or a level face-off doesn't get a redundant "wins 1 of 1".
+    const leader = wins.a > wins.b ? 'a' : (wins.b > wins.a ? 'b' : null);
+    if (leader && kept.length >= 2) {
+      const label = leader === 'a' ? 'A' : 'B';
+      head.append(el('span', 'vm-knockout-tale-tally',
+        `${label} wins ${wins[leader]} of ${kept.length}`));
+    }
+    panel.append(head);
+
+    const sideEl = (text, side, winner) => {
       const cell = el('span', `vm-knockout-stat-side vm-knockout-stat-${side}`);
-      if (stat.winner === side) cell.classList.add('is-winner');
+      if (winner === side) {
+        cell.classList.add('is-winner');
+        const tick = el('span', 'vm-knockout-stat-tick', '✓');
+        tick.setAttribute('aria-hidden', 'true');
+        cell.append(tick);
+      }
       cell.append(el('span', 'vm-knockout-stat-val', String(text)));
       return cell;
     };
-    row.append(sideEl(stat.aText, 'a'));
-    row.append(el('span', 'vm-knockout-stat-label', stat.label));
-    row.append(sideEl(stat.bText, 'b'));
-    return row;
+
+    for (const r of kept) {
+      const row = el('div', 'vm-knockout-stat-row');
+      row.setAttribute('aria-label', `${r.label} head to head`);
+      row.append(sideEl(r.aText, 'a', r.winner));
+      row.append(el('span', 'vm-knockout-stat-label', r.label));
+      row.append(sideEl(r.bText, 'b', r.winner));
+      panel.append(row);
+    }
+    return panel;
   };
 
   // Record a pick: winner advances, loser is logged (for the advancement-weighted
@@ -1081,6 +1278,28 @@ function mount(root, ctx) {
   renderSeedSkeleton();
   boot();
 }
+
+// A test barrel of the pure stat-row builders, so the honest-data discipline
+// (return null when a value is absent on either car; younger/quicker/documented
+// wins; model rows carry tier:'model') can be unit-tested DOM-free, the way
+// age.test.js exercises the helpers in match-signal.js. Not used at runtime.
+export const _stat = {
+  lowerBetterRow,
+  higherBetterRow,
+  zeroTo62Row,
+  ageRow,
+  fshRow,
+  firstRows,
+  // accessors + formatters, for asserting the exact rendered text
+  mileageOf,
+  powerOf,
+  ccOf,
+  topSpeedOf,
+  zeroTo62Of,
+  milesText,
+  secsText,
+  ageText,
+};
 
 // The switcher tab is brand-agnostic shell UI, so its label is neutral —
 // "Head to head", not "MINI Knockout". The campaign name lives as the wordmark

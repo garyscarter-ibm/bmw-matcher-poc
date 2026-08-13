@@ -197,6 +197,16 @@ function num(v) {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 }
 
+/** Registration year from the BMW/MINI feed's ISO date ("2023-10-31T00:00:00Z"),
+ *  or undefined. Only the year is taken — the client derives age from `year`
+ *  (registrationDate step 2), so the month/day the feed also carries aren't
+ *  needed here. Guarded against a garbage string or a pre-1990 year. */
+function regYear(dateStr) {
+  if (typeof dateStr !== 'string') return undefined;
+  const y = Number(dateStr.slice(0, 4));
+  return Number.isFinite(y) && y > 1990 ? y : undefined;
+}
+
 /**
  * 0-62: start from the line's base spec, then speed up for performance trims
  * detected in the derivative (M badges, xDrive50e PHEV, ti hot-hatch, etc.).
@@ -1140,11 +1150,13 @@ export function mapFerrariRaw(raw) {
     // No number plate in the feed; age comes from the registration year.
     year: raw?.year || undefined,
     photo: raw?.photo || undefined, // public Thron cover frame (ferrari-listing.js)
-    // Real per-listing facts recovered from the feed. cc/power describe THIS
-    // car (real figures the feed reported); colour is its own paint. Each is
-    // only set when the source carried it, no invented defaults.
+    // Real per-listing facts recovered from the feed. cc/power/topSpeed describe
+    // THIS car (real figures the feed reported); colour is its own paint. Each is
+    // only set when the source carried it, no invented defaults. topSpeed is mph
+    // for this feed (topSpeedUnit); the card labels it and appends the unit.
     cc: cc || undefined,
     power: power || undefined,
+    topSpeed: num(raw?.topSpeed),
     colour: raw?.exteriorColor || undefined,
     // The real dealer holding this car (Meridien Modena, Graypaul Nottingham …),
     // not the Ferrari-wide constant; falls back to it when absent.
@@ -1699,6 +1711,13 @@ export function mapVehicle(v, brand = 'bmw') {
     // ---- display-only (surfaced by index.js publicCar) ----
     mileage: num(v.mileage),
     plate: v?.identification?.plate || undefined,
+    // Real per-listing figures the feed carries but the schema never scored:
+    // engine capacity (cc) and the registration year. Both describe THIS car, so
+    // the card layer (knockout tale-of-the-tape, age frame) may state them as the
+    // listing's own; year gives BMW/MINI a reliable age source that doesn't lean
+    // on the plate decode. Each only set when the feed carried it.
+    cc: num(v?.engine?.cc),
+    year: regYear(v?.registration?.date),
     photo,
     retailerName,
     // Miles from the searched location. Only present on `sort=distance`

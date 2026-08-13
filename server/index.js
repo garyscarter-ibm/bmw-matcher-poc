@@ -191,11 +191,14 @@ function publicCar(car) {
     transmission: car.transmission,
     colour: car.colour,
     // Per-listing detail recovered from the raw feeds, for the card layer.
-    // cc/power are real for Honda (bhp) and Motorrad (kW); fullServiceHistory and
-    // previousOwners are real per-listing for Ford. Each describes the individual
-    // car (not the model), so a card may state them as the listing's own.
+    // cc/power are real for Honda (bhp), Motorrad (kW) and Ferrari (bhp), and now
+    // BMW/MINI (cc, from the feed's engine block); topSpeed is real per-listing
+    // for Ferrari (mph); fullServiceHistory and previousOwners are real per-
+    // listing for Ford. Each describes the individual car (not the model), so a
+    // card may state them as the listing's own.
     cc: car.cc,
     power: car.power,
+    topSpeed: car.topSpeed,
     fullServiceHistory: car.fullServiceHistory,
     previousOwners: car.previousOwners,
     // Set when repeat listings of the same car were grouped (see

@@ -2918,26 +2918,68 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Head-to-head stat row: ONE real, brand-appropriate metric compared across the
-   two contenders, sitting under the face-off. Three cells in a row that line up
-   with the two cards (value, centred label, value); the winning side is
-   emphasised so the duel shows a reason at a glance. Only painted when the
-   per-brand statRow hook returns a comparable metric, so it never appears empty
-   or half-filled. */
-.vm-knockout-stat {
+/* The "tale of the tape": a framed panel of up to THREE real, brand-appropriate
+   metrics compared across the two contenders, sitting under the face-off (not
+   between the cards — the VS badge owns that seam and the cards stay edge-to-
+   edge). A titled surface card with an optional "A wins N of M" tally chip, then
+   one row per metric; each row lines its two values up under the two cards.
+   Content, not motion, so it needs no reduced-motion handling. Only painted when
+   the per-brand statRows hook yields at least one honest, comparable row, so it
+   never appears empty or half-filled. */
+.vm-knockout-tale {
+  margin-top: var(--vm-space-4);
+  padding: var(--vm-space-4) var(--vm-space-4) var(--vm-space-3);
+  background: var(--vm-surface-alt);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+}
+/* Header: the panel's bold uppercase title (reusing the round-rail treatment) on
+   the left, the tally chip pushed to the right when present. */
+.vm-knockout-tale-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--vm-space-3);
+  margin-bottom: var(--vm-space-2);
+  padding-bottom: var(--vm-space-2);
+  border-bottom: var(--vm-border-width) solid var(--vm-line);
+}
+.vm-knockout-tale-title {
+  font-family: var(--vm-font-bold);
+  font-size: var(--vm-text-label);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--vm-accent-spot);
+}
+/* Tally chip: quiet, factual "A wins 2 of 3" — the panel's one-line verdict. */
+.vm-knockout-tale-tally {
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--vm-ink-muted);
+  white-space: nowrap;
+}
+/* One metric row: three cells that line up with the two cards (value, centred
+   label, value). Reuses the 1fr auto 1fr grid so every row's values sit under
+   the same contender. Rows stack with a hairline between them. */
+.vm-knockout-stat-row {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: var(--vm-space-2);
-  margin-top: var(--vm-space-3);
-  padding: var(--vm-space-3) var(--vm-space-2);
+  padding: var(--vm-space-2) 0;
+}
+.vm-knockout-stat-row + .vm-knockout-stat-row {
   border-top: var(--vm-border-width) solid var(--vm-line);
 }
 .vm-knockout-stat-side {
   display: flex;
+  align-items: baseline;
+  gap: var(--vm-space-1);
   min-width: 0;
   font-size: var(--vm-text-label);
-  color: var(--vm-ink-muted);
+  color: var(--vm-ink);
 }
 .vm-knockout-stat-a { justify-content: flex-start; text-align: left; }
 .vm-knockout-stat-b { justify-content: flex-end; text-align: right; }
@@ -2955,13 +2997,21 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   white-space: nowrap;
 }
 /* Winner highlight: the better side goes bold and inks up in the brand accent,
-   so the edge is obvious without a second glance. A tie highlights neither. */
+   with a small tick, so the edge is obvious without a second glance. A tie
+   highlights neither. */
 .vm-knockout-stat-side.is-winner {
   color: var(--vm-accent-spot);
   font-family: var(--vm-font-bold);
   font-weight: 700;
 }
 .vm-knockout-stat-side.is-winner .vm-knockout-stat-val { overflow: visible; }
+.vm-knockout-stat-tick {
+  font-size: var(--vm-text-eyebrow);
+  line-height: 1;
+  color: var(--vm-accent-spot);
+}
+/* On the B side the tick trails the value (mirrors the right alignment). */
+.vm-knockout-stat-b .vm-knockout-stat-tick { order: 2; }
 
 /* The face-off: two contenders that sit SHOULDER TO SHOULDER — a fight, not a
    list. Kept side-by-side even on the narrowest screens (a vertical stack read
@@ -3184,6 +3234,19 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   background: var(--vm-accent-spot);
   border-color: var(--vm-accent-spot);
   color: #fff;
+}
+/* MINI's tale panel matches the deck's softer corner and turns the title up to
+   the brand accent (British Racing Green spot), so the face-off reads as MINI's
+   playful register rather than the restrained BMW default. */
+.vm.vm-mini .vm-knockout-tale { border-radius: var(--vm-radius); }
+
+/* --- Ferrari's tale panel: the spare, reverent register the rest of the brand
+   keeps. The title sits in the brand's serif display face and stays understated
+   (no shout), the surface is the flat band, and the winner tick/accent carries
+   the only colour. The richest-data brand, so it usually fills all three rows. */
+.vm.vm-ferrari .vm-knockout-tale-title {
+  font-family: var(--vm-font-heading);
+  letter-spacing: 1.5px;
 }
 
 /* --- reduced motion: no fly-out, no crown lift — the JS commits instantly.
