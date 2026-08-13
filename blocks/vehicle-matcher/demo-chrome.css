@@ -1,0 +1,345 @@
+/*
+ * demo-chrome.css — fake brand-homepage furniture around the vehicle-matcher.
+ *
+ * This is DEMO-ONLY chrome, kept out of the portable block CSS on purpose. It
+ * lets a stakeholder see the tool sitting inside convincing (not pixel-perfect)
+ * brand-homepage furniture: a top nav, a photographic hero band, and a footer,
+ * all wrapping the real block. Loaded only by homepage.html; index.html and any
+ * real EDS page never see it.
+ *
+ * How the theming works — the trick that makes ONE shell serve five brands:
+ * the shell wrapper carries `class="vm vm-<brand> demo-shell"`. The brand design
+ * tokens (--vm-accent, --vm-font-heading, …) are declared on the compound
+ * selector `.vm.vm-<brand>` in vehicle-matcher.css, so putting both classes on
+ * the wrapper makes every token cascade down to the chrome as ordinary inherited
+ * custom properties. The chrome below reads only `var(--vm-*)` — zero duplicated
+ * colour or font values, one source of truth, and auto-reskin is a single class
+ * swap on the wrapper.
+ *
+ * The catch the `.vm` class brings with it, and the fix:
+ * `.vm` (vehicle-matcher.css) is not only the token block — it also lays the
+ * TOOL out: transparent background, 880px max-width, centred, with padding. On
+ * the wrapper that would clamp the full-bleed nav/hero to 880px and break the
+ * homepage look. So `.demo-shell.vm` below RESETS exactly those four layout
+ * properties on the wrapper only. The inner `.vehicle-matcher.block` is a
+ * separate element decorated on its own, so it re-applies `.vm`'s 880px measure
+ * to itself and keeps the standalone reading width — same as index.html.
+ *
+ * Guardrail (see vehicle-matcher.css:323): no element here is named
+ * `.vehicle-matcher-wrapper` — that selector strips the block's 880px measure,
+ * which we want to keep.
+ */
+
+/* --- wrapper: neutralise the block's own layout, keep its tokens/ink/font --- */
+.demo-shell.vm {
+  /* Undo the four layout properties `.vm` sets on itself, so the wrapper is a
+     plain full-bleed container. Tokens, colour and font-family still inherit. */
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: var(--vm-surface);
+  /* A homepage is a full page, so own the min-height and let sections stack. */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ================= top nav ================= */
+
+.demo-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--vm-space-6);
+  padding: var(--vm-space-4) var(--vm-space-6);
+  background: var(--vm-surface);
+  border-bottom: 1px solid var(--vm-line);
+  font-family: var(--vm-font-body);
+  color: var(--vm-ink);
+}
+
+.demo-nav-logo {
+  display: flex;
+  align-items: center;
+  /* room for a wide wordmark, but the img/text shrinks to fit */
+  min-height: 34px;
+}
+.demo-nav-logo img {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+/* Text-wordmark fallback when no clean SVG mark is committed for a brand. Reads
+   in the brand's own packaged heading face, so it's on-brand without a binary. */
+.demo-logo-text {
+  font-family: var(--vm-font-heading);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  color: var(--vm-ink-strong);
+  text-decoration: none;
+}
+.vm-mini .demo-logo-text { text-transform: uppercase; letter-spacing: 0.06em; }
+
+.demo-nav-links {
+  display: flex;
+  gap: var(--vm-space-5);
+  margin-left: var(--vm-space-4);
+  font-size: 14px;
+}
+.demo-nav-links a {
+  color: var(--vm-ink);
+  text-decoration: none;
+  opacity: 0.85;
+}
+.demo-nav-links a:hover { opacity: 1; }
+
+.demo-nav-spacer { flex: 1 1 auto; }
+
+/* "Back to the real <origin>" affordance — a quiet outline link on the right. */
+.demo-nav-back {
+  font-size: 13px;
+  color: var(--vm-ink-muted);
+  text-decoration: none;
+  border: 1px solid var(--vm-line);
+  padding: 8px 14px;
+  border-radius: var(--vm-radius-control);
+  white-space: nowrap;
+}
+.demo-nav-back:hover { color: var(--vm-ink); border-color: var(--vm-ink-muted); }
+
+/* Hide the extra nav labels on small screens; keep logo + back link. */
+@media (max-width: 719px) {
+  .demo-nav-links { display: none; }
+}
+
+/* ================= hero band ================= */
+
+/*
+ * The hero carries a real brand photograph (set inline per brand as
+ * background-image on this element) with the headline overlaid, the way the
+ * real homepages are built. A dark left-weighted gradient scrim keeps the
+ * overlaid type legible over any photo. When a brand has no committed photo the
+ * shell adds `.is-plain` and the band falls back to the token accent colour, so
+ * the demo never breaks.
+ */
+.demo-hero {
+  position: relative;
+  padding: clamp(56px, 12vw, 132px) var(--vm-space-6);
+  background-color: var(--vm-surface-dark); /* shows through until an image loads */
+  background-size: cover;
+  background-position: center;
+  font-family: var(--vm-font-heading);
+  color: #fff;
+  overflow: hidden;
+}
+.demo-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.18));
+}
+/* No-photo fallback: a flat brand accent band. */
+.demo-hero.is-plain { background-image: none; background-color: var(--vm-accent); }
+.demo-hero.is-plain::before { background: none; }
+
+.demo-hero-inner {
+  position: relative; /* above the scrim */
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.demo-hero-kicker {
+  margin: 0 0 var(--vm-space-3);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+.demo-hero-title {
+  margin: 0 0 var(--vm-space-4);
+  font-weight: 300;
+  font-size: clamp(32px, 6vw, 64px);
+  line-height: 1.05;
+  max-width: 16ch;
+}
+.demo-hero-sub {
+  margin: 0;
+  font-family: var(--vm-font-body);
+  font-weight: 400;
+  font-size: clamp(16px, 2.2vw, 22px);
+  line-height: 1.35;
+  max-width: 42ch;
+  opacity: 0.95;
+}
+/* MINI's homepage headline beat: uppercase serif. */
+.vm-mini .demo-hero-title { text-transform: uppercase; letter-spacing: 0.01em; }
+
+/* An optional hero CTA — reads the same brand button tokens the tool's own
+   buttons do, so its size/shape/colour match the tool automatically. */
+.demo-cta {
+  display: inline-block;
+  margin-top: var(--vm-space-6);
+  min-height: var(--vm-btn-height);
+  min-width: var(--vm-btn-min-width);
+  padding: var(--vm-btn-padding);
+  box-sizing: border-box;
+  border: var(--vm-border-width) solid var(--vm-accent);
+  border-radius: var(--vm-radius-control);
+  background: var(--vm-accent);
+  color: var(--vm-accent-ink);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.demo-cta:hover { filter: brightness(1.08); }
+/* On the no-photo accent band the accent-filled CTA would vanish (accent on
+   accent). Invert it to a solid white button with accent text, so it reads
+   clearly as a button on the colour block — the way real brand heroes place a
+   light CTA on a flat colour panel. The photo-hero CTA keeps the accent fill,
+   which sits fine over the dark scrim. */
+.demo-hero.is-plain .demo-cta {
+  background: #fff;
+  color: var(--vm-accent);
+  border-color: #fff;
+}
+
+/* ================= tool section ================= */
+
+/*
+ * The band the real block sits in. A light section band (alt surface) sets the
+ * tool apart from the white nav above and the dark footer below, the rhythm the
+ * real homepages use. The block paints its own transparent background and keeps
+ * its 880px measure, centred here.
+ */
+.demo-tool {
+  flex: 1 1 auto;
+  padding: var(--vm-space-12) var(--vm-space-4) var(--vm-space-16);
+  background: var(--vm-surface-alt);
+}
+
+/* ================= footer ================= */
+
+.demo-footer {
+  padding: var(--vm-space-10) var(--vm-space-6) var(--vm-space-8);
+  background: var(--vm-surface-dark);
+  color: #fff;
+  font-family: var(--vm-font-body);
+  font-size: 14px;
+}
+.demo-footer-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vm-space-6);
+  align-items: baseline;
+}
+.demo-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vm-space-5);
+}
+.demo-footer-links a { color: #fff; opacity: 0.85; text-decoration: none; }
+.demo-footer-links a:hover { opacity: 1; }
+.demo-footer-spacer { flex: 1 1 auto; }
+/* The plain-language "this is an internal demo, not a real brand site" note. */
+.demo-footer-note {
+  width: 100%;
+  margin-top: var(--vm-space-6);
+  padding-top: var(--vm-space-5);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.7;
+}
+
+/* ================= brand picker (no ?brand=) ================= */
+
+/*
+ * The neutral landing splash shown when no brand is chosen. It carries NO
+ * vm-<brand> class, so it uses the base BMW-default tokens — deliberately
+ * marque-neutral. Five tiles, each a plain link into the themed shell.
+ */
+.demo-picker {
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vm-space-10);
+  padding: var(--vm-space-12) var(--vm-space-6);
+  background: #0d0f12;
+  color: #f2f4f7;
+  font-family: 'Helvetica Neue', helvetica, arial, sans-serif;
+}
+.demo-picker-head { text-align: center; max-width: 40ch; }
+.demo-picker-title {
+  margin: 0 0 var(--vm-space-3);
+  font-size: clamp(24px, 4vw, 34px);
+  font-weight: 600;
+}
+.demo-picker-lede {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #aeb4bd;
+}
+.demo-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--vm-space-4);
+  width: 100%;
+  max-width: 860px;
+}
+.demo-picker-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vm-space-3);
+  min-height: 132px;
+  padding: var(--vm-space-6);
+  border: 1px solid #2a2f37;
+  border-radius: 12px;
+  background: #16191e;
+  color: #f2f4f7;
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.demo-picker-tile:hover {
+  border-color: #4c8bf5;
+  background: #1c2027;
+  transform: translateY(-2px);
+}
+/* A white plate behind the mark so every brand logo reads on the dark tile —
+   several marks are near-black (MINI wing, Honda H, the Motorrad lockup) and
+   would vanish directly on #16191e. The plate is how these marks sit on real
+   brand chips, so it also looks right. The mark scales to fit inside it. */
+.demo-picker-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 64px;
+  padding: 0 var(--vm-space-4);
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 8px;
+}
+.demo-picker-logo img { max-height: 40px; max-width: 100%; width: auto; }
+/* Text-wordmark fallback sits on the same white plate, so it needs dark ink. */
+.demo-picker-logo .demo-picker-tile-label { color: #16191e; }
+.demo-picker-tile-label { font-size: 15px; font-weight: 600; }
+.demo-picker-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  max-width: 52ch;
+  color: #7c828b;
+}

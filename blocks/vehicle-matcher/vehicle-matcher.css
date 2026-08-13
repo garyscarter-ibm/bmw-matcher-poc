@@ -409,6 +409,13 @@
   --vm-radius: 6px;
   --vm-radius-control: 999px;
 
+  /* buttons: MINI's pills read taller and rounder than BMW's flat slab, with
+     more horizontal breathing room and a slightly narrower min-width (a pill
+     doesn't want BMW's wide rectangular measure). */
+  --vm-btn-height: 48px;
+  --vm-btn-padding: 13px 26px 14px;
+  --vm-btn-min-width: 208px;
+
   /* motion: MINI is playful — the same game animations get a springy
      overshoot (a little go-kart bounce as cards settle and stamps land),
      and a slightly longer pop so the bounce has room to read. */
@@ -520,6 +527,12 @@
   --vm-radius: 8px;
   --vm-radius-control: 8px;
 
+  /* buttons: Honda's denser mainstream retail UI runs a touch shorter than
+     BMW's 46px, tighter padding, and a narrower min-width. */
+  --vm-btn-height: 44px;
+  --vm-btn-padding: 11px 18px 13px;
+  --vm-btn-min-width: 200px;
+
   /* motion: calm and honest — a clean ease-out with no overshoot (Honda isn't
      playful like MINI; it's steady). Slightly quicker than BMW's pop. */
   --vm-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -620,6 +633,12 @@
   --vm-radius: 4px;
   --vm-radius-control: 4px;
 
+  /* buttons: Ford's FordF1 CTAs run at mainstream web scale, a shade chunkier
+     than Honda but still shorter than BMW's slab, with a moderate min-width. */
+  --vm-btn-height: 44px;
+  --vm-btn-padding: 12px 20px 13px;
+  --vm-btn-min-width: 210px;
+
   /* motion: confident and clean, a touch more energetic than Honda's calm
      ease-out (Ford sells a Mustang), but no MINI-style overshoot. */
   --vm-ease: cubic-bezier(0.2, 0.75, 0.2, 1);
@@ -715,6 +734,12 @@
      so square corners like BMW (not Ford/Honda's rounding). */
   --vm-radius: 0px;
   --vm-radius-control: 0px;
+
+  /* buttons: closest to BMW (the shared parent design language), nudged a touch
+     tighter — the sportier sub-brand runs slightly more compact CTAs. */
+  --vm-btn-height: 44px;
+  --vm-btn-padding: 11px 20px 14px;
+  --vm-btn-min-width: 220px;
 
   /* motion: crisp and quick, a touch faster than BMW cars — the sportier
      sub-brand — but no bounce. */
