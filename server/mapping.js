@@ -922,6 +922,239 @@ export function mapFordRaw(raw) {
 }
 
 /* ====================================================================== *
+ * Ferrari — approved-used, the richest and cleanest feed of any brand.
+ *
+ * preowned.ferrari.com server-renders every listing as JSON (see
+ * ferrari-listing.js), so mapFerrariRaw consumes a FLAT record that already
+ * carries real per-listing price, year, mileage, colour, gearbox, engine, and
+ * (for most cars) a real total displacement and power. It maps that to the SAME
+ * engine schema every other brand emits.
+ *
+ * The brand-shaped decisions, all load-bearing:
+ *   - EVERY Ferrari is a performance car. The 0-62 SCALE is recalibrated in
+ *     FERRARI_TUNING (a 3.0s car is mid-pack here, not "insanely quick"); this
+ *     table carries honest absolute seconds and lets tuning stretch them.
+ *   - Body keys off the NAME, not the feed's bodyStyle — the feed calls Spider
+ *     and GTS cars "coupè" (see ferrari-listing.js). GTS/Spider/Cabrio →
+ *     convertible, Purosangue → SUV, else coupe.
+ *   - Fuel keys off the SPEC TABLE, never the card's fuelType (routinely empty
+ *     on the 296/SF90/12Cilindri). The 296 and SF90 are plug-in hybrids; the
+ *     rest are petrol. Gating on the spec row (not a name test) means a future
+ *     EV in the range resolves right the day it lands, the way brand.test.js
+ *     asserts.
+ *   - Real cc/power come THROUGH per-listing; the spec table only backfills the
+ *     handful of cards the feed leaves blank (the 296 GTS ships no cc). A spec
+ *     value never overwrites a real one.
+ * ---------------------------------------------------------------------- */
+
+/* Model figures keyed by canonical line. zeroTo62 = seconds (honest absolute;
+ * the SCALE lives in tuning). boot = usable litres (a Ferrari's frunk/shelf, not
+ * a hatchback boot; the Purosangue is the only genuinely practical one).
+ * sizeClass 1..5 tracks footprint/usability: mid-engined two-seaters are 2,
+ * front-engined GTs and 2+2s are 3, the Purosangue SUV is 4. seats = real
+ * capacity (2, or 4 for the 2+2 GTs and the Purosangue). `fuel` overrides the
+ * petrol default only for the plug-in hybrids. mpg is a nominal combined figure
+ * so the (down-weighted) economy axis has a positive number; the phevs score on
+ * evRange instead. Figures are established manufacturer specs cross-checked
+ * against the real cc/power the feed reports per listing. */
+const MODEL_SPECS_FERRARI = {
+  // ---- current / recent range ----  (cc is the model's nominal displacement, a
+  // display backfill for the rare card the feed leaves blank — the 296 GTS)
+  '296': { boot: 169, seats: 2, zeroTo62: 2.9, sizeClass: 2, mpg: 39, cc: 2992, fuel: 'phev', evRange: 15 }, // 296 GTB/GTS, PHEV V6
+  SF90: { boot: 74, seats: 2, zeroTo62: 2.5, sizeClass: 2, mpg: 39, cc: 3990, fuel: 'phev', evRange: 15 }, // SF90 Stradale/Spider, PHEV V8
+  Roma: { boot: 272, seats: 4, zeroTo62: 3.4, sizeClass: 3, mpg: 26, cc: 3855 }, // Roma / Roma Spider, front-engined 2+2 GT
+  Portofino: { boot: 292, seats: 4, zeroTo62: 3.5, sizeClass: 3, mpg: 26, cc: 3855 }, // Portofino / Portofino M, folding-hard-top GT
+  Purosangue: { boot: 473, seats: 4, zeroTo62: 3.3, sizeClass: 4, mpg: 17, cc: 6496 }, // the four-door, four-seat V12 SUV
+  '12Cilindri': { boot: 270, seats: 2, zeroTo62: 2.9, sizeClass: 3, mpg: 17, cc: 6496 }, // 12Cilindri, front V12 GT
+  '812': { boot: 320, seats: 2, zeroTo62: 2.9, sizeClass: 3, mpg: 18, cc: 6496 }, // 812 Superfast / GTS, front V12
+  F8: { boot: 200, seats: 2, zeroTo62: 2.9, sizeClass: 2, mpg: 23, cc: 3902 }, // F8 Tributo / Spider, mid V8
+  '488': { boot: 230, seats: 2, zeroTo62: 3.0, sizeClass: 2, mpg: 24, cc: 3902 }, // 488 GTB / Spider / Pista, mid V8
+  '458': { boot: 230, seats: 2, zeroTo62: 3.0, sizeClass: 2, mpg: 21, cc: 4497 }, // 458 Italia / Spider / Speciale, mid V8
+  'California T': { boot: 340, seats: 4, zeroTo62: 3.6, sizeClass: 3, mpg: 27, cc: 3855 }, // California T, folding-hard-top GT
+  GTC4Lusso: { boot: 450, seats: 4, zeroTo62: 3.4, sizeClass: 4, mpg: 18, cc: 6262 }, // GTC4Lusso, shooting-brake 2+2
+  FF: { boot: 450, seats: 4, zeroTo62: 3.7, sizeClass: 4, mpg: 18, cc: 6262 }, // FF, four-seat four-wheel-drive
+  F12: { boot: 320, seats: 2, zeroTo62: 3.1, sizeClass: 3, mpg: 18, cc: 6262 }, // F12berlinetta, front V12
+  '612 Scaglietti': { boot: 240, seats: 4, zeroTo62: 4.2, sizeClass: 3, mpg: 17, cc: 5748 }, // 2+2 front V12 GT
+  '430 Scuderia': { boot: 250, seats: 2, zeroTo62: 3.6, sizeClass: 2, mpg: 18, cc: 4308 }, // F430 track special, mid V8
+  // ---- classics (a few genuinely old cars in the pool) ----
+  Testarossa: { boot: 140, seats: 2, zeroTo62: 5.2, sizeClass: 3, mpg: 15, cc: 4943 }, // flat-12 icon
+  F355: { boot: 140, seats: 2, zeroTo62: 4.7, sizeClass: 2, mpg: 18, cc: 3496 }, // F355 Spider, mid V8
+  '360': { boot: 210, seats: 2, zeroTo62: 4.5, sizeClass: 2, mpg: 18, cc: 3586 }, // 360 Modena/Spider, mid V8
+  '328': { boot: 130, seats: 2, zeroTo62: 5.5, sizeClass: 2, mpg: 20, cc: 3186 }, // 328 GTB/GTS, mid V8
+  '512 BB': { boot: 130, seats: 2, zeroTo62: 5.4, sizeClass: 3, mpg: 14, cc: 4943 }, // Berlinetta Boxer, flat-12
+  '550 Maranello': { boot: 190, seats: 2, zeroTo62: 4.4, sizeClass: 3, mpg: 16, cc: 5474 }, // front V12 GT
+  '275 GTB': { boot: 120, seats: 2, zeroTo62: 6.0, sizeClass: 3, mpg: 14, cc: 3286 }, // 275 GTB/4, front V12 classic
+  '365 GTB4': { boot: 120, seats: 2, zeroTo62: 5.4, sizeClass: 3, mpg: 13, cc: 4390 }, // 365 GTB/4 "Daytona", front V12
+};
+const DEFAULT_SPEC_FERRARI = {
+  boot: 230, seats: 2, zeroTo62: 3.5, sizeClass: 2, mpg: 20,
+};
+
+/** Normalise a Ferrari carName to a MODEL_SPECS_FERRARI key. The feed sends
+ *  names with and without a "Ferrari " prefix ("Ferrari Roma" vs "296 GTS"), and
+ *  the model families share number stems, so order matters: the multi-word and
+ *  longer-stem lines are tested before the bare numbers. */
+function ferrariLine(name = '') {
+  const s = String(name).toLowerCase().replace(/^ferrari\s+/, '').trim();
+  // Plug-in hybrids first (their spec rows carry the phev flag).
+  if (/\bsf90\b/.test(s)) return 'SF90';
+  if (/\b296\b/.test(s)) return '296';
+  // Named lines (word models) before the numeric ones.
+  if (/purosangue/.test(s)) return 'Purosangue';
+  if (/12\s*cilindri/.test(s)) return '12Cilindri';
+  if (/portofino/.test(s)) return 'Portofino';
+  if (/\broma\b/.test(s)) return 'Roma';
+  if (/california/.test(s)) return 'California T';
+  if (/gtc4\s*lusso/.test(s)) return 'GTC4Lusso';
+  if (/testarossa/.test(s)) return 'Testarossa';
+  if (/\bff\b/.test(s)) return 'FF';
+  if (/f12/.test(s) || /berlinetta/.test(s)) return 'F12';
+  if (/\bf8\b/.test(s)) return 'F8';
+  if (/f355|\b355\b/.test(s)) return 'F355';
+  if (/550\s*maranello|\b550\b/.test(s)) return '550 Maranello';
+  if (/512\s*bb/.test(s)) return '512 BB';
+  if (/612\s*scaglietti|\b612\b/.test(s)) return '612 Scaglietti';
+  if (/430\s*scuderia/.test(s)) return '430 Scuderia';
+  if (/275\s*gtb/.test(s)) return '275 GTB';
+  if (/365\s*gtb/.test(s)) return '365 GTB4';
+  // Numeric lines (bare model numbers) last.
+  if (/\b812\b/.test(s)) return '812';
+  if (/\b488\b/.test(s)) return '488';
+  if (/\b458\b/.test(s)) return '458';
+  if (/\b360\b/.test(s)) return '360';
+  if (/\b328\b/.test(s)) return '328';
+  return null; // caller falls back to DEFAULT_SPEC_FERRARI, keeps the raw name
+}
+
+/** Body for a Ferrari, from the NAME (the feed's bodyStyle is unreliable —
+ *  Spider/GTS cars report "coupè"). Purosangue is the SUV; the Portofino and
+ *  California are folding-hard-top convertibles whatever the trim word says;
+ *  Spider/GTS/Cabrio/Aperta name an open car; everything else is a coupe. */
+function ferrariBody(name = '') {
+  const s = String(name).toLowerCase();
+  if (/purosangue/.test(s)) return 'suv';
+  if (/portofino|california/.test(s)) return 'convertible';
+  if (/\bspider\b|\bgts\b|\bcabrio|\bapert(a|o)\b|\bconvertible\b/.test(s)) return 'convertible';
+  return 'coupe';
+}
+
+/** Tags for a Ferrari. Every car is a drivers-car with image; the open cars add
+ *  a lifestyle lean, the 2+2/SUV add usability, the plug-ins add tech/efficient,
+ *  and the genuine classics add a collectable flag. */
+function ferrariTags(line, body, fuel, seats) {
+  const tags = new Set(['drivers-car', 'image']);
+  if (body === 'convertible') tags.add('lifestyle');
+  if (body === 'suv') { tags.add('family'); tags.add('practical'); }
+  if (seats >= 4) tags.add('practical');
+  if (fuel === 'phev' || fuel === 'ev') { tags.add('efficient'); tags.add('tech'); }
+  const CLASSIC = new Set(['Testarossa', 'F355', '360', '328', '512 BB',
+    '550 Maranello', '275 GTB', '365 GTB4', '612 Scaglietti']);
+  if (CLASSIC.has(line)) tags.add('collectable');
+  return [...tags];
+}
+
+/** Ferrari display name: the feed's carName is already clean and marketed
+ *  ("488 Spider", "Ferrari Roma Spider"), so we keep it, just ensuring a single
+ *  "Ferrari " prefix so every card reads as the marque. */
+function ferrariDisplayName(name = '') {
+  let n = String(name).trim().replace(/\s+/g, ' ');
+  if (!/^ferrari\b/i.test(n)) n = `Ferrari ${n}`;
+  return n.replace(/^Ferrari\s+Ferrari\s+/i, 'Ferrari ');
+}
+
+/** A short derived blurb for a Ferrari (the feed carries no marketing copy).
+ *  Keeps the register spare and specific: engine layout when known, body, and
+ *  the approved-used promise. No em dashes. */
+function ferrariBlurb(displayName, body, fuel, engine, retailerName) {
+  const bodyWord = {
+    coupe: 'coupe', convertible: 'open top', suv: 'four-seat SUV',
+  }[body] || 'coupe';
+  let power;
+  if (fuel === 'phev') power = 'plug-in hybrid';
+  else if (fuel === 'ev') power = 'electric';
+  else {
+    // Pull the cylinder story from the engine string when it names one.
+    const e = String(engine || '').toLowerCase();
+    if (/v12|12\s*cil|flat-?12|boxer/.test(e)) power = 'V12';
+    else if (/v8/.test(e)) power = 'V8';
+    else if (/v6/.test(e)) power = 'V6';
+    else power = 'petrol';
+  }
+  const from = retailerName ? ` from ${retailerName}` : '';
+  return `Ferrari Approved ${displayName.replace(/^Ferrari\s+/, '')}, ${power} ${bodyWord}, sold with the official warranty${from}.`;
+}
+
+const FERRARI_RETAILER_ID = 'ferrari-approved';
+const FERRARI_RETAILER_NAME = 'Ferrari Approved';
+
+/**
+ * Project one FLAT Ferrari record (from ferrari-listing.js, live or snapshot)
+ * to the engine's mapped-car schema — the SAME shape mapVehicle()/mapFordRaw()
+ * produce. Returns null (caller filters) if there's no price.
+ */
+export function mapFerrariRaw(raw) {
+  const price = num(raw?.price);
+  if (!price) return null;
+
+  const rawName = String(raw?.name || raw?.modelName || '');
+  const line = ferrariLine(rawName);
+  const spec = (line && MODEL_SPECS_FERRARI[line]) || DEFAULT_SPEC_FERRARI;
+  // Fuel is the spec row's — never the card's fuelType, which is often blank on
+  // exactly the electrified cars (296/SF90). Defaults to petrol.
+  const fuel = spec.fuel || 'petrol';
+  const body = ferrariBody(rawName);
+  const displayName = ferrariDisplayName(rawName);
+
+  // Real per-listing power/cc come through; the spec table never overwrites a
+  // real value, it only backfills a blank one (the 296 GTS ships no cc).
+  const power = num(raw?.powerHp);
+  const cc = num(raw?.cc) || spec.cc;
+
+  const evRange = (fuel === 'phev' || fuel === 'ev') ? (spec.evRange || 15) : undefined;
+
+  return {
+    id: String(raw?.id ?? raw?.vin ?? `${line || rawName}-${price}`),
+    name: displayName,
+    line: line || displayName.replace(/^Ferrari\s+/, ''),
+    body,
+    fuel,
+    priceMin: price,
+    priceMax: price,
+    sizeClass: spec.sizeClass,
+    seats: spec.seats,
+    boot: spec.boot,
+    zeroTo62: spec.zeroTo62,
+    styleLine: null,
+    doors: null,
+    features: [],
+    transmission: transmissionFor(raw?.gearBox),
+    // A combustion car needs a positive mpg for the (down-weighted) economy
+    // axis; the phevs score on evRange and leave mpg at the nominal spec figure.
+    mpg: spec.mpg,
+    ...(evRange ? { evRange } : {}),
+    tags: ferrariTags(line, body, fuel, spec.seats),
+    blurb: ferrariBlurb(displayName, body, fuel, raw?.engine, FERRARI_RETAILER_NAME),
+
+    // ---- display-only (surfaced by index.js publicCar) ----
+    mileage: num(raw?.mileage),
+    // No number plate in the feed; age comes from the registration year.
+    year: raw?.year || undefined,
+    photo: raw?.photo || undefined, // public Thron cover frame (ferrari-listing.js)
+    // Real per-listing facts recovered from the feed. cc/power describe THIS
+    // car (real figures the feed reported); colour is its own paint. Each is
+    // only set when the source carried it, no invented defaults.
+    cc: cc || undefined,
+    power: power || undefined,
+    colour: raw?.exteriorColor || undefined,
+    // The real dealer holding this car (Meridien Modena, Graypaul Nottingham …),
+    // not the Ferrari-wide constant; falls back to it when absent.
+    retailerName: raw?.dealerName || FERRARI_RETAILER_NAME,
+    retailerId: FERRARI_RETAILER_ID,
+    link: raw?.link || 'https://preowned.ferrari.com/en-GB/',
+  };
+}
+
+/* ====================================================================== *
  * Motorrad — motorcycles on the car engine (branch bike-brand-motorrad).
  *
  * The matcher scores cars; Motorrad sells bikes. Rather than fork the engine,

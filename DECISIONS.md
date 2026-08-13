@@ -57,6 +57,31 @@ Format: **[area] decision** — why, and how to undo if you disagree.
   The response envelope is now known (`SearchFilter.ResOverviewData.totalItemCount`, `ResTable`),
   which shaped both the adapter and the fixture schema.
 
+- **[ferrari-data] Ferrari uses a real baked snapshot: the CARS and the card PHOTOS are both
+  cold-fetchable (verified 2026-08-13).** `preowned.ferrari.com` is a Next.js app that
+  server-renders its full stock into a public `__NEXT_DATA__` JSON blob — no token, no session,
+  plainly `curl`-able (148 real cars: names, prices, mileage, real per-listing power/cc, gearbox,
+  engine string). Ferrari serves `fixtures/ferrari-cars.json`, a one-off real snapshot baked from
+  the `__NEXT_DATA__` records through `mapFerrariRaw` by `scripts/build-ferrari-fixtures.mjs`.
+  Every per-listing fact (price, mileage, power, cc) is genuine; per-model figures
+  (boot/seats/0-62/mpg/sizeClass) come from `MODEL_SPECS_FERRARI`. The live adapter
+  (`ferrariLiveStock` in `stock.js`, `source: 'live-ferrari'`) is wired against the discovered
+  `__NEXT_DATA__` contract; the registry ships `source: 'fixtures'`. To refresh: re-run the builder
+  against a fresh page fetch.
+
+  **CORRECTION (2026-08-13):** the original claim that the PHOTOS are "NOT cold-scriptable /
+  gallery-gated / deliberately empty" was WRONG for the card image. The card cover photo is a
+  Thron DAM asset served from the token-free `/delivery/public/` path: the site's own JS hardcodes
+  the clientId (`ferrari`) and sessId (`3zayf6`) as plain public constants, so a gallery id resolves
+  to a real JPEG with no SDK session. The trap is the delivery verb — a GALLERY id uses `thumbnail`
+  (returns the cover frame), a single-image id uses `image`; `image` on a gallery id 404s, which is
+  what first read as "gated". `thronCardImage()` in `ferrari-listing.js` builds the URL; `projectAd`
+  now sets `photo` from `cardImages.thronGalleryId`, so the baked snapshot ships **148/148 real
+  cover photos** (was 0/148), each verified `200 image/jpeg` ~600px. The genuinely session-gated
+  thing — the detail-page swipeable multi-image gallery/video — is still off-limits and not fetched
+  (same client-issued-token class as Ford's `x-eusl-k`); a Ferrari card therefore shows ONE real
+  cover shot, not a multi-image set, which the cards read fine on.
+
 ## Foundations (branch `vehicle-brand-ford-honda`)
 
 - **[fixtures-loader] `source: 'feed' | 'fixtures'` on the brand registry.** New brands
@@ -682,5 +707,120 @@ a deliberate, reversible call.
   consistency with BMW/MINI, accepting the weaker footing. If the licence is ever challenged, the
   clean swap is a freely-licensed condensed sans (e.g. Barlow/Saira Condensed) under the same family
   names — no CSS change beyond the `@font-face` `src`.
+
+## Ferrari (branch `brand-ferrari`) — a two-seat performance range on the car engine
+
+- **[ferrari-flat-projection] Ferrari gets a dedicated `mapFerrariRaw`, like Honda/Ford, not a
+  `BRAND_MAPPERS` entry.** BMW/MINI share the Auto Trader feed shape `mapVehicle` reads; Ferrari's
+  `__NEXT_DATA__` record is flat (`name`/`modelName`, `price`, `mileage`, `powerHp`, `cc`, `engine`,
+  `gearBox`, `vin`), so it has its own projection emitting the identical mapped-car schema the
+  fixtures loader serves. The parser lives standalone in `server/ferrari-listing.js` (pure, no
+  network); the live adapter and the builder both hand `mapFerrariRaw` the same flat shape, so no
+  engine or mapper change is needed if the feed goes live.
+
+- **[ferrari-fuel-from-spec] Fuel is read from the SPEC row, never the card's `fuelType`.** The
+  feed leaves `fuelType` blank on exactly the electrified cars (the 296 and SF90 plug-in hybrids),
+  so a name- or card-based fuel check silently maps them to petrol — the same class of bug that hit
+  Motorrad's CE 02. `MODEL_SPECS_FERRARI` carries a `fuel: 'phev'` flag on the 296 and SF90 rows,
+  and `mapFerrariRaw` takes fuel from the spec row (defaulting to petrol), so every 296/SF90 variant
+  resolves to `phev` with an `evRange`, and everything else to `petrol`. Guarded in `brand.test.js`
+  by iterating every 296/SF90 name spelling and asserting `phev` + `evRange > 0`.
+
+- **[ferrari-body-from-name] Body is derived from the NAME, not the feed's `bodyStyle`.** The feed
+  reports "coupè" even for open cars, so `ferrariBody` reads the model name: the Purosangue is the
+  SUV; the Portofino and California are folding-hard-top convertibles; anything naming Spider / GTS
+  / Cabrio / Aperta is a convertible; everything else is a coupe. This is the only reliable source
+  (a "296 GTS" reports as a coupé in the feed but is an open car). Every body maps to one of exactly
+  three the range has — coupe / convertible / suv — asserted per-name in `brand.test.js` and range-
+  bounded across the whole shipped fixture (no off-range body or fuel).
+
+- **[ferrari-spec-backfill-not-overwrite] Real per-listing cc/power are kept; the spec table only
+  backfills a blank.** `cc: num(raw.cc) || spec.cc` and `power: num(raw.powerHp)` — a real per-car
+  figure is never overwritten by the generic model figure (the rule from Step 2). The one car that
+  needs the backfill is the 296 GTS, which ships no cc; it takes 2992 from the spec row. Confirmed
+  end-to-end on the live server: the SF90's real 1000 hp and the 812's real 6496 cc surface through
+  `publicCar` unchanged.
+
+- **[ferrari-no-invented-price] A record with no price is DROPPED, never shown with a fabricated
+  one.** `mapFerrariRaw` returns null on a priceless record (caller filters), matching Honda/Ford.
+  Guarded by a `brand.test.js` null-on-priceless test.
+
+- **[ferrari-model-specs] `MODEL_SPECS_FERRARI` keys real spec data by model line, current range
+  plus the genuine classics in the pool.** Boot, seats, 0-62, size class (1-5) and mpg per line
+  (296/SF90/Roma/Portofino/Purosangue/12Cilindri/812/F8/488/458/California T/GTC4Lusso/FF/F12/612/
+  430 Scuderia, plus Testarossa/F355/360/328/512 BB/550/275 GTB/365 GTB4). `ferrariLine` normalises
+  a card name to a key, testing multi-word and longer-number-stem lines before bare numbers so the
+  families that share number stems don't collide. `DEFAULT_SPEC_FERRARI` covers any unlisted line.
+  A genuine classic adds a `collectable` tag.
+
+- **[ferrari-tuning] Ferrari tuning leans performance + character, light on economy.** Built via
+  `mergeTuning(FERRARI_TUNING)` onto BMW's base: heavier performance (2.6) and character (2.6)
+  weights, body fit still strong (4.5), economy nearly muted (0.6) — nobody cross-shops a Ferrari on
+  mpg. The 0-62 curve is recalibrated to the range's actual spread (`zeroBase: 6.0, span: 3.5`, vs
+  BMW's slower base) so a 2.5s SF90 and a 5.5s classic sit at meaningfully different points on the
+  performance axis rather than all pinning at "very fast". Hard filters relaxed for a two-seat range
+  (crew boot/seats tolerant). Validated: a performance-led coupe buyer tops out on the SF90 Stradale,
+  a family/space answer surfaces the Purosangue, an open-car answer the 296 GTS.
+
+- **[ferrari-questions] Ferrari drops the charging question and offers only the bodies/fuels it
+  stocks.** `BRANDS.ferrari.questions = { drop: ['charging'] }` — no EVs, and the plug-ins are not
+  pitched on home charging. The car-body options are gated by a `brands:` allowlist, so Ferrari was
+  added to `coupe`, `convertible`, `suv` and `phev` (and correctly NOT to hatchback/saloon/estate/
+  mpv/diesel). The universal `petrol` / `ev` / `open` fuel options carry no gate and show for every
+  brand by design (offering "fully electric" or "open to any" as a filter is harmless even with no
+  EV stock). Asserted in `brand.test.js` and confirmed on the live `/api/questions` endpoint.
+
+- **[ferrari-theme] `.vm.vm-ferrari`: Ferrari red #da291c on near-black ink, calm luxury motion,
+  packaged Ferrari Sans.** Palette lifted from the preowned site's own CSS (red #da291c, ink
+  #181818, muted #8f8f8f, band #f6f7f8, hairline #d0dddd), not guessed. Red is the accent FILL for
+  the primary button (BMW footing, not MINI's black-button reservation), hover #b31f14. Headings are
+  Ferrari Sans Medium, sentence case (text-transform:none), not BMW's Light uppercase. Small 2px
+  radius (the site runs a small radius, not BMW/Motorrad's hard 0). Calm ease, no overshoot —
+  luxury moves calmly. The mode switcher takes the base accent-on-hover treatment (red is the
+  accent, so no override needed, unlike Motorrad's near-black tabs).
+
+- **[ferrari-font] Ferrari Sans is a brand-owned face; packaged Regular + Medium, Medium mapped to
+  a 500-700 weight span.** The real typeface the live site loads is Ferrari Sans (aliased
+  "Title-Font"/"Body-Font" in the site CSS), NOT a guessed "Ferrari Sans" placeholder — verified
+  against the preowned Next.js CSS chunks (the national site's CSS was bot-walled 403). There is no
+  Bold cut, so the Medium woff is declared across `font-weight: 500 700` so any bold request resolves
+  to Medium rather than falling through to Helvetica. It is a Ferrari-owned brand asset (BMW/Ford/MINI
+  footing, not Honda's licensed-Proxima-Nova caveat), so self-hosting is the straightforward call.
+  Files: `Ferrari-SansRegular.woff` (400), `Ferrari-SansMedium.woff` (500 700) from
+  `preowned.ferrari.com/static/assets/fonts/`.
+
+- **[ferrari-voice] Ferrari copy is re-voiced, not noun-swapped: romantic, drive-and-feeling led,
+  names the official "Ferrari Approved" programme.** Voice sourced across a spread of the national
+  site (`ferrari.com/en-GB`) plus model and preowned pages: Italian, heritage-proud, emotional. The
+  intro lede opens on "how you drive, the roads you love" (not BMW's "your life, your miles") and
+  closes on cars "that were made for you". Read side by side against BMW/Honda/Ford/Motorrad, the
+  register is distinct, not the marque-noun-swap the house rule forbids. All on-screen copy is
+  em-dash-free.
+
+## Testing (Ferrari)
+
+- **[ferrari-render] Ferrari joins the render matrix by loading its REAL baked fixtures.** Like
+  Honda/Ford/Motorrad, `ferrariPool()` reads `fixtures/ferrari-cars.json` (what the loader serves)
+  rather than synthesising a feed, so the render test exercises the exact cars a browser sees across
+  every body (coupé, Spider, the Purosangue) and both fuels (petrol and the 296/SF90 plug-ins), each
+  now with its real public Thron cover photo. All three modes (questions/mingle/knockout) mount,
+  paint, carry the `vm-ferrari` theme class, and stay em-dash-free.
+
+- **[ferrari-server-tests] Added eleven Ferrari tests to `brand.test.js`.** Config resolves as a
+  fixtures brand with a `ferrari.com` origin and the `ferrari-approved` retailer; `mapFerrariRaw`
+  projects to a valid engine car; fuel comes off the spec row so every 296/SF90 spelling → phev +
+  evRange (never petrol); body derives from the name for coupe/convertible(GTS/Spider/Portofino)/suv;
+  a real per-listing cc/power is kept and only a blank is spec-backfilled; a priceless record returns
+  null; every shipped fixture is engine-valid AND range-bounded (body ∈ {coupe,convertible,suv},
+  fuel ∈ {petrol,phev}) with em-dash guards on name and blurb, AND carries a public Thron cover
+  photo; `thronCardImage` builds a session-less `/delivery/public/thumbnail/` URL (the `thumbnail`
+  verb pinned, no token/query) and `projectAd` resolves `photo` from the ad's `thronGalleryId`;
+  Ferrari tuning ranks the outright-fastest car for a performance-led buyer;
+  `questionsForBrand('ferrari')` drops charging and offers exactly the bodies/fuels the range has.
+  **The tuning test's answer set states no fuel preference on purpose:** an early version pinned
+  `fuel: ['petrol','phev']` and the petrol Testarossa edged the phev SF90 by winning the fuel-fit
+  bonus (a correct engine result, wrong test) — so the "wants the fastest" test leaves fuel neutral
+  and lets performance + character decide. Suite: 176 tests, all green, no
+  BMW/MINI/Honda/Ford/Motorrad regression.
 
 <!-- Further decisions appended below as the run proceeds. -->

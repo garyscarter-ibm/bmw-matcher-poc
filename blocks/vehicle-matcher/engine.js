@@ -13,13 +13,48 @@
  * and resolve to an empty result rather than break the surface around them.
  */
 
+/**
+ * sessionStorage key holding the shared demo password the login overlay
+ * captured (see index.html). It's the whole client side of the auth: the real
+ * gate is the server's X-Access-Key check, and this is just where we stash the
+ * value so every call can carry it.
+ */
+export const ACCESS_KEY_STORAGE = 'vmAccessKey';
+
+/** Auth headers for every API call: the stored shared password as X-Access-Key,
+ * or nothing when none is set (local dev against an ungated server, and the
+ * jsdom render tests, both send no header and the open server accepts them). */
+function authHeaders() {
+  const key = (typeof sessionStorage !== 'undefined')
+    ? sessionStorage.getItem(ACCESS_KEY_STORAGE)
+    : null;
+  return key ? { 'X-Access-Key': key } : {};
+}
+
+/**
+ * A 401 means the shared password was wrong or has been rotated. Drop the stale
+ * value and tell the harness (index.html) to re-show its login overlay, then let
+ * the caller's own error handling run. Only apiGetQuestions acts on this — it's
+ * the load-bearing call that throws; the others degrade to empty, so a bad key
+ * simply yields an empty shell, which is the intended "useless without the API".
+ */
+function onUnauthorized() {
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.removeItem(ACCESS_KEY_STORAGE);
+  }
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('vm-auth-failed'));
+  }
+}
+
 /** The quiz definition for a brand/retailer. Throws on failure — the caller
  * can't render an interface without it. */
 export async function apiGetQuestions(base, retailer, brandKey) {
   const url = new URL(`${base}/api/questions`);
   if (retailer) url.searchParams.set('retailer', retailer);
   if (brandKey) url.searchParams.set('brand', brandKey);
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: authHeaders() });
+  if (res.status === 401) onUnauthorized();
   if (!res.ok) throw new Error(`Questions request failed (${res.status})`);
   const data = await res.json();
   return { questions: data.questions };
@@ -30,7 +65,7 @@ export async function apiGetQuestions(base, retailer, brandKey) {
 export async function apiMatch(base, answers, retailer, brandKey) {
   const res = await fetch(`${base}/api/match`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ answers, retailer, brand: brandKey }),
   });
   if (!res.ok) throw new Error(`Match request failed (${res.status})`);
@@ -54,7 +89,7 @@ export async function apiNearby(base, answers, retailer, brandKey) {
   try {
     const res = await fetch(`${base}/api/nearby`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ answers, retailer, brand: brandKey }),
     });
     if (!res.ok) return noAnswer;
@@ -78,7 +113,7 @@ export async function apiPreview(base, answers, retailer, brandKey) {
   try {
     const res = await fetch(`${base}/api/preview`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ answers, retailer, brand: brandKey }),
     });
     if (!res.ok) return [];
@@ -107,7 +142,7 @@ export async function apiField(base, answers, retailer, brandKey, size, enrich =
   try {
     const res = await fetch(`${base}/api/field`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
         answers, retailer, brand: brandKey, size, enrich,
       }),

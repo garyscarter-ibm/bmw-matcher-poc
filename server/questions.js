@@ -47,9 +47,12 @@ export const QUESTIONS = [
       { value: 'hatchback', label: 'Hatchback', brands: ['bmw', 'mini', 'honda', 'ford'] },
       { value: 'saloon', label: 'Saloon', brands: ['bmw'] },
       { value: 'estate', label: 'Estate or Touring', brands: ['bmw', 'mini', 'honda', 'ford'] },
-      { value: 'suv', label: 'SUV', brands: ['bmw', 'mini', 'honda', 'ford'] },
-      { value: 'coupe', label: 'Coupé', brands: ['bmw'] },
-      { value: 'convertible', label: 'Convertible', brands: ['bmw', 'mini', 'ford'] },
+      // Ferrari's stock is coupé / convertible / one SUV (the Purosangue), so it
+      // takes those three car bodies and none of the mainstream ones (no hatch,
+      // saloon, estate or MPV Ferrari exists).
+      { value: 'suv', label: 'SUV', brands: ['bmw', 'mini', 'honda', 'ford', 'ferrari'] },
+      { value: 'coupe', label: 'Coupé', brands: ['bmw', 'ferrari'] },
+      { value: 'convertible', label: 'Convertible', brands: ['bmw', 'mini', 'ford', 'ferrari'] },
       { value: 'mpv', label: 'Family carrier', brands: ['bmw'] },
       // Bike categories — Motorrad only. Each value matches a `body` the Motorrad
       // mapper emits (see mapMotorradRaw / MODEL_SPECS_MOTORRAD), so the engine's
@@ -76,7 +79,7 @@ export const QUESTIONS = [
     options: [
       { value: 'petrol', label: 'Petrol' },
       { value: 'diesel', label: 'Diesel', sub: 'Higher miles, more torque', brands: ['bmw'] },
-      { value: 'phev', label: 'Plug-in hybrid', sub: 'Electric and petrol combined', brands: ['bmw', 'mini', 'honda', 'ford'] },
+      { value: 'phev', label: 'Plug-in hybrid', sub: 'Electric and petrol combined', brands: ['bmw', 'mini', 'honda', 'ford', 'ferrari'] },
       { value: 'ev', label: 'Fully electric' },
       { value: 'open', label: 'Help me decide', sub: 'Open to any fuel type' },
     ],
@@ -237,6 +240,82 @@ const BRAND_COPY = {
         comfort: { label: 'Comfort over distance' },
         tech: { label: 'Tech & electronics' },
         image: { label: 'Style & character' },
+      },
+    },
+  },
+  ferrari: {
+    // Ferrari voice: Italian, romantic, heritage-proud, addressed to a
+    // Ferrarista (per ferrari.com / preowned.ferrari.com: "Join the world of
+    // Ferraristi", "La nuova dolce vita", "Configure your dreams", the Prancing
+    // Horse, Maranello, Italian excellence since 1947). It leads on emotion and
+    // driving joy, never on value or spec, and it treats the buyer as joining a
+    // family, not making a purchase. Charging is dropped (see
+    // BRANDS.ferrari.questions.drop); ids and option values are untouched so the
+    // engine scores exactly as for any car.
+    budget: {
+      title: 'Where shall we set the budget?',
+      help: 'A rough figure to aim at. We’ll gently flag anything that’s a reach.',
+    },
+    bodyStyles: {
+      title: 'Which shape stirs you?',
+      help: 'Choose as many as you like, or leave it to us.',
+      options: {
+        coupe: { label: 'Coupé', sub: 'The classic berlinetta silhouette' },
+        convertible: { label: 'Spider', sub: 'Roof down, the road open' },
+        suv: { label: 'Purosangue', sub: 'Four seats, four doors, thoroughbred' },
+        any: { label: 'Surprise me', sub: 'Open to any shape' },
+      },
+    },
+    fuel: {
+      title: 'How would you like it powered?',
+      help: 'The range runs on petrol, with plug-in hybrids joining the bloodline.',
+      options: {
+        petrol: { label: 'Petrol', sub: 'The full-blooded V8, V12 and V6' },
+        phev: { label: 'Plug-in hybrid', sub: 'Electrified power, as on the 296 and SF90' },
+        open: { label: 'Help me decide', sub: 'Open to either' },
+      },
+    },
+    primaryUse: {
+      title: 'How will you use it?',
+      options: {
+        city: { label: 'Around the city', sub: 'Seen and savoured' },
+        commute: { label: 'The everyday drive' },
+        family: { label: 'The family thoroughbred', sub: 'Days out, in style' },
+        roadtrips: { label: 'Grand tours', sub: 'Long roads, open country' },
+        fun: { label: 'For the pure joy of it', sub: 'Weekends and favourite roads' },
+      },
+    },
+    people: {
+      title: 'Who rides with you?',
+      options: {
+        solo: { label: 'Just me (and the odd passenger)' },
+        family: { label: 'Two of us, and then some', sub: 'A 2+ or four-seat cabin' },
+        crew: { label: 'The whole family', sub: 'Four seats, regularly' },
+      },
+    },
+    mileage: {
+      title: 'How far will you drive it a year?',
+      help: 'Roughly. It helps us weigh how the car will be lived with.',
+    },
+    style: {
+      title: 'How do you like to drive?',
+      help: 'From a composed grand tourer to the sharpest thoroughbred.',
+      options: {
+        1: { label: 'Composed and refined' },
+        2: { label: 'Leaning refined' },
+        3: { label: 'A bit of both' },
+        4: { label: 'Leaning sporting' },
+        5: { label: 'The sharpest edge' },
+      },
+    },
+    priorities: {
+      title: 'Finally, choose your top two.',
+      options: {
+        economy: { label: 'Running costs' },
+        performance: { label: 'Performance' },
+        comfort: { label: 'Comfort on the road' },
+        tech: { label: 'Technology' },
+        image: { label: 'Presence and style' },
       },
     },
   },

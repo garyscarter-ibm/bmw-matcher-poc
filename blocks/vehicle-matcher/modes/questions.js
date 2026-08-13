@@ -463,6 +463,51 @@ BRAND_COPY.motorrad = {
 };
 
 /*
+ * Ferrari copy. Same all-or-nothing build as Honda/Ford/Motorrad: spread the BMW
+ * base so every key resolves, then re-voice the lines that carry the marque or
+ * its register. Ferrari's voice is Italian, romantic and heritage-proud, and it
+ * speaks to a Ferrarista joining a family, not a shopper making a purchase (per
+ * ferrari.com / preowned.ferrari.com: "Join the world of Ferraristi", "La nuova
+ * dolce vita", "Configure your dreams", the Prancing Horse, Maranello, Italian
+ * excellence since 1947). It leads on emotion and the drive, never on value or
+ * spec, and it stays warm and unhurried rather than clipped. Where the honesty
+ * frames (unmet / closest / weak) must stay plain and true, they keep their
+ * candour but in Ferrari's fuller cadence. No em dashes anywhere.
+ */
+BRAND_COPY.ferrari = {
+  ...BRAND_COPY.bmw,
+  name: 'Ferrari',
+  title: 'Find the Ferrari that’s yours.',
+  cta: 'Find my Ferrari',
+  // Romantic, insider, heritage-led: the car is a thoroughbred, the buyer is
+  // joining a bloodline. Lead on the drive and the feeling, name the official
+  // Ferrari Approved programme rather than "approved-used". See DECISIONS.md and
+  // docs/tone-style-guide.md (Ferrari).
+  lede: ({ questions, retailer }) => `${questions} quick questions about how you drive, `
+    + 'the roads you love and your budget. We’ll match you with the Ferrari Approved '
+    + `cars at ${retailer} that were made for you, and tell you why.`,
+  unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby just now. `
+    + 'These are the closest to everything else you told us.',
+  tasteTitle: ({ model }) => `The one for you is the ${model}.`,
+  tasteTitleHere: ({ model, retailer }) => `The one for you at ${retailer} is the ${model}.`,
+  tasteLede: () => 'A few of these suit you equally well on paper. This one speaks most '
+    + 'to what you said matters.',
+  tiedLede: () => 'On your answers we can’t choose between them: each suits you as well as '
+    + 'the next. Now it comes down to the one that moves you.',
+  closestLede: () => 'None of these is everything you asked for. Each card says what it '
+    + 'gets right, and where it falls short.',
+  weakLede: () => 'These are the nearest we hold, and each one misses something you '
+    + 'said mattered. If none of them stirs you, nothing here will.',
+  workingLabel: 'HOW WE GOT HERE',
+  working: ({ total, eligible }) => `We went through every one of the ${total} Ferraris in stock here. `
+    + `${eligible} were in budget and roomy enough for you.`,
+  workingMargin: ({ margin }) => ` Nothing else here came within ${margin} points.`,
+  workingWeak: ({ top }) => ` The best of them reached ${top}%.`,
+  workingScore: ' A match score is how well a car fits your answers, nothing else, '
+    + 'so cars that suit you equally share one.',
+};
+
+/*
  * How an unmet want is named in the results note, per brand — plural noun
  * phrases that drop into "No ___ at <retailer>…". Per-brand because MINI
  * names its own shapes (a Countryman, not an SUV) and calls its EVs
@@ -526,6 +571,17 @@ const UNMET_PHRASES = {
       scooter: 'electric scooters',
     },
   },
+  ferrari: {
+    // Ferrari's used range is petrol plus the 296/SF90 plug-in hybrids; no
+    // diesel or fully electric. Its three bodies are named the way the quiz
+    // names them: the Spider for a convertible, the Purosangue for the SUV.
+    fuel: {
+      petrol: 'petrol Ferraris', phev: 'plug-in hybrid Ferraris',
+    },
+    bodyStyles: {
+      coupe: 'coupés', convertible: 'Spiders', suv: 'the Purosangue',
+    },
+  },
 };
 
 /*
@@ -581,6 +637,13 @@ const TRADE_COPY = {
       naked: 'a naked bike', roadster: 'a roadster', adventure: 'an adventure bike',
       tourer: 'a tourer', sport: 'a sports bike', heritage: 'a heritage bike',
       scooter: 'an electric scooter',
+    },
+  },
+  ferrari: {
+    label: 'The trade-off',
+    fuel: { petrol: 'petrol', phev: 'a plug-in hybrid' },
+    bodyStyles: {
+      coupe: 'a coupé', convertible: 'a Spider', suv: 'the Purosangue',
     },
   },
 };

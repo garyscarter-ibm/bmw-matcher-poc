@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import {
-  mapVehicle, mapHondaRaw, mapFordRaw, mapMotorradRaw,
+  mapVehicle, mapHondaRaw, mapFordRaw, mapMotorradRaw, mapFerrariRaw,
 } from '../mapping.js';
 import { questionsForBrand, applyBespokeAnswers } from '../questions.js';
 import { normalizeBrand, brandConfig, brandTuning } from '../brands.js';
@@ -12,6 +12,7 @@ import { rankCars } from '../engine.js';
 import { motorradRowsFromEnvelope, motorradRowToRaw, parseMotorradSid } from '../stock.js';
 import { parseListingHtml, parseCard, listingUrl } from '../honda-listing.js';
 import { parseResTable, parseRow, splitRows } from '../motorrad-listing.js';
+import { thronCardImage, projectAd } from '../ferrari-listing.js';
 
 /* Feed-shaped fixtures (the fields mapVehicle actually reads). */
 const bmwVehicle = {
@@ -1217,4 +1218,230 @@ test('the captured rows resolve to the right model lines and honest categories',
     assert.equal(bike.body, body, `${title} -> category`);
     assert.equal(bike.cc, cc, `${title} -> capacity`);
   }
+});
+
+/* ================================================================== *
+ * Ferrari — a fixtures-source brand of a very different SHAPE to the
+ * mainstream marques: a two-seat, high-performance range with no diesel,
+ * no hatchbacks, a single four-seat SUV (the Purosangue) and two plug-in
+ * hybrids (296, SF90) whose fuel the feed leaves blank. The cars are
+ * cold-fetchable (public __NEXT_DATA__ JSON) but the photos are
+ * Thron-gallery-gated, so the brand ships a real 148-car snapshot and the
+ * live adapter is wired dormant. mapFerrariRaw is the flat-raw -> mapped-car
+ * projection (same shape mapFordRaw produces). These tests pin the parts a
+ * thin fixture can't guarantee: fuel comes off the SPEC row not the card
+ * (so every 296/SF90 is phev, never petrol), body comes off the NAME (so a
+ * "GTS"/Spider is convertible and the Purosangue is the SUV), and the spec
+ * table never overwrites a real per-listing cc/power. See the Ferrari
+ * section of DECISIONS.md.
+ * ================================================================== */
+
+// The flat-raw shape mapFerrariRaw consumes (snapshot record, or the live
+// adapter's projected ad). Defaults to a petrol coupe (the F8 Tributo).
+const ferrariRaw = (overrides = {}) => ({
+  id: 'FER-TEST-1',
+  name: 'Ferrari F8 Tributo',
+  price: 219900,
+  mileage: 6200,
+  powerHp: 720,
+  cc: 3902,
+  engine: '3.9 V8',
+  gearBox: 'Automatic',
+  ...overrides,
+});
+
+test('brand config: ferrari is a fixtures-source brand with a Ferrari origin', () => {
+  const cfg = brandConfig('ferrari');
+  assert.equal(cfg.source, 'fixtures', 'ferrari serves from the baked snapshot, not a live feed');
+  assert.match(cfg.origin, /ferrari\.com/);
+  assert.equal(cfg.defaultRetailer, 'ferrari-approved');
+  assert.equal(normalizeBrand('Ferrari'), 'ferrari');
+  assert.equal(normalizeBrand('FERRARI'), 'ferrari');
+});
+
+test('mapFerrariRaw projects a flat record into the engine car schema', () => {
+  const car = mapFerrariRaw(ferrariRaw());
+  for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
+    assert.ok(car[field] !== undefined, `mapped Ferrari missing ${field}`);
+  }
+  assert.equal(car.line, 'F8');
+  assert.equal(car.body, 'coupe');
+  assert.equal(car.fuel, 'petrol');
+  assert.equal(car.priceMin, 219900);
+  assert.equal(car.priceMax, 219900, 'a used car is a single price, not a range');
+  assert.ok(car.mpg > 0, 'a combustion Ferrari carries an mpg for the (down-weighted) economy axis');
+  assert.equal(car.seats, 2, 'a mid-engined Ferrari is a two-seater');
+  assert.match(car.name, /^Ferrari /, 'the display name leads with the marque');
+  assert.ok(car.tags.includes('drivers-car') && car.tags.includes('image'), 'every Ferrari reads as a drivers-car with image');
+});
+
+test('mapFerrariRaw takes fuel from the SPEC row, never the blank card: every 296/SF90 is phev', () => {
+  // The bug this guards: the feed leaves fuelType blank on exactly the
+  // electrified cars, so a name/card-based check silently maps them petrol.
+  // Fuel is the spec row's, so every plug-in resolves to phev with a range.
+  for (const name of ['Ferrari 296 GTB', 'Ferrari 296 GTS', '296 GTS', 'Ferrari SF90 Stradale', 'SF90 Spider']) {
+    const car = mapFerrariRaw(ferrariRaw({ name, price: 300000, cc: undefined, powerHp: undefined }));
+    assert.equal(car.fuel, 'phev', `${name} is a plug-in hybrid, not petrol`);
+    assert.ok(car.evRange > 0, `${name} (phev) carries an electric-only range`);
+    assert.ok(car.mpg > 0, `${name} also carries a nominal combustion mpg`);
+    assert.ok(car.tags.includes('efficient') && car.tags.includes('tech'), `${name} reads as the electrified, techy car`);
+  }
+  // A car with no spec row falls back to petrol (never invents phev).
+  const petrol = mapFerrariRaw(ferrariRaw());
+  assert.equal(petrol.fuel, 'petrol');
+  assert.ok(!petrol.evRange, 'a petrol Ferrari carries no ev range');
+});
+
+test('mapFerrariRaw derives body from the NAME, not the unreliable card bodyStyle', () => {
+  // Every category the range actually has, resolved off the name: the open
+  // cars (Spider/GTS/Portofino/California), the SUV (Purosangue), and coupe
+  // as the default. A "GTS" is open even though the feed reports "coupè".
+  const coupe = mapFerrariRaw(ferrariRaw({ name: 'Ferrari 812 Superfast' }));
+  assert.equal(coupe.body, 'coupe');
+
+  const spider = mapFerrariRaw(ferrariRaw({ name: 'Ferrari F8 Spider' }));
+  assert.equal(spider.body, 'convertible');
+
+  const gts = mapFerrariRaw(ferrariRaw({ name: 'Ferrari 296 GTS', price: 300000 }));
+  assert.equal(gts.body, 'convertible', 'a GTS is an open car whatever the card says');
+
+  const portofino = mapFerrariRaw(ferrariRaw({ name: 'Ferrari Portofino M', price: 170000 }));
+  assert.equal(portofino.body, 'convertible', 'the folding-hard-top GT is a convertible');
+
+  const suv = mapFerrariRaw(ferrariRaw({ name: 'Ferrari Purosangue', price: 350000, cc: 6496 }));
+  assert.equal(suv.body, 'suv');
+  assert.equal(suv.seats, 4, 'the Purosangue is the four-seat Ferrari');
+  assert.ok(suv.tags.includes('family') && suv.tags.includes('practical'), 'the SUV reads as the usable one');
+});
+
+test('mapFerrariRaw keeps a real per-listing cc/power; the spec table only backfills a blank', () => {
+  // The rule from Step 2: never present a generic spec value as measured, and
+  // never let a spec value overwrite a real one.
+  const real = mapFerrariRaw(ferrariRaw({ name: 'Ferrari 296 GTB', cc: 2992, powerHp: 830, price: 300000 }));
+  assert.equal(real.cc, 2992, 'a real per-listing cc is kept');
+  assert.equal(real.power, 830, 'a real per-listing power is kept');
+
+  // The 296 GTS ships no cc: the spec row backfills it (2992), never leaving it blank.
+  const blank = mapFerrariRaw(ferrariRaw({ name: 'Ferrari 296 GTS', cc: undefined, powerHp: undefined, price: 300000 }));
+  assert.equal(blank.cc, 2992, 'a blank cc is backfilled from the spec row');
+});
+
+test('mapFerrariRaw returns null for a priceless record (never invents a price)', () => {
+  assert.equal(mapFerrariRaw(ferrariRaw({ price: 0 })), null);
+  assert.equal(mapFerrariRaw(ferrariRaw({ price: undefined })), null);
+});
+
+test('thronCardImage builds a public, session-less cover URL for a gallery id', () => {
+  // The card image is a Thron DAM asset on the token-free /delivery/public/
+  // path — the clientId (ferrari) and sessId (3zayf6) are hardcoded public
+  // constants, not per-session values, so a cold script resolves the cover.
+  const gid = 'a643790c-131e-4e24-b053-d2ab73783d8a';
+  const url = thronCardImage(gid, '600x400', 'Ferrari 488 GTB');
+  assert.ok(url.startsWith('https://ferrari-cdn.thron.com/delivery/public/'), 'lives on the public delivery path');
+  // A GALLERY id resolves through the `thumbnail` verb (its cover frame); the
+  // `image` verb is for single-image ids and 404s on a gallery. Getting this
+  // wrong is the whole trap, so pin it.
+  assert.match(url, /\/delivery\/public\/thumbnail\/ferrari\//, 'a gallery id uses the thumbnail verb');
+  assert.ok(url.includes(`/${gid}/3zayf6/std/600x400/`), 'carries the gallery id, public sessId and requested size');
+  assert.ok(!url.includes('token') && !url.includes('?'), 'no token or session query param');
+  // No id -> no photo (a placeholder ad), never a broken URL.
+  assert.equal(thronCardImage(null), null);
+  assert.equal(thronCardImage(undefined, '600x400', 'x'), null);
+});
+
+test('projectAd resolves the card cover photo from the ad thronGalleryId', () => {
+  const ad = {
+    id: 'FER-1', carName: 'Ferrari F8 Tributo', price: '219,900',
+    cardImages: { thronGalleryId: 'a643790c-131e-4e24-b053-d2ab73783d8a' },
+  };
+  const rec = projectAd(ad);
+  assert.equal(rec.thronGalleryId, 'a643790c-131e-4e24-b053-d2ab73783d8a', 'carries the gallery id');
+  assert.equal(
+    rec.photo,
+    thronCardImage(ad.cardImages.thronGalleryId, '600x400', ad.carName),
+    'photo is the public cover URL built from that id',
+  );
+  // A gallery-less ad projects with no photo (undefined, not a broken URL) —
+  // the mapper and cards guard on car.photo, so it degrades cleanly.
+  const noGallery = projectAd({ id: 'FER-2', carName: 'Ferrari Roma', price: '150,000', cardImages: {} });
+  assert.equal(noGallery.photo, undefined, 'a gallery-less ad carries no photo');
+});
+
+test('every Ferrari fixture is engine-valid (the baked snapshot the app serves)', () => {
+  const path = fileURLToPath(new URL('../../fixtures/ferrari-cars.json', import.meta.url));
+  const cars = JSON.parse(readFileSync(path, 'utf8'));
+  assert.ok(cars.length > 0, 'ferrari fixtures are not empty');
+  for (const car of cars) {
+    for (const field of ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax', 'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb']) {
+      assert.ok(car[field] !== undefined, `${car.name || car.id} missing ${field}`);
+    }
+    assert.ok(car.priceMin <= car.priceMax, `${car.name} price range inverted`);
+    assert.ok(['coupe', 'convertible', 'suv'].includes(car.body), `${car.name} has an off-range body (${car.body})`);
+    assert.ok(['petrol', 'phev'].includes(car.fuel), `${car.name} has an off-range fuel (${car.fuel})`);
+    if (car.fuel === 'phev') assert.ok(car.evRange > 0, `${car.name} (phev) needs evRange`);
+    else assert.ok(car.mpg > 0, `${car.name} needs mpg`);
+    assert.ok(!car.blurb.includes('—'), `${car.name} blurb has an em dash`);
+    assert.ok(!car.name.includes('—'), `${car.name} name has an em dash`);
+    // The snapshot now ships a real cover photo per car (public Thron cover
+    // frame). Guard that they stay present and public — a regression to the old
+    // photo-less snapshot, or a token creeping into the URL, fails here.
+    assert.ok(
+      typeof car.photo === 'string' && car.photo.startsWith('https://ferrari-cdn.thron.com/delivery/public/thumbnail/'),
+      `${car.name} is missing its public Thron cover photo`,
+    );
+  }
+});
+
+test('ferrari tuning surfaces the outright-fastest car for a performance-led buyer', () => {
+  // Ferrari tuning leans performance + character + body fit, light on economy.
+  // For a buyer who wants the quickest thing, the SF90 (2.5s) should out-rank a
+  // slower classic, even though both are "a Ferrari".
+  const sf90 = {
+    id: 'sf90', name: 'Ferrari SF90 Stradale', line: 'SF90', body: 'coupe', fuel: 'phev',
+    priceMin: 300000, priceMax: 300000, sizeClass: 2, seats: 2, boot: 74, zeroTo62: 2.5,
+    mpg: 39, evRange: 15, tags: ['drivers-car', 'image', 'efficient', 'tech'], blurb: '',
+  };
+  const testarossa = {
+    id: 'testarossa', name: 'Ferrari Testarossa', line: 'Testarossa', body: 'coupe', fuel: 'petrol',
+    priceMin: 300000, priceMax: 300000, sizeClass: 3, seats: 2, boot: 140, zeroTo62: 5.2,
+    mpg: 15, tags: ['drivers-car', 'image', 'collectable'], blurb: '',
+  };
+  // No fuel preference is stated: this buyer is about pace, not powertrain, so
+  // the fuel-fit axis stays neutral and performance + character decide. (State a
+  // petrol-only preference and the phev SF90 rightly loses the fuel bonus — a
+  // different, also-correct answer; that is not what "wants the fastest" tests.)
+  const driver = {
+    budget: [250000, 350000], bodyStyles: ['coupe'], fuel: [],
+    primaryUse: 'fun', people: 'solo', mileage: 3000, style: '5',
+    priorities: ['performance'],
+  };
+  const ranked = rankCars(driver, [testarossa, sf90], brandTuning('ferrari'));
+  assert.equal(ranked[0].car.id, 'sf90', 'the outright-fastest Ferrari tops for a performance-led buyer');
+});
+
+test('questionsForBrand(ferrari) drops charging and offers only the bodies/fuels the range has', () => {
+  const questions = questionsForBrand('ferrari');
+  const ids = questions.map((q) => q.id);
+  // A Ferrari has no charging-plug question (no EVs, and the phevs are not
+  // pitched on home charging), so it is dropped like every non-EV brand.
+  assert.ok(!ids.includes('charging'), 'ferrari drops the charging question');
+  // It keeps the standard car questions (unlike the bikes brand).
+  for (const kept of ['budget', 'bodyStyles', 'fuel', 'people', 'style', 'priorities']) {
+    assert.ok(ids.includes(kept), `ferrari keeps the "${kept}" question`);
+  }
+
+  // bodyStyles offers exactly Ferrari's real bodies, and none it lacks.
+  const bodyValues = questions.find((q) => q.id === 'bodyStyles').options.map((o) => o.value);
+  for (const has of ['coupe', 'convertible', 'suv']) {
+    assert.ok(bodyValues.includes(has), `ferrari offers the ${has} body`);
+  }
+  for (const lacks of ['hatchback', 'saloon', 'estate', 'mpv']) {
+    assert.ok(!bodyValues.includes(lacks), `ferrari does not offer the ${lacks} body it has no stock of`);
+  }
+
+  // fuel offers petrol + the plug-in hybrids, never diesel.
+  const fuelValues = questions.find((q) => q.id === 'fuel').options.map((o) => o.value);
+  assert.ok(fuelValues.includes('petrol'), 'ferrari offers petrol');
+  assert.ok(fuelValues.includes('phev'), 'ferrari offers the plug-in hybrids (296, SF90)');
+  assert.ok(!fuelValues.includes('diesel'), 'ferrari never offers diesel');
 });

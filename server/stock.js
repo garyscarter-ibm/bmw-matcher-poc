@@ -25,10 +25,16 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { lookupDealer } from './dealers.js';
-import { mapVehicle, mapMotorradRaw, mapHondaRaw } from './mapping.js';
+import { mapVehicle, mapMotorradRaw, mapHondaRaw, mapFerrariRaw } from './mapping.js';
 import { brandConfig, normalizeBrand } from './brands.js';
 import { parseListingHtml, listingUrl } from './honda-listing.js';
 import { parseResTable } from './motorrad-listing.js';
+import {
+  parseListingHtml as parseFerrariHtml,
+  listingUrl as ferrariListingUrl,
+  paginationOf as ferrariPaginationOf,
+  extractNextData as extractFerrariNextData,
+} from './ferrari-listing.js';
 
 // Repo root, from this module's location (server/ → ..). Used to resolve the
 // fixtures directory for fixtures-backed brands without depending on cwd.
@@ -377,6 +383,72 @@ async function hondaLiveStock(opts = {}) {
   return cars;
 }
 
+/* --------------------------- live Ferrari feed ------------------------ *
+ * preowned.ferrari.com is a server-rendered Next.js app: every result page ships
+ * the whole result set as PUBLIC JSON in <script id="__NEXT_DATA__"> (see
+ * ferrari-listing.js). No token, no session, no forgery — a plain GET of each
+ * result page returns the inventory, and pagination is a `?pl=N` query param.
+ * So this environment can walk the entire pool cold, exactly as the Motorrad
+ * self-issued-session adapter does, and map every ad through the SAME
+ * mapFerrariRaw the committed snapshot was built with.
+ *
+ * Dormant while the registry says `source: 'fixtures'`. It ships fixtures for
+ * one reason only: the CAR data is cold-fetchable but the PHOTOS are not — the
+ * card images are Thron DAM galleries resolved solely through the site's runtime
+ * Thron SDK session, which a cold script can't turn into an image URL. Both
+ * paths (live and snapshot) therefore serve photo-less cards that degrade
+ * cleanly; the snapshot avoids hammering Ferrari's production site with 15 GETs
+ * per cache-miss for data that doesn't change hour to hour. Flip Ferrari to
+ * `source: 'live-ferrari'` and this fetches live with the identical mapper and
+ * the same StockUnavailableError contract as every other live brand. See the
+ * Ferrari section of DECISIONS.md.
+ * --------------------------------------------------------------------- */
+
+// Safety cap on pagination. The real pool is ~159 cars at ~11/page (~15 pages);
+// this bounds a runaway loop well above the real page count. The adapter also
+// stops early once it has walked every page the feed's own pagination reports.
+const FERRARI_PAGE_LIMIT = Number(process.env.FERRARI_PAGE_LIMIT) || 20;
+
+/**
+ * Fetch and map the live Ferrari pool. Reads page 1, learns the real page count
+ * from the payload's pagination, walks the rest, dedupes by the ad id, and maps
+ * each raw record through the shared mapFerrariRaw — the identical projection the
+ * snapshot uses, so a live car is indistinguishable from a fixture car.
+ *
+ * @returns {Promise<Array>} mapped Ferrari cars
+ */
+async function ferrariLiveStock() {
+  const first = await httpsGet(ferrariListingUrl(1), { Accept: 'text/html' });
+  if (first.status !== 200) {
+    throw new StockUnavailableError(`Ferrari listing returned HTTP ${first.status}`);
+  }
+  const seen = new Set();
+  const cars = [];
+  const addFrom = (html) => {
+    for (const rec of parseFerrariHtml(html)) {
+      if (seen.has(rec.id)) continue;
+      seen.add(rec.id);
+      const car = mapFerrariRaw(rec);
+      if (car) cars.push(car);
+    }
+  };
+  addFrom(first.body);
+
+  // Learn the true page count from the payload; fall back to the safety cap.
+  const pag = ferrariPaginationOf(extractFerrariNextData(first.body));
+  const pages = Math.min(pag?.pages || FERRARI_PAGE_LIMIT, FERRARI_PAGE_LIMIT);
+  for (let page = 2; page <= pages; page += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const res = await httpsGet(ferrariListingUrl(page), { Accept: 'text/html' });
+    if (res.status !== 200) break; // a later-page failure just ends pagination
+    addFrom(res.body);
+  }
+  if (cars.length === 0) {
+    throw new StockUnavailableError('Ferrari listing returned no usable cars');
+  }
+  return cars;
+}
+
 /* --------------------------- live Motorrad feed ----------------------- *
  * Motorrad's approved-used stock is served by a session-gated AngularJS app
  * (ng-app="GMBApp") behind POST /api/ResultOverview/ShowResults: it takes a
@@ -692,6 +764,18 @@ export async function fetchRetailerStock(brand = 'bmw', retailerSite) {
     const key = keyFor(b, site);
     seenRetailers.set(key, { brand: b, retailerSite: site });
     return cachedFetch(cacheByRetailer, key, () => motorradLiveStock(origin));
+  }
+
+  // Ferrari's live feed, when the registry opts into it. The listing is
+  // server-rendered JSON (public __NEXT_DATA__, no token), so it has its own
+  // cold-walk adapter; cached per brand+retailer exactly like the other live
+  // brands. A fetch failure throws StockUnavailableError (→ 502), no silent
+  // fallback. Ferrari ships `source: 'fixtures'` today (photos are gallery-gated,
+  // see ferrariLiveStock); this case is live the day that flips.
+  if (source === 'live-ferrari') {
+    const key = keyFor(b, site);
+    seenRetailers.set(key, { brand: b, retailerSite: site });
+    return cachedFetch(cacheByRetailer, key, () => ferrariLiveStock());
   }
 
   const key = keyFor(b, site);
