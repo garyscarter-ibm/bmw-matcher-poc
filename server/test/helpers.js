@@ -69,9 +69,10 @@ export async function get(base, path) {
 }
 
 /** Raw request with a caller-chosen method — for exercising route dispatch
- * (wrong method, OPTIONS preflight) where fetch's helpers would get in the way. */
-export async function request(base, path, { method = 'GET' } = {}) {
-  const res = await fetch(`${base}${path}`, { method });
+ * (wrong method, OPTIONS preflight) where fetch's helpers would get in the way.
+ * `headers` lets an auth test send an X-Access-Key (or omit it). */
+export async function request(base, path, { method = 'GET', headers } = {}) {
+  const res = await fetch(`${base}${path}`, { method, headers });
   const out = await readResponse(res);
   out.headers = res.headers;
   return out;
@@ -194,6 +195,21 @@ export function fordPool(n = 20) {
  */
 export function motorradPool(n = 20) {
   const path = fileURLToPath(new URL('../../fixtures/motorrad-bikes.json', import.meta.url));
+  const all = JSON.parse(readFileSync(path, 'utf8'));
+  return all.slice(0, n);
+}
+
+/**
+ * A pool of `n` real Ferrari cars from `fixtures/ferrari-cars.json` — the baked,
+ * mapFerrariRaw-projected snapshot the fixtures stock source serves for Ferrari.
+ * Same rationale as ford/honda: the CARS are cold-fetchable (public __NEXT_DATA__
+ * JSON, no token) but the PHOTOS are Thron-gallery-gated, so the brand ships a
+ * real 148-car snapshot and the render test exercises the exact cars a browser
+ * sees across every body (coupé, Spider, the Purosangue) and both fuels (petrol
+ * and the 296/SF90 plug-in hybrids). Identical engine schema to every car brand.
+ */
+export function ferrariPool(n = 20) {
+  const path = fileURLToPath(new URL('../../fixtures/ferrari-cars.json', import.meta.url));
   const all = JSON.parse(readFileSync(path, 'utf8'));
   return all.slice(0, n);
 }
