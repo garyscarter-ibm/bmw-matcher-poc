@@ -1,0 +1,26 @@
+CSS CUSTOM PROPERTIES, VAUXHALL: NONE OBTAINED.
+
+Status: NOT REACHABLE, which is weaker than NOT FOUND and much weaker than NOT PUBLISHED.
+Vauxhall may well define a full custom-property theme. This run could not see it.
+
+Why:
+  1. https://www.vauxhall.co.uk/ returns HTTP 403 to the only network tool available.
+     Re-tested fresh on 2026-08-14, still 403.
+  2. No first-party Vauxhall asset host exists in DNS. assets. cdn. static. images.
+     content. and business.vauxhall.co.uk all return ENOTFOUND, so there is no
+     un-WAF'd host serving Vauxhall CSS to read instead.
+  3. No browser on this install, so no resolved :root values via getComputedStyle.
+  4. The fetcher converts HTML to markdown before any model reads it, stripping
+     <link rel=stylesheet> and <style>. So stylesheet URLs cannot be discovered from
+     any HTML page in this run, including reachable third-party dealer pages.
+
+For completeness, the only custom properties seen anywhere this run were on the Stellantis
+press portal (www.media.stellantis.com), a different FCA-legacy codebase with no Vauxhall
+selectors at all, and they belong to a vendor library rather than to any brand theme:
+  --animate-duration: 1s
+  --animate-delay: 1s
+  --animate-repeat: 1
+Source: animate.css 4.1.1, MIT licensed, bundled in /build/app.1cf248ac.css.
+These are NOT Vauxhall tokens and must not be treated as such.
+
+See ../observations.md section 7 for what would unblock this.

@@ -1,0 +1,188 @@
+{
+  "dimension": "visual.color",
+  "brand": "vauxhall",
+  "retrievedAt": "2026-08-14",
+  "regime": "D",
+  "identityDate": "UNRESOLVED",
+  "revision": "REVISED 2026-08-14 by the run owner after first-party logo assets were retrieved and measured. The earlier version of this file recorded zero colour values and two low-confidence third-party candidates. Both candidates are now DISPROVED as first-party values. See `measurementNote` and `contradictions`.",
+
+  "summary": "Vauxhall's mark is red plus navy, and both values are now MEASURED from first-party PNG assets: #eb0000 for the griffin roundel and #00003a for the wordmark. No first-party colour SPECIFICATION (Pantone, CMYK, or a stated hex in a guideline) was found anywhere this run, so what is recorded here is what the brand's own published assets render, which is a different and slightly weaker claim than a published token. The two hex candidates previously carried from a fan-wiki SVG (#d7001c, #000037) do NOT match the first-party assets and must not be used. Colour ladder rungs 1 to 4 remain structurally unreachable; the values below come from a newly opened route, first-party raster assets measured pixel-wise, which sits alongside rung 3 rather than on the published ladder.",
+
+  "measurementNote": {
+    "how": "Four first-party PNG assets were fetched, verified with file(1) as genuine PNGs, and measured with Pillow 11.3.0. Only pixels with alpha > 200 were counted. Reported percentages are shares of opaque pixels.",
+    "colourManagement": "NONE of the four PNGs carries an embedded ICC profile, so sRGB is assumed and the hex values are used as read. This is the standard assumption and it is stated because a tagged profile would change the numbers.",
+    "whyThisIsNotRung3": "Rung 3 is a live DOM or manifest. This is neither. It is a published raster asset on a first-party host, measured directly. It beats any third-party artefact and it is dated only by its live use, not by a publication date.",
+    "independence": "vauxhall-logo-stellantis-dam.png and vauxhall-stellantis-dam.png are the SAME artwork at different canvas sizes: identical colour proportions (80.68 / 19.32) and inked aspect ratios of 1.1753 and 1.1755. They are ONE source in two renditions and must not be counted as two independent corroborations."
+  },
+
+  "entries": [
+    {
+      "id": "brand-red",
+      "name": "Vauxhall red (descriptive name; no first-party colour name was published)",
+      "model": "hex",
+      "value": "#eb0000",
+      "rgb": [235, 0, 0],
+      "appliedTo": "the griffin emblem: the outer ring, the griffin silhouette and the flag device inside the roundel",
+      "status": "measured-from-first-party-asset",
+      "confidence": "high",
+      "confidenceScope": "high that this is the value the brand's own published logo assets render. NOT high that it is the specified brand colour, because no colour specification was found. A spec may define a Pantone or CMYK build that converts to a slightly different sRGB hex.",
+      "share": "80.68% of opaque pixels in both DAM lockups",
+      "rung": "first-party asset measurement (off-ladder, ranks above rung 5)",
+      "authority": "A2",
+      "party": "first",
+      "currency": "current, live 2026-08-14; asset itself undated",
+      "sourceIds": ["s85", "s86"],
+      "source": "https://www.stellantis.com/content/dam/stellantis-corporate/brands/vauxhall/vauxhall-logo.png",
+      "file": "visual/logo/vauxhall-logo-stellantis-dam.png",
+      "notes": "Exactly two colours make up the full-colour lockup and this is the dominant one. Not #d7001c: that candidate is 12 units lower in red and carries a blue component of 28, and it came from a fan wiki. See contradictions."
+    },
+    {
+      "id": "brand-navy",
+      "name": "Vauxhall navy (descriptive name; no first-party colour name was published)",
+      "model": "hex",
+      "value": "#00003a",
+      "rgb": [0, 0, 58],
+      "appliedTo": "the VAUXHALL wordmark, set below the roundel in the vertical lockup",
+      "status": "measured-from-first-party-asset",
+      "confidence": "high",
+      "confidenceScope": "same scope caveat as brand-red: measured from the published asset, not read from a specification.",
+      "share": "19.32% of opaque pixels in both DAM lockups",
+      "rung": "first-party asset measurement (off-ladder, ranks above rung 5)",
+      "authority": "A2",
+      "party": "first",
+      "currency": "current, live 2026-08-14; asset itself undated",
+      "sourceIds": ["s85", "s86"],
+      "source": "https://www.stellantis.com/content/dam/stellantis-corporate/brands/vauxhall/vauxhall-logo.png",
+      "file": "visual/logo/vauxhall-logo-stellantis-dam.png",
+      "notes": "Very near the old #000037 candidate but NOT equal to it: blue channel 58 rather than 55. The near-miss is itself evidence about the candidate's provenance, see contradictions."
+    },
+    {
+      "id": "mono-lockup-navy",
+      "name": "monochrome lockup navy",
+      "model": "hex",
+      "value": "#002a42",
+      "rgb": [0, 42, 66],
+      "appliedTo": "the entire vertical lockup, emblem and wordmark together, in the one-colour treatment",
+      "status": "measured-from-first-party-asset",
+      "confidence": "high",
+      "confidenceScope": "high as the value of this specific published variant. It is a VARIANT treatment, not a master palette entry, and it should not be presented as the brand navy.",
+      "share": "98.25% of opaque pixels; the remaining 1.75% is anti-aliasing across 37 near-identical shades",
+      "rung": "first-party asset measurement",
+      "authority": "A2",
+      "party": "first",
+      "currency": "current, in live use on the UK press portal 2026-08-14",
+      "sourceIds": ["s87"],
+      "source": "https://www.media.stellantis.com/uploads/uk/brand/verticalbluecopy-69a81b0da8eff.png",
+      "file": "visual/logo/vauxhall-vertical-blue-presskit.png",
+      "notes": "This is the asset whose filename ('verticalbluecopy') previously looked like evidence of a competing blue-led identity. Measured and viewed, it is simply the vertical lockup rendered in ONE flat colour. It is distinctly greener and lighter than the wordmark navy #00003a, so the mono variant is not just the wordmark colour reused. It resolves the red-versus-blue question rather than creating one."
+    },
+    {
+      "id": "mono-lockup-white",
+      "name": "reversed lockup white",
+      "model": "hex",
+      "value": "#ffffff",
+      "rgb": [255, 255, 255],
+      "appliedTo": "the entire lockup in the reversed (knockout) treatment, for dark backgrounds",
+      "status": "measured-from-first-party-asset",
+      "confidence": "high",
+      "confidenceScope": "high that a pure-white reversed lockup is published and in use. Trivial as a colour value; recorded because it evidences that a reversed treatment EXISTS, which is a logo-rules fact.",
+      "share": "100% of opaque pixels; the file contains exactly one colour",
+      "rung": "first-party asset measurement",
+      "authority": "A2",
+      "party": "first",
+      "currency": "current, in live use as the press-portal footer logo 2026-08-14",
+      "sourceIds": ["s88"],
+      "source": "https://www.media.stellantis.com/uploads/uk/vauxhall-footerLogo.png",
+      "file": "visual/logo/vauxhall-footer-logo-presskit.png",
+      "notes": "131 x 130 px, pure #ffffff at every opaque pixel. Small and clearly a UI asset rather than a master, but it is first-party and it proves the reversed lockup is part of the live system."
+    },
+    {
+      "id": "subbrand-gse-yellow",
+      "name": "GSE yellow",
+      "model": "name only, no numeric value published",
+      "value": null,
+      "appliedTo": "GSE performance sub-brand: brake callipers, signature lettering, interior displays and accents",
+      "status": "first-party-named-no-value",
+      "confidence": "medium",
+      "rung": "first-party incidental (press release), off-ladder for the master palette",
+      "authority": "A2",
+      "party": "first",
+      "currency": "current, published 2026-07-13",
+      "sourceIds": ["s51"],
+      "source": "https://www.media.stellantis.com/uk-en/vauxhall/press/new-vauxhall-mokka-gse-press-information",
+      "notes": "Quoted verbatim from the release: 'Alcon four-pot front callipers in GSE yellow', 'Yellow and black signature GSE lettering', and interior 'adorned with GSE logo and GSE colours/displays'. A SUB-BRAND livery, not the master palette, and no numeric value is published. Note the orthography is GSE, not GSe: see industry/sub-brands-gse-and-vxr.md."
+    },
+    {
+      "id": "subbrand-gse-black",
+      "name": "black / high-gloss black",
+      "model": "name only, no numeric value published",
+      "value": null,
+      "appliedTo": "GSE sub-brand: contrast roof, bonnet, sports bumpers, skid plates, cladding",
+      "status": "first-party-named-no-value",
+      "confidence": "medium",
+      "rung": "first-party incidental (press release), off-ladder for the master palette",
+      "authority": "A2",
+      "party": "first",
+      "currency": "current, published 2026-07-13",
+      "sourceIds": ["s51"],
+      "source": "https://www.media.stellantis.com/uk-en/vauxhall/press/new-vauxhall-mokka-gse-press-information",
+      "notes": "Product finish vocabulary, quoted: 'sports bumpers in high-gloss black', 'Black contrast roof', 'black-painted skid plates'. The paired half of the GSE yellow/black livery, not a brand token."
+    }
+  ],
+
+  "disproved": [
+    {
+      "id": "candidate-emblem-red",
+      "value": "#d7001c",
+      "wasClaimedAs": "the emblem red, read out of a Wikipedia/Logopedia SVG (A4) and independently found declared in an Evans Halshaw dealer SVG (A4)",
+      "status": "DISPROVED as a first-party value",
+      "why": "The first-party assets render #eb0000. #d7001c differs in every channel (215 vs 235 red, 28 vs 0 blue). It is not a rounding artefact and there is no colour profile in play that would explain it.",
+      "keepBecause": "Two independent-looking third-party sources both state it, so it is the value circulating in the dealer and fan-wiki supply chain. That is worth knowing when auditing third-party Vauxhall material, but it must not populate tokens."
+    },
+    {
+      "id": "candidate-wordmark-navy",
+      "value": "#000037",
+      "wasClaimedAs": "the wordmark navy, same two third-party sources",
+      "status": "DISPROVED as a first-party value",
+      "why": "The first-party assets render #00003a. The blue channel is 58, not 55.",
+      "keepBecause": "The near-miss is diagnostic. A three-unit drift in one channel is what re-tracing or re-saving a logo through a third-party pipeline looks like, which supports the shared-ancestry reading below."
+    }
+  ],
+
+  "contradictions": [
+    {
+      "issue": "Which hue leads the current identity: red or blue",
+      "valueA": "red on the emblem",
+      "valueB": "blue, inferred from the live first-party asset filename 'verticalbluecopy'",
+      "resolved": true,
+      "resolution": "RESOLVED BY MEASUREMENT 2026-08-14. Both are true and they were never in conflict. The full-colour master lockup is a RED griffin roundel (#eb0000) above a NAVY wordmark (#00003a). The 'blue' asset is a one-colour MONOCHROME variant of the same vertical lockup, rendered entirely in #002a42. The filename described a variant treatment, not a competing primary. Per the run's precedence rules a measurement wins on a rendered fact, and this is a rendered fact.",
+      "resolvedBy": ["s85", "s86", "s87"]
+    },
+    {
+      "issue": "Whether the two third-party sources agreeing on #d7001c and #000037 constituted independent corroboration or shared ancestry",
+      "valueA": "independent corroboration: a franchised retailer's asset library is supplied through Vauxhall's dealer marketing channel, so exact agreement with the fan-wiki file would mean both descend from the real master",
+      "valueB": "shared ancestry: Wikipedia's own file history cites 'an official SVG from a Vauxhall dealer site', so both copies may descend from one dealer-supplied file and agreement proves only lineage",
+      "resolved": true,
+      "resolution": "RESOLVED IN FAVOUR OF SHARED ANCESTRY. Both third-party sources agree exactly with each other and BOTH differ from the first-party assets. Two sources agreeing on a wrong value is the signature of one common upstream copy, not of independent access to the master. The web dimension's suspicion was correct and is now evidenced.",
+      "resolvedBy": ["s85", "s86"],
+      "consequence": "The stopping rule of 'two independent sources agree' must not be applied to these two. Recorded so a later run does not re-promote #d7001c."
+    }
+  ],
+
+  "stillNotPublished": [
+    "Any colour SPECIFICATION: no Pantone, no CMYK, no stated hex, no colour name, from any first-party source. Everything above is measured off artwork, which cannot tell you the intended spec or the print build.",
+    "A secondary or extended palette. Nothing beyond the two mark colours and the two variant treatments was evidenced. Whether Vauxhall has UI greys, accent colours or a tint system is UNKNOWN, not absent.",
+    "Colour usage rules: proportion, backgrounds permitted, minimum contrast, which variant to use when. Not published on any reachable surface.",
+    "Any dating of these values, so they cannot be checked for staleness against the unresolved identity date."
+  ],
+
+  "ladder": {
+    "rung1_token_package": "unreachable / probed dry by recon (npm and GitHub both searched; no Vauxhall, Opel or Stellantis token package exists)",
+    "rung2_guideline_doc": "NOT FOUND, ever, at any guessed path per Wayback (recon)",
+    "rung3_css_custom_props_manifest": "NOT PROBED as a measurement, host walled. vauxhall.co.uk is WAF-403 and no browser is available. Probed indirectly: www.stellantis.com/en/brands/vauxhall returned no hex, no rgb(), no custom property, no inline style and no stylesheet link in fetchable text.",
+    "rung4_computed_styles": "unreachable, no browser",
+    "rung5_case_study_criticism": "PROBED, dry for Vauxhall. Brand New has no Vauxhall post on its Automobile archive (page 1 of 9) nor on the complete archive (page 1 of 1508). Its one Stellantis-group entry, 'New Logo for Opel' (2023-07-25), is subscriber-paywalled and was not bypassed.",
+    "rung6_aggregator": "PARTIALLY PROBED. schemecolor.com/vauxhall-logo-colors.php returns HTTP 404. Brandfetch and BrandColors NOT PROBED, and no longer worth probing for colour now that first-party assets have been measured.",
+    "offLadder_firstPartyAssetMeasurement": "REACHED. This is what produced the values above, and on a run with no browser and no reachable brand site it turned out to be the highest-authority colour route available."
+  }
+}

@@ -1,0 +1,243 @@
+# Verbatim page extract: Stellantis 2025 Annual Report and Form 20-F
+
+Source URL: https://www.stellantis.com/content/dam/stellantis-corporate/investors/financial-reports/Stellantis-NV-20251231-Annual-Report.pdf
+Party: first (Stellantis N.V., Vauxhall's parent)
+Authority: A2 (A1 as a regulatory filing for facts about corporate structure)
+publishedAt: 2026-02-26 (produced via Workiva, covering FY2025)
+retrievedAt: 2026-08-14
+Pages in document: 519
+Retrieval route: WebFetch cannot render PDF text, but it caches the binary to the session
+  tool-results directory. pypdf then extracts locally with no network. See CAPABILITY.md.
+Extracted by: the run owner (main thread), independently of the audience dimension agent,
+  to verify that agent's load-bearing quotations. All four checked out.
+
+Only the load-bearing pages are reproduced. The full 519-page document was not retained:
+it is 8,821,356 bytes and is freely re-fetchable from the stable URL above.
+
+
+==============================================================================
+PAGE 12 -- portfolio structure: the five portfolios, luxury / premium / global SUV / American / European
+==============================================================================
+
+MANAGEMENT REPORT
+Stellantis Overview 
+Stellantis is a global automaker engaged in designing, engineering, manufacturing, distributing and selling 
+vehicles and components worldwide. Stellantis designs, engineers, manufactures, distributes and sells vehicles 
+across five portfolios: (i) luxury vehicles under the Maserati brand; (ii) premium vehicles covered by Alfa Romeo, 
+DS and Lancia brands; (iii) global sport utility vehicles under the Jeep brand; (iv) American brands covering 
+Dodge, Ram and Chrysler vehicles and (v) European brands covering Abarth, Citroën, FIAT, Opel, Peugeot and 
+Vauxhall vehicles. Stellantis centralizes design, engineering, development and manufacturing operations, while 
+maintaining strong regional empowerment and decision-making to stay closely aligned with local customer 
+needs. Leapmo t o r  I n t e r n a t i o n a l ,  i s  a  j o i n t l y  e s t a b l i s h e d ,  S t e l l a n t i s - c o n t r o l l e d  c o m p a n y  c r e a t e d  i n  2 0 2 4  a n d  
+o w n e d  5 1  p e r c e n t  b y  S t e l l a n t i s  a n d  4 9  p e r c e n t  b y  L e a p m o t o r ,  t o  d i s t r i b u t e  L e a p m o t o r - b r a n d e d  v e h i c l e s  o u t s i d e  
+of China (“LPMI”). Stellantis also provides retail and dealer financing, leasing and rental services available 
+through its subsidiaries, joint ventures and commercial arrangements with third party financial institutions. 
+Additionally, Stellantis supports its vehicle shipments with the sale of related service parts and accessories, as 
+well as service contracts, worldwide. 
+Stellantis engages in several other related activities. These include pre-owned car businesses and two mobility 
+brands—Free2move and Share Now. The Company also operates independent after-market parts and service 
+businesses, and its circular-economy business aims to extend the lifespan of vehicles and components to 
+reintegrate materials and end-of-life vehicles into the production cycle for new products. 
+In 2025, Stellantis reported:
+• 5,484 thousand vehicles shipped (refer to Financial Overview - Shipment Information included elsewhere in 
+this report for additional information);
+• Net revenues of €153.5 billion;
+• Net loss of €22.3 billion;
+• Adjusted Operating Income/(Loss) (“AOI”) of €(0.8) billion (refer to Non-GAAP Financial Measures included 
+elsewhere in this report for additional information);
+• Cash flows used in operating activities of €4.7 billion; and
+• Industrial free cash flow of €(4.5) billion (refer to Non-GAAP Financial Measures included elsewhere in this 
+report for additional information).
+At December 31, 2025, the Company’s available liquidity was €49.8 billion (including €18.3 billion available 
+under undrawn committed credit lines), of which industrial available liquidity was €45.7 billion. Refer to Financial 
+Overview - Liquidity and Capital Resources included elsewhere in this report for additional information.
+History of Stellantis
+Stellantis N.V. was incorporated as a public limited liability company (naamloze vennootschap) under the laws of 
+the Netherlands in April 2014 under the name Fiat Chrysler Automobiles N.V.
+In its current configuration, Stellantis is the result of the merger of FCA and PSA, each of which were leading 
+independent global automotive groups prior to the merger.
+12
+
+==============================================================================
+PAGE 16 -- THE LOAD-BEARING PAGE: Vauxhall named as a mainstream brand, explicitly distinct from premium
+==============================================================================
+
+• NVIDIA, Uber Technologies, Inc and Foxconn to expand Level 4 globally, commencing in the U.S; and
+• Bolt to advance large-scale deployment of Level 4 in Europe.
+Localization Expansion:  extending the successful South American localization model to the Middle East and 
+Africa, covering both vehicle and component production. Stellantis is actively increasing local production in 
+Algeria.
+Developing existing partnerships,  in November 2025, Stellantis and Contemporary Amperex Technology Co., 
+Limited (“CATL”) announced an agreement to invest up to €4.1 billion to form a joint venture to build a large-
+scale lithium iron phosphate (“LFP”) battery plant in Zaragoza, Spain.
+AOI-accretive products : introducing new and enhanced products aimed at strengthening AOI, including the 
+r e l a u n c h  o f  t h e  R a m  1 5 0 0  e q u i p p e d  w i t h  a  H E M I  V - 8  e n g i n e  a n d  t h e  r e i n s t a t e m e n t  o f  t h e  S R T  d i v i s i o n ,  
+accompanied by the announcement of additional product initiatives. Programs that are not expected to achieve 
+profitable scale, such as the Ram 1500 BEV, have been discontinued.
+Overview of Our Business 
+Stellantis’ activities during the year ended December 31, 2025, were carried out through the following six 
+reportable segments:
+(i) North America: Stellantis’ operations to manufacture, distribute and sell vehicles in the United States, 
+Canada and Mexico, primarily under the Jeep, Ram, Dodge, Chrysler, FIAT and Alfa Romeo brands. 
+Manufacturing plants are located in U.S., Canada and Mexico; 
+(ii) Enlarged Europe: Stellantis’ operations to manufacture, distribute and sell vehicles in Europe (which 
+includes the 27 members of the European Union, the United Kingdom (“UK”) and the members of the 
+European Free Trade Association), under the mainstream brands Citroën, FIAT, Opel, Peugeot, Vauxhall as 
+well as premium brands Alfa Romeo, DS and Lancia. Manufacturing plants are located in France, Italy, 
+Spain, Germany, UK, Poland, Portugal, Serbia and Slovakia. Since 2024, Leapmotor-branded vehicles have 
+been distributed in Enlarged Europe by LPMI;
+(iii) Middle East & Africa: Stellantis’ operations to manufacture, distribute and sell vehicles primarily in Türkiye, 
+Algeria and Morocco under the Peugeot, Citroën, Opel, FIAT and Jeep brands. Manufacturing plants are 
+primarily located in Morocco, Algeria and Türkiye, through Tofas, our joint venture. Since 2024, Leapmotor-
+branded vehicles have been distributed in Middle East & Africa by LPMI;
+(iv) South America: Stellantis’ operations to manufacture, distribute and sell vehicles in South and Central 
+America, primarily under the FIAT, Jeep, Ram, Peugeot and Citroën brands, with the largest focus of its 
+business in Brazil and Argentina. Manufacturing plants are located in the main markets of Brazil and 
+Argentina. In 2025, Leapmotor-branded vehicles have been distributed in South America by LPMI;
+(v) China and India & Asia Pacific: Stellantis’ operations to manufacture, distribute and sell vehicles in the Asia 
+Pacific region (mostly in China, Japan, India, Australia and South Korea) carried out in the region through 
+both subsidiaries and joint ventures, primarily under the Jeep, Peugeot, Citroën, FIAT, DS and Alfa Romeo 
+brands. Manufacturing plants are located in India and Malaysia, through our joint operation India Fiat India 
+Automobiles Private Limited (“FIAPL JV”) and our 100 percent owned subsidiary Stellantis Gurun (Malaysia). 
+Our Citroën and Peugeot branded vehicles are manufactured in China by Dongfeng Peugeot Citroën 
+Automobiles (“DPCA”) under various license agreements. Since 2024, we distribute Leapmotor-branded 
+vehicles in Asia Pacific (excluding China) by LPMI; and
+(vi) Maserati: Stellantis’ operations to design, engineer, develop, manufacture, distribute worldwide and sell 
+luxury vehicles under the Maserati brand. Design, engineering and manufacturing plants are located in Italy.
+ 
+16
+
+==============================================================================
+PAGE 39 -- UK ZEV regulation and non-ZEV CO2 fleet targets
+==============================================================================
+
+Non-compliance with the fleet average targets will result in financial penalties to the manufacturer of €95 per CO2 
+gram over the target amount multiplied by the number of vehicles registered in the EU. In 2025, the European 
+Commission approved a measure to assess the CO2 compliance over a three-year period (2025 - 2027) for both 
+M1 and N1.
+Other countries in Enlarged Europe region outside of the EU perimeter, such as the UK and Switzerland, 
+introduced specific regulations aimed to reduce vehicle CO2 emissions and fuel consumption. The UK 
+implemented a regulation beginning in 2024 with obligations for manufacturers to achieve a minimum 
+percentage of ZEVs increasing each year and reaching 100 percent in 2035, and specific targets on CO2 for 
+non-ZEV CO2 fleet. The UK CO2 regulation includes several flexibilities such as a credit banking/borrowing and a 
+trading system.
+South America Region
+In Brazil, the MOVER program, which follows the same concept as ROTA 2030, proposes to establish new 
+mandatory requirements for vehicle commercialization, including a new vehicle labeling program, commitments 
+to achieve new minimum level of energy efficiency, structural performance and driver assistance and a 
+commitment to achieve recyclability and recoverability rates.
+The MOVER regulations for CO2 and fuel efficiency will start on October 1, 2026 and proposes to incorporate two 
+fleet categories split into: combined passenger cars and large SUV, and LCVs. Among other things, the rule 
+rewards the improvement of energy efficiency by adopting ethanol fuel and electric vehicle (“EV”) technologies 
+and provides credit flexibilities for technologies that provide benefits in conditions that are not seen on the 
+standardized government test cycles.
+Although there is no current mandatory greenhouse gas requirement in Argentina, in 2022 the government 
+implemented a comparative labeling based on the European statements (NEDC cycle).
+In Chile, the country’s first energy efficiency laws which include the vehicle sector, were published in 2021. The 
+regulations defining fuel economy technical rules and targets for light duty vehicles were published in 2022 and 
+implemented in 2024, while regulations defining rules and targets for medium-duty vehicles were published in 
+2024 and are expected to be implemented in 2028.
+China and India & Asia Pacific Region 
+China has adopted WLTP for ICE vehicles and PHEVs and a unique Chinese test cycle is applied to BEVs. The 
+2021-2025 Phase V Corporate Average Fuel Consumption (“CAFC”) rules increase in stringency, reaching a 
+target of 4.6 liters per 100 kilometers by 2025. The 2026-2030 Phase VI CAFC regulation was released in 2025, 
+which will tighten up the CAFC target to 3.3 liters per 100 kilometers by 2030. 
+New Energy Vehicles (“NEVs”) consist of PHEVs, BEVs, and fuel cell vehicles, which generate positive NEV 
+credits, improve CAFC performance in the CAFC calculation, subject to meeting certain criteria. Currently, off-
+cycle credit flexibilities in China are available in the areas of high efficiency air conditioning and regenerative 
+braking technologies, subject to meeting certain standards. China also formulated the electric consumption limit 
+regulation for BEVs in 2025, which is the first such requirement to be implemented globally.
+39
+
+==============================================================================
+PAGE 47 -- affordability and the lower-price-point model launches
+==============================================================================
+
+Pricing. The automotive industry has historically experienced intense price competition resulting from the variety 
+of available competitive vehicles and excess global manufacturing capacity. Manufacturers have typically 
+promoted products by offering dealer, retail and fleet incentives, including cash rebates, option package 
+discounts, and subsidized financing or leasing programs, leading to increased price pressure and sharpened 
+competition within the industry. We plan to continue to use such incentives, as needed, to price vehicles 
+competitively and to manage demand and support inventory management profitability. In addition, in order to 
+address an actual or perceived affordability issue in our product portfolio, we are launching several new models 
+at lower price points. This may adversely affect mix in future periods.
+Our ability to maintain or increase pricing has impacted, and will continue to impact, our results of operations 
+and profitability. In 2024, relatively high retail pricing, together with a gap in our product portfolio refreshment, 
+contributed to an unusually high level of dealer-owned inventories particularly in the U.S. To address these 
+inventory levels we repositioned our pricing relative to peers and implemented incentives which had an adverse 
+impact on our net pricing. In 2025, net pricing declined in North America, Enlarged Europe and South America 
+and improved in Middle East & Africa.
+Financing. Given that a large percentage of the vehicles we sell to dealers and retail customers worldwide are 
+financed, the availability and cost of financing is a significant factor affecting our vehicle shipment volumes and 
+Net revenues. Availability of customer financing could affect the vehicle mix, as customers who have access to 
+greater financing are able to purchase higher priced vehicles, whereas when customer financing is constrained, 
+vehicle mix could shift towards less expensive vehicles. More expensive vehicle financing may also make our 
+vehicles less affordable to retail consumers or steer consumers to less expensive vehicles that would be less 
+profitable for us. 
+Although several central banks began to lower interest rates in 2024 and 2025 following increases in prior years, 
+inflation and inflation expectations remain uncertain and the cost of consumer credit in the medium term is 
+unclear. 
+Production Costs. Production costs include purchases (including costs related to the purchase of components 
+and raw materials), labor costs, depreciation, amortization, logistic and product warranty and recall campaign 
+costs. We purchase a variety of components, raw materials, supplies, utilities, logistics and other services from 
+numerous suppliers. Fluctuations in production costs are primarily related to the number of vehicles we produce 
+and sell along with shifts in vehicle mix, as newer models of vehicles generally have more technologically 
+advanced components and enhancements and therefore higher costs per unit. 
+Production costs may also be affected by significant fluctuations in raw material prices. As recently as 2022, we 
+experienced a strong surge in raw material costs, which adversely affected our results in that period. To the 
+extent our raw material costs increase in the future and we are unable to mitigate the effects of such increases, 
+our profitability could be impacted.
+We typically seek to manage production costs and minimize their volatility by using fixed price purchase 
+contracts, commercial negotiations and technical efficiencies. Despite our efforts, our production costs related 
+to raw materials and components may increase as a result of tariffs. Refer to “Tariffs and Trade Policies” above 
+for a further discussion. Uncertainty related to tariffs and trade policy in our larger markets including the U.S., the 
+European Union and China may also make it more difficult to predict our raw material and components costs. 
+47
+
+==============================================================================
+PAGE 495 -- plant list: Ellesmere Port as the group's UK plant
+==============================================================================
+
+Each of the assembly plants listed below have a covered area of more than 100,000 square meters:
+ North America
+U.S. Warren, Michigan
+U.S. Sterling Heights, Michigan
+U.S. Belvidere, Illinois
+U.S. Toledo, Ohio (Toledo North)
+U.S. Detroit, Michigan (Detroit Assembly Complex - Jefferson)
+U.S. Detroit, Michigan (Detroit Assembly Complex - Mack)
+U.S. Toledo, Ohio (Toledo South)
+Mexico Toluca, Estado de México
+Mexico Saltillo, Coahuila (Saltillo Truck)
+Mexico Saltillo, Coahuila (Saltillo Van)
+Canada Windsor, Ontario
+Canada Brampton, Ontario
+South America
+Brazil Betim
+Brazil Goiana
+Brazil Porto Real
+Argentina Buenos Aires
+Argentina Cordoba
+Enlarged Europe
+France Hordain
+France Mulhouse
+France Poissy
+France Rennes
+France Sochaux
+Germany Eisenach
+Germany Russelsheim
+Italy Turin (Mirafiori)
+Italy Cassino
+Italy Pomigliano
+Italy Melfi
+Italy Val Di Sangro
+Poland Gliwice
+Poland Tychy
+Slovakia Trnava
+Serbia Kragujevac
+Spain Madrid
+Spain Vigo
+Spain Zaragoza
+UK Ellesmere Port
+Country Location 
+495

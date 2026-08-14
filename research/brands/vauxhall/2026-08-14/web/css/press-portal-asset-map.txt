@@ -1,0 +1,62 @@
+NO VAUXHALL STYLESHEET WAS OBTAINED IN THIS RUN.
+This directory contains no downloaded CSS. www.vauxhall.co.uk returned HTTP 403 and no
+first-party Vauxhall asset host exists in DNS. See ../observations.md section 1.
+
+What follows is the STELLANTIS PRESS PORTAL's public asset map, host
+www.media.stellantis.com. It is FCA-legacy code with no Vauxhall or Opel selectors and it
+is NOT a source of Vauxhall design tokens. Recorded only so an unblocked re-run does not
+have to rediscover the route.
+
+The route itself is the transferable finding: a `.css` or `.json` URL fetched DIRECTLY returns
+its real contents, whereas an HTML page does not (the fetcher strips the head). So a public
+build manifest turns "no browser" into "whole stylesheet set enumerable".
+
+Public asset maps found, both HTTP 200:
+  https://www.media.stellantis.com/build/entrypoints.json    (~45 Webpack Encore entrypoints)
+  https://www.media.stellantis.com/build/manifest.json       (hashed asset map)
+
+Unhashed guess that FAILED, for the record:
+  https://www.media.stellantis.com/build/app.css             HTTP 404
+
+Fetched and confirmed 200 (contents summarised in ../tokens.json under nonRepresentative):
+  /build/brand-homepage.1804b95a.css
+  /build/app.1cf248ac.css
+  /build/layout.b79f35b3.css
+
+CSS paths transcribed from the manifest. NOT individually verified: the fetcher refused to
+reproduce the JSON verbatim, citing an internal quoting limit, so these hashes come from a
+paraphrase. Re-verify any hash before relying on it.
+  /build/sonata.80840d03.css              /build/gallery-detail.00f25c8f.css
+  /build/app.1cf248ac.css                 /build/video.d278b148.css
+  /build/layout.b79f35b3.css              /build/newsletter.08fe8867.css
+  /build/homepage.c82abcd3.css            /build/accountEdit.43ad4f04.css
+  /build/brand-homepage.1804b95a.css      /build/staff.6bef5a98.css
+  /build/models.2f459ca4.css              /build/management.90613420.css
+  /build/single-models.930e6384.css       /build/links.ab130524.css
+  /build/press-releases.e773b7db.css      /build/specialBase.55e192e7.css
+  /build/press-releases-content.f2ec9cfb.css  /build/specialCategorized.ef062923.css
+  /build/album-images.25dd868a.css        /build/awards.a6be6a10.css
+  /build/current-models.b0bc6bda.css      /build/privacy-information.bf6618af.css
+  /build/gallery-category.722605e7.css    /build/terms-and-condition.3e84241d.css
+  /build/cars-models.a1799391.css         /build/favourites.726928a6.css
+  /build/error-page.b21c4f00.css          /build/dam.a70c84b2.css
+  /build/search.1d5b398c.css              /build/dam-api.c730a43e.css
+  /build/login.f4012476.css               /build/images-video-dam.a1afdf82.css
+  /build/account.1e0388c3.css             /build/layoutPresskit.7d3cf99e.css
+  /build/download.0ab30e5b.css            /build/presskit.ba4442d8.css
+  /build/thank-you.26183634.css           /build/audit.f38eba27.css
+  /build/multi-upload.06840065.css        /build/no-content.e2079122.css
+  /build/multi-upload-images-dam.06840065.css
+  /build/multi-upload-videos-dam.06840065.css
+  chunks: /build/3152.93f57554.css  /build/8785.675997fa.css  /build/5289.d987ae61.css
+          /build/9187.20c26881.css  /build/5320.95d24af1.css
+
+Entrypoints with no CSS: cross-country, large-file-upload, print, gtm_events
+Vendor CSS also present: bootstrap 4.6.1 and 4.5.3 minified, jquery.fancybox.min,
+dropzone.min, many CKEditor skins (moono, moono-lisa, kama), highlight.js themes.
+
+Webfont files on that host, all under /build/fonts/ (NOT Vauxhall's brand fonts):
+  GothamMediumRegular.6d206629.eot   GothamBold.b526b1df.eot   GothamProReg.2a8145c3.eot
+  OpenSans.76093dba.eot   OpenSans-Semibold.9d83d6a8.eot   OpenSans-Bold.41e5eae9.eot
+  fa-brands-400.23f19bb0.eot   fa-regular-400.77206a6b.eot   fa-solid-900.9bbb245e.eot
+Each has woff2, ttf and svg siblings; GothamProReg also has otf.

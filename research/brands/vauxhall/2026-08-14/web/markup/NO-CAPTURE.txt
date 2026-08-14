@@ -1,0 +1,13 @@
+NO VAUXHALL PAGE HTML WAS CAPTURED. This directory is empty by circumstance, not by choice.
+raw/web/ is empty for the same reason.
+
+https://www.vauxhall.co.uk/ returned HTTP 403 on a fresh re-test on 2026-08-14. No page on
+that host was ever retrieved, so there is no markup to store.
+
+Separately, even for hosts that DID return 200 (the Stellantis press room, and two UK Vauxhall
+franchise sites), no HTML could be stored: WebFetch returns a model's markdown reading of a
+page rather than the page itself, so no original markup ever existed on disk to save. That
+also means raw/web/ cannot hold "untouched fetched bodies" as the output schema expects.
+
+Read this as NOT REACHABLE, not as NOT PUBLISHED and not as NOT PROBED.
+Full host probe table and unblock list: ../observations.md

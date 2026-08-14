@@ -1,0 +1,381 @@
+{
+  "industry": "automotive: UK-market mass-market passenger cars and light commercial vehicles, sold by a UK marque inside a 14-brand multinational group (Stellantis NV), through a franchised dealer network, under UK advertising, emissions-labelling and consumer-credit regulation",
+  "regime": "C for this dimension: press kit only. A live, dated, first-party Vauxhall press room exists outside the WAF that blocks the brand's own site, but no published brand guideline, naming standard or unit style guide was found anywhere.",
+  "rationale": "A UK automotive brand's guideline needs five things the generic copy, visual, web and audience dimensions would miss. (1) Exact model and sub-brand orthography, because electrified variant naming is where automotive brands are most particular and most inconsistent, and because it churns fast enough that an undated range list is worthless. (2) Externally imposed disclaimer and figure-presentation regimes, which are prescriptive and are set by VCA, ASA/BCAP and the FCA rather than by the brand. (3) A dense unit vocabulary (PS, kW, Nm, miles, kWh, g/km, kg, cubic metres) whose conventions are brand-specific and, here, internally contradictory. (4) A two-audience split, consumer cars against SME van buyers, that runs on different metrics and different small print. (5) A national-versus-dealer voice split, because franchised retailers author their own copy against the same marque. Regulators and trade bodies proved unusually valuable in this run precisely because they sit outside the WAF that blocks www.vauxhall.co.uk, so the regulated tier is better evidenced than the brand's own consumer surface.",
+  "capabilityNote": "Text-only run, no shell internet, no browser, no WebSearch, no binary downloads. WebFetch was the only network tool and it returns model-mediated extracts under a roughly 125-character per-quote cap, so no page was retained verbatim in full. Every quotation in the topic files is a short quoted fragment reported by the fetcher, not a transcription of a saved raw page. raw/industry/ is therefore empty by capability, not by omission. || CORRECTED 2026-08-14 by the run owner: the clause 'no binary downloads' in this note is FALSE. The harness fetcher also saves a response body to disk and reports the path, which the sandboxed shell can read. Six binaries were retrieved on that route later in the run, including the Stellantis annual report PDF and four first-party logo PNGs that yielded the run's only measured colour values. This does NOT change any finding in this dimension, because nothing here depended on a binary. It is corrected so that a future run does not inherit the wrong capability model. See CAPABILITY.md and GAPS.md.",
+  "fetchBudget": {
+    "allowed": "14 to 18",
+    "used": 17
+  },
+  "assets": [
+    {
+      "topic": "Range and model architecture, with exact orthography",
+      "file": "industry/range-and-model-architecture.md",
+      "summary": "Current first-party convention is '<Model> Electric' as a separate capitalised word: 'Astra Electric', 'Astra Plug-in Hybrid', 'Astra Hybrid' (s44, 2026-07-24), 'Combo Electric', 'Vivaro Electric', 'Movano Electric', 'Combo Life Electric', 'Vivaro Life Electric' (s46, 2026-05-14). No instance of 'Corsa-e', 'Mokka-e' or 'e-Corsa' in any 2026 body text collected; the hyphenated '-e' form survives only in a Wikipedia image filename (s43) and a dealer image path (s57), so it is legacy. Trim ladders observed: Astra 'Griffin', 'GS', 'Ultimate' (s44); vans 'Pro', 'Prime', 'Prime-Plus' with size letters M and XL (s46); plus 'Grandland Griffin' and 'New Mokka Yes' (s41). 'Design' was NOT FOUND in current first-party usage despite appearing in this run's brief. Powertrain designations are written into the variant string, e.g. 'Electric 156PS', 'Plug-in Hybrid 1.6 195PS e-DCT7' (s44). First-party segment vocabulary is European letter segments: 'C-segment', 'B-segment icon', 'C-SUV' (s54, 2026-05-08). Wikipedia's range table (s43) is used for membership only and is treated as stale for orthography, since it carries no electrified naming at all.",
+      "sourceIds": [
+        "s41",
+        "s65",
+        "s44",
+        "s42",
+        "s48",
+        "s51",
+        "s54",
+        "s71"
+      ],
+      "confidence": "high for orthography, medium for range completeness",
+      "rung": "2 for orthography (first-party dated press releases); 5 for the range table (Wikipedia, A3)",
+      "adjudication": "Per the brief, first-party dated usage wins for orthography. Wikipedia loses on currency and directness here.",
+      "gaps": [
+        "No observed body-text instance of the electric Corsa or electric Frontera name; 'Corsa Electric' and 'Frontera Electric' are inferred from pattern, NOT OBSERVED.",
+        "NOT PUBLISHED: no first-party naming document found. Orthography is induced from usage across five dated releases.",
+        "NOT PROBED, because BLOCKED: full price list and full trim matrix live on www.vauxhall.co.uk (s1, HTTP 403)."
+      ]
+    },
+    {
+      "topic": "Performance sub-brand: GSE, and the status of VXR",
+      "file": "industry/sub-brands-gse-and-vxr.md",
+      "summary": "TWO DISAGREEMENTS WITH THIS RUN'S BRIEF, recorded unresolved. First, the brief states the line is written 'GSe'; every first-party body-text occurrence collected writes 'GSE', capital E (s53, 2026-07-13; s45, 2026-08-05). s53 defines it twice, as \"GSE: Grand Sport Electric.\" and as \"Vauxhall introduced its new GSE (Grand Sport Electric) performance sub-brand\", dating its introduction to 2023. Derived forms observed: 'GSE badging', 'GSE bumper', 'GSE performance seats', 'GSE yellow', 'GSE logo', 'GSE suspension bushings' (s45). Press-room headlines are set all-caps and slugs are lower-cased, so neither is evidence; the two press-information documents are. Second, the brief frames the question as GSE versus VXR, but the brand does not draw that contrast: s53 mentions neither VXR nor OPC anywhere, and claims lineage instead from 'GTE and GSi models from recent decades', narrated with dated specifics (Astra GTE Mk1 1984, Nova GTE 1987, Corsa GSi 1993, Astra Mk4 GSi 2002). Positioning lines quoted: \"Everyday rally feeling\", \"From rally to road\". Wikipedia (s43) states the VXR badge was \"ushered into hiatus\" after the 2017 PSA acquisition, and credits Lotus and Triple Eight Racing input; that claim is A3 and single-sourced.",
+      "sourceIds": [
+        "s65",
+        "s42",
+        "s51"
+      ],
+      "confidence": "high for the spelling and the expansion, medium for the VXR position",
+      "rung": "2 (first-party dated press releases) for GSE; 5 (Wikipedia, A3) for VXR",
+      "gaps": [
+        "NOT PUBLISHED: no first-party statement on VXR's status or retirement.",
+        "NOT PROBED, because BLOCKED: whether Opel styles the badge 'GSe' in its own material is unverified; www.opel.com is WAF-403 (s4). A guideline must not assume the twins agree.",
+        "NOT PROBED: whether 'GSE' is trademarked in that exact form. UK IPO is walled (s36); EUIPO and WIPO were subsequently PROBED and both are WALLED, not unprobed (EUIPO JavaScript-only, WIPO behind a captcha). All three registries are walled, so this needs a browser rather than more budget."
+      ]
+    },
+    {
+      "topic": "Twin-brand relationship: how Vauxhall handles Opel in UK-facing copy",
+      "file": "industry/twin-brand-opel-vauxhall.md",
+      "summary": "Opel heritage is not suppressed. s54 (2026-05-08), published on the Vauxhall UK press room, uses the hyphenated compound 'Opel-Vauxhall' throughout, in headline bullets, body text and both quotes, and separates the marques only once, as \"Vauxhall and its European sister brand, Opel\". German provenance is stated as an asset: \"Designed and created by Opel-Vauxhall in Rüsselsheim, Germany\", and Chéreau's quote offers \"German engineering excellence with global technological innovation speed\". Observed pattern: 'Opel-Vauxhall' for the engineering and corporate actor, 'Vauxhall' for product and market, 'Opel' for the sister marque. Exact titles: Florian Huettl, 'Opel-Vauxhall CEO' (s54), against 'CEO, Opel and Vauxhall' on the Stellantis corporate site (s19), an unresolved difference in form; Xavier Chéreau, 'Chairman of the Opel-Vauxhall supervisory board and Stellantis Chief Human Resources & Sustainability Officer' (s54); Eurig Druce, 'Vauxhall Managing Director & Stellantis UK Group Managing Director' (s46), the distinct UK commercial voice. Second touchpoint: s53 states Vauxhall \"joined sister brand Opel\" in the ADAC GSE Rally Cup. Stated geography: design Rüsselsheim, development Germany and China, proposed build at \"the Corsa plant in Zaragoza, Spain\" home of the Corsa \"since 1982\" and \"under evaluation\", Ellesmere Port as \"the UK's first electric-only manufacturing plant\" in standing boilerplate. s54 also carries an investor-style hedging register ('intended', 'contemplated', 'would', \"subject to the execution of definitive agreements and customary approvals\", sales \"expected from 2028\") inside a consumer-facing press room. Historic corroboration: the Group B Opel Manta 400 appears inside Vauxhall's own motorsport history (s56), so the engineering share predates Stellantis.",
+      "sourceIds": [
+        "s19",
+        "s48",
+        "s51",
+        "s54",
+        "s66"
+      ],
+      "confidence": "high for the observed forms, medium for the pattern",
+      "rung": "2 (first-party dated press releases)",
+      "gaps": [
+        "UNRESOLVED: only one release collected uses 'Opel-Vauxhall'. Whether it is the house form or an artefact of a Rüsselsheim-originated corporate release relayed to the UK room needs two more Europe-originated releases to settle.",
+        "NOT PROBED, because BLOCKED: whether Opel is named in UK consumer advertising as opposed to press material. www.vauxhall.co.uk is WAF-403 (s1)."
+      ]
+    },
+    {
+      "topic": "UK regulatory conventions for fuel economy, CO2 and EV claims",
+      "file": "industry/uk-regulatory-figure-presentation.md",
+      "summary": "CRITICAL FINDING: VCA (s55) defines 'promotional literature' as \"all printed matter used in the marketing, advertising and promotion of a new passenger car\" and states explicitly that \"Websites, workshop manuals or owners' handbooks are not considered to fall within the definition of promotional literature.\" So the mandated CO2 and fuel-consumption presentation rules bite on print and outdoor, NOT on the brand's own website, where the CAP Code governs instead. Governing instruments, named by VCA: the Passenger Car (Fuel Consumption and CO2 Emissions Information) Regulations 2001 with 2004, 2013 and 2018 amendments, plus EU Directive 1999/94/EC, the EU Tyre Labelling regulation in force since November 2012, and The Vehicle Emissions Trading Schemes Order 2023 (ZEV Mandate), the last captured by citation only. The presentation test is qualitative, not metric: text must be \"easy to read\", \"easily understandable\" and \"no less prominent than the main part of the information\". NO font size, point size, contrast ratio or placement rule is specified; VCA instead names the failure modes, omission, \"a smaller font\", or a colour \"not as prominent as the main text\". Multi-model literature may be \"limited to the range of data from lowest to highest performing examples\", which is the regulatory basis for Vauxhall's own span convention. NOT PUBLISHED: no mandated caveat wording exists on either VCA page reached, and no 'for comparison purposes only' string, so that familiar sentence is not VCA-dictated. WLTP \"replaced the NEDC test procedure ... in September 2017\", mandatory for all new internal-combustion cars by September 2018 (s48), and neither page prescribes how the WLTP qualifier should be written, which is consistent with the five capitalisations Vauxhall itself uses. Enforcement: VCA is \"the nominated UK enforcement body\" for promotional literature, Trading Standards handles point of sale, penalties are case by case via a \"nominated Decision Officer\", and a voluntary pre-print opinion service exists at adverts@vca.gov.uk. Also records the live Electric Car Grant pattern: \"£34,495 OTR (£32,995 inc. Electric Car Grant*)\" with the asterisk expanding to exactly \"*Pending government approval\" (s45), and £36,995 OTR to £35,495 on Mokka GSE (s53), a £1,500 reduction in both cases.",
+      "sourceIds": [
+        "s44",
+        "s42",
+        "s58",
+        "s51",
+        "s59"
+      ],
+      "confidence": "high for what VCA states",
+      "rung": "1 to 2 (regulator's own purpose-made guidance pages, first-party official)",
+      "probeResults": {
+        "reached": [
+          "s48 VCA fuel consumption and CO2 hub",
+          "s55 VCA Enforcement on Advertising"
+        ],
+        "notProbed": [
+          "VCA WLTP page (URL captured)",
+          "VCA Fuel Consumption Labelling",
+          "VCA Point of Sale system",
+          "VCA Responsibilities of manufacturers, importers and dealers",
+          "gov.uk ZEV mandate collection, reached only by citation",
+          "all five VCA downloadable guidance documents, URLs captured, none opened, most valuable being Environmental Labels 2026 (VCA062 Rev 6)"
+        ],
+        "walled": [],
+        "deadEnd": []
+      },
+      "gaps": [
+        "NOT PUBLISHED by this regulator: any prescribed form of caveat words.",
+        "NOT PROBED: the four legislation.gov.uk statutory instruments themselves, URLs captured.",
+        "DATING ANOMALY, unresolved: s48 states it was last updated 2021-01-07 yet links guidance dated 2025 and 2026, so the page date understates the currency of linked material.",
+        "SOURCE INCONSISTENCY, recorded not corrected: s44 writes 'ECS saving £2,200 in VED over six years' where 'ECG' would be expected."
+      ]
+    },
+    {
+      "topic": "Motor finance advertising: FCA rules plus Vauxhall's observed small print",
+      "file": "industry/motor-finance-advertising.md",
+      "summary": "Two rungs joined. RULES, from CONC 3.5 'Financial promotions about credit agreements not secured on land' (s52, page states last updated 06/04/2020): a representative example is triggered under CONC 3.5.3R(1) where a promotion \"indicates a rate of interest or an amount relating to the [cost of credit]\", and CONC 3.5.4G(1) notes a rate of interest \"is not limited to an annual rate of interest but would include a [monthly] or daily rate or an [APR]\", which is the rule that catches 'from £x per month'. CONC 3.5.5R(1) lists the eight components in order, (a) rate of interest and whether fixed or variable, (b) other charges in the total charge for credit, (c) total amount of credit, (d) representative APR, (e) cash price and advance payment, (f) duration, (g) total amount payable, (h) each repayment. CONC 3.5.5R(5) requires it be \"specified in a clear, concise and prominent way\", labelled with the words \"representative example\", with \"each item of information being given equal prominence\". CONC 3.5.7R(1) requires a representative APR where the promotion implies access for the credit-restricted, makes a favourable comparison, or includes \"an incentive to apply for [credit]\". CONC 3.5.9R governs presentation, e.g. shown as \"%APR\" with \"variable\" and \"representative\". The representative APR definition sits in the Glossary (G3354) with a \"51% test\" per CONC 3.5.6G(1A), NOT PROBED. PRACTICE, from s46 (2026-05-14), which carries three finance products in one release: Leasys Business Contract Hire at \"£305 per month\" with \"£1,830\" initial rental for Combo Electric Pro and \"£335 per month\" with \"£2,010\" for Vivaro Electric, both \"36 months, 10,000 miles per annum, six months' initial rental\", small print \"Excess mileage charges apply.\" and provider address \"Leasys, Pinley House, 2 Sunbeam Way, Coventry, CV3 1ND.\"; SFS Conditional Sale on Combo at \"60 Monthly Payments of\" \"£299\", OTR \"£29,917.00\" diesel against \"£34,569.00\" electric, credit \"£15,211.86\", interest \"£2,728.14\", \"Fixed rate of interest per year\" \"6.9%\" and \"APR Representative\" \"6.9%\", with \"Applicants must be 18+.\" and \"Finance by Stellantis Financial Services, RH1 1QA.\"; SFS Finance Lease at \"35 Monthly Payments of\" \"£289\" with \"Price excludes VAT.\" and the bolded risk warning \"You will not own the vehicle.\", the only small print observed to receive typographic emphasis. Broker disclosure: \"Vauxhall Motors Limited is a credit broker and not a lender\" and \"Vauxhall will not receive a commission for any introduction\". The observed table maps item for item onto CONC 3.5.5R(1)(a) and (c) to (h); note the label is inverted to \"APR Representative\", and the literal heading 'representative example' was not observed. Contrast: the car releases state prices, P11D, VED and BiK but no monthly payment, APR, PCP or deposit at all (s45, s44, s53).",
+      "sourceIds": [
+        "s44",
+        "s42",
+        "s48",
+        "s60",
+        "s57",
+        "s51"
+      ],
+      "confidence": "high for both the rules and the observed practice",
+      "rung": "1 for the rules (FCA Handbook, first-party official, purpose-made); 2 for the practice (dated first-party press release)",
+      "probeResults": {
+        "reached": [
+          "s52 handbook.fca.org.uk CONC 3.5"
+        ],
+        "deadEnd": [
+          "s49 www.fca.org.uk/firms/consumer-credit/financial-promotions-adverts, HTTP 404. Do not re-probe. The Handbook host is a different host and works."
+        ]
+      },
+      "gaps": [
+        "NOT PROBED: CONC 3.3, CONC 3.6, and the FCA Glossary definition of representative APR with its 51% test.",
+        "NOT FOUND, because BLOCKED: no consumer PCP representative example at all. Every example collected is Business Contract Hire, Conditional Sale or Finance Lease, all van products. PCP is the dominant UK consumer car product and its illustrations live on www.vauxhall.co.uk (s1, WAF-403).",
+        "NOT PROBED: FCA motor-finance-specific pages on www.fca.org.uk beyond the single 404."
+      ]
+    },
+    {
+      "topic": "ASA record for Vauxhall, and the BCAP rules its ads have touched",
+      "file": "industry/asa-and-bcap-record.md",
+      "summary": "The brief flagged ASA rulings as potentially the best find available. The result is valuable but not as anticipated. Searching the ASA rulings database for 'Vauxhall' (s47) returns Rulings (0), Mail order cases (0), Database cases (0), Informally resolved (5). There is NO formal ASA adjudication against Vauxhall in the searchable database, so the hoped-for verbatim advertisement copy is NOT PUBLISHED, not merely not found: per the ASA's own page text, the informally resolved list records parties who \"agree to amend or withdraw their ad without being subject to a formal ruling\", and no copy accompanies them. The five cases, advertiser named exactly 'Vauxhall Motors Ltd': 2025-01-08 (1 complaint), 2024-12-18 (0 complaints), 2024-09-18 (1), 2022-11-09 (1), 2021-11-17 (1). The 2024-12-18 entry showing zero complaints implies an ASA-initiated or compliance-initiated intervention. The real prize is the filter panel, which lists BCAP Code rules 3.1, 3.9, 3.33 and 3.39, each with one case, so these were television or radio advertisements and these four obligations are the ones Vauxhall's broadcast advertising has actually engaged. Exact text from BCAP section '03 Misleading advertising' (s51): 3.1 \"Advertisements must not materially mislead or be likely to do so.\"; 3.9 \"Broadcasters must hold documentary evidence to prove claims that the audience is likely to regard as objective and that are capable of objective substantiation.\"; 3.33, asterisked as a prohibited practice, \"Advertisements must not provide materially inaccurate information on market conditions or the availability of the product or service\"; 3.39 \"Advertisements that include comparisons with unidentifiable competitors must not mislead, or be likely to mislead, consumers.\" Adjacent rules captured because they govern the constructions Vauxhall uses: 3.24 on 'from' and 'up to' pricing, which \"must not mislead by exaggerating the availability or amount of benefits likely to be obtained by consumers\"; 3.11 \"Qualifications must not mislead by not being presented clearly.\", which is the actual source of small-print legibility discipline in broadcast, not the VCA; 3.18 to 3.23 on prices including the limited VAT-exclusive exception at 3.19; and 3.25 to 3.28 on 'free' claims, relevant to the observed Ohme charger bundle. ASA rulings are \"published every Wednesday\".",
+      "sourceIds": [
+        "s48",
+        "s55",
+        "s56"
+      ],
+      "confidence": "high for what the database shows; the reading of what the four rules attached to is explicitly labelled inference",
+      "rung": "1 to 2 (the regulator's own published case database and code text)",
+      "gaps": [
+        "NOT PROBED, and now the highest-value remaining probe in this area: CAP Code (non-broadcast) section 3. Since VCA excludes websites from the CO2 regulations, CAP is the operative regime for www.vauxhall.co.uk copy.",
+        "NOT PROBED: a separate ASA search for rulings against Vauxhall dealers or dealer groups. The 'Vauxhall' query returned only the manufacturer as advertiser.",
+        "UNRESOLVED: whether per-case pages exist for the five informally resolved matters. No URLs were present in the fetched content and none were invented.",
+        "Working search pattern recorded: https://www.asa.org.uk/codes-and-rulings/rulings.html?q=<term> with anchors #rulings, #informally-resolved, #mail-order-cases, #database-cases."
+      ]
+    },
+    {
+      "topic": "SMMT registration data by brand, and the real segment vocabulary",
+      "file": "industry/smmt-registrations-and-segments.md",
+      "summary": "s50 covers July 2026 and year to date January to July 2026, download labelled 'New car registrations data July 2026'. Vauxhall July 2026: 5,840 units, 3.73% share, against 4,892 and 3.49% in 2025, +19.38%. Year to date 2026: 54,841 units, 4.24% share, against 51,574 and 4.36%, +6.33%. Corsa ranks 10th in July (2,326) and 5th year to date (20,796); Frontera appears among July BEV models (1,248). Market totals: July 156,571 against 140,154, +11.71%; year to date 1,294,499 against 1,182,373, +9.48%. DISAGREEMENT, not resolved: Vauxhall's own headline claims \"TOTAL MARKET SHARE OF 4.8% IN FIRST HALF OF 2026\" (s41, dated 2026-07-06) against SMMT's car-only 4.24% for January to July. Two plausible reconciliations, both unverified: different denominators, since 'total market share' in UK trade usage normally means cars plus LCV and Vauxhall is proportionally stronger in LCV, or different periods, H1 against January to July. The underlying release was not fetched, only its headline. The brief's expected segment vocabulary is NOT PUBLISHED on this page: Supermini, Lower Medium, Dual Purpose and MPV do not appear, and there is no body-style or size segment table at all. What SMMT does publish: fuel type using the exact labels BEV, HEV, PHEV, PETROL, DIESEL, with July 2026 BEV 43,106 at 27.5% share and +44.5%, HEV 20,711, PHEV 23,359, PETROL 62,799 at -5.2%, DIESEL 6,596 at -17.7%, year-to-date BEV 327,683 at 25.31%, and the methodological note that petrol and diesel absorb mild hybrids because MHEVs are \"not presented as a separate powertrain category in headline figures\"; and sales type Private, Fleet, Business, with July 2026 Private 58,137 at 37.1%, Fleet 93,734 at 59.9%, Business 4,700 at +61.3%, defined on the page as Fleet being companies running 25 or more vehicles and business fewer than 25. That definition is load-bearing: Vauxhall's named van audience of SME and sole trader (s46) sits in SMMT's Business band, not Fleet. Consequence for a guideline: Vauxhall's own copy uses European letter segments (s54) while its trade body publishes no size segments, so the letter-segment vocabulary is a Stellantis and European convention, not inherited from SMMT.",
+      "sourceIds": [
+        "s41",
+        "s48",
+        "s61",
+        "s54"
+      ],
+      "confidence": "high for the figures as published; the 4.8% against 4.24% reconciliation is unverified",
+      "rung": "2 (trade body: first-party to the industry, third-party to the brand, A3)",
+      "gaps": [
+        "NOT PROBED, and the probe that would settle the 4.8% question: SMMT LCV registrations at /vehicle-data/lcv-registrations/.",
+        "NOT PROBED: the Vauxhall market-share release itself; only its index headline is evidenced.",
+        "NOT PROBED, out of capability: the data ZIP is a binary. DataShop is paid.",
+        "NOT PUBLISHED on this page, as distinct from absent from SMMT: the historic size-segment taxonomy, which may sit behind DataShop or inside the ZIP."
+      ]
+    },
+    {
+      "topic": "Spec vocabulary and unit conventions",
+      "file": "industry/spec-vocabulary-and-units.md",
+      "summary": "The inconsistencies are themselves the finding. POWER: PS and hp are both used and kW is always the bracketed conversion, never the headline. Two press-information documents three weeks apart give the same figure as \"281PS (207kW)\" (s45, 2026-08-05) and \"281hp (207kW)\" (s53, 2026-07-13). Pattern offered as pattern not rule: PS dominates inside formal variant designations ('Electric 156PS', '130PS'), hp appears in vans ('100hp', '120hp', '136hp') and in flowing prose, bhp appears only for historic vehicles ('115bhp', '197bhp'). No space before the unit. Derived metrics '181hp/tonne' (s45), '176hp/tonne' and '216Nm/tonne' (s53). TORQUE: '345Nm' closed and '345 Nm' spaced both appear in s45; historic imperial '145lb/ft' (s53). RANGE always in miles with a WLTP qualifier: \"up to 232 miles (WLTP)\" (s45), \"209 miles (WLTP)\" (s53), \"up to 213 miles on a single charge (WLTP combined cycle)\" (s46), \"281 miles (hatch) / 275 miles (Sports Tourer)\" (s44). EV efficiency in two incompatible forms: '4.1-4.2 miles/kWh' (s44) against '3.4 m/kWh' (s53). Economy in mpg as spans with inconsistent spacing; CO2 in g/km as spans, BEVs as 'CO2 0 g/km' (s44) or 'CO2 0' (s53), and s45, an all-electric car, states no CO2 figure at all. THE WLTP QUALIFIER APPEARS IN FIVE CAPITALISATIONS across four releases in three months: '(WLTP)', '(WLTP combined)', '(WLTP Combined)', '(WLTP Combined High)', '(WLTP combined cycle)'. There is no observable house rule, and the regulator prescribes none (s55). BATTERY in kWh with gross and useable distinguished, e.g. \"54kWh (51kWh useable) lithium-ion battery\" (s45). CHARGING as a percentage window plus duration, e.g. \"0-80% takes 30 minutes from a 100kW DC rapid charger\" and \"0-100% charge from an 11kW AC charger will take 5 hours and 45 minutes\" (s45), with duration formats varying between '5 hours and 45 minutes', '3h 20min' and '5h 45 mins'. DIMENSIONS in mm with thousands separators for cars but metres for vans ('Medium (4.98m) or XL (5.33m)', s46); boot volume in litres seats-up then folded; van load volume in spelled-out cubic metres, not m3. Range is quoted per tyre choice, a WLTP consequence: '201 miles (Michelin) / 209 miles (Goodyear)' (s53). Warranty: three years, unlimited mileage year one, 60,000 miles years two and three, EV battery 'eight-year/100,000 miles' guaranteeing at least 70% of original charging capacity (s44).",
+      "sourceIds": [
+        "s44",
+        "s42",
+        "s48",
+        "s51",
+        "s59"
+      ],
+      "confidence": "high for the forms observed",
+      "rung": "2 (first-party dated press releases, 2026-05-14 to 2026-08-05)",
+      "gaps": [
+        "NOT PUBLISHED: no first-party unit style guide. Everything is induced from usage.",
+        "NOT FOUND: Movano payload, load volume, towing and range. The model is named in s46 but no figures were captured, and Movano is the large van whose figures differ most.",
+        "NOT FOUND: any car towing figure. Towing was collected for vans only."
+      ]
+    },
+    {
+      "topic": "The commercial-vehicle register: van copy against car copy",
+      "file": "industry/commercial-vehicle-register.md",
+      "summary": "The cars sell capability, the vans sell cost. s46 (2026-05-14) builds a direct cost-parity headline by pairing diesel and electric variants at near-identical monthly payments, absorbing an OTR gap of \"£29,917.00\" against \"£34,569.00\" into deposit and contribution so both land at \"£299\" per month. Variant strings observed exactly: 'Combo Panel Van M Diesel 100hp Manual Pro', 'Combo Electric Panel Van M 136hp Pro', 'Vivaro Panel Van M Diesel 120hp Manual Prime', 'Vivaro Electric Panel Van M 136hp Prime', 'Combo Electric Panel Van M 136hp Prime-Plus'. Induced structure: <Model> [Electric] Panel Van <size> [fuel] <power>hp [transmission] <trim>, with fuel named only for diesel, so electric is carried by the model name instead of a fuel token, a meaningful asymmetry. CV spec vocabulary: payload as a maximum in kg, \"payload of up to 759kg\" and \"maximum payload of 1,210kg\"; load volume in spelled-out cubic metres, \"4.4 cubic metres\" qualified \"with FlexCargo bulkhead\" and \"6.6 cubic metres\"; towing as braked capacity, \"towing capacity (braked) of 750kg\" and \"of 1,000kg\"; length in metres. Audience named explicitly, unlike the car releases: 'Retail (SME) business customers', 'sole traders', 'SME customers', which map to SMMT's Business band of fewer than 25 vehicles, not Fleet (s50), so this is small-business copy and not large-fleet copy. Eurig Druce is quoted using both registers in one quotation, \"helping more motorists make the switch to electric\" and \"committed to electrifying Britain's businesses.\" Event naming is internally inconsistent: \"LCV 'Professional Days' sales event\" in prose against a \"Pro Days Contribution\" of \"£1,000\" in the finance table. Offer mechanics distinctive to this register: order-by and register-by pairing (\"until 31st May, registered by 30th September\"), numeric DD/MM/YYYY (\"between 08/05/2026 and 31/05/2026\") alongside prose ordinals in the same release, the charger bundle \"an Ohme EV charger up to the value of £1,050 (incl. VAT) with standard installation\" against \"Customer value of up to £875 (excl. VAT)\", and the territorial carve-out \"Offer applies to GB Mainland only.\" Dual VAT presentation, inclusive for consumer-facing value and exclusive for business, is the defining B2B tell. The van range also carries the brand's principal UK manufacturing proof point, since standing boilerplate in every release names Ellesmere Port as \"the UK's first electric-only manufacturing plant where the Combo Electric van is made.\"",
+      "sourceIds": [
+        "s41",
+        "s65",
+        "s44",
+        "s42",
+        "s48",
+        "s61",
+        "s51"
+      ],
+      "confidence": "high for the observed register, medium for how far it generalises, since it rests mainly on one release",
+      "rung": "2 (first-party dated press release)",
+      "gaps": [
+        "NOT FOUND: Movano specifics. Named but unfigured.",
+        "NOT FOUND: first-party copy for chassis cab and crew cab body types, which Wikipedia lists (s43).",
+        "NOT FOUND: any large-fleet or fleet-manager register. Everything observed is SME."
+      ]
+    },
+    {
+      "topic": "National brand voice against franchised dealer voice",
+      "file": "industry/dealer-versus-national-tone.md",
+      "summary": "The brief's reachability prediction is confirmed: www.vauxhall.co.uk is WAF-403 (s1) while www.evanshalshaw.com/vauxhall/ (s57) loaded fully, so dealer group sites are usable third-party proxies for brand material. NOT FOUND, not NOT PUBLISHED: no dealer toolkit, retailer brand centre, franchise portal or communication standard. Such material normally sits behind a dealer login, WebSearch does not exist in this run, and guessed paths on the brand's own host cannot be probed at all. What the dealer does with the brand: base model names are written correctly and plainly, but the electrified naming architecture is flattened into generic powertrain categories, 'Hybrid and Electric Range' and 'Vauxhall Hybrid and Electric Vans' with slug hybrid-electric, and the fetcher reports no use of Vauxhall's own sub-brand naming conventions anywhere on the page, no 'Electric' as a formal badge, no '-e', no GSE. Vauxhall taglines are not reused; copy is dealer-authored and service-led, including the dealer's own \"Switch it up with an exciting, eco-friendly and electric new Vauxhall from Evans Halshaw.\" Note 'eco-friendly', an unqualified environmental claim of exactly the kind the ASA scrutinises, appearing in dealer copy and in no Vauxhall release collected. Co-branding runs with dealer primacy: the composite 'Evans Halshaw Vauxhall' is used as a single entity name, Vauxhall's logo is a section badge while the dealer logo holds the site-wide header. Compliance-relevant absence: no pricing, no monthly figures, no PCP or HP mention, no representative APR or representative example, no asterisked footnote, no finance-provider identification and no credit-broker statement. Offers are unquantified, \"a wide variety of competitive offers\", and an affinity discount is teased as a question rather than a figure. Inference, labelled as such: by stating no rate and no cost-of-credit amount the page avoids triggering CONC 3.5.3R(1), and by teasing rather than quantifying it stays clear of 3.5.7R(1)(c). Local authoring is evidenced by a surviving typo 'award-winng', a heading and alt-text mismatch between 'MyVauxhall App' and 'My Vauxhall App', and reuse of an image asset from the Hyundai section of the same site. Likely manufacturer-supplied: the logo asset, studio and lifestyle photography, and references to Vauxhall Connect, MyVauxhall and the Motability Scheme, the last appearing on the dealer site and in no press release collected. The external obligation that sits on the dealer rather than the brand: per s48 dealers must display a label showing official fuel consumption and CO2 data for every new car in a showroom, enforced by Trading Standards, not VCA.",
+      "sourceIds": [
+        "s1",
+        "s58",
+        "s57",
+        "s71"
+      ],
+      "confidence": "medium. One dealer group observed, so a single data point, not a pattern",
+      "rung": "3 to 4 (the retailer's own live site: A2 for the retailer, evidence-by-artefact for the brand relationship)",
+      "gaps": [
+        "NOT PROBED, and the highest-value reachable follow-up here: the dealer's offers, stock listing and leasing pages, where the representative examples and real disclaimer patterns will be.",
+        "NOT PROBED: any second dealer group or single-site franchised dealer, so no corroboration.",
+        "NOT FOUND: any evidence of what the brand permits or forbids. Everything here is what one dealer does, which evidences the gap between national and local practice but not the rule."
+      ]
+    },
+    {
+      "topic": "Motorsport lineage and sponsorship, dated",
+      "file": "industry/motorsport-and-sponsorship.md",
+      "summary": "CURRENT, first-party: standing boilerplate in s45, s46 and s53 states \"Vauxhall is proud to be the official automotive partner of Team GB\", supporting athletes preparing for the Los Angeles 2028 Olympic Games. Because it sits in fixed boilerplate it is a load-bearing brand claim, not a campaign line, and it displaces the football era in prominence: reconnaissance (s40) established Vauxhall as main sponsor of the England, Northern Ireland, Scotland and Wales national football teams from 2011, and no football sponsorship appears in any 2026 release collected. Recorded as not observed in current material, NOT as ended, since no first-party statement of its end was found. 2026 activity from the press index (s41): 2026-08-12 Olympic-qualification research, 2026-07-20 third consecutive podium at Rallye Weiz, 2026-07-16 official automobile partner of the Novuna London Athletics Meet, 2026-06-15 first win in the ADAC GSE Rally Cup, 2026-06-01 podium \"on its return to motorsport\", 2026-05-26 first images of Mokka GSE Rally. The 2026-06-01 headline dates the works re-entry to the 2026 season and implies a preceding absence. Rally programme detail from s53: the ADAC GSE Rally Cup, \"all-electric one-make\", which Vauxhall \"joined sister brand Opel\" in, car Mokka GSE Rally, driver Ioan Lloyd, \"features seven rounds across six European countries\", with the transfer claim made explicit, knowledge \"gained from the racetrack helps shape Vauxhall's cars on the road\", under \"Everyday rally feeling\" and \"From rally to road\". So the motorsport asset is deliberately wired to the road-car sub-brand, the championship being named after it. HISTORIC, from s56 (Wikipedia, A3, article dated 2025-10-27): rallying from the Magnum with Will Sparrow and Brian Culcheth, the Chevette HS homologation special from 1976 with Pentti Airikkala, Tony Pond, Russell Brookes and Jimmy McRae, Airikkala taking the British Rally Championship in 1979, Chevette retired 1983, focus to the Group B Opel Manta 400, Group B banned 1986, Louise Aitken-Walker winning the 1990 ladies' World Championship in an Astra, a four-wheel-drive Calibra considered 1991 to 1992 with Stig Blomqvist trialling one at the 1993 Swedish Rally, and Astra winning the Formula 2 category in 1993 and 1994 with David Llewellin. BTCC from 1989 with the Cavalier, John Cleland champion 1995 and retiring 1999, Vectra from 1996, the Astra Coupe dominating 2001 to 2004 with titles for Jason Plato 2001, James Thompson 2002 to 2004 and Yvan Muller 2003 plus Manufacturers and Teams Awards each year, Vectra returning 2007 with Fabrizio Giovanardi titles in 2007 and 2008 before Vauxhall withdrew sponsorship, a November 2016 return with Power Maxed Racing under Tom Chilton and Senna Proctor, 2018 as TAG Autosport with Power Maxed Racing, and 2019 as Sterling Insurance with Power Maxed Racing fielding Jason Plato and Rob Collard. IMPORTANT NEGATIVE: the Motorsports section mentions neither VXR nor Triple Eight nor works teams, despite Wikipedia's separate VXR section crediting Triple Eight Racing input (s43), so the encyclopedia's own two sections do not join up. Recorded, not resolved.",
+      "sourceIds": [
+        "s40",
+        "s41",
+        "s65",
+        "s42",
+        "s48",
+        "s51",
+        "s66"
+      ],
+      "confidence": "medium for the history (A3, single encyclopedia source), high for the current",
+      "rung": "5 (Wikipedia, A3) for the historic record; 2 (first-party dated press releases) for 2026",
+      "gaps": [
+        "NOT FOUND: any first-party statement dating the end of BTCC involvement or of the football sponsorship. The 2026 'return to motorsport' headline implies a gap but does not date its start.",
+        "NOT PROBED: the individual 2026 motorsport and sponsorship releases. Only headlines and dates from the index, plus the rally detail inside s53.",
+        "UNRESOLVED wording inconsistency needing confirmation: 'official automobile partner' of the athletics meet (s41 headline) against 'official automotive partner' of Team GB (boilerplate)."
+      ]
+    },
+    {
+      "topic": "Configurator, stock-listing UX and photography conventions: what the wall blocked",
+      "file": "industry/configurator-photography-and-what-the-wall-blocked.md",
+      "summary": "Recorded as BLOCKED, not absent, per the brief. Configurator flow, trim-selector UX, stock-listing filters, result-card anatomy and photography angle conventions are all normally read off the live consumer site. www.vauxhall.co.uk returns HTTP 403 on every path tried (s1, s2, s3), www.opel.com is behind the same WAF (s4), there is no shell internet and no browser, and web.archive.org/web/ is blocked at the fetcher, so the archived site cannot be read either. What was recovered anyway: the press image library exists with known paths, https://www.media.stellantis.com/uk-en/vauxhall/media-library/gallery and the international pattern /em-en/{brand}/media-library/{press-images|press-videos|gallery} (s9, s11), NOT PROBED this run and the single best available source for approved photography, sitting outside the WAF; two first-party brand PNG paths captured in reconnaissance but not fetched because binaries are out of capability (s11), where the filename fragment 'verticalbluecopy' is a filename artefact only and must not be read as a colour claim; view-naming evidence from one third-party alt string, \"Grey Vauxhall Corsa Electric Front\" with folder path corsa/2025/electric (s57), implying an asset set organised by model, model year and powertrain with named views. Caption conventions from the releases: wheel specification is footnoted rather than shown, the s44 asterisk expanding to \"Unique design of 18-inch wheels fitted as standard on all electric versions\", which implies imagery cannot be relied on to represent trim; a UK release carries an untranslated German certification, the AGR asterisk expanding to \"Aktion Gesunder Rücken e.V\" (s44), a twin-brand artefact; and the embargo format is label, subject, weekday, ordinal date, @, 24-hour time, territory in brackets, \"EMBARGO: Driving Impressions – Wednesday, 22nd July @ 00:01 (UK)\" (s53), with releases closing 'ENDS'. Configurator-adjacent naming captured: CONNECT ONE and CONNECT PLUS tiers for MyVauxhall 2.0 (s37), Vauxhall Connect (s57), Vauxhall PureSense and Vauxhall PureConnect (s53). The Motability Scheme appears on the dealer site (s57) and in no press release collected.",
+      "sourceIds": [
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+        "s9",
+        "s11",
+        "s37",
+        "s44",
+        "s51",
+        "s71"
+      ],
+      "confidence": "low for anything positive; high for the blockage itself, which is confirmed",
+      "rung": "none reachable for the primary evidence",
+      "gaps": [
+        "NOT PROBED, reachable, best next step: the Vauxhall press media-library gallery.",
+        "NOT PROBED, reachable: Evans Halshaw Vauxhall stock and leasing pages, as substitute for configurator and stock-listing UX.",
+        "NOT PROBED: a second dealer group for corroboration.",
+        "OUT OF CAPABILITY: binary download of the two first-party PNG brand assets at s11."
+      ]
+    }
+  ],
+  "crossCuttingDisagreements": [
+    {
+      "issue": "Performance sub-brand spelling",
+      "positions": [
+        {
+          "claim": "GSe",
+          "source": "this run's brief"
+        },
+        {
+          "claim": "GSE, with the expansion 'Grand Sport Electric', introduced 2023",
+          "source": "s53 dated 2026-07-13 and s45 dated 2026-08-05, first-party body text"
+        }
+      ],
+      "resolution": "First-party dated usage wins for orthography per the brief's own rule, so GSE. Opel's own styling remains unverified because www.opel.com is walled (s4). Not resolved silently."
+    },
+    {
+      "issue": "Whether the guideline's performance contrast is GSE against VXR",
+      "positions": [
+        {
+          "claim": "GSe versus the historic VXR",
+          "source": "this run's brief"
+        },
+        {
+          "claim": "GSE claims lineage from GTE and GSi; VXR and OPC are never mentioned",
+          "source": "s51"
+        }
+      ],
+      "resolution": "Unresolved. VXR appears to be a dormant heritage badge, with Wikipedia (s43) dating its hiatus to the 2017 PSA acquisition, but that is a single A3 source and no first-party statement was found."
+    },
+    {
+      "issue": "Vauxhall UK market share",
+      "positions": [
+        {
+          "claim": "4.8% total market share, first half of 2026",
+          "source": "s41 headline dated 2026-07-06"
+        },
+        {
+          "claim": "4.24% car-only share, January to July 2026",
+          "source": "s61"
+        }
+      ],
+      "resolution": "Not resolved. Likely different denominators (cars plus LCV against cars only) or different periods. SMMT LCV data at /vehicle-data/lcv-registrations/ was not probed and would settle it."
+    },
+    {
+      "issue": "Power unit",
+      "positions": [
+        {
+          "claim": "281PS (207kW)",
+          "source": "s45 dated 2026-08-05"
+        },
+        {
+          "claim": "281hp (207kW)",
+          "source": "s53 dated 2026-07-13"
+        }
+      ],
+      "resolution": "Genuine first-party internal inconsistency three weeks apart, not a source conflict. Recorded as a finding."
+    },
+    {
+      "issue": "WLTP qualifier form",
+      "positions": [
+        {
+          "claim": "five capitalisations in use: (WLTP), (WLTP combined), (WLTP Combined), (WLTP Combined High), (WLTP combined cycle)",
+          "source": "s44, s45, s46, s53"
+        },
+        {
+          "claim": "no prescribed form of words and no mandated caveat wording",
+          "source": "s48 and s55, VCA"
+        }
+      ],
+      "resolution": "No conflict, but jointly explanatory: the brand is inconsistent because the regulator prescribes nothing here. NOT PUBLISHED rather than not found."
+    },
+    {
+      "issue": "Which channel the CO2 presentation rules govern",
+      "positions": [
+        {
+          "claim": "printed matter only; \"Websites, workshop manuals or owners' handbooks are not considered to fall within the definition of promotional literature.\"",
+          "source": "s55, VCA"
+        }
+      ],
+      "resolution": "Single-sourced but explicit and first-party official. Consequence: online copy falls to the CAP Code, which was NOT PROBED. A guideline applying one disclaimer regime across all channels would be wrong in both directions."
+    },
+    {
+      "issue": "Shared-leadership title form",
+      "positions": [
+        {
+          "claim": "Florian Huettl, 'Opel-Vauxhall CEO'",
+          "source": "s54"
+        },
+        {
+          "claim": "Florian Huettl, 'CEO, Opel and Vauxhall'",
+          "source": "s19"
+        }
+      ],
+      "resolution": "Unresolved difference in form between the press room and the Stellantis corporate site."
+    }
+  ],
+  "gaps": [
+    "NOT PUBLISHED anywhere reachable: a naming standard, a unit style guide, a disclaimer library, or a dealer or retailer communication standard. Every convention in these twelve files is induced from dated usage, not read off a rule.",
+    "NOT FOUND, because BLOCKED: no consumer PCP representative example, no configurator, no stock-listing UX, no photography angle spec, no live price or trim matrix. All live on www.vauxhall.co.uk (s1, HTTP 403), with www.opel.com behind the same WAF (s4) and the Wayback content proxy blocked at the fetcher.",
+    "NOT PUBLISHED: no formal ASA ruling against Vauxhall exists, so the brief's best-hoped-for source, verbatim advertisement copy quoted by a regulator, does not exist for this brand. Five informally resolved cases exist but publish no copy.",
+    "HIGHEST-VALUE UNPROBED, all reachable: CAP Code section 3 (the operative regime for the brand's website copy); the Vauxhall press media-library gallery; SMMT LCV registrations; Evans Halshaw's offers, stock and leasing pages; the VCA 'Environmental Labels 2026' guidance document; the FCA Glossary representative-APR 51% test.",
+    "OUT OF CAPABILITY this run: all binaries, so the two first-party brand PNGs (s11), the SMMT data ZIP and the five VCA guidance documents were not opened. PDF readability via WebFetch was not tested because no PDF was fetched.",
+    "Movano is named in first-party copy but carries no captured payload, load volume, towing or range figure, and it is the large van whose figures differ most.",
+    "No large-fleet or fleet-manager register found; all observed business copy is SME and sole trader.",
+    "Only one dealer group was observed, so the national-against-dealer finding is a single data point rather than a pattern."
+  ]
+}

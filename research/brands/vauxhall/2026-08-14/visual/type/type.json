@@ -1,0 +1,95 @@
+{
+  "dimension": "visual.type",
+  "brand": "vauxhall",
+  "retrievedAt": "2026-08-14",
+  "regime": "D",
+  "identified": false,
+  "summary": "Vauxhall's typeface is UNIDENTIFIED. No family name, no foundry, no weight set and no ownership status could be evidenced from any reachable source this run. The typography ladder failed at rung 5 (Fonts In Use, WhatTheFont, agency case study) after that rung was actually probed rather than assumed. Rungs 1 to 4 are structurally unreachable. Do NOT accept a plausible-sounding 'Vauxhall Sans': nothing this run supports any family name at all.",
+  "families": [],
+  "ownership": {
+    "status": "unknown",
+    "notes": "Ownership is answered at the foundry, and no candidate foundry was ever identified, so the question could not be asked. Not probed rather than unpublished."
+  },
+  "ladder": {
+    "rung1_type_spec_or_token_package": "unreachable / probed dry by recon. No design system exists and npm plus GitHub were both searched with multiple targeted queries for Vauxhall, Opel and Stellantis. No package.",
+    "rung2_document_fonts_and_fontface_src": "NOT PROBED, structurally impossible this run. vauxhall.co.uk is WAF-403, there is no browser and the shell has no internet. This is the rung that would settle it in one call on an unblocked run.",
+    "rung3_font_file_internals": "unreachable. No binary can be downloaded to disk this run, so no fontTools inspection was possible. Capability gap, not an absence.",
+    "rung4_brand_guideline_doc": "NOT FOUND. Recon established via Wayback that no brand-guideline PDF has ever existed at any guessed path.",
+    "rung5_fontsinuse_whatthefont_case_study": "PROBED AND DRY. This is the rung that failed. Detail below.",
+    "rung6_aggregator": "NOT PROBED (budget). Brandfetch exposes a claimed typeface field and would be worth one call on a later run, at A4, unverified."
+  },
+  "rung5_detail": {
+    "fontsinuse_basic_search": {
+      "probed": true,
+      "result": "dry",
+      "by": "recon",
+      "sources": [
+        "https://fontsinuse.com/search?q=vauxhall",
+        "https://fontsinuse.com/search?q=opel"
+      ]
+    },
+    "fontsinuse_structured_browse": {
+      "probed": true,
+      "result": "dry on page 1 of 5",
+      "source": "https://fontsinuse.com/in/1/topics/36/automotive",
+      "detail": "The Automotive topic holds 331 uses across 5 pages. Page 1 (about 60 entries, sorted by contribution date) contains NO Stellantis-group marque at all: no Vauxhall, Opel, Stellantis, Peugeot, Citroen or General Motors. Marques present instead: Porsche, Maserati, Cadillac, Lincoln, Renault, Aston Martin, Pirelli, Hot Wheels.",
+      "unchecked": "pages 2 to 5 of the Automotive topic, and /search/advanced. Budget ran out. Report as unchecked, not absent."
+    },
+    "whatthefont": {
+      "probed": false,
+      "reason": "requires uploading a raster sample of the mark. No binary could be downloaded and no screenshot could be captured this run, so there was no sample to submit."
+    },
+    "agency_case_study": {
+      "probed": true,
+      "result": "dry for Vauxhall",
+      "detail": "underconsideration.com Brand New Automobile industry archive page 1 of 9 lists no Vauxhall post. Complete-archive page 1 of 1508 lists no Vauxhall, Opel or Stellantis post. No agency case study for a Vauxhall identity was found. Vauxhall may simply never have been covered.",
+      "sources": [
+        "https://www.underconsideration.com/brandnew/archives/category/industry/automobile",
+        "https://www.underconsideration.com/brandnew/archives/complete"
+      ]
+    }
+  },
+  "opel_adjacent": {
+    "label": "ADJACENT EVIDENCE, NOT VAUXHALL EVIDENCE",
+    "caveat": "Opel is Vauxhall's twin brand on a shared platform with a shared CEO (Florian Huettl, 'CEO, Opel and Vauxhall'), and Vauxhall models are re-badged Opels. That makes Opel a useful comparator and NOT proof of anything about Vauxhall's typography. Nothing below may populate a Vauxhall type token.",
+    "findings": [
+      {
+        "claim": "No Opel corporate typeface was named by any reachable source either.",
+        "detail": "Opel's own design press category (7 releases, 2013 to 2024) names no typeface and no font family. Neither does the Opel identity post on Brand New, which is paywalled.",
+        "sources": [
+          "https://www.media.stellantis.com/em-en/opel/press-category/technology-design",
+          "https://www.underconsideration.com/brandnew/archives/new_logo_for_opel_2.php"
+        ]
+      }
+    ]
+  },
+  "related_first_party_design_language_terms": {
+    "note": "Not typography, but the only first-party named design vocabulary evidenced this run. Recorded here because a later run may find the typeface documented alongside these terms.",
+    "terms": [
+      {
+        "term": "Bold & Pure design language",
+        "quote": "Bold & Pure design language of the Mokka combined with performance accents",
+        "authority": "A2",
+        "publishedAt": "2026-07-13",
+        "source": "https://www.media.stellantis.com/uk-en/vauxhall/press/new-vauxhall-mokka-gse-press-information"
+      },
+      {
+        "term": "Vauxhall Vizor",
+        "quote": "including an evolution of the Vauxhall Vizor",
+        "authority": "A2",
+        "publishedAt": "2026-07-13",
+        "source": "https://www.media.stellantis.com/uk-en/vauxhall/press/new-vauxhall-mokka-gse-press-information",
+        "note": "Confirms 'Vizor' is Vauxhall's own first-party term for its front-end panel, not only Opel's. In this release it is applied to a concept car, not the production model."
+      },
+      {
+        "term": "Pure Panel",
+        "quote": "10-inch Multimedia Navi Pure Panel system",
+        "authority": "A2",
+        "publishedAt": "2026-07-13",
+        "source": "https://www.media.stellantis.com/uk-en/vauxhall/press/new-vauxhall-mokka-gse-press-information",
+        "note": "Shared with Opel, where it is described as an 'All-digital Pure Panel cockpit' (2021-11-25, media.stellantis.com/em-en/opel/press-category/technology-design)."
+      }
+    ]
+  },
+  "whatWouldUnblock": "One fetch of vauxhall.co.uk with the WAF passed, or any browser session on it, reading @font-face src and document.fonts. That is rung 2 and it would settle family name, weights and the webfont filenames immediately. Failing that, Fonts In Use Automotive pages 2 to 5, or a Brandfetch lookup at A4."
+}

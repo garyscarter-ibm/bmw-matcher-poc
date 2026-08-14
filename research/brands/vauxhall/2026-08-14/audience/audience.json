@@ -1,0 +1,370 @@
+{
+  "dimension": "audience",
+  "brandKey": "vauxhall",
+  "displayName": "Vauxhall (Vauxhall Motors Limited)",
+  "market": "United Kingdom only",
+  "collectedAt": "2026-08-14",
+  "regime": "C/D",
+  "ladder": {
+    "startRung": 3,
+    "landedRung": 2,
+    "rungDetail": {
+      "rung1": "NOT FOUND. No published segmentation and no media kit with audience data on any reachable host. Separately NOT PROBED on www.vauxhall.co.uk, which is WAF-403 to this harness.",
+      "rung2": "REACHED AND EXHAUSTED for portfolio segment role and group price-band strategy. Stellantis 2025 Annual Report and Form 20-F opened and text-extracted. Strongest evidence in the dimension.",
+      "rung3": "REACHED. Eight first-party press releases, brand page positioning, sponsorship pattern, app listing. Ad archives NOT PROBED (require search or a browser). Careers copy PROBED AND DRY.",
+      "rung4": "PARTIALLY REACHED via SMMT registration data. UNEXHAUSTED, not dry: WebSearch does not exist in this run, so trade press and third-party demographic profiles could not be reached by host-guessing.",
+      "rung5": "NOT PROBED. No reachable review or forum host found without search."
+    }
+  },
+  "fetchBudget": { "used": 18, "allowed": "14-18" },
+  "segments": [
+    {
+      "id": "seg-a",
+      "name": "Value-led private retail buyer, supermini and small SUV",
+      "who": "UK private buyers at the bottom of the mainstream price band, buying a B-segment hatch or a small crossover, typically on finance. Demographics are not published by the brand and were not found third-party.",
+      "jobsToBeDone": [
+        "Get a familiar, known car at a low monthly cost",
+        "Get a lot of standard equipment for the money",
+        "Move to electric without paying more than for petrol or hybrid"
+      ],
+      "decisionDrivers": [
+        { "driver": "Monthly cost, stated as such", "evidence": "May 2026 sales event translates its own discount into roughly '£20 per month over a typical four-year finance agreement'.", "sourceIds": ["s49"], "type": "claimed", "confidence": "high", "rung": 3 },
+        { "driver": "Specification for money", "evidence": "New Mokka YES trim replaces Griffin at the foot of the range, sold on 'enhanced specification and distinctive styling at an attainable price'; adds parking sensors, 180-degree reversing camera, blind-spot detection, keyless entry, power-folding heated mirrors.", "sourceIds": ["s52"], "type": "claimed", "confidence": "high", "rung": 3 },
+        { "driver": "Named entry price points", "evidence": "Mokka range opens at £26,545 OTR; Astra from £27,495 OTR; Corsa YES 1.2 Turbo 100PS quoted at £20,890 OTR, £19,390 after event and online-store savings. £20,890 is the lowest OTR figure found in this run.", "sourceIds": ["s52", "s44", "s49"], "type": "observed", "confidence": "high", "rung": 3 },
+        { "driver": "Third-party endorsement", "evidence": "Grandland 3rd, Frontera 5th, Mokka 8th in Auto Express Driver Power 2026 survey, per a Vauxhall release dated 2026-06-10.", "sourceIds": ["s41"], "type": "claimed", "confidence": "medium", "rung": 3 }
+      ],
+      "objections": [
+        { "objection": "Electric costs more than petrol", "brandAnswer": "Astra Electric presented under the heading 'Accessible electric' as costing less than the hybrid and PHEV versions once the £1,500 Electric Car Grant applies.", "sourceIds": ["s44"], "confidence": "high", "rung": 3 },
+        { "objection": "I have nowhere to charge", "brandAnswer": "Electric Streets of Britain campaign, plus £500 credit toward an Ohme home charger, a Kerbo Charge cross-pavement channel, or public charging credit.", "sourceIds": ["s49", "s43"], "confidence": "high", "rung": 3 },
+        { "objection": "Will it be any good", "brandAnswer": "Driver Power 2026 placings cited.", "sourceIds": ["s41"], "confidence": "medium", "rung": 3 }
+      ],
+      "priceSensitivity": {
+        "level": "high",
+        "evidence": "Incentives stacked in a single May 2026 event: £1,000 extra discount on any model, £1,500 Electric Car Grant, £500 charging credit, 10,000 miles free home charging valued at £175, and 50,000 Tesco Clubcard points valued at £500. A grocery loyalty tie-in is a mass-market channel choice.",
+        "sourceIds": ["s49"],
+        "confidence": "high",
+        "rung": 3
+      },
+      "evidenceForSegmentExisting": {
+        "firstParty": "Pricing and trim architecture; brand volume claim of 62,839 vehicles registered H1 2026 with retail up 19%.",
+        "thirdParty": "SMMT records Corsa as 5th best-selling car in the UK for Jan to Jul 2026 at 20,796 units, and 10th in July 2026 alone at 2,326 units.",
+        "sourceIds": ["s49", "s44", "s52", "s46", "s61"],
+        "confidence": "high",
+        "rung": 3
+      }
+    },
+    {
+      "id": "seg-b",
+      "name": "SME and sole-trader van buyer",
+      "who": "Business customers buying one or a few light commercial vehicles. Named explicitly by the brand as 'Retail (SME) business customers' and sole traders; offer stated to apply to business customers only. No large-fleet programme described in that release.",
+      "whoSourceNote": "Targeting language reached this agent in paraphrase, because the fetching model declined verbatim reproduction beyond about 125 characters.",
+      "jobsToBeDone": [
+        "Get a working van at a monthly cost that does not penalise choosing electric",
+        "Carry a required payload and load volume",
+        "Avoid a charging-infrastructure cost on top of the vehicle"
+      ],
+      "decisionDrivers": [
+        { "driver": "Diesel-to-electric monthly payment parity across three named finance products", "evidence": "LEASYS Business Contract Hire 36 months 10,000 miles a year: Combo Pro diesel 100hp and Combo Electric 136hp both £305 a month; Vivaro Prime diesel 120hp and Vivaro Electric 136hp both £335 a month. SFS Conditional Sale 60 months 6.9% fixed, 6.9% representative APR: Combo Prime-Plus £299 a month both fuels; Vivaro Prime £339 a month both fuels. SFS Finance Lease 36 months: Combo Pro £289 a month both; Vivaro Prime £319 a month both.", "sourceIds": ["s48"], "type": "observed", "confidence": "high", "rung": 3 },
+        { "driver": "Payload, load volume, range", "evidence": "Combo Electric to 4.4m3 and 759kg payload, 213 miles WLTP; Vivaro Electric to 6.6m3 and 1,210kg payload, 219 miles WLTP.", "sourceIds": ["s48"], "type": "claimed", "confidence": "high", "rung": 3 },
+        { "driver": "Bundled charging hardware and a cash contribution", "evidence": "Free Ohme charger with standard residential installation worth up to £1,050 including VAT, GB mainland only; £1,000 'Professional Days' contribution.", "sourceIds": ["s48"], "type": "observed", "confidence": "high", "rung": 3 }
+      ],
+      "objections": [
+        { "objection": "Total cost of ownership versus diesel", "brandAnswer": "Monthly payment parity structure.", "sourceIds": ["s48"], "confidence": "high", "rung": 3 },
+        { "objection": "Range and charging", "brandAnswer": "WLTP figures plus the bundled charger.", "sourceIds": ["s48"], "confidence": "high", "rung": 3 }
+      ],
+      "priceSensitivity": {
+        "level": "high, and expressed in monthly payment rather than list price",
+        "evidence": "Vauxhall Motors Limited is disclosed as a credit broker introducing only Stellantis Financial Services, receiving no commission while retailers may. A compliance disclosure of that kind indicates finance is the primary purchase route for this segment.",
+        "sourceIds": ["s48"],
+        "confidence": "medium",
+        "rung": 3,
+        "note": "Disclosure wording reached this agent in paraphrase."
+      },
+      "evidenceForSegmentExisting": {
+        "firstParty": "Explicit SME and sole-trader targeting language and full finance tables; brand claim of 13,838 LCVs and 8.3% LCV share in H1 2026, up 14% or 1,731 units.",
+        "thirdParty": "SMMT LCV registrations Jan to Jul 2026: Vauxhall 15,015 units, 8.02% share, up 6.03%.",
+        "sourceIds": ["s48", "s46", "s62"],
+        "confidence": "high for the segment, medium for its trajectory",
+        "rung": 3
+      }
+    },
+    {
+      "id": "seg-c",
+      "name": "Motability and accessibility-constrained driver",
+      "who": "Disabled drivers and their families acquiring through the Motability Scheme, plus drivers dependent on on-street public charging for lack of off-street parking. The 2026-07-29 release also names elderly residents, wheelchair users and pedestrians as beneficiaries.",
+      "jobsToBeDone": [
+        "Obtain a vehicle within Motability Scheme rules",
+        "Get a body style that fits an access or seating need",
+        "Be able to actually charge it without a driveway"
+      ],
+      "decisionDrivers": [
+        { "driver": "Scheme eligibility across the electric range", "evidence": "Five Scheme-eligible electric models named: Corsa Electric, Mokka Electric, Astra Electric, Combo Life Electric, Vivaro Life Electric (seating up to nine).", "sourceIds": ["s43"], "type": "claimed", "confidence": "medium", "rung": 3 },
+        { "driver": "Long institutional relationship", "evidence": "Vauxhall states it is a founding member of the Motability Scheme and has worked with the Motability Foundation and Motability Operations since 1977.", "sourceIds": ["s43"], "type": "claimed", "confidence": "medium", "rung": 3, "note": "Brand claim, paraphrase-derived, not independently corroborated this run." },
+        { "driver": "Demonstrated Scheme standing", "evidence": "Vauxhall states it was the Motability Scheme's best-selling manufacturer in 2024.", "sourceIds": ["s43"], "type": "claimed", "confidence": "medium", "rung": 3, "note": "Brand claim for calendar 2024. No 2025 or 2026 figure found. Not independently corroborated." }
+      ],
+      "objections": [
+        {
+          "objection": "Public charging is not physically accessible",
+          "brandAnswer": "Vauxhall's own Freedom of Information research, fieldwork 2026-03 to 2026-05, sent to 413 UK councils with 194 replying: 49 councils have accessible on-street charging in 2026 against 24 in 2025; on-street chargers in disabled bays up from 105 in 2024 to 245; about 15% of on-street chargers adapted for disabled drivers; 14% meet BSI PAS 1899:2022; over half of responding councils factor disabled and elderly residents into charging strategy. An earlier round, fieldwork 2025-11 to 2026-01 among tier-one councils, found 7% still permit unsafe cable covers and 42% will offer cross-pavement charging by end of 2026. Campaign registrations: over 12,500 streets nominated, over 500 respondents stating a need for disabled-access parking.",
+          "sourceIds": ["s43"],
+          "confidence": "medium",
+          "rung": 3,
+          "note": "All figures are brand-commissioned research reported by the brand, reaching this agent in paraphrase. Periods are as stated. Not independently corroborated."
+        }
+      ],
+      "priceSensitivity": {
+        "level": "structurally different: mediated by a Motability allowance rather than by list price",
+        "evidence": "The Tesco Clubcard element of the May 2026 sales event is restricted to retail customers and explicitly excludes Motability, fleet and LCV. That exclusion is first-party evidence that Vauxhall treats Motability as a distinct commercial channel rather than a slice of retail.",
+        "sourceIds": ["s49"],
+        "confidence": "high",
+        "rung": 3
+      },
+      "evidenceForSegmentExisting": {
+        "firstParty": "Motability statements and eligible-model list; three consecutive years of brand-commissioned FOI research on accessible charging (2024, 2025, 2026); a channel exclusion written into offer terms.",
+        "thirdParty": "None found.",
+        "sourceIds": ["s43", "s49"],
+        "confidence": "medium-high",
+        "rung": 3
+      }
+    },
+    {
+      "id": "seg-d",
+      "name": "Company-car and fleet driver",
+      "who": "Drivers taking a Vauxhall through an employer scheme, and the fleet buyers who specify it. Evidence is thinner than for segments A to C but explicit.",
+      "jobsToBeDone": [
+        "Minimise benefit-in-kind exposure",
+        "Cover high mileage comfortably"
+      ],
+      "decisionDrivers": [
+        { "driver": "Benefit-in-kind and tax position", "evidence": "Astra press information publishes BiK rates of 4% electric, 10% PHEV, 28% hybrid, 32% petrol, alongside P11D and VED tables.", "sourceIds": ["s44"], "type": "observed", "confidence": "medium", "rung": 3 },
+        { "driver": "High-mileage suitability, named as such", "evidence": "The electric Astra's added chassis stiffness and stability are said to suit long motorway runs 'for company car users covering significant mileage'.", "sourceIds": ["s44"], "type": "claimed", "confidence": "medium", "rung": 3 },
+        { "driver": "Range and charge time", "evidence": "Astra Electric 281 miles WLTP hatch, 275 Sports Tourer; DC 20 to 80% in 32 minutes.", "sourceIds": ["s41", "s44"], "type": "claimed", "confidence": "medium", "rung": 3 },
+        { "driver": "Group-level leasing capability", "evidence": "Leasys, a 50% joint venture with Credit Agricole Consumer Finance & Mobility, dedicated to pan-European multi-brand long-term operational leasing.", "sourceIds": ["s68"], "type": "observed", "confidence": "high", "rung": 2, "locator": "page 26" }
+      ],
+      "objections": [
+        { "objection": "Range and charge time for high-mileage drivers", "brandAnswer": "Published WLTP and DC charge figures.", "sourceIds": ["s44"], "confidence": "medium", "rung": 3 }
+      ],
+      "priceSensitivity": {
+        "level": "mediated by tax rather than sticker price",
+        "evidence": "The published BiK ladder is the argument made to this segment.",
+        "sourceIds": ["s44"],
+        "confidence": "medium",
+        "rung": 3
+      },
+      "evidenceForSegmentExisting": {
+        "firstParty": "Explicit company-car reference and full tax tables; Vauxhall breaking out retail growth of 19% separately in its own H1 2026 results release, implying a non-retail remainder it chooses not to size.",
+        "thirdParty": "Market-wide channel context only: SMMT records the July 2026 UK new-car market as 37.1% private, 59.9% fleet, 3.0% business. This is the whole market, NOT Vauxhall.",
+        "sourceIds": ["s44", "s46", "s61"],
+        "confidence": "medium for the segment existing, none for its size",
+        "rung": 3,
+        "gapNote": "Vauxhall's own retail versus fleet versus Motability split is NOT PUBLISHED."
+      }
+    }
+  ],
+  "claimed": [
+    { "claim": "Energising a Better Britain", "kind": "tagline", "verbatim": true, "sourceIds": ["s19"], "confidence": "high", "rung": 3, "party": "first" },
+    { "claim": "The British automotive brand. More than just a car maker, Vauxhall is a mobility provider focused on ensuring electric equality for all.", "kind": "descriptor", "verbatim": true, "sourceIds": ["s19"], "confidence": "high", "rung": 3, "party": "first" },
+    { "claim": "Vauxhall aims to build vehicles that are relevant to all, offering design, equipment, technology and electrification at an attainable level.", "kind": "purpose, boilerplate", "verbatim": false, "sourceIds": ["s43", "s48", "s44", "s52"], "confidence": "high", "rung": 3, "party": "first", "note": "Paraphrase-derived. The phrases 'relevant to all' and 'electrification at an attainable level' were returned as short quotations; the surrounding sentence was not." },
+    { "claim": "Vauxhall began building cars in the UK in 1903 and is Britain's oldest and most familiar automotive manufacturer.", "kind": "heritage, boilerplate", "verbatim": false, "sourceIds": ["s46", "s43"], "confidence": "medium", "rung": 3, "party": "first" },
+    { "claim": "Vauxhall is leading the way in making electric vehicles more accessible; Electric Streets exists so nobody is left behind in the transition to electric mobility.", "kind": "access mission", "verbatim": true, "sourceIds": ["s44"], "confidence": "high", "rung": 3, "party": "first" },
+    { "claim": "Ellesmere Port is the UK's first electric-only manufacturing plant and home of the Combo Electric van.", "kind": "manufacturing, boilerplate", "verbatim": false, "sourceIds": ["s43", "s48"], "confidence": "medium", "rung": 3, "party": "first", "corroboration": "Ellesmere Port is the only UK plant in the group's plant list in the 2025 Annual Report, page 495 (s-a2)." },
+    { "claim": "Since the end of 2024 Vauxhall has offered a fully electric version of every car and van in its line-up, and was among the first to offer electric versions of all its vans from 2021.", "kind": "range", "verbatim": false, "sourceIds": ["s46", "s43", "s48"], "confidence": "medium", "rung": 3, "party": "first" },
+    { "claim": "Vauxhall is the Official Automotive Partner of Team GB, supporting athletes toward the Los Angeles 2028 Olympic Games.", "kind": "sponsorship", "verbatim": false, "sourceIds": ["s46", "s43", "s48", "s53"], "confidence": "high", "rung": 3, "party": "first", "gapNote": "Term, value and start date NOT PUBLISHED in any of the four releases that mention it." }
+  ],
+  "investorGradeCorroboration": {
+    "note": "Rung 2. The strongest audience evidence in the run, because it is the group's own written classification of Vauxhall's portfolio role, made to shareholders.",
+    "document": "Stellantis 2025 Annual Report and Form 20-F, 519 pages, produced 2026-02-26, covering FY2025",
+    "sourceIds": ["s68"],
+    "party": "first",
+    "authority": "A2",
+    "confidence": "high",
+    "rung": 2,
+    "findings": [
+      { "finding": "Five portfolios named. Vauxhall sits in 'European brands covering Abarth, Citroen, FIAT, Opel, Peugeot and Vauxhall vehicles', separate from luxury (Maserati), premium (Alfa Romeo, DS, Lancia), global SUV (Jeep) and American brands (Dodge, Ram, Chrysler).", "locator": "page 12", "verbatim": true },
+      { "finding": "Enlarged Europe is sold 'under the mainstream brands Citroen, FIAT, Opel, Peugeot, Vauxhall as well as premium brands Alfa Romeo, DS and Lancia'. The group therefore classifies Vauxhall as mainstream, explicitly not premium and not luxury.", "locator": "page 16", "verbatim": true },
+      { "finding": "'in order to address an actual or perceived affordability issue in our product portfolio, we are launching several new models at lower price points. This may adversely affect mix in future periods.'", "locator": "page 47", "verbatim": true },
+      { "finding": "The strategic reassessment is described as informed by 'customer purchasing behavior, affordability considerations, infrastructure readiness and incentive frameworks'.", "locator": "pages 14 and 52", "verbatim": true },
+      { "finding": "UK regulatory context: 'The UK implemented a regulation beginning in 2024 with obligations for manufacturers to achieve a minimum percentage of ZEVs increasing each year and reaching 100 percent in 2035, and specific targets on CO2 for non-ZEV CO2 fleet', with credit banking, borrowing and trading flexibilities. The filing does not use the phrase 'ZEV mandate'.", "locator": "page 39", "verbatim": true },
+      { "finding": "Vauxhall Motors Limited is listed as a United Kingdom entity, 100% owned.", "locator": "page 378", "verbatim": false },
+      { "finding": "Products are named as Opel and Vauxhall pairs: 'the Opel and Vauxhall Mokka', 'Opel/Vauxhall Combo', 'Opel/Vauxhall Corsa', 'Opel/Vauxhall Frontera'.", "locator": "pages 18, 25, 67", "verbatim": true },
+      { "finding": "Stellantis held second place in the United Kingdom at group level in 2025, and second place in the EU30 PC and CV markets overall with 16 percent share. No Vauxhall-specific UK share figure appears anywhere in the filing.", "locator": "page 25", "verbatim": false }
+    ]
+  },
+  "observed": [
+    {
+      "observation": "The price band matches the mainstream classification.",
+      "detail": "Every OTR figure captured this run sits between £20,890 (Corsa YES 1.2 Turbo 100PS) and £38,105 (Mokka Ultimate Electric). The performance halo tops out at £36,995 (Mokka GSE). No Vauxhall above £40,000 appeared in any of the eight releases read.",
+      "sourceIds": ["s49", "s44", "s52"],
+      "confidence": "high",
+      "rung": 3
+    },
+    {
+      "observation": "Sponsorship is mass-participation without exception, on a dated pattern spanning 1986 to 2026.",
+      "detail": "Football Conference, England's top non-league division, 1986 to 1998, succeeding Gola and succeeded by Nationwide Building Society. Primary sponsor of the England, Northern Ireland, Scotland and Wales national football teams from 2011. Official Automotive Partner of Team GB toward Los Angeles 2028. Official Automobile Partner of the Novuna London Athletics Meet, London Stadium, 2026-07-18. ADAC GSE Rally Cup with an electric Mokka GSE Rally, driver Ioan Lloyd. No golf, sailing, F1-level motorsport, arts or luxury partnership was found.",
+      "sourceIds": ["s40", "s41", "s46", "s43", "s53"],
+      "confidence": "medium-high",
+      "rung": 3,
+      "party": "mixed: 1986-1998 and 2011 are third-party (Wikipedia citing The Guardian 2011-01-10 and BBC News 2011-01-11); 2026 items are first-party",
+      "implication": "IMPLICATION, NOT FACT: the revealed preference is for reach across the whole national population rather than status signalling to a narrow one. Consistent with the mainstream classification at rung 2."
+    },
+    {
+      "observation": "The 'British brand' claim is a company, market and single-factory claim rather than a product-engineering one.",
+      "detail": "Vauxhall Motors Limited is a 100%-owned UK subsidiary of Stellantis NV; the brand shares a chief executive with Opel (Florian Huettl, titled 'CEO, Opel and Vauxhall'); the filing names the vehicles as Opel/Vauxhall pairs; one UK plant appears in the group plant list, Ellesmere Port.",
+      "sourceIds": ["s68", "s19"],
+      "confidence": "high",
+      "rung": 2
+    },
+    {
+      "observation": "Two owner-facing app registers coexist and do not match.",
+      "detail": "MyVauxhall, seller Vauxhall, opens 'MyVauxhall is the official app for Vauxhall drivers - to enhance the driving and ownership experience', rated 4.49 from 16,142 ratings, first released 2019-11-11, latest version 2026-08-03. MyVauxhall 2.0, seller Vauxhall, is an early preview 'currently available exclusively for the New Grandland Electric model', tiered CONNECT ONE (bundled ten years from warranty start) and CONNECT PLUS (adds remote control, maintenance history, monitoring), rated 3.81 from 311 ratings, first released 2025-04-28, latest version 2026-08-11. Both free, Utilities.",
+      "sourceIds": ["s69"],
+      "confidence": "high",
+      "rung": 3,
+      "note": "The tier names are the brand segmenting its own owners by subscription. Rating counts are published numbers and are scale indicators only, not audience size."
+    }
+  ],
+  "divergences": [
+    {
+      "id": "div-1",
+      "title": "'Electric equality for all' versus the observed emphasis on performance derivatives",
+      "claimed": "Access-led, mass-market framing: 'electric equality for all', 'leading the way in making electric vehicles more accessible'.",
+      "observedCounterweight": "Of the 20 press releases on the reachable index, covering 2026-04-29 to 2026-08-12, seven concern GSE performance or motorsport (Corsa GSE twice, Mokka GSE press information, Mokka GSE Rally reveal, three ADAC GSE Rally Cup results) against one release on the entry-level YES trim.",
+      "sourceIds": ["s19", "s41", "s44", "s52"],
+      "resolved": false,
+      "note": "Both sides are first-party. Do not treat the positioning claim as describing the communications output over this period.",
+      "confidence": "high",
+      "rung": 3
+    },
+    {
+      "id": "div-2",
+      "title": "'Attainable' as a price claim versus as a finance claim",
+      "claimed": "Electric vans available for the same monthly price as diesel; electrification 'at an attainable level'.",
+      "observedCounterweight": "List prices carry large electric premiums: Combo Prime-Plus £34,569 electric against £29,917 diesel, a £4,652 premium; Vivaro Prime £47,075 electric against £37,291 diesel, a £9,784 premium. Monthly payments are nonetheless identical (£299 and £339). Parity is engineered in the finance structure plus a £1,000 contribution, not in the price of the vehicle.",
+      "sourceIds": ["s48"],
+      "resolved": false,
+      "note": "Most consequential divergence for how the brand can honestly describe affordability. The audience being addressed buys a monthly payment.",
+      "confidence": "high",
+      "rung": 3
+    },
+    {
+      "id": "div-3",
+      "title": "The headline market-share claim rests on a combined car-plus-van base and is NOT independently verified",
+      "claimed": "Press release dated 2026-07-06, headlined 'VAUXHALL ACHIEVES TOTAL MARKET SHARE OF 4.8% IN FIRST HALF OF 2026'. Period covered: H1 2026, that is 2026-01 to 2026-06. Also states 62,839 vehicles registered in H1 2026, combined car and van volume up 7% year to date, retail up 19%, and a climb from sixth to fourth in the combined car and van market. Within the same release, a claim attributed to SMMT: best-selling B-segment brand, hatch and SUV combined, with 11% share; Corsa 18,470 units at 13% supermini share; Frontera 13,688 registrations; Frontera Electric 8,267; total electric car sales up 31% year on year to over 10,000 units with EV share up 0.12 points to 3.6%.",
+      "observedCounterweight": "Third-party SMMT data for a different and longer period, 2026-01 to 2026-07, gives Vauxhall cars only 54,841 units at 4.24% share, down from 4.36% a year earlier, and LCVs 15,015 units at 8.02% share.",
+      "sourceIds": ["s46", "s61", "s62"],
+      "resolved": false,
+      "verificationStatus": "THE 4.8% FIGURE IS NOT INDEPENDENTLY VERIFIED. It comes solely from the Vauxhall press release that states it. SMMT publishes car and LCV shares separately and on a different period, so it neither confirms nor refutes the combined H1 figure. Bases differ (combined versus car-only) and periods differ (six months versus seven).",
+      "instruction": "Record both figures with their exact bases and periods. Do not average them. Do not present 4.8% as established.",
+      "confidence": "medium",
+      "rung": "3 for the claim, 4 for the third-party data"
+    },
+    {
+      "id": "div-4",
+      "title": "The growth narrative versus the latest third-party month",
+      "claimed": "H1 2026 release: LCV volume up 14%, 1,731 more units, to 13,838, with share up 0.82 points to 8.3%.",
+      "observedCounterweight": "SMMT for 2026-01 to 2026-07: Vauxhall LCVs 15,015 units, up 6.03%, at 8.02% share. SMMT for July 2026 alone: Vauxhall LCVs down 39.72% year on year, 1,264 against 2,097, share roughly halved from 8.95% to 4.42%. Car side, July 2026 was up 19.38%, 5,840 against 4,892, share up to 3.73% from 3.49%.",
+      "sourceIds": ["s46", "s61", "s62"],
+      "resolved": false,
+      "note": "Periods differ and a single month is volatile. Flagged as unresolved tension between the brand's published trajectory and the most recent third-party month, not as a refutation.",
+      "confidence": "medium",
+      "rung": 4
+    },
+    {
+      "id": "div-5",
+      "title": "The third-party sponsorship record is stale by roughly fifteen years",
+      "claimed": "Current first-party sponsorship set: Team GB to LA 2028, Novuna London Athletics Meet 2026, ADAC GSE Rally Cup 2026.",
+      "observedCounterweight": "Wikipedia's Sponsorships section, re-verified this run, documents only the Football Conference era 1986 to 1998 and the 2011 home-nations deal. It carries nothing on Team GB, LA 2028, the athletics meet or the rally cup.",
+      "sourceIds": ["s40", "s41", "s46", "s53"],
+      "resolved": false,
+      "note": "Anyone building the audience picture from third-party sources alone would get a 2011 answer.",
+      "confidence": "high",
+      "rung": 3
+    },
+    {
+      "id": "div-6",
+      "title": "Brand-commissioned PR research is not audience data and must not be used as segmentation",
+      "claimed": "Release dated 2026-08-12 reports an OnePoll survey of 2,000 UK adults, described as nationally representative, fieldwork June 2026: 26% think they could qualify for LA2028; 24% 'quietly confident' about sporting ability; 33% rank confidence above natural talent; 39% rate their own driving 'better than average', rising to 49% of men; 38% of men rate themselves better than average at sport against 18% of women; 67% perform better with friendly competition, 74% of men; 24% took up or resumed a sport after watching the Olympics.",
+      "observedCounterweight": "The survey is about sporting and driving self-confidence among UK adults in general. It is not a profile of Vauxhall buyers, it carries no age or regional splits, and the release does not link any respondent to the brand.",
+      "sourceIds": ["s53"],
+      "resolved": false,
+      "instruction": "Treat as a channel and register signal only. Do not repurpose any of these percentages as Vauxhall audience demographics.",
+      "confidence": "high",
+      "rung": 3
+    }
+  ],
+  "registerImplications": [
+    { "implication": "Money is the message and it is stated monthly. Copy must carry numbers precisely and carry the qualifying terms nearby, because the propositions are legally conditioned: APR, deposit, final payment, excess mileage, registration deadlines, geographic exclusions.", "sourceIds": ["s48", "s49"], "confidence": "high", "rung": 3 },
+    { "implication": "'Attainable' and 'accessible' are the brand's own load-bearing words, appearing in trim positioning, model section headings and boilerplate. 'Premium' is used as a negative, as in getting extra space 'without paying a premium'. The register is value-affirming rather than status-conferring.", "sourceIds": ["s44", "s52"], "confidence": "high", "rung": 3 },
+    { "implication": "The audience cannot be assumed to have a driveway. An entire campaign exists because a material part of the addressable market charges at the kerb. Copy presuming home charging excludes people the brand is explicitly courting.", "sourceIds": ["s43"], "confidence": "high", "rung": 3 },
+    { "implication": "Part of the audience is disabled and the brand addresses them plainly rather than euphemistically: disabled drivers, disabled bays, accessible chargers, cross-pavement channels. Register should match that plainness.", "sourceIds": ["s43"], "confidence": "high", "rung": 3 },
+    { "implication": "National-sport register, not elite register. Non-league football through to Team GB is a register of participation and of 'us', not of aspiration to exclusivity.", "sourceIds": ["s40", "s41", "s53"], "confidence": "medium-high", "rung": 3 },
+    { "implication": "UK-only means UK conventions throughout, with no market variants to reconcile: OTR, BiK, P11D, VED, Electric Car Grant, Motability, mpg, miles, £.", "sourceIds": ["s43", "s44", "s52"], "confidence": "high", "rung": 3 },
+    { "implication": "Trim names are words, not codes: YES, Griffin, Design, GS, Ultimate, GSE. The brand nowhere explains what YES stands for, so the audience is expected to absorb it rather than decode it.", "sourceIds": ["s49", "s44", "s52"], "confidence": "high", "rung": 3 },
+    { "implication": "Two owner-facing registers coexist: a broad one for all 'Vauxhall drivers' and a tiered subscription one (CONNECT ONE, CONNECT PLUS) currently limited to one model.", "sourceIds": ["s69"], "confidence": "high", "rung": 3 },
+    { "note": "Cross-referenced conceptually to the copy dimension. Its files were not read and its work is not duplicated." }
+  ],
+  "geography": {
+    "scope": "United Kingdom only",
+    "evidence": [
+      { "point": "Described as 'The British automotive brand'; the tagline names Britain.", "sourceIds": ["s19"], "confidence": "high", "rung": 3 },
+      { "point": "The group filing lists Vauxhall solely within the Enlarged Europe segment, and Vauxhall Motors Limited as a United Kingdom entity, 100% owned.", "sourceIds": ["s68"], "locator": "pages 16 and 378", "confidence": "high", "rung": 2 },
+      { "point": "All press output is on a uk-en locale path and all prices are quoted in £ OTR.", "sourceIds": ["s41"], "confidence": "high", "rung": 3 },
+      { "point": "The one UK plant in the group's plant list is Ellesmere Port.", "sourceIds": ["s68"], "locator": "page 495", "confidence": "high", "rung": 2 }
+    ],
+    "withdrawalDate": {
+      "briefAssertion": "The run brief states Vauxhall was withdrawn from all non-UK markets in the early 1980s.",
+      "status": "NOT FOUND this run. No source located. Not asserted here.",
+      "confidence": "none"
+    },
+    "consequences": [
+      "The brand carries no international audience, so every positioning, sponsorship and register decision is calibrated to exactly one national market, and can be. That is why national sport works as a strategy and why copy can assume shared UK reference points without translation cost.",
+      "The audience is national but the product is not. The filing names the vehicles as Opel/Vauxhall pairs and gives the two brands one chief executive, so the brand has to make UK-specific meaning out of pan-European hardware. That is precisely what the Britishness, Ellesmere Port, Team GB and Electric Streets material is doing."
+    ],
+    "consequenceSourceIds": ["s68", "s19", "s43"],
+    "regionalSkewWithinUK": {
+      "status": "NOT ESTABLISHED",
+      "detail": "No customer-distribution data by region was found at any rung. The only regional figures located are charging infrastructure, not customers: 43 accessible on-street chargers in the Northwest, 14 in Scotland, 2,131 in London. Two weak operational signals point at a GB-mainland addressable audience for some propositions: the Ohme charger offer is GB mainland only, and the Octopus charging credit excludes Northern Ireland, the Isle of Man and the Channel Islands. These are offer mechanics, not audience geography.",
+      "sourceIds": ["s43", "s48", "s49"],
+      "confidence": "low",
+      "rung": 3
+    }
+  },
+  "gaps": [
+    { "item": "Published segmentation or media kit with audience data", "status": "NOT FOUND", "rungFailed": 1, "detail": "Nothing of the kind on any reachable host.", "unblock": "www.vauxhall.co.uk is WAF-403 to this harness, so a consumer-site audience page is NOT PROBED rather than absent. Single biggest unblock available." },
+    { "item": "Vauxhall's own retail versus fleet versus Motability volume split", "status": "NOT PUBLISHED", "rungFailed": 2, "detail": "The H1 2026 release gives retail growth of 19% and total volume of 62,839 but never the split.", "sourceIds": ["s46"] },
+    { "item": "Buyer demographics of any kind: age, gender, income, household, life stage", "status": "NOT FOUND at any rung", "rungFailed": 4, "detail": "No number of this type appears anywhere in the material collected, and none is estimated. Because WebSearch does not exist in this run, rung 4 could only be reached by host-guessing, so rung 4 is UNEXHAUSTED, not dry: trade press (Auto Express, Autocar, Fleet News, Car Dealer) and Motability Operations' own reporting were not reachable." },
+    { "item": "Customer language in reviews and forums", "status": "NOT PROBED", "rungFailed": 5, "detail": "No reachable host found without search." },
+    { "item": "Ad archive targeting signals: Meta Ad Library, Google Ads Transparency Center, TikTok Creative Center", "status": "NOT PROBED", "rungFailed": 3, "detail": "All require query interfaces needing search or a browser. A real gap for this dimension specifically, because ad archives show who is actually targeted rather than who the brand says it serves." },
+    { "item": "Motability volumes for 2025 or 2026", "status": "NOT FOUND", "rungFailed": 3, "detail": "Only the brand's own claim to have been the Scheme's best-selling manufacturer in calendar 2024, uncorroborated.", "sourceIds": ["s43"] },
+    { "item": "Team GB partnership term, value and start date", "status": "NOT PUBLISHED", "rungFailed": 3, "detail": "Absent from all four releases that mention the partnership." },
+    { "item": "Capital markets day or investor-day deck, universal registration document, integrated report", "status": "NOT FOUND on the financial-reports page", "rungFailed": 2, "detail": "That page carries only annual reports, 20-Fs, semi-annual and interim reports back to 2020. The investor hub references an Investor Day dated 2026-05-21; that deck was not located on the reports page and is NOT PROBED elsewhere.", "sourceIds": ["s67", "s20"] },
+    { "item": "Stellantis H1 2026 interim report", "status": "NOT PROBED (budget)", "rungFailed": 2, "detail": "Listed at s-a1 as /content/dam/stellantis-corporate/investors/financial-reports/Stellantis-NV-20260630-Interim-Report.pdf. Most likely place for a dated UK or Enlarged Europe update. Now known to be extractable via the local-pypdf route.", "sourceIds": ["s67"] },
+    { "item": "Exact reconciliation of the 4.8% claim with SMMT data", "status": "NOT RESOLVED, deliberately", "rungFailed": null, "detail": "Different bases and different periods. See divergence div-3." },
+    { "item": "Careers copy naming an audience", "status": "PROBED AND DRY", "rungFailed": 3, "detail": "careers.stellantis.com is reachable but carries no job listings on the landing page, no marketing career area, and no customer or audience language. Its inclusive language is about employees, and the talent community is North America only.", "sourceIds": ["s70", "s21"] },
+    { "item": "SMMT publication dates", "status": "NOT STATED", "rungFailed": null, "detail": "Neither SMMT data page carries an explicit publication date. The LCV page has a stale section heading ('March new LCV Registrations Overview By Weight', and a 'July 2025 By Brand' heading over Jul-26 versus Jul-25 columns). Data is labelled July 2026. Treat dates as the period covered, not as verified publication dates.", "sourceIds": ["s61", "s62"] },
+    { "item": "Press releases older than 2026-04-29", "status": "NOT PROBED", "rungFailed": 3, "detail": "The press-room ?page=2 parameter is ignored and re-serves page 1, so only the most recent 20 releases could be enumerated. Any Motability-specific or fleet-specific release is NOT PROBED rather than absent. No release on the reachable page mentions Motability, insurance, young drivers or company-car schemes in its headline; the Motability evidence in seg-c comes from body copy and boilerplate.", "sourceIds": ["s41"] }
+  ],
+  "methodNotes": [
+    "PDF capability finding: WebFetch cannot read PDF text, returning raw PDF object structure instead. However it saves the binary to disk, and the local shell (which has no internet) can extract that file with pypdf, which is installed. All annual-report quotations here were obtained that way. This is a reusable route for any PDF in this environment.",
+    "Verbatim capture was partly blocked by the fetcher, not by the source. On several pages the fetching model declined to reproduce text beyond roughly 125 characters per quotation and returned a paraphrase. Items marked verbatim: false or noted as paraphrase-derived must not be treated as quotable copy.",
+    "Nothing prompt-injection-like, hostile or self-referential was found in any fetched text. The only anomalies were mechanical: SMMT's LCV page carries a stale section heading, and the press-room ?page=2 parameter is ignored.",
+    "www.vauxhall.co.uk was not re-probed, per the capability constraints."
+  ],
+  "sourcesDiscovered": [
+    { "id": "s67", "url": "https://www.stellantis.com/en/investors/reporting/financial-reports", "title": "Stellantis Investor Relations, Financial Reports index", "party": "first", "kind": "annual-report", "authority": "A2", "currency": "current", "publishedAt": null, "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": ["audience"], "note": "Enumerates annual reports, 20-Fs, semi-annual and interim reports 2020 to 2026 with verbatim /content/dam/ PDF paths. Carries NO capital-markets-day deck, NO universal registration document, NO integrated report. The 2026 interim report PDF (Stellantis-NV-20260630-Interim-Report.pdf) is listed but was not opened." },
+    { "id": "s68", "url": "https://www.stellantis.com/content/dam/stellantis-corporate/investors/financial-reports/Stellantis-NV-20251231-Annual-Report.pdf", "title": "Stellantis 2025 Annual Report and Form 20-F", "party": "first", "kind": "annual-report", "authority": "A2", "currency": "current", "publishedAt": "2026-02-26", "retrieval": "text-only via local pypdf extraction after WebFetch saved the binary", "retrievedAt": "2026-08-14", "goodFor": ["audience", "industry"], "note": "RUNG 2, STRONGEST AUDIENCE SOURCE IN THE RUN. 519 pages, produced via Workiva, dated 2026-02-26, covering FY2025. WebFetch alone CANNOT read it (returns raw PDF structure); pypdf on the locally saved binary can. Classifies Vauxhall as a mainstream European brand, explicitly not premium and not luxury (pp12, 16). States a lower-price-point strategy to address affordability (p47). States the UK ZEV regulation from 2024 to 100% in 2035 without using the phrase 'ZEV mandate' (p39). Lists Vauxhall Motors Limited as a 100%-owned UK entity (p378) and Ellesmere Port as the only UK plant (p495). Names products as Opel/Vauxhall pairs (pp18, 25, 67). Contains NO Vauxhall-specific UK market-share figure." },
+    { "id": "s41", "url": "https://www.media.stellantis.com/uk-en/vauxhall/press", "title": "Stellantis Media, Vauxhall UK press index", "party": "first", "kind": "press-kit", "authority": "A2", "currency": "current", "publishedAt": null, "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": ["audience", "copy", "industry"], "note": "20 releases enumerated, 2026-04-29 to 2026-08-12, with dates and slugs. ?page=2 is ignored and re-serves page 1, so older releases are NOT PROBED. Communications mix over the period: 7 of 20 releases concern GSE performance or motorsport, 1 concerns the entry-level YES trim." },
+    { "id": "s46", "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/vauxhall-achieves-total-market-share-of-4-8-in-first-half-of-2026", "title": "Vauxhall achieves total market share of 4.8% in first half of 2026", "party": "first", "kind": "press-release", "authority": "A2", "currency": "current", "publishedAt": "2026-07-06", "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": ["audience", "industry"], "note": "The 4.8% figure is verified as PRESENT and correctly reported by recon, but it is NOT INDEPENDENTLY CORROBORATED: it is a combined car-plus-van share for H1 2026 stated only by Vauxhall. Also: 62,839 vehicles H1 2026; combined volume up 7% YTD; retail up 19%; sixth to fourth place; Corsa 18,470 units at 13% supermini share; Frontera 13,688; Frontera Electric 8,267; electric cars up 31% YoY to over 10,000 with EV share up 0.12 points to 3.6%; LCVs up 14% (1,731 units) to 13,838 with share up 0.82 points to 8.3%; 11% B-segment brand share attributed to SMMT. Spokesperson Eurig Druce, Vauxhall Managing Director and Stellantis UK Group Managing Director. CARRIES THE 'About Vauxhall Motors' BOILERPLATE that recon reported as absent." },
+    { "id": "s43", "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/on-street-electric-vehicle-charging-for-disabled-drivers-doubles-in-last-12-months-but-75-of-councils-still-have-no-accessible-chargers", "title": "On-street EV charging for disabled drivers doubles; 75% of councils still have no accessible chargers", "party": "first", "kind": "press-release", "authority": "A2", "currency": "current", "publishedAt": "2026-07-29", "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": ["audience"], "note": "THE KEY SEGMENT-C SOURCE. Brand-commissioned FOI research, fieldwork 2026-03 to 2026-05, 413 councils contacted, 194 replied. Also documents Motability: founding member, working with the Motability Foundation and Motability Operations since 1977, best-selling Scheme manufacturer in 2024, five eligible electric models named. Electric Streets of Britain campaign, electricstreets.co.uk. Regional charger counts (Northwest 43, Scotland 14, London 2,131). Full 'About Vauxhall Motors' boilerplate." },
+    { "id": "s48", "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/vauxhall-vans-electric-for-the-same-monthly-price-as-diesel", "title": "Vauxhall vans: electric for the same monthly price as diesel", "party": "first", "kind": "press-release", "authority": "A2", "currency": "current", "publishedAt": "2026-05-14", "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": ["audience"], "note": "THE KEY SEGMENT-B SOURCE. Explicitly targets 'Retail (SME) business customers' and sole traders. Three named finance products with full tables: LEASYS Business Contract Hire, SFS Conditional Sale (6.9% APR), SFS Finance Lease. Shows the divergence in div-2: large electric list-price premiums (£4,652 Combo, £9,784 Vivaro) neutralised to identical monthly payments." },
+    { "id": "s49", "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/vauxhall-announces-new-sales-event-with-additional-1-000-saving", "title": "Vauxhall announces new sales event with additional £1,000 saving", "party": "first", "kind": "press-release", "authority": "A2", "currency": "current", "publishedAt": "2026-05-11", "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": ["audience"], "note": "Best price-sensitivity evidence in the run. Stacked incentives; 'Electric All In' package; Tesco 50,000 Clubcard points worth £500 EXPLICITLY EXCLUDING Motability, fleet and LCV, which is the cleanest evidence that Motability is a distinct channel. Lowest OTR found anywhere: Corsa YES 1.2 Turbo 100PS £20,890, £19,390 after savings. PCP worked examples including 0% APR on Frontera Electric GS. No spokesperson quoted." },
+    { "id": "s44", "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/vauxhall-astra-astra-sports-tourer-press-information", "title": "Vauxhall Astra and Astra Sports Tourer, press information", "party": "first", "kind": "press-release", "authority": "A2", "currency": "current", "publishedAt": "2026-07-24", "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": ["audience", "copy"], "note": "Full trim ladder with OTR prices (Griffin, GS, Ultimate across Electric, PHEV, Hybrid, petrol). The ONLY source found naming a company-car audience: electric chassis suits long motorway runs 'for company car users covering significant mileage'. Publishes BiK (4/10/28/32%), P11D and VED tables. Verbatim positioning phrases: 'Accessible electric', 'Attainable', 'Vauxhall is leading the way in making electric vehicles more accessible', Electric Streets 'so nobody is left behind in the transition to electric mobility'. NO Motability mention." },
+    { "id": "s52", "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/vauxhall-opens-orders-for-new-mokka-yes-with-enhanced-specification-and-unique-styling", "title": "Vauxhall opens orders for new Mokka YES", "party": "first", "kind": "press-release", "authority": "A2", "currency": "current", "publishedAt": "2026-07-28", "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": ["audience", "copy"], "note": "YES is the new entry-level trim, replacing Griffin at the foot of the Mokka range, at £26,545 OTR. Full four-trim ladder to £38,105. Verbatim: 'enhanced specification and distinctive styling at an attainable price', 'increased specification and distinctive styling at an accessible price'. The release never explains what YES stands for. No target buyer named. No spokesperson quoted." },
+    { "id": "s53", "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/over-a-quarter-of-brits-think-they-could-qualify-for-the-la2028-olympic-games-vauxhall-research-reveals", "title": "Over a quarter of Brits think they could qualify for the LA2028 Olympic Games, Vauxhall research reveals", "party": "first", "kind": "press-release", "authority": "A2", "currency": "current", "publishedAt": "2026-08-12", "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": ["audience"], "note": "OnePoll survey of 2,000 UK adults, described as nationally representative, fieldwork June 2026, with gender splits but NO age or regional splits. IMPORTANT: this is PR research about sporting and driving self-confidence among UK adults generally, NOT a profile of Vauxhall buyers. Must not be repurposed as segmentation. Confirms Team GB Official Automotive Partner status with no term stated." },
+    { "id": "s69", "url": "https://itunes.apple.com/search?term=vauxhall&country=gb&entity=software&limit=25", "title": "Apple App Store search API (GB), vauxhall, limit 25", "party": "first", "kind": "app-listing", "authority": "A2", "currency": "current", "publishedAt": null, "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": ["audience", "copy"], "note": "Widens recon's s37 (limit=10) to 25. Adds the published rating counts: MyVauxhall 4.49 from 16,142 ratings (released 2019-11-11, v1.54.2 dated 2026-08-03); MyVauxhall 2.0 3.81 from 311 ratings (released 2025-04-28, latest 2026-08-11), early preview limited to New Grandland Electric, tiers CONNECT ONE and CONNECT PLUS. Also surfaces e-ROUTES by Stellantis Auto SAS (Free2move Charge route planner, 3.76 from 201). Feed reported 13 results, 11 returned." },
+    { "id": "s61", "url": "https://www.smmt.co.uk/vehicle-data/car-registrations/", "title": "SMMT UK new car registrations, July 2026 and year to date", "party": "third", "kind": "machine-readable", "authority": "A3", "currency": "current", "publishedAt": null, "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": ["audience", "industry"], "note": "RUNG 4 THIRD-PARTY CORROBORATION, and the authoritative UK volume source. NOT PROBED by recon. Vauxhall cars July 2026: 5,840 units, 3.73% share, up 19.38% (from 4,892 at 3.49%). Jan to Jul 2026: 54,841 units, 4.24% share, up 6.33% (from 51,574 at 4.36%, so share DOWN year on year). Corsa 5th best-selling model YTD at 20,796; 10th in July at 2,326. Frontera 5th best-selling BEV in July at 1,248. Market channel split July 2026: private 37.1%, fleet 59.9%, business 3.0% (WHOLE MARKET, not Vauxhall). NO explicit publication date on the page." },
+    { "id": "s62", "url": "https://www.smmt.co.uk/vehicle-data/lcv-registrations/", "title": "SMMT UK new LCV registrations, July 2026 and year to date", "party": "third", "kind": "machine-readable", "authority": "A3", "currency": "current", "publishedAt": null, "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": ["audience", "industry"], "note": "NOT PROBED by recon. Vauxhall LCVs July 2026: 1,264 units, 4.42% share, DOWN 39.72% (from 2,097 at 8.95%). Jan to Jul 2026: 15,015 units, 8.02% share, up 6.03% (from 14,161 at 7.89%). Ford leads July at 35.90%. Creates divergence div-4 against the brand's H1 claim of +14%. Stale section headings on the page ('March new LCV Registrations Overview By Weight'; 'July 2025 By Brand' over Jul-26 columns). NO explicit publication date." },
+    { "id": "s63", "url": "https://www.smmt.co.uk/", "title": "SMMT homepage", "party": "third", "kind": "site-page", "authority": "A3", "currency": "current", "publishedAt": null, "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": [], "note": "REACHABLE, contradicting no prior finding since recon never probed it. Carries no registration tables itself; it is the routing hub to the /vehicle-data/ sub-pages that do (car, LCV, EV, bus and coach, HGV, used car, Motorparc, car manufacturing). Only data item on the homepage is used cars Q1 2026 (2,016,232 units, down 0.2%), dated 2026-08-11." },
+    { "id": "s70", "url": "https://careers.stellantis.com/", "title": "Stellantis global careers landing page", "party": "first", "kind": "site-page", "authority": "A2", "currency": "current", "publishedAt": null, "retrieval": "text-only", "retrievedAt": "2026-08-14", "goodFor": [], "note": "NOT PROBED by recon; now PROBED AND DRY for audience. Reachable but no job listings on the landing page, no marketing career area, no customer or audience language. Vauxhall appears only as a brand carousel logo (brand-vauxhall-16.svg) linking to vauxhall.com and vauxhall.co.uk, and the carousel links appear offset by one. Talent community restricted to North America." }
+  ]
+}

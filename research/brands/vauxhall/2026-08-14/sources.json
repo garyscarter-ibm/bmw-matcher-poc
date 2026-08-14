@@ -1,0 +1,1464 @@
+[
+  {
+    "id": "s1",
+    "url": "https://www.vauxhall.co.uk/",
+    "title": "Vauxhall UK — marketing site (root)",
+    "party": "first",
+    "kind": "site-page",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "walled",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "HTTP 403 to WebFetch (confirmed by runner before this agent ran). Whole Stellantis brand-site estate sits behind a WAF that refuses the harness fetcher. Not re-probed here per brief; recorded per instruction."
+  },
+  {
+    "id": "s2",
+    "url": "https://www.vauxhall.co.uk/robots.txt",
+    "title": "Vauxhall UK robots.txt",
+    "party": "first",
+    "kind": "machine-readable",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "walled",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "HTTP 403, confirmed by runner. Not re-probed."
+  },
+  {
+    "id": "s3",
+    "url": "https://vauxhall.co.uk/sitemap.xml",
+    "title": "Vauxhall UK sitemap",
+    "party": "first",
+    "kind": "machine-readable",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "walled",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "HTTP 403, confirmed by runner. Not re-probed."
+  },
+  {
+    "id": "s4",
+    "url": "https://www.opel.com/",
+    "title": "Opel corporate/marketing site (root)",
+    "party": "first",
+    "kind": "site-page",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "walled",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "HTTP 403, confirmed by runner. Same WAF as vauxhall.co.uk. Not re-probed."
+  },
+  {
+    "id": "s5",
+    "url": "https://media.vauxhall.co.uk/",
+    "title": "Vauxhall media host guess",
+    "party": "first",
+    "kind": "press-kit",
+    "authority": "A2",
+    "currency": "undated",
+    "publishedAt": null,
+    "retrieval": "dead-end",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Resolves but ECONNREFUSED on 443, per runner's CAPABILITY.md. Do not re-probe."
+  },
+  {
+    "id": "s6",
+    "url": "https://uk-media.stellantis.com/",
+    "title": "UK media host guess (wrong pattern)",
+    "party": "first",
+    "kind": "press-kit",
+    "authority": "A2",
+    "currency": "undated",
+    "publishedAt": null,
+    "retrieval": "dead-end",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "ENOTFOUND, per runner's CAPABILITY.md. The real pattern is media.stellantis.com/uk-en/vauxhall (see s11). Do not re-probe this host."
+  },
+  {
+    "id": "s7",
+    "url": "https://media.stellantis.co.uk/",
+    "title": "Stellantis UK media host guess",
+    "party": "first",
+    "kind": "press-kit",
+    "authority": "A2",
+    "currency": "undated",
+    "publishedAt": null,
+    "retrieval": "dead-end",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "getaddrinfo ENOTFOUND. Does not exist. Do not re-probe."
+  },
+  {
+    "id": "s8",
+    "url": "https://stellantis-media.co.uk/",
+    "title": "Stellantis-media UK host guess",
+    "party": "first",
+    "kind": "press-kit",
+    "authority": "A2",
+    "currency": "undated",
+    "publishedAt": null,
+    "retrieval": "dead-end",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "getaddrinfo ENOTFOUND. Does not exist. Do not re-probe."
+  },
+  {
+    "id": "s9",
+    "url": "https://media.stellantis.com/",
+    "title": "Stellantis Media — international press portal (em-en locale)",
+    "party": "first",
+    "kind": "press-kit",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "copy",
+      "industry"
+    ],
+    "note": "Reachable, no error. Corporate media portal covering all 14 Stellantis brands plus mobility/motorsport. Nav links to Vauxhall's own locale at /uk-en/vauxhall (s11), so this root itself is only a routing hub for Vauxhall purposes. Press pattern /em-en/{brand}/press; media-library patterns /em-en/{brand}/media-library/{press-images|press-videos|gallery}. Some sections gated behind /em-en/login."
+  },
+  {
+    "id": "s10",
+    "url": "https://www.media.stellantis.com/",
+    "title": "Stellantis Media — international press portal (www variant)",
+    "party": "first",
+    "kind": "press-kit",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "copy",
+      "industry"
+    ],
+    "note": "Same portal as s9 via www subdomain; duplicate content, kept as a separate record because it is the canonical form linked from stellantis.com."
+  },
+  {
+    "id": "s11",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall",
+    "title": "Stellantis Media — Vauxhall UK press room",
+    "party": "first",
+    "kind": "press-kit",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "copy",
+      "audience",
+      "industry"
+    ],
+    "note": "BEST FIND of this run. Live, dated Vauxhall-specific press room outside the vauxhall.co.uk WAF. Press index at /uk-en/vauxhall/press, releases at /uk-en/vauxhall/press/{slug}, RSS at /uk-en/vauxhall/rss, images at /uk-en/vauxhall/media-library/gallery. Dated items observed Jul-Aug 2026 including a market-share figure ('4.8%' H1 2026 UK share) and Corsa GSE pricing. No 'About Vauxhall' boilerplate paragraph present on this landing page (checked; genuinely absent here, may exist on individual release pages, unprobed). Brand logo image referenced at /uploads/uk/brand/verticalbluecopy-69a81b0da8eff.png and footer logo /uploads/uk/vauxhall-footerLogo.png — first-party PNG paths, not fetched as binary (text-only constraint) but worth a later run downloading if binary capability exists."
+  },
+  {
+    "id": "s12",
+    "url": "https://registry.npmjs.org/-/v1/search?text=stellantis&size=20",
+    "title": "npm registry search: stellantis",
+    "party": "first",
+    "kind": "machine-readable",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Dead-end for design tokens. Only 2 unrelated hits (a financing-form package, a Mopar HomeKit plugin)."
+  },
+  {
+    "id": "s13",
+    "url": "https://registry.npmjs.org/-/v1/search?text=opel%20design%20system&size=20",
+    "title": "npm registry search: opel design system",
+    "party": "first",
+    "kind": "machine-readable",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Dead-end. No Opel or Vauxhall packages in the 20 results shown (243,379 total matches on the broad term, not narrowed by brand)."
+  },
+  {
+    "id": "s14",
+    "url": "https://registry.npmjs.org/-/v1/search?text=vauxhall&size=20",
+    "title": "npm registry search: vauxhall",
+    "party": "first",
+    "kind": "machine-readable",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Dead-end for design tokens. 6 hits, none a UI/token package: an Obsidian/Quartz colour theme named 'vauxhall' (unrelated to the brand), a vehicle-telemetry connector, an OnStar API client, and spam."
+  },
+  {
+    "id": "s15",
+    "url": "https://api.github.com/search/repositories?q=vauxhall+design+tokens",
+    "title": "GitHub repo search: vauxhall design tokens",
+    "party": "first",
+    "kind": "machine-readable",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "total_count: 0. Dead-end."
+  },
+  {
+    "id": "s16",
+    "url": "https://api.github.com/orgs/vauxhall",
+    "title": "GitHub org: vauxhall",
+    "party": "first",
+    "kind": "machine-readable",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2022-12",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Org exists (created 2022-12-23) but public_repos: 0, no description, not verified. Reserved/squatted, not in active use for publishing anything."
+  },
+  {
+    "id": "s17",
+    "url": "https://api.github.com/orgs/Stellantis",
+    "title": "GitHub org: Stellantis",
+    "party": "first",
+    "kind": "machine-readable",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2016-09",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Org exists, created 2016-09-13, blog=stellantis.com, 9 public repos, no description, not verified. The repo list itself was not enumerated (budget) -- unprobed, worth a follow-up call to /orgs/Stellantis/repos."
+  },
+  {
+    "id": "s18",
+    "url": "https://api.github.com/orgs/opel",
+    "title": "GitHub org: opel",
+    "party": "first",
+    "kind": "machine-readable",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "dead-end",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "HTTP 404 -- no such org."
+  },
+  {
+    "id": "s19",
+    "url": "https://www.stellantis.com/en/brands/vauxhall",
+    "title": "Stellantis corporate site -- Vauxhall brand page",
+    "party": "first",
+    "kind": "site-page",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "file": "copy/pages/stellantis-brand-page-vauxhall.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "copy",
+      "audience"
+    ],
+    "note": "Top source. Only positioning statement found anywhere in this run: tagline 'Energising a Better Britain'; descriptor 'The British automotive brand. More than just a car maker, Vauxhall is a mobility provider focused on ensuring electric equality for all.' No history, no founding/rebrand/acquisition dates on-page. CEO named as Florian Huettl, 'CEO, Opel and Vauxhall' -- corroborates shared-management/twin-brand structure. Footer copyright '(c) 2026 Stellantis NV' is the only date."
+  },
+  {
+    "id": "s20",
+    "url": "https://www.stellantis.com/en/investors",
+    "title": "Stellantis Investor Relations overview",
+    "party": "first",
+    "kind": "annual-report",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Reachable hub page only; links to Financial Reports, SEC filings, Investor Day 2026 (2026-05-21), Q1-Q3 2026 results dates. No Vauxhall-specific sales/segment data on this page itself -- the actual annual report PDF was not opened this pass (budget). Follow-up: /en/investors/reporting/financial-reports."
+  },
+  {
+    "id": "s21",
+    "url": "https://www.stellantis.com/en/careers",
+    "title": "Stellantis corporate Careers overview",
+    "party": "first",
+    "kind": "site-page",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Generic group-level culture copy only ('Driving a Future of Choices', 'Choose Your Own Road', '170 nationalities across 14 brands'). No Vauxhall-specific careers content or link; points to careers.stellantis.com (unprobed) and LinkedIn."
+  },
+  {
+    "id": "s22",
+    "url": "http://archive.org/wayback/available?url=vauxhall.co.uk&timestamp=20080101",
+    "title": "Wayback availability check -- vauxhall.co.uk near 2008-01-01",
+    "party": "third",
+    "kind": "archive",
+    "authority": "A2",
+    "currency": "dated",
+    "publishedAt": "2008-01",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "visual"
+    ],
+    "note": "Snapshot exists at 2008-01-02. Confirms the domain existed then, coinciding with Wikipedia's documented 2008 griffin logo revision (s39). Cannot view content (Wayback proxy blocked); existence only."
+  },
+  {
+    "id": "s23",
+    "url": "http://archive.org/wayback/available?url=vauxhall.co.uk&timestamp=20190101",
+    "title": "Wayback availability check -- vauxhall.co.uk near 2019-01-01",
+    "party": "third",
+    "kind": "archive",
+    "authority": "A2",
+    "currency": "dated",
+    "publishedAt": "2019-01",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "visual"
+    ],
+    "note": "Snapshot exists at 2019-01-01 12:28:47. Proves the domain was live then; does NOT independently corroborate a 2019 logo change -- content unreadable."
+  },
+  {
+    "id": "s24",
+    "url": "http://archive.org/wayback/available?url=vauxhall.co.uk&timestamp=20210301",
+    "title": "Wayback availability check -- vauxhall.co.uk near 2021-03-01",
+    "party": "third",
+    "kind": "archive",
+    "authority": "A2",
+    "currency": "dated",
+    "publishedAt": "2021-02",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "visual"
+    ],
+    "note": "Snapshot exists at 2021-02-28. Brackets the Stellantis-merger date (2021-01-16). Content unreadable."
+  },
+  {
+    "id": "s25",
+    "url": "http://archive.org/wayback/available?url=vauxhall.co.uk/brand-guidelines",
+    "title": "Wayback availability check -- vauxhall.co.uk/brand-guidelines",
+    "party": "third",
+    "kind": "archive",
+    "authority": "A2",
+    "currency": "undated",
+    "publishedAt": null,
+    "retrieval": "dead-end",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Empty archived_snapshots -- this path never existed at any date the Wayback Machine captured. A brand-guidelines PDF, if it ever existed, was not at this path."
+  },
+  {
+    "id": "s26",
+    "url": "http://archive.org/wayback/available?url=vauxhall.co.uk/about-us/brand.html",
+    "title": "Wayback availability check -- vauxhall.co.uk/about-us/brand.html",
+    "party": "third",
+    "kind": "archive",
+    "authority": "A2",
+    "currency": "undated",
+    "publishedAt": null,
+    "retrieval": "dead-end",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Empty archived_snapshots -- guessed path, never captured."
+  },
+  {
+    "id": "s27",
+    "url": "https://en.wikipedia.org/wiki/Vauxhall_Motors",
+    "title": "Wikipedia -- Vauxhall Motors",
+    "party": "third",
+    "kind": "article",
+    "authority": "A3",
+    "currency": "dated",
+    "publishedAt": "2025-10",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "visual",
+      "industry",
+      "audience"
+    ],
+    "note": "Page last edited 2025-10-27 per file-usage metadata. Richest single structured source in this run: full ownership chain with exact dates (GM 1925-11-16 to 2017, PSA 2017-2021, Stellantis 2021-01-16-present), dedicated Logo section (see s39) and Sponsorships section (see s40). Infobox logo filename is 'Vauxhall_logo_2019.svg' (see s29/s30) but nothing in the article's own prose independently explains or dates a 2019 redesign -- flagged as a discrepancy."
+  },
+  {
+    "id": "s28",
+    "url": "https://en.wikipedia.org/wiki/Opel",
+    "title": "Wikipedia -- Opel",
+    "party": "third",
+    "kind": "article",
+    "authority": "A3",
+    "currency": "dated",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "visual",
+      "industry"
+    ],
+    "note": "Used for context only, not as a Vauxhall source per se. Opel's own logo has a clean, well-dated version history per infobox gallery captions: 2009-2017, 2017-2020, 2020-2023, since 2023 (current file Opel_logo_2023.svg). Confirms Opel underwent identity revisions timed to the PSA (2017) and Stellantis (post-2020/2023) transitions -- Vauxhall's own article shows no equivalent dated sequence for its own griffin, which is itself a gap worth flagging: Vauxhall may or may not have mirrored Opel's cadence, but the encyclopedia does not say so."
+  },
+  {
+    "id": "s29",
+    "url": "https://en.wikipedia.org/wiki/File:Vauxhall_logo_2019.svg",
+    "title": "Wikipedia file page -- Vauxhall_logo_2019.svg",
+    "party": "third",
+    "kind": "aggregator",
+    "authority": "A4",
+    "currency": "undated",
+    "publishedAt": "2020-06",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "visual"
+    ],
+    "note": "IMPORTANT DISCREPANCY. Despite the filename, this is NOT a dated, sourced 2019 asset. Source field literally reads 'Logo obtained from Logopedia' (a Fandom fan wiki -- third party, not Vauxhall). No author credited. Upload history: first uploaded 2020-06-15 (not 2019); revised 2020-07-10 'now including the updated wordmark'; revised 2020-09-23 citing 'an official SVG from a Vauxhall dealer site' (still not vauxhall.co.uk itself); size-reduced 2020-12-28. Non-free/fair-use tag, low-resolution only. The '2019' in the filename is unexplained anywhere on the page and is not corroborated by the article's own Logo section (s39), which stops its dated narrative at 2008. Treat any date claim resting on this filename as UNVERIFIED."
+  },
+  {
+    "id": "s30",
+    "url": "https://upload.wikimedia.org/wikipedia/en/1/18/Vauxhall_logo_2019.svg",
+    "title": "Raw SVG asset backing s29",
+    "party": "third",
+    "kind": "aggregator",
+    "authority": "A4",
+    "currency": "undated",
+    "publishedAt": "2020-06",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "visual"
+    ],
+    "note": "Per the runner's prior probe (RUNNER-NOTES.md): 3,146 bytes, 344x291, image/svg+xml, reachable. Two candidate hex values read out of the markup: #d7001c (emblem/griffin badge + ring) and #000037 (wordmark glyph group). Explicitly candidates only, not tokens -- provenance is the same fan-wiki-sourced file as s29, so authority stays A4 regardless of directness. If the true current identity postdates 2019, these are also superseded."
+  },
+  {
+    "id": "s31",
+    "url": "https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=Vauxhall%20logo&srnamespace=6&format=json&srlimit=20",
+    "title": "Wikimedia Commons file search -- 'Vauxhall logo'",
+    "party": "third",
+    "kind": "machine-readable",
+    "authority": "A3",
+    "currency": "undated",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Rung probed and DRY for an official current SVG, not exhausted: 197 total hits, only first 20 examined. Results were photographs of physical badges/grilles/signage plus one unrelated file, 'File:Vauxhall Cross roundel.svg', which is the LONDON UNDERGROUND/rail interchange roundel, not the car brand -- confirms the identity-collision risk the brief flagged. 177 results remain unpaged; a later run could page further or filter by fileext:svg."
+  },
+  {
+    "id": "s32",
+    "url": "https://www.wikidata.org/wiki/Special:EntityData/Q59187.json",
+    "title": "Wikidata -- Vauxhall Motors (Q59187)",
+    "party": "third",
+    "kind": "machine-readable",
+    "authority": "A3",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "industry",
+      "audience"
+    ],
+    "note": "Structured corroboration of the ownership chain: P749 (parent org) General Motors 1925-11-16 to 2017-08-01, Groupe PSA 2017-08-02 to 2021-01-15, Stellantis (Europe entity) from 2021-01-16 to present (preferred rank). P571 (inception) 1857 (day-precision-0, year only). P154 (logo image) points only to 'Vauxhall lichtreclame.JPG', an old neon-sign photograph -- NOT a current wordmark, confirming Wikidata carries no dated official logo image for this entity. Headquarters (P159) changed 2019-05-07 (Luton Griffin House to Chalton House) -- a real, dated 2019 event, but about the HQ address, not the logo."
+  },
+  {
+    "id": "s33",
+    "url": "https://fontsinuse.com/search?q=vauxhall",
+    "title": "Fonts In Use search -- vauxhall",
+    "party": "third",
+    "kind": "article",
+    "authority": "A3",
+    "currency": "undated",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Rung probed and DRY via the basic search box ('No Uses found'). Advanced search (/search/advanced) and the Automotive topic browse (/in/1/topics/36/automotive, 331 entries) were NOT probed -- a later run should check those before concluding Fonts In Use has nothing on Vauxhall."
+  },
+  {
+    "id": "s34",
+    "url": "https://fontsinuse.com/search?q=opel",
+    "title": "Fonts In Use search -- opel",
+    "party": "third",
+    "kind": "article",
+    "authority": "A3",
+    "currency": "undated",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Rung probed and DRY, same caveat as s33 -- basic search only."
+  },
+  {
+    "id": "s35",
+    "url": "https://www.underconsideration.com/brandnew/archives/?s=vauxhall",
+    "title": "Brand New (UnderConsideration) search -- vauxhall",
+    "party": "third",
+    "kind": "article",
+    "authority": "A3",
+    "currency": "undated",
+    "publishedAt": null,
+    "retrieval": "dead-end",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "The ?s= query parameter does not work on this site's search -- returned a blank 'Untitled Document' with no body content, so this is INCONCLUSIVE rather than a proven-dry rung. Site is reachable; the correct search entry point was not found this pass (budget). Worth retrying with the site's own search form/endpoint in a later run."
+  },
+  {
+    "id": "s36",
+    "url": "https://trademarks.ipo.gov.uk/ipo-tmtext",
+    "title": "UK IPO trademark search",
+    "party": "first",
+    "kind": "trademark-filing",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "walled",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "HTTP 403 Forbidden. Same class of block as the vauxhall.co.uk WAF, or a generic bot-block on this UK government service. CORRECTED after recon: EUIPO eSearch and WIPO Global Brand Database were subsequently PROBED and both are WALLED, not unprobed (EUIPO is JavaScript-only and returns zero result rows to a text fetch, see s76; WIPO sits behind an Altcha captcha, see s77). All three trademark registries are therefore walled. This remains the single highest-value unblocked check for dating the current mark, but it needs a BROWSER, not more budget."
+  },
+  {
+    "id": "s37",
+    "url": "https://itunes.apple.com/search?term=vauxhall&country=gb&entity=software&limit=10",
+    "title": "Apple App Store search API (GB) -- vauxhall",
+    "party": "first",
+    "kind": "app-listing",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2019-11",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "audience",
+      "copy"
+    ],
+    "note": "Reachable JSON API, no error. Found the official app 'MyVauxhall' (seller: Vauxhall, released 2019-11-11, current version updated 2026-08-03) described as 'the official app for Vauxhall drivers -- to enhance the driving and ownership experience', plus a preview successor 'MyVauxhall 2.0' (released 2025-04-28, limited to New Grandland Electric, tiered as 'CONNECT ONE' / 'CONNECT PLUS'). Also surfaced third-party apps referencing Vauxhall/Opel (OPL Monitor, My Vauxhall Corsa lookup tool) -- clearly not first-party, kept separate. Google Play was NOT PROBED this pass."
+  },
+  {
+    "id": "s38",
+    "url": "https://logos.fandom.com/wiki/Vauxhall",
+    "title": "Logopedia (Fandom) -- Vauxhall",
+    "party": "third",
+    "kind": "aggregator",
+    "authority": "A4",
+    "currency": "undated",
+    "publishedAt": null,
+    "retrieval": "walled",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "HTTP 402 Payment Required. This is the very site the Wikipedia file (s29) cites as its logo source, so it could not be checked for corroboration or a stated date."
+  },
+  {
+    "id": "s39",
+    "url": "https://en.wikipedia.org/w/api.php?action=parse&page=Vauxhall_Motors&prop=wikitext&section=27&format=json",
+    "title": "Wikipedia -- Vauxhall Motors, 'Logo' section (wikitext)",
+    "party": "third",
+    "kind": "article",
+    "authority": "A3",
+    "currency": "dated",
+    "publishedAt": "2009-09",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "visual"
+    ],
+    "note": "MOST CONCRETE DATED LOGO EVIDENCE FOUND. States the griffin has been 'redesigned and released nine times' since the 1920s. Explicitly dates a 2005 design and its 2008 rework, quoting GM UK chairman Bill Parfitt on the new griffin paying 'homage to our 100-year-plus manufacturing heritage' while reflecting a 'fresh design philosophy' (first seen on the Astra, continued on the Insignia). Citation: 'Vauxhall's Griffin Flies to New Horizon', publisher Vauxhall Motors, dated 2009-09-10 (live URL now dead, archived 2009-08-17) -- this citation is itself first-party (a Vauxhall Motors press release) even though only its title/date survive via the Wikipedia citation, not the page's own text. NO 2019 change is mentioned anywhere in this section, which directly conflicts with the '2019' in the infobox filename (s29)."
+  },
+  {
+    "id": "s40",
+    "url": "https://en.wikipedia.org/w/api.php?action=parse&page=Vauxhall_Motors&prop=wikitext&section=28&format=json",
+    "title": "Wikipedia -- Vauxhall Motors, 'Sponsorships' section (wikitext)",
+    "party": "third",
+    "kind": "article",
+    "authority": "A3",
+    "currency": "dated",
+    "publishedAt": "2011-01",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "industry",
+      "audience"
+    ],
+    "note": "Two dated sponsorship eras: Football Conference 1986-1998 (succeeding Gola, succeeded by Nationwide Building Society), and main sponsor of England/N.Ireland/Scotland/Wales national football teams from 2011-present. Citations: The Guardian 2011-01-10 and BBC News 2011-01-11. Corroborated by current evidence at s11 (2026 press releases mention GSE Rally Cup motorsport and a Novuna London Athletics Meet partnership), suggesting an ongoing pattern of mass-participation-sport and athletics sponsorship rather than elite/luxury sponsorship -- relevant signal for the audience dimension."
+  },
+  {
+    "id": "s41",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press",
+    "title": "Vauxhall UK press index",
+    "party": "first",
+    "kind": "site-page",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "file": "copy/pages/press-index-vauxhall-uk.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "release inventory",
+      "headline conventions"
+    ],
+    "note": "20 items visible. Pagination is INERT: ?page=2 and ?page=5 both re-serve page 1, so releases older than 2026-05-06 were NOT PROBED. Boilerplate does not appear on the index, only on individual releases."
+  },
+  {
+    "id": "s42",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/new-corsa-gse-attainable-electric-hot-hatch-available-for-32-995",
+    "title": "New Corsa GSE pricing",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-release",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-08-05",
+    "retrieval": "text-only",
+    "file": "copy/pages/pr-2026-08-05-corsa-gse-pricing.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "price mechanics",
+      "GSE orthography"
+    ],
+    "note": "Headline price GBP 32,995 hedged by a single asterisk reading '*Pending government approval'."
+  },
+  {
+    "id": "s43",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/on-street-electric-vehicle-charging-for-disabled-drivers-doubles-in-last-12-months-but-75-of-councils-still-have-no-accessible-chargers",
+    "title": "Accessible charging FOI research",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-release",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-07-29",
+    "retrieval": "text-only",
+    "file": "copy/pages/pr-2026-07-29-accessible-charging-foi.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "accessibility segment",
+      "campaign voice"
+    ],
+    "note": "FOI-based advocacy release. Evidence for the accessibility-constrained audience segment."
+  },
+  {
+    "id": "s44",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/vauxhall-astra-astra-sports-tourer-press-information",
+    "title": "Astra and Astra Sports Tourer press information",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-pack",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-07-24",
+    "retrieval": "text-only",
+    "file": "copy/pages/pr-2026-07-24-astra-press-information.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "spec vocabulary",
+      "units",
+      "bullet form"
+    ],
+    "note": "Longest artefact in the corpus, about 30 bullets. Primary source for unit and spec-table mechanics."
+  },
+  {
+    "id": "s45",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/vauxhall-announced-as-official-automobile-partner-of-the-novuna-london-athletics-meet",
+    "title": "Novuna London Athletics Meet partnership",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-release",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-07-16",
+    "retrieval": "text-only",
+    "file": "copy/pages/pr-2026-07-16-novuna-athletics.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "sponsorship voice",
+      "Team GB boilerplate variant"
+    ]
+  },
+  {
+    "id": "s46",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/vauxhall-achieves-total-market-share-of-4-8-in-first-half-of-2026",
+    "title": "H1 2026 market share 4.8%",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-release",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-07-06",
+    "retrieval": "text-only",
+    "file": "copy/pages/pr-2026-07-06-market-share.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "the 4.8% claim",
+      "results register"
+    ],
+    "note": "Sole source of the 4.8% figure. Combined car-plus-van, H1 2026, stated only by Vauxhall. NOT independently verified; SMMT Jan-Jul 2026 gives cars 4.24% and LCVs 8.02% on different bases."
+  },
+  {
+    "id": "s47",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/ioan-lloyd-celebrates-vauxhall-s-first-win-in-adac-gse-rally-cup",
+    "title": "First win in ADAC GSE Rally Cup",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-release",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-06-15",
+    "retrieval": "text-only",
+    "file": "copy/pages/pr-2026-06-15-rally-first-win.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "motorsport register"
+    ]
+  },
+  {
+    "id": "s48",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/vauxhall-vans-electric-for-the-same-monthly-price-as-diesel",
+    "title": "Vans: electric at diesel monthly price",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-release",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-05-14",
+    "retrieval": "text-only",
+    "file": "copy/pages/pr-2026-05-14-vans-price-parity.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "SME and van segment",
+      "B2B register"
+    ]
+  },
+  {
+    "id": "s49",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/vauxhall-announces-new-sales-event-with-additional-1-000-saving",
+    "title": "Sales event, additional GBP 1,000 saving",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-release",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-05-11",
+    "retrieval": "text-only",
+    "file": "copy/pages/pr-2026-05-11-sales-event.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "offer small print",
+      "retail register"
+    ],
+    "note": "Densest source of offer small print: names Arnold Clark as a non-participating retailer, household claim limits, NI/IoM/Channel Islands carve-outs."
+  },
+  {
+    "id": "s50",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/new-vauxhall-corsa-gse-electrifying-rebirth-of-the-hot-hatch",
+    "title": "New Corsa GSE reveal",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-release",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-05-06",
+    "retrieval": "text-only",
+    "file": "copy/pages/pr-2026-05-06-corsa-gse-reveal.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "reveal register",
+      "the single observed pun"
+    ],
+    "note": "'ELECTRIFYING REBIRTH' is the one pun in 11 artefacts."
+  },
+  {
+    "id": "s51",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/new-vauxhall-mokka-gse-press-information",
+    "title": "New Mokka GSE press information",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-pack",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-07-13",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "Bold & Pure",
+      "Vizor",
+      "Pure Panel",
+      "GSE livery",
+      "modular boilerplate"
+    ],
+    "note": "Load-bearing across three dimensions. Source of 'Bold & Pure design language', 'an evolution of the Vauxhall Vizor', '10-inch Multimedia Navi Pure Panel system', GSE yellow/black livery, and the proof that the ABOUT VAUXHALL MOTORS block is MODULAR (the Team GB sentence is absent here but present on s45, s46, s48, s50). Read by the copy agent but NOT captured to a copy/pages/ file."
+  },
+  {
+    "id": "s52",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/vauxhall-opens-orders-for-new-mokka-yes-with-enhanced-specification-and-unique-styling",
+    "title": "Mokka YES trim appearance package",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-release",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-07-28",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "trim naming"
+    ],
+    "note": "Nearest release to a brand-identity topic and it is a trim package, not an identity announcement."
+  },
+  {
+    "id": "s53",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/over-a-quarter-of-brits-think-they-could-qualify-for-the-la2028-olympic-games-vauxhall-research-reveals",
+    "title": "LA2028 consumer research",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-release",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-08-12",
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "sponsorship",
+      "consumer research voice"
+    ]
+  },
+  {
+    "id": "s54",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/press/vauxhall-announces-new-c-segment-suv-in-europe-first-model-of-the-intended-expanded-partnership-with-leapmotor",
+    "title": "New C-segment SUV, Leapmotor partnership",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-release",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "range architecture"
+    ],
+    "note": "Contains a first-party typo, 'would be is designed', recorded as a data anomaly not a style rule."
+  },
+  {
+    "id": "s55",
+    "url": "https://www.asa.org.uk/codes-and-rulings/rulings.html?q=vauxhall",
+    "title": "ASA rulings search for Vauxhall",
+    "party": "third",
+    "kind": "site-page",
+    "kindDetail": "regulator-search",
+    "authority": "A3",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "file": "copy/pages/asa-rulings-probe.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "regulatory record"
+    ],
+    "note": "Reachable and rendered. ZERO formal rulings against Vauxhall; five informally resolved cases 2021-11-17 to 2025-01-08. So the hoped-for route of reading verbatim ad copy quoted by a regulator is NOT PUBLISHED, not merely unreached."
+  },
+  {
+    "id": "s56",
+    "url": "https://www.asa.org.uk/type/broadcast/code_section/03.html",
+    "title": "BCAP Code section 3, misleading advertising",
+    "party": "third",
+    "kind": "site-page",
+    "kindDetail": "regulator-code",
+    "authority": "A1",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "applicable ad rules"
+    ],
+    "note": "BCAP 3.1, 3.9, 3.33, 3.39 each appear once against Vauxhall's informally resolved cases, all broadcast."
+  },
+  {
+    "id": "s57",
+    "url": "https://www.handbook.fca.org.uk/handbook/CONC/3/5.html",
+    "title": "FCA CONC 3.5, credit advertising",
+    "party": "third",
+    "kind": "site-page",
+    "kindDetail": "regulator-code",
+    "authority": "A1",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "motor finance ad rules"
+    ]
+  },
+  {
+    "id": "s58",
+    "url": "https://www.vehicle-certification-agency.gov.uk/fuel-consumption-co2/",
+    "title": "VCA fuel consumption and CO2",
+    "party": "third",
+    "kind": "site-page",
+    "kindDetail": "regulator",
+    "authority": "A1",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "emissions labelling"
+    ],
+    "note": "Load-bearing: VCA states websites 'are not considered to fall within the definition of promotional literature', so the CO2 presentation rules do NOT govern the brand's own site. CAP Code section 3 is the operative regime there and it is UNPROBED."
+  },
+  {
+    "id": "s59",
+    "url": "https://www.vehicle-certification-agency.gov.uk/fuel-consumption-co2/enforcement/enforcement-on-advertising/",
+    "title": "VCA enforcement on advertising",
+    "party": "third",
+    "kind": "site-page",
+    "kindDetail": "regulator",
+    "authority": "A1",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "emissions labelling enforcement"
+    ]
+  },
+  {
+    "id": "s60",
+    "url": "https://www.fca.org.uk/firms/consumer-credit/financial-promotions-adverts",
+    "title": "FCA financial promotions page",
+    "party": "third",
+    "kind": "site-page",
+    "kindDetail": "regulator",
+    "authority": "A1",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "dead-end",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "HTTP 404. Superseded by the handbook route at s57."
+  },
+  {
+    "id": "s61",
+    "url": "https://www.smmt.co.uk/vehicle-data/car-registrations/",
+    "title": "SMMT UK car registrations",
+    "party": "third",
+    "kind": "site-page",
+    "kindDetail": "industry-body",
+    "authority": "A3",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "independent volume and share"
+    ],
+    "note": "Jan-Jul 2026: Vauxhall cars 54,841, 4.24% share, DOWN from 4.36%. Different base and period from the brand's own 4.8% claim; not reconciled, not averaged."
+  },
+  {
+    "id": "s62",
+    "url": "https://www.smmt.co.uk/vehicle-data/lcv-registrations/",
+    "title": "SMMT UK LCV registrations",
+    "party": "third",
+    "kind": "site-page",
+    "kindDetail": "industry-body",
+    "authority": "A3",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "independent van volume"
+    ],
+    "note": "Jan-Jul 2026: 15,015 LCVs, 8.02% share. Page carries stale headings, noted as a source anomaly."
+  },
+  {
+    "id": "s63",
+    "url": "https://www.smmt.co.uk/",
+    "title": "SMMT homepage",
+    "party": "third",
+    "kind": "site-page",
+    "kindDetail": "industry-body",
+    "authority": "A3",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "navigation to data sets"
+    ]
+  },
+  {
+    "id": "s64",
+    "url": "https://en.wikipedia.org/w/api.php?action=parse&page=Vauxhall_Motors&prop=sections&format=json",
+    "title": "Wikipedia Vauxhall Motors section index",
+    "party": "third",
+    "kind": "machine-readable",
+    "kindDetail": "encyclopaedia-api",
+    "authority": "A3",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "navigation"
+    ]
+  },
+  {
+    "id": "s65",
+    "url": "https://en.wikipedia.org/w/api.php?action=parse&page=Vauxhall_Motors&prop=wikitext&section=17",
+    "title": "Wikipedia Vauxhall Motors, wikitext section 17",
+    "party": "third",
+    "kind": "machine-readable",
+    "kindDetail": "encyclopaedia-api",
+    "authority": "A3",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "model history"
+    ]
+  },
+  {
+    "id": "s66",
+    "url": "https://en.wikipedia.org/w/api.php?action=parse&page=Vauxhall_Motors&prop=wikitext&section=29",
+    "title": "Wikipedia Vauxhall Motors, wikitext section 29",
+    "party": "third",
+    "kind": "machine-readable",
+    "kindDetail": "encyclopaedia-api",
+    "authority": "A3",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "motorsport and sub-brand history"
+    ]
+  },
+  {
+    "id": "s67",
+    "url": "https://www.stellantis.com/en/investors/reporting/financial-reports",
+    "title": "Stellantis financial reports index",
+    "party": "first",
+    "kind": "site-page",
+    "kindDetail": "corporate-page",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "route to filings"
+    ],
+    "note": "Enumerates annual reports, 20-Fs, semi-annual and interim reports 2020-2026 with verbatim /content/dam/ PDF paths. Carries NO capital-markets-day deck and NO integrated report. The 2026 interim report PDF is listed but was NOT opened."
+  },
+  {
+    "id": "s68",
+    "url": "https://www.stellantis.com/content/dam/stellantis-corporate/investors/financial-reports/Stellantis-NV-20251231-Annual-Report.pdf",
+    "title": "Stellantis 2025 Annual Report and Form 20-F",
+    "party": "first",
+    "kind": "annual-report",
+    "kindDetail": "regulatory-filing",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-02-26",
+    "retrieval": "downloaded",
+    "file": "raw/audience/stellantis-2025-annual-report-extract.txt",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "portfolio position",
+      "price strategy",
+      "UK regulation",
+      "plant footprint"
+    ],
+    "note": "STRONGEST AUDIENCE SOURCE IN THE RUN. 519 pages, 8,821,356 bytes, produced via Workiva. WebFetch cannot render PDF text but SAVES THE BINARY; pypdf extracted it locally. p16 names Vauxhall among 'the mainstream brands Citroen, FIAT, Opel, Peugeot, Vauxhall as well as premium brands Alfa Romeo, DS and Lancia'. p47 lower price points for affordability. p39 UK ZEV regulation. p495 Ellesmere Port. Load-bearing quotes INDEPENDENTLY RE-VERIFIED by the run owner against the binary; extract at raw/audience/stellantis-2025-annual-report-extract.txt."
+  },
+  {
+    "id": "s69",
+    "url": "https://itunes.apple.com/search?term=vauxhall&country=gb&entity=software&limit=25",
+    "title": "iTunes Search API, Vauxhall UK apps",
+    "party": "first",
+    "kind": "app-listing",
+    "kindDetail": "app-store-api",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "file": "copy/pages/myvauxhall-app-store-listings.md",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "app listing copy",
+      "consumer-adjacent register"
+    ],
+    "note": "First-party listing text for MyVauxhall. One of only two consumer-register artefacts reachable in the run."
+  },
+  {
+    "id": "s70",
+    "url": "https://careers.stellantis.com/",
+    "title": "Stellantis careers",
+    "party": "first",
+    "kind": "site-page",
+    "kindDetail": "corporate-page",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "employer voice"
+    ],
+    "note": "Reachable; unprobed by recon."
+  },
+  {
+    "id": "s71",
+    "url": "https://www.evanshalshaw.com/vauxhall/",
+    "title": "Evans Halshaw Vauxhall section",
+    "party": "third",
+    "kind": "site-page",
+    "kindDetail": "dealer-site",
+    "authority": "A4",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "dealer versus national tone"
+    ],
+    "note": "Returned 200 but reported zero stylesheets and zero @font-face because WebFetch strips the document head. The dealer-template route was defeated by the fetcher, not by the dealer."
+  },
+  {
+    "id": "s72",
+    "url": "https://www.evanshalshaw.com/-/media/evanshalshaw/logos/vauxhall/vauxhall-svg.svg",
+    "title": "Vauxhall lockup SVG, Evans Halshaw Sitecore library",
+    "party": "third",
+    "kind": "asset",
+    "kindDetail": "svg-artefact",
+    "authority": "A4",
+    "currency": "undated",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "logo geometry"
+    ],
+    "note": "Declares .cls-2{fill:#d7001c} and .cls-1{fill:#000037} in its own style block. Both values are DISPROVED as first-party by measurement against s85/s86. Wordmark is outlined paths, so it identifies no typeface. viewBox 0 0 59 50, Inkscape-edited, undated."
+  },
+  {
+    "id": "s73",
+    "url": "https://www.pentagon-group.co.uk/vauxhall",
+    "title": "Pentagon Group Vauxhall section",
+    "party": "third",
+    "kind": "site-page",
+    "kindDetail": "dealer-site",
+    "authority": "A4",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "dealer tone"
+    ],
+    "note": "Same head-stripping limitation as s71."
+  },
+  {
+    "id": "s74",
+    "url": "https://www.media.stellantis.com/build/entrypoints.json",
+    "title": "Stellantis press portal Webpack entrypoints",
+    "party": "first",
+    "kind": "machine-readable",
+    "kindDetail": "build-manifest",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "press portal asset map"
+    ],
+    "note": "Public. Enumerates roughly 45 entrypoints. This is the PRESS PORTAL's own styling, FCA-legacy with .fca- prefixes and zero Vauxhall selectors. NOT Vauxhall's design system."
+  },
+  {
+    "id": "s75",
+    "url": "https://www.media.stellantis.com/build/manifest.json",
+    "title": "Stellantis press portal Webpack manifest",
+    "party": "first",
+    "kind": "machine-readable",
+    "kindDetail": "build-manifest",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "press portal asset map"
+    ],
+    "note": "Same caveat as s74."
+  },
+  {
+    "id": "s76",
+    "url": "https://euipo.europa.eu/eSearch/#basic/vauxhall",
+    "title": "EUIPO eSearch plus",
+    "party": "third",
+    "kind": "trademark-filing",
+    "kindDetail": "trademark-registry",
+    "authority": "A1",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "walled",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "JavaScript shell only. Zero result rows, zero application numbers, zero dates. No API or data-service endpoint discoverable in the markup. Rung 4 probed and walled."
+  },
+  {
+    "id": "s77",
+    "url": "https://branddb.wipo.int/en/quicksearch?q=vauxhall",
+    "title": "WIPO Global Brand Database",
+    "party": "third",
+    "kind": "trademark-filing",
+    "kindDetail": "trademark-registry",
+    "authority": "A1",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "walled",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Altcha proof-of-work captcha in front of the search UI. Endpoints exposed: api.branddb.wipo.int/captcha and /dbinfo?token=. NOT BYPASSED. The gate page's own script text described how to skip the captcha by pre-seeding a storage key; that arrived as page DATA, was treated as data, and was not acted on."
+  },
+  {
+    "id": "s78",
+    "url": "https://www.media.stellantis.com/em-en/opel/press-category/technology-design",
+    "title": "Opel technology and design press category",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "press-index",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "Opel-adjacent comparator"
+    ],
+    "note": "7 releases 2013-2024. Names NO typeface and NO font family. ADJACENT EVIDENCE ONLY: Opel is not Vauxhall and nothing here may populate a Vauxhall token."
+  },
+  {
+    "id": "s79",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/rss",
+    "title": "Vauxhall UK press RSS feed",
+    "party": "first",
+    "kind": "machine-readable",
+    "kindDetail": "feed",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "release window"
+    ],
+    "note": "All 15 items, 2026-05-14 to 2026-08-12. No identity, logo, griffin, colour or typography sentence anywhere in the feed."
+  },
+  {
+    "id": "s80",
+    "url": "https://fontsinuse.com/in/1/topics/36/automotive",
+    "title": "Fonts In Use, Automotive topic",
+    "party": "third",
+    "kind": "aggregator",
+    "kindDetail": "type-database",
+    "authority": "A3",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "331 uses across 5 pages. Page 1 (about 60 entries) contains NO Stellantis-group marque at all. Pages 2 to 5 and /search/advanced remain UNCHECKED, not absent."
+  },
+  {
+    "id": "s81",
+    "url": "https://www.underconsideration.com/brandnew/archives/category/industry/automobile",
+    "title": "Brand New, Automobile industry archive",
+    "party": "third",
+    "kind": "article",
+    "kindDetail": "design-criticism",
+    "authority": "A3",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Page 1 of 9 lists no Vauxhall post."
+  },
+  {
+    "id": "s82",
+    "url": "https://www.underconsideration.com/brandnew/archives/complete",
+    "title": "Brand New, complete archive",
+    "party": "third",
+    "kind": "article",
+    "kindDetail": "design-criticism",
+    "authority": "A3",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "text-only",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Page 1 of 1508 lists no Vauxhall, Opel or Stellantis post."
+  },
+  {
+    "id": "s83",
+    "url": "https://www.underconsideration.com/brandnew/archives/new_logo_for_opel_2.php",
+    "title": "Brand New, New Logo for Opel",
+    "party": "third",
+    "kind": "article",
+    "kindDetail": "design-criticism",
+    "authority": "A3",
+    "currency": "dated",
+    "publishedAt": "2023-07-25",
+    "retrieval": "walled",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Subscriber paywall. NOT BYPASSED, so it yielded no colour or type values. Opel-adjacent in any case."
+  },
+  {
+    "id": "s84",
+    "url": "https://www.schemecolor.com/vauxhall-logo-colors.php",
+    "title": "SchemeColor, Vauxhall logo colours",
+    "party": "third",
+    "kind": "aggregator",
+    "authority": "A4",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "dead-end",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "HTTP 404. Aggregator rung 6, partially probed. No longer worth probing now that first-party assets are measured."
+  },
+  {
+    "id": "s85",
+    "url": "https://www.stellantis.com/content/dam/stellantis-corporate/brands/vauxhall/vauxhall-logo.png",
+    "title": "Vauxhall full-colour vertical lockup, Stellantis corporate DAM",
+    "party": "first",
+    "kind": "asset",
+    "kindDetail": "logo-asset",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "downloaded",
+    "file": "visual/logo/vauxhall-logo-stellantis-dam.png",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "logo artwork",
+      "measured brand colour"
+    ],
+    "note": "RETRIEVED AND MEASURED. 1080x1080 RGBA PNG, 105 KB, no ICC profile. Exactly two colours: #eb0000 at 80.68% of opaque pixels (griffin roundel) and #00003a at 19.32% (wordmark). Adobe Photoshop 25.3 (Macintosh) metadata. On disk at visual/logo/vauxhall-logo-stellantis-dam.png. Same artwork as s86."
+  },
+  {
+    "id": "s86",
+    "url": "https://www.stellantis.com/content/dam/stellantis-corporate/brands/vauxhall/vauxhall.png",
+    "title": "Vauxhall full-colour lockup on 16:9 canvas, Stellantis corporate DAM",
+    "party": "first",
+    "kind": "asset",
+    "kindDetail": "logo-asset",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "downloaded",
+    "file": "visual/logo/vauxhall-stellantis-dam.png",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "logo artwork"
+    ],
+    "note": "RETRIEVED. 1280x720 RGBA PNG, 55.2 KB. Identical colour proportions and inked aspect ratio to s85 (1.1755 vs 1.1753), so it is the SAME ARTWORK on a different canvas. Counts as one source with s85, NOT two corroborations. On disk at visual/logo/vauxhall-stellantis-dam.png."
+  },
+  {
+    "id": "s87",
+    "url": "https://www.media.stellantis.com/uploads/uk/brand/verticalbluecopy-69a81b0da8eff.png",
+    "title": "Vauxhall one-colour vertical lockup, UK press portal",
+    "party": "first",
+    "kind": "asset",
+    "kindDetail": "logo-asset",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "downloaded",
+    "file": "visual/logo/vauxhall-vertical-blue-presskit.png",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "monochrome logo variant",
+      "resolution of the red-versus-blue question"
+    ],
+    "note": "RETRIEVED AND MEASURED. 1634x1411 RGBA PNG, 177.8 KB. A MONOCHROME rendering of the same vertical lockup, entirely #002a42 at 98.25% of opaque pixels (remainder is anti-aliasing across 37 near shades). This RESOLVES the contested red-versus-blue reading: the filename described a one-colour variant treatment, not a competing primary hue. On disk at visual/logo/vauxhall-vertical-blue-presskit.png."
+  },
+  {
+    "id": "s88",
+    "url": "https://www.media.stellantis.com/uploads/uk/vauxhall-footerLogo.png",
+    "title": "Vauxhall reversed lockup, UK press portal footer",
+    "party": "first",
+    "kind": "asset",
+    "kindDetail": "logo-asset",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "downloaded",
+    "file": "visual/logo/vauxhall-footer-logo-presskit.png",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "reversed logo variant"
+    ],
+    "note": "RETRIEVED AND MEASURED. 131x130 RGBA PNG, 2 KB. Pure #ffffff at every opaque pixel: a knockout lockup for dark grounds. Proves a reversed treatment exists in the live system. On disk at visual/logo/vauxhall-footer-logo-presskit.png."
+  },
+  {
+    "id": "s89",
+    "url": "https://admin.media.stellantis.com/uploads/uk/content-image/6742/image-20260713123714-1_6a54cdeb35ab0.jpeg",
+    "title": "Mokka GSE press pack, inline image 1",
+    "party": "first",
+    "kind": "asset",
+    "kindDetail": "press-photo",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": "2026-07-13",
+    "retrieval": "downloaded",
+    "file": "raw/visual/mokka-gse-press-image-01.jpg",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [
+      "art direction",
+      "GSE heritage lineage"
+    ],
+    "note": "RETRIEVED AND VIEWED, the only Vauxhall photograph actually seen in this run. 378x252 JPEG, 15.9 KB, so it is the web-optimised inline copy and not the full-resolution press asset. Content: a white 1980s Astra GTE three-door in a panning motion shot, low three-quarter front angle, natural daylight, hillside scrub background, motion blur on wheels and background. Corroborates with imagery the brand's claimed GSE lineage from GTE and GSi. Sibling URLs cannot be guessed: each asset carries its own hash and the -5_ variant with the same hash 404s."
+  },
+  {
+    "id": "s90",
+    "url": "https://www.media.stellantis.com/uk-en/vauxhall/media-library/gallery",
+    "title": "Vauxhall UK press media library",
+    "party": "first",
+    "kind": "press-kit",
+    "kindDetail": "gallery",
+    "authority": "A2",
+    "currency": "current",
+    "publishedAt": null,
+    "retrieval": "dead-end",
+    "retrievedAt": "2026-08-14",
+    "goodFor": [],
+    "note": "Client-side rendered. Three gallery URLs returned the navigation shell only, with zero gallery items, zero captions and zero asset URLs. The richest source of first-party captions on the site was reachable but unreadable. Capability gap, PROBED, not an absence of captions."
+  }
+]
