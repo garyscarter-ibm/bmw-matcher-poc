@@ -15,12 +15,12 @@
  *      the *taste* answer keys (body, fuel, style, priorities) — see
  *      swipesToAnswers().
  *   3. A RESULT: the assembled brief goes to the real /api/match (the identical
- *      call the questions mode makes). The ENGINE'S pick wins; the swipe taste
+ *      call the questionnaire mode makes). The ENGINE'S pick wins; the swipe taste
  *      only re-ranks within the feasible set it returned. So the match is always
  *      a car the person could actually buy, with the engine's real reasons.
  *
  * This mode owns its own copy, cards and state — it deliberately does NOT reuse
- * the questions mode's BRAND_COPY/matchCard (different voice, different card
+ * the questionnaire mode's BRAND_COPY/matchCard (different voice, different card
  * shape). Only el/cardinal/gbp (ui.js) and the engine client are shared.
  *
  * The scoring engine and car dataset live behind an API (see server/ and
@@ -116,7 +116,7 @@ const MINGLE_COPY = {
     thinTitle: 'Playing it cool, then.',
     thinLede: 'You kept your cards close, so here’s the best fit for what you told us.',
     // Honest "not quite" note — the engine's own weak/unmet signal, in character
-    // (§6.2). Reuses the concept behind the questions mode's weak/rescue copy.
+    // (§6.2). Reuses the concept behind the questionnaire mode's weak/rescue copy.
     weakNote: 'Full disclosure, though: none of these *quite* nailed your taste. '
       + 'Stock changes every week, so it’s worth another swipe soon.',
     // CTAs + share
@@ -418,7 +418,7 @@ function mount(root, ctx) {
   // Per-run state — a fresh local object, NOT hung on the shared ctx, so a mode
   // swap and re-mount (the switcher re-calls mount with the same ctx) starts
   // clean. The mode owns its own state and its own hash key (it never touches
-  // ctx.answers or the questions mode's #m= link).
+  // ctx.answers or the questionnaire mode's #m= link).
   const state = {
     questions: [], // the engine's per-brand questions (seeds the budget/use tiles)
     seed: null, // { budget, primaryUse }
@@ -477,7 +477,7 @@ function mount(root, ctx) {
    * what the car's for. Both the budget bands and the "what's it for" tiles are
    * built from the engine's own per-brand questions (state.questions) — NOT from
    * local copy — so MINI shows MINI's labels and MINI-scale money, exactly like
-   * the questions mode. Only the seed's framing (kicker/title/lede) is copy. */
+   * the questionnaire mode. Only the seed's framing (kicker/title/lede) is copy. */
   const renderSeed = (preset) => {
     root.replaceChildren();
     const screen = el('div', 'vm-screen vm-mingle-seed');
@@ -1007,7 +1007,7 @@ function mount(root, ctx) {
     const answers = swipesToAnswers(state.kept, state.seed);
     let result;
     try {
-      // The identical call the questions mode makes. THROWS on failure — guard.
+      // The identical call the questionnaire mode makes. THROWS on failure — guard.
       result = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand);
     } catch {
       showError(showResult);
@@ -1158,7 +1158,7 @@ function mount(root, ctx) {
 
   const doShare = async (hero, btn) => {
     const text = copy.shareText({ model: hero.car.name, retailer: ctx.retailerLabel || 'MINI' });
-    // Own hash key — never the questions mode's #m=. v1 links back to the mode;
+    // Own hash key — never the questionnaire mode's #m=. v1 links back to the mode;
     // the richer "landing shows their match" is a fast-follow (spec §6.3/§10).
     const url = `${window.location.origin}${window.location.pathname}${window.location.search}#mingle=1`;
     if (navigator.share) {
@@ -1177,7 +1177,7 @@ function mount(root, ctx) {
   /* ------------------------------ boot ------------------------------
    * The seed's budget bands and "what's it for" tiles are per-brand, and the
    * brand's authored labels + budget ceiling live behind apiGetQuestions — so,
-   * like the questions mode, we fetch that first. mount stays synchronous: it
+   * like the questionnaire mode, we fetch that first. mount stays synchronous: it
    * paints the seed skeleton now and does the fetch in this detached boot(), so
    * the shell never awaits a cold backend. apiGetQuestions THROWS on failure
    * (it's load-bearing here — no questions, no seed), so guard it and offer a

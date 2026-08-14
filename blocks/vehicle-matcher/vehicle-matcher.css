@@ -2355,7 +2355,7 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
  *
  * A Valentine's swipe game over the shared engine: a seed step, a swipeable
  * deck of real stock, and a match reveal. All scoped under .vm and built on the
- * same tokens as the questions mode; MINI tweaks live under .vm.vm-mini so a
+ * same tokens as the questionnaire mode; MINI tweaks live under .vm.vm-mini so a
  * BMW skin inherits the base. Every animation is disabled under the
  * reduced-motion block at the end of this section.
  *

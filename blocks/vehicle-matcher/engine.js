@@ -79,7 +79,7 @@ export async function apiMatch(base, answers, retailer, brandKey) {
  * throwing: the caller just omits the "Worth the drive" section.
  *
  * Returns `{ nearby, unmet }`. `unmet` is the wants this pool had nothing
- * behind (see the unmet note in modes/questions.js) and is `null` whenever we
+ * behind (see the unmet note in modes/questionnaire.js) and is `null` whenever we
  * didn't get a usable answer — a failed lookup, or an older API that doesn't
  * send the field. An empty list of cars is a finding; a failed lookup is not,
  * and the two must not be confused before telling a user something doesn't exist.

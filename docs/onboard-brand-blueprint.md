@@ -174,7 +174,7 @@ signatures you must set deliberately, not inherit**:
   must mirror it here exactly as it does on `.vm-btn` — Motorrad overrides
   `.vm.vm-<brand> .vm-switcher-tab` to UPPERCASE and the active tab to the near-black fill, not
   blue. Same rule as the primary-button fill: don't let a brand's identity stop at the stage
-  edge. (The tab *labels* stay brand-neutral by design — "Questions"/"Swipe"/"Head to head" —
+  edge. (The tab *labels* stay brand-neutral by design — "Questionnaire"/"Swipe"/"Head to head" —
   the brand name lives in the in-stage wordmark, spec §9; this bullet is about colour/font, not
   copy.)
 
@@ -274,7 +274,7 @@ the engine**:
 
 1. `cd server && npm test` — green, and BMW/MINI output unchanged (no regression).
 2. `node --check` every edited `.js`; check CSS brace balance.
-3. Local run: `npm run serve`, open `?brand=<key>&mode=questions|mingle|knockout` — each
+3. Local run: `npm run serve`, open `?brand=<key>&mode=questionnaire|mingle|knockout` — each
    mode paints, populates from the brand's stock, photos de-prioritised, knockout reads
    head-to-head, reveal fires, reduced-motion safe, re-mount safe.
 4. Headless DOM harness (jsdom): mount each mode per brand and assert rendered output.

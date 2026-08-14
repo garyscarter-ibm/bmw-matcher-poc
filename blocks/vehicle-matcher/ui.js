@@ -5,7 +5,7 @@
  * every interface "mode" (see modes/) needs, with no dependency on the quiz,
  * the engine client, or any brand copy. Anything a second mode would obviously
  * reuse lives here; anything still coupled to the questions flow stays in
- * modes/questions.js until a second mode actually needs it.
+ * modes/questionnaire.js until a second mode actually needs it.
  */
 
 /** Create an element with an optional class and text — the workhorse the whole

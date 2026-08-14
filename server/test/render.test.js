@@ -31,15 +31,15 @@ import {
 } from './helpers.js';
 
 // Brands under render test, each with a stock pool and the marque name. The
-// wordmark is asserted only where a mode actually shows it: the questions
+// wordmark is asserted only where a mode actually shows it: the questionnaire
 // intro names the brand for every marque ("Find your perfect BMW"), whereas the
 // two game modes lead with a neutral, brand-agnostic seed screen ("Car Match" /
 // "Head to Head" on BMW) and reveal the brand voice later, by design (see the
 // mode requirement docs). So the universal render check is "paints + correct
-// theme + no em dashes"; the wordmark check is scoped to questions.
+// theme + no em dashes"; the wordmark check is scoped to questionnaire.
 // Motorrad is the first non-car brand: its pool is BIKES (motorrad-bikes.json),
 // but the mapped shape is identical, so the same render matrix applies. Its
-// wordmark on the questions intro is "BMW Motorrad".
+// wordmark on the questionnaire intro is "BMW Motorrad".
 const BRANDS = [
   { key: 'bmw', pool: () => bmwPool(20), name: /BMW/i },
   { key: 'mini', pool: () => miniPool(8), name: /MINI/i },
@@ -49,7 +49,7 @@ const BRANDS = [
   { key: 'ferrari', pool: () => ferrariPool(20), name: /Ferrari/i },
 ];
 
-const MODES = ['questions', 'mingle', 'knockout'];
+const MODES = ['questionnaire', 'mingle', 'knockout'];
 
 let server;
 let modes;
@@ -83,13 +83,13 @@ for (const mode of MODES) {
         text.replace(/\s/g, '').length > 20,
         `${mode}/${brand.key} rendered no meaningful text`,
       );
-      // Brand copy resolved on the questions intro, which names the marque for
+      // Brand copy resolved on the questionnaire intro, which names the marque for
       // every brand. The game modes lead with a neutral seed screen by design,
       // so their wordmark is checked in their own reveal, not here.
-      if (mode === 'questions') {
+      if (mode === 'questionnaire') {
         assert.match(
           text, brand.name,
-          `questions/${brand.key} did not show the brand wordmark`,
+          `questionnaire/${brand.key} did not show the brand wordmark`,
         );
       }
       // The stage carries the brand theme class the CSS hangs off.
@@ -110,7 +110,7 @@ for (const mode of MODES) {
 // second interface on top of the first. Mount twice into the same stage-owning
 // body and assert the second run replaced rather than appended.
 test('re-mounting a mode starts a clean run', async () => {
-  const first = mountMode(modes.questions, { base: server.base, brand: 'bmw' });
+  const first = mountMode(modes.questionnaire, { base: server.base, brand: 'bmw' });
   await settle(first, (s) => s.textContent.replace(/\s/g, '').length > 20);
 
   // The shell re-mounts by handing the mode a fresh stage; simulate that.
@@ -157,7 +157,7 @@ test('no em dashes in painted copy', async () => {
 // server or DOM — it stands alone.
 test('no em dashes in any string literal across the client copy surface', () => {
   const CLIENT_FILES = [
-    'modes/questions.js', 'modes/mingle.js', 'modes/knockout.js',
+    'modes/questionnaire.js', 'modes/mingle.js', 'modes/knockout.js',
     'modes/match-signal.js', 'vehicle-matcher.js', 'quiz-meta.js',
     'vehicle-matcher.css',
   ];

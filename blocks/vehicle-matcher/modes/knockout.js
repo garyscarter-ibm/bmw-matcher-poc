@@ -17,7 +17,7 @@
  *      whittle it to a single champion. Each pick nudges the *taste* answer keys,
  *      weighted by how far a car advances (bracketToAnswers()).
  *   3. A RESULT: the assembled brief goes to the real /api/match (the identical
- *      call the questions mode makes). The player's CHAMPION is the hero of the
+ *      call the questionnaire mode makes). The player's CHAMPION is the hero of the
  *      reveal — always honoured — and the engine supplies its real "why" and the
  *      honest note when the numbers don't back the crown ("champion, engine
  *      validates"). So the celebration is the player's; the truth is the engine's.
@@ -1090,7 +1090,7 @@ function mount(root, ctx) {
 
   /* --------------------------- result --------------------------- */
   // The champion is the lone survivor of the bracket. We STILL call the real
-  // engine (the same call the questions mode makes) — not to pick the hero (the
+  // engine (the same call the questionnaire mode makes) — not to pick the hero (the
   // champion is always the hero, decision "champion, engine validates") but to
   // attach its real "why" reasons and to know when to add the honest note.
   const showResult = async (champion) => {

@@ -1,5 +1,5 @@
 /*
- * Questions mode — the original, question-by-question matcher interface.
+ * Questionnaire mode — the original, question-by-question matcher interface.
  *
  * One of several interchangeable interface "modes" over the shared engine (see
  * ../modes/index.js and the shell in ../vehicle-matcher.js). This is the whole
@@ -3292,7 +3292,7 @@ async function renderResults(root, ctx, answers) {
 /* ------------------------------ decorate ------------------------------ */
 
 /*
- * The questions interface as a mountable mode.
+ * The questionnaire interface as a mountable mode.
  *
  * The shell (../vehicle-matcher.js) has already read authored config and put
  * `api`, `retailer`, `retailerLabel`, `brand` and `overrides` on `ctx`, applied
@@ -3366,4 +3366,4 @@ function mount(root, ctx) {
   boot();
 }
 
-export default { key: 'questions', label: 'Questions', mount };
+export default { key: 'questionnaire', label: 'Questionnaire', mount };

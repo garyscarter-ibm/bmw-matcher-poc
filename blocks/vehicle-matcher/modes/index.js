@@ -18,11 +18,11 @@
  * change. The first entry is the default when nothing is authored/overridden.
  */
 
-import questions from './questions.js';
+import questionnaire from './questionnaire.js';
 import mingle from './mingle.js';
 import knockout from './knockout.js';
 
-export const MODES = [questions, mingle, knockout];
+export const MODES = [questionnaire, mingle, knockout];
 
 export const DEFAULT_MODE = MODES[0];
 

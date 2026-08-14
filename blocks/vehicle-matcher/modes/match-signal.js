@@ -2,7 +2,7 @@
  * Shared "signal" helpers for the game modes (Swipe / MINI Mingle and the
  * Head-to-head / MINI Knockout championship). Both modes do the same core job:
  * they let a player express taste over a deck of real stock, then turn that taste
- * into the SAME answer keys the questions mode produces and hand them to the real
+ * into the SAME answer keys the questionnaire mode produces and hand them to the real
  * engine. The engine — not the game — picks the match (see the mode docs).
  *
  * These helpers are the mode-agnostic, brand-safe pieces of that job:
@@ -272,7 +272,7 @@ export function rankByFrequency(values) {
 /*
  * Turn a WEIGHTED bag of liked cars (plus the seed answers) into the engine's
  * answer object — the whole point of the game modes. The result is the SAME shape
- * the questions mode builds; it goes straight to /api/match.
+ * the questionnaire mode builds; it goes straight to /api/match.
  *
  * `liked` is a flat list of cars where a car appears once per unit of preference:
  * the swipe game passes each kept car once; the knockout passes each car `weight`

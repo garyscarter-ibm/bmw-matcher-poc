@@ -3,7 +3,7 @@
  *
  * The server-side tests (api/engine/brand) prove the engine and the HTTP
  * contract. This harness closes the last gap: it actually MOUNTS each interface
- * mode (questions / swipe / knockout) in a real DOM and asserts it paints, per
+ * mode (questionnaire / swipe / knockout) in a real DOM and asserts it paints, per
  * brand — so a client render regression (a mode that throws on mount, or paints
  * nothing for a new brand) is caught by CI, not by eyeballing the browser.
  *
@@ -124,7 +124,7 @@ export async function startModeServer(poolsByBrand) {
   };
 }
 
-/** Dynamically import a mode module by key (questions | mingle | knockout). */
+/** Dynamically import a mode module by key (questionnaire | mingle | knockout). */
 export async function loadMode(key) {
   const mod = await import(new URL(`modes/${key}.js`, BLOCK_DIR));
   return mod.default;
