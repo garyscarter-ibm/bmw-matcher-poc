@@ -59,6 +59,16 @@ jobs:
             # backend. Exact match, so only that one attribute is ever rewritten.
             find _site -maxdepth 1 -name '*.html' -exec \
               sed -i "s|data-api=\"http://localhost:8787\"|data-api=\"${API_URL}\"|g" {} +
+
+            # Then prove it landed. A failed rewrite does not reliably fail this
+            # step (find -exec ... + does not always surface the child's status),
+            # so trusting the exit code would let us publish a site still calling
+            # localhost:8787 while the job reports success.
+            if grep -rl 'data-api="http://localhost:8787"' _site --include='*.html'; then
+              echo "::error::API_URL rewrite did not apply to the files listed above"
+              exit 1
+            fi
+            echo "API rewrite ok: $(grep -ho 'data-api="[^"]*"' _site/*.html | sort -u)"
           fi
           echo "Published tree:"
           find _site -maxdepth 2 -name '*.html' | sort
