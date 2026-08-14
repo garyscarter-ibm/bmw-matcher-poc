@@ -21,8 +21,9 @@
 import questionnaire from './questionnaire.js';
 import mingle from './mingle.js';
 import knockout from './knockout.js';
+import podium from './podium.js';
 
-export const MODES = [questionnaire, mingle, knockout];
+export const MODES = [questionnaire, mingle, knockout, podium];
 
 export const DEFAULT_MODE = MODES[0];
 

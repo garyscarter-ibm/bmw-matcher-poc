@@ -49,7 +49,7 @@ const BRANDS = [
   { key: 'ferrari', pool: () => ferrariPool(20), name: /Ferrari/i },
 ];
 
-const MODES = ['questionnaire', 'mingle', 'knockout'];
+const MODES = ['questionnaire', 'mingle', 'knockout', 'podium'];
 
 let server;
 let modes;
@@ -106,6 +106,115 @@ for (const mode of MODES) {
   }
 }
 
+/*
+ * Podium's two locked rules, neither of which the mount matrix above can see
+ * (it only asserts the first paint).
+ *
+ * 1. The conditional questions are spliced IN PLACE. A rebuild of the pane is
+ *    one line and it throws away scroll position and focus, so the check is
+ *    that the removed block is gone AND that a neighbouring block is the same
+ *    DOM node it was before the answer changed.
+ * 2. "Not this one" only offers a reason whose follow-up can move the result
+ *    FOR THIS BRAND. MINI drops the mileage question in brands.js, so MINI must
+ *    not offer Mileage; a button that looks like it did something but cannot is
+ *    worse than no button.
+ */
+test('podium splices a conditional question out in place', async () => {
+  const stage = mountMode(modes.podium, { base: server.base, brand: 'bmw' });
+  // `charging` shows while fuel is unanswered (SHOW_IF.charging).
+  await settle(stage, (s) => s.querySelector('.vm-podium-q[data-qid="charging"]'));
+
+  const budgetBefore = stage.querySelector('.vm-podium-q[data-qid="budget"]');
+  const fuel = stage.querySelector('.vm-podium-q[data-qid="fuel"]');
+  const petrol = [...fuel.querySelectorAll('.vm-option')]
+    .find((b) => b.textContent.includes('Petrol'));
+  petrol.click();
+
+  assert.equal(
+    stage.querySelector('.vm-podium-q[data-qid="charging"]'), null,
+    'charging survived a petrol-only answer',
+  );
+  assert.equal(
+    stage.querySelector('.vm-podium-q[data-qid="budget"]'), budgetBefore,
+    'the pane was rebuilt rather than spliced: the budget block is a new node',
+  );
+});
+
+test('podium only offers a dismissal reason the brand can act on', async () => {
+  const reasonsFor = async (brand) => {
+    resetDom();
+    const stage = mountMode(modes.podium, { base: server.base, brand });
+    // The reject trigger only exists once a live podium has painted.
+    await settle(stage, (s) => s.querySelector('.vm-podium-reject'));
+    stage.querySelector('.vm-podium-reject').click();
+    return [...stage.querySelectorAll('.vm-podium-pop-reason')].map((b) => b.textContent);
+  };
+
+  const bmw = await reasonsFor('bmw');
+  assert.ok(bmw.includes('Price'), 'BMW was not offered the price branch');
+  assert.ok(bmw.includes('Mileage'), 'BMW asks about mileage, so it must offer that branch');
+
+  const mini = await reasonsFor('mini');
+  assert.ok(mini.includes('Price'), 'MINI was not offered the price branch');
+  assert.ok(
+    !mini.includes('Mileage'),
+    'MINI drops the mileage question, so the branch has nowhere to write',
+  );
+});
+
+/*
+ * Podium's third locked rule, and the load-bearing one: a medal is a claim that
+ * one car beat another, so the podium must never invent a ranking the engine
+ * did not make. When the engine is not decisive the tied cars are joint first;
+ * nothing is labelled 2nd or 3rd.
+ *
+ * Written as an invariant that holds in BOTH states rather than as a test that
+ * forces a tie, because whether a given pool ties is a property of the engine's
+ * scoring and would make this a brittle assertion about fixture data. Either
+ * branch is meaningful: the tied branch catches a fabricated runner-up, the
+ * decisive branch catches a podium that lost its single clear winner. Run over
+ * every brand so a tie is genuinely exercised somewhere in the matrix.
+ */
+test('podium never labels a runner-up unless the engine ranked one', async () => {
+  for (const brand of BRANDS) {
+    resetDom();
+    // eslint-disable-next-line no-await-in-loop
+    const stage = mountMode(modes.podium, { base: server.base, brand: brand.key });
+    // eslint-disable-next-line no-await-in-loop
+    await settle(stage, (s) => s.querySelector('.vm-podium-step'));
+
+    const steps = stage.querySelector('.vm-podium-steps');
+    const all = [...stage.querySelectorAll('.vm-podium-step')];
+    const count = (cls) => all.filter((s) => s.classList.contains(cls)).length;
+
+    // No step may carry two rank classes at once, tied or not.
+    for (const step of all) {
+      const ranks = ['is-gold', 'is-silver', 'is-bronze']
+        .filter((c) => step.classList.contains(c));
+      assert.equal(
+        ranks.length, 1,
+        `${brand.key}: a step carried ${ranks.length} rank classes (${ranks.join(', ')})`,
+      );
+    }
+
+    if (steps.classList.contains('is-tied')) {
+      assert.equal(
+        count('is-gold'), all.length,
+        `${brand.key}: a tied podium left a step without joint first`,
+      );
+      assert.equal(
+        count('is-silver') + count('is-bronze'), 0,
+        `${brand.key}: a tied podium fabricated a runner-up the engine did not rank`,
+      );
+    } else {
+      assert.equal(
+        count('is-gold'), 1,
+        `${brand.key}: a decisive podium did not have exactly one winner`,
+      );
+    }
+  }
+});
+
 // A re-mount (switching tabs re-calls mount) must start clean, not stack a
 // second interface on top of the first. Mount twice into the same stage-owning
 // body and assert the second run replaced rather than appended.
@@ -158,7 +267,13 @@ test('no em dashes in painted copy', async () => {
 test('no em dashes in any string literal across the client copy surface', () => {
   const CLIENT_FILES = [
     'modes/questionnaire.js', 'modes/mingle.js', 'modes/knockout.js',
-    'modes/match-signal.js', 'vehicle-matcher.js', 'quiz-meta.js',
+    'modes/podium.js', 'modes/match-signal.js',
+    // The shared render modules lifted out of questionnaire.js. Their string
+    // literals are on-screen copy for every mode that renders a card or a
+    // question, so they belong in the same guard.
+    'modes/result-card.js', 'modes/question-ui.js', 'modes/brand-copy.js',
+    'modes/preview-feed.js',
+    'vehicle-matcher.js', 'quiz-meta.js',
     'vehicle-matcher.css',
   ];
   const blockDir = new URL('../../blocks/vehicle-matcher/', import.meta.url);

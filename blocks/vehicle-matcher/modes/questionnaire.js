@@ -17,9 +17,19 @@
  * because the encoded state is this mode's answer shape.
  */
 
-import { SHOW_IF, BUDGET_BANDS, pillFor } from '../quiz-meta.js';
-import { apiGetQuestions, apiMatch, apiNearby, apiPreview } from '../engine.js';
+import { BUDGET_BANDS, pillFor } from '../quiz-meta.js';
+import { apiGetQuestions, apiMatch, apiNearby } from '../engine.js';
 import { el, cardinal, gbp } from '../ui.js';
+import {
+  BRAND_COPY, UNMET_PHRASES, TRADE_COPY, orList, andList, tradeLines,
+} from './brand-copy.js';
+import {
+  CONCEPT_LABELS, listingsOf, distanceLabel, matchCard, previewTile,
+} from './result-card.js';
+import {
+  isVisible, visibleQuestions, formatSliderValue, renderRangeSlider, renderOptionList,
+} from './question-ui.js';
+import { createPreviewFeed } from './preview-feed.js';
 
 const HASH_KEY = 'm';
 
@@ -37,648 +47,6 @@ function validBudget(value) {
   }
   if (typeof value === 'number') return Number.isFinite(value) && value > 0;
   return !!BUDGET_BANDS[value];
-}
-
-/** Brand-specific display copy, keyed by brand. `name` is the marque, `title`
- * the intro headline, `cta` the intro button. `lede({ questions, retailer })`
- * builds the intro paragraph — a function because the two brands phrase it
- * differently, not just swap nouns.
- *
- * The question count is passed in rather than written into the copy (brands
- * have different totals, and a brand gaining a question needs no copy edit).
- * Deliberately no match count anywhere: results show one clear winner or the
- * whole tie, so any promised number would be wrong half the time.
- *
- * Voices follow docs/tone-style-guide.md: BMW is assured and understated (the
- * flat, unapologetic close borrowed from bmw.co.uk's register), MINI keeps the
- * warmth but smiles. Deliberately no "quiz" anywhere — this is a matcher, and
- * the word undersold it. */
-const BRAND_COPY = {
-  bmw: {
-    name: 'BMW',
-    title: 'Find your perfect BMW.',
-    cta: 'Find my BMW',
-    // No promised count: results now show one clear winner or the whole tie
-    // (up to MAX_SHOWN), so naming a number here would be wrong half the time.
-    lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
-      + `your miles and your budget. We’ll match you with the approved-used `
-      + `cars at ${retailer} that suit you best, and tell you why.`,
-    // Approved Used's no-surprises register: state the fact, name the
-    // retailer, don't dress it up (docs/tone-style-guide.md). No label —
-    // BMW's copy states things rather than announcing them.
-    unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
-      + 'These are the closest matches to everything else you asked for.',
-    // Shown instead of the "your perfect BMW is…" headline when the engine
-    // can't separate the top cars (see matchCars: decisive/clusterSize).
-    // Stated plainly, as a fact about the stock rather than an apology.
-    tiedTitle: ({ count }) => `${cardinal(count)} of these fit you equally well.`,
-    /*
-     * The scoped headlines, used ONLY when the scope is load-bearing: a car at
-     * another retailer genuinely outranks the best one here. Everywhere else
-     * the unqualified line stands, because a qualification that isn't doing
-     * work is just a smaller claim (docs/results-page-review.md).
-     *
-     * The block is authored onto ONE retailer's page, so "at Grassicks Garage"
-     * is not a hedge — it's a more accurate statement of what was searched. A
-     * higher score in the group below then contradicts nothing, because the
-     * headline never claimed to be about that group.
-     */
-    tiedTitleHere: ({ count, retailer }) => `At ${retailer}, ${cardinal(count)} of these `
-      + 'fit you equally well.',
-    // Fit couldn't separate them, but what they told us matters could. Naming
-    // the pick is honest here, and it's what finally makes the preference
-    // questions capable of changing the recommendation.
-    tasteTitle: ({ model }) => `Your best match is the ${model}.`,
-    tasteTitleHere: ({ model, retailer }) => `Your best match at ${retailer} is the ${model}.`,
-    tasteLede: () => 'Several of these suit you equally well on paper. This one lines up '
-      + 'best with what you said matters.',
-    // The retailer is named on every card, so the lede doesn't repeat it —
-    // and a brand plural appended to a retailer label reads "Sytner Luton
-    // MINI MINIs", which is why neither brand's copy builds one.
-    tiedLede: () => 'On your answers we can’t split them: each suits you as well as the next. '
-      + 'The difference now is which you prefer the look of.',
-    /*
-     * The refine panel: BMW states the instruction, no exclamation, no
-     * cheerleading (docs/tone-style-guide.md).
-     *
-     * The label names the effect AND the set it acts on. "So, what do you
-     * fancy?" / "Narrow it down" were invitations that never said what a tap
-     * would change, and the owner's report of the chips was exactly that: it's
-     * "unclear what clicking them affects". That is a labelling problem as much
-     * as a positioning one, so both were fixed.
-     */
-    refineLabel: ({ count }) => (count > 1 ? `Narrow these ${count} down` : 'Narrow this one down'),
-    // Feedback at the control itself, the moment a chip goes on. The running
-    // brief below the cars says the same thing at more length, but it is below
-    // the cars — by the time you reach it you have already stopped wondering
-    // whether the tap did anything.
-    refineStatus: ({ shown, wants }) => (shown === 1
-      ? `One car still matches, with ${wants}.`
-      : `${shown} cars still match, with ${wants}.`),
-    refineStatusPlain: ({ shown }) => (shown === 1
-      ? 'One car still matches.'
-      : `${shown} cars still match.`),
-    refineEmpty: ({ wants }) => `Nothing here has ${wants} together. `
-      + 'Drop one of those and we’ll show you what does.',
-    refineEmptyHidden: 'That’s all of them ruled out. Bring one back, or start over.',
-    tiedEmptyTitle: 'Nothing left to show.',
-    // Rejection, in the retailer's plain register — a question, not a plea.
-    rejectOpen: 'Not this one',
-    rejectPrompt: 'What put you off?',
-    rejectJust: 'Just not this one',
-    pickLabel: 'Choose yours',
-    kitLabel: 'What’s fitted',
-    kitMore: ({ count }) => `, and ${count} more`,
-    briefLabel: 'What I’ve picked up',
-    hiddenChip: ({ count }) => `${count} ruled out`,
-    // The "closest here" frame (docs/results-page-states.md): the local cars
-    // miss something the buyer asked for, so no headline may crown one. First
-    // paint must be true whether or not the nearby tier later finds the real
-    // thing — this claims nothing beyond this retailer's stock.
-    closestTitle: ({ retailer }) => `The closest matches at ${retailer}.`,
-    closestLede: () => 'Nothing here ticks every box you gave us. Each card says what it '
-      + 'gets right, and what it doesn’t.',
-    closestSettled: ({ model }) => `Your closest match here is the ${model}.`,
-    closestSettledHere: ({ model, retailer }) => `Your closest match at ${retailer} is the ${model}.`,
-    /*
-     * One step below `closest`: not "here is the nearest we have" but "we have
-     * not got it" (see WEAK_SCORE). Approved Used's register does this well
-     * without help — state the fact, name the retailer, don't soften it and
-     * don't apologise for it. No `Here` variant: the sentence names the
-     * retailer already, exactly as the closest frame's does.
-     */
-    weakTitle: ({ retailer }) => `Nothing at ${retailer} is close to what you asked for.`,
-    weakLede: () => 'These are the nearest we hold, and each one misses something you '
-      + 'said mattered. If none of them works, nothing here does.',
-    // The rescue note: the want is missing HERE but met nearby — by owner
-    // decision (2026-07-22) the local cards keep the lead and this note
-    // carries the fact, so the buyer weighs proximity against fit themselves.
-    // The rescue note points at the list, not at a section: nearby cars are
-    // IN the list now, wherever their score puts them.
-    rescueNote: ({ list, retailer, miles, where }) => `No ${list} at ${retailer} right now. `
-      + `The nearest is ${miles} away at ${where}, and it’s in the list below.`,
-    // Only `empty` survives: state 5, where the retailer had nothing and the
-    // nearby cars are the results rather than a band beneath them.
-    driveLede: {
-      empty: ({ retailer }) => `Nothing at ${retailer} fits those answers, so these are the `
-        + 'closest matches at other retailers instead.',
-    },
-    /*
-     * The two group labels. They describe PLACE and nothing else.
-     *
-     * That is the whole rule the old banded page broke: "Close, but not level
-     * with the cars above" and "two of these fit you equally well" were both
-     * quality claims on the same scale, made by different sections, so one
-     * could contradict the other. "At Grassicks Garage" asserts nothing about
-     * fit, so it cannot contradict a higher score in the group below it. Same
-     * reason the old "NEXT BEST" heading had to go: it ranked.
-     */
-    hereHeading: ({ retailer }) => `AT ${retailer.toUpperCase()}`,
-    awayHeading: 'AT OTHER RETAILERS',
-    rejectHint: 'Turned down? We’ll bring the next one up.',
-    // The working. A verdict with no evidence behind it reads as thin stock
-    // rather than as a clear winner, especially on a page holding one card.
-    searchingNearby: 'Still checking other retailers within reach',
-    workingLabel: 'HOW WE GOT HERE',
-    working: ({ total, eligible }) => `We went through all ${total} BMWs in stock here. `
-      + `${eligible} were in budget and big enough for you.`,
-    workingMargin: ({ margin }) => ` Nothing else here came within ${margin} points.`,
-    // The evidence for the weak headline, and the one number on the page a
-    // reader can check against the badges on the cards.
-    workingWeak: ({ top }) => ` The best of them reached ${top}%.`,
-    // What the badge means, said once. It has been unexplained since fit and
-    // taste were split, and several cards can carry the same number, which
-    // reads as a bug rather than as a claim about how alike they are.
-    workingScore: ' A match score is how well a car fits your answers, nothing else, '
-      + 'so cars that suit you equally share one.',
-    // The other half of a scoped headline: which car beat the one here, and
-    // where it is. Shown exactly when the headline scopes, so the two read as
-    // one statement rather than repeating each other.
-    searchedWider: ({ model, miles, where }) => 'We looked further afield too. '
-      + `The ${model} at ${where} scores higher, and it’s ${miles}.`,
-  },
-  mini: {
-    name: 'MINI',
-    title: 'Find your perfect MINI.',
-    cta: 'Let’s find your MINI',
-    lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
-      + `your miles and your money. We’ll find the MINIs at ${retailer} `
-      + 'with your name on them, and tell you exactly why.',
-    // Same fact, MINI's register: the UPPERCASE-with-a-full-stop beat as the
-    // lead-in, then warm and plain. A shortage is a shrug, never a shrug-off.
-    unmetLabel: 'SMALL SNAG.',
-    unmet: ({ list, retailer }) => `No ${list} at ${retailer} or anywhere nearby right now. `
-      + 'Here’s the closest we’ve got to the rest of your brief.',
-    // Same fact in MINI's register: a tie is a nice problem, not a shortfall.
-    tiedTitle: ({ count }) => `It’s a ${cardinal(count)}-way tie.`,
-    // Scoped, same rule as BMW's: only when a car elsewhere actually outranks
-    // the best one here.
-    tiedTitleHere: ({ count, retailer }) => `At ${retailer}, it’s a ${cardinal(count)}-way tie.`,
-    tasteTitle: ({ model }) => `We’d go for the ${model}.`,
-    tasteTitleHere: ({ model, retailer }) => `At ${retailer}, we’d go for the ${model}.`,
-    tasteLede: () => 'A few of these fit your brief just as well. This one’s the most you.',
-    tiedLede: () => 'They all fit what you told us, just as well as each other. '
-      + 'So it comes down to taste now. Which is the fun bit.',
-    // MINI asks rather than instructs, and treats a dead end as a shrug. Same
-    // change as BMW's: the label now names what a tap does and to how many.
-    refineLabel: ({ count }) => (count > 1
-      ? `Fancy narrowing these ${count} down?`
-      : 'Fancy narrowing this one down?'),
-    refineStatus: ({ shown, wants }) => (shown === 1
-      ? `One left in the running, with ${wants}.`
-      : `${shown} left in the running, with ${wants}.`),
-    refineStatusPlain: ({ shown }) => (shown === 1
-      ? 'One left in the running.'
-      : `${shown} left in the running.`),
-    refineEmpty: ({ wants }) => `Ah. Nothing here has ${wants} all at once. `
-      + 'Let one of them go and we’ll show you what’s left.',
-    refineEmptyHidden: 'Well, that’s the lot ruled out. Bring one back, or start over.',
-    tiedEmptyTitle: 'That’s the lot, then.',
-    rejectOpen: 'Not this one',
-    rejectPrompt: 'Go on then, what’s wrong with it?',
-    rejectJust: 'Just not feeling it',
-    pickLabel: 'Which one, then?',
-    kitLabel: 'What’s on it',
-    kitMore: ({ count }) => `, and ${count} more`,
-    briefLabel: 'So, what I know so far',
-    hiddenChip: ({ count }) => `${count} ruled out`,
-    // The "closest here" frame, MINI register: honest shrug, no apology.
-    closestTitle: ({ retailer }) => `The closest we’ve got at ${retailer}.`,
-    closestLede: () => 'None of these is the whole wish list, but they’re close. '
-      + 'And each one owns up to what’s missing.',
-    closestSettled: ({ model }) => `Closest to your brief: the ${model}.`,
-    closestSettledHere: ({ model, retailer }) => `Closest to your brief at ${retailer}: `
-      + `the ${model}.`,
-    // The same "we have not got it" as BMW's, in MINI's register: a shrug that
-    // still gives a straight answer, and a reason to come back rather than an
-    // apology. See WEAK_SCORE for when it fires.
-    weakTitle: ({ retailer }) => `We haven’t got your MINI at ${retailer} right now.`,
-    weakLede: () => 'Here’s the nearest we’ve got anyway, but none of them is it. '
-      + 'Stock turns over quickly, so it’s worth another look soon.',
-    rescueLabel: 'NOT HERE, BUT NOT FAR.',
-    rescueNote: ({ list, miles, where }) => `No ${list} at ours right now. `
-      + `The nearest is ${miles} away at ${where}, and it’s in the list below.`,
-    driveLede: {
-      empty: () => 'Nothing at ours fits that brief. These nearby MINIs get closest.',
-    },
-    // Place, never quality — see the BMW pair above for why that rule exists.
-    // MINI's headings carry the full stop; BMW's don't.
-    hereHeading: ({ retailer }) => `AT ${retailer.toUpperCase()}.`,
-    awayHeading: 'ALSO WITHIN REACH.',
-    rejectHint: 'Not feeling it? We’ll bring the next one up.',
-    searchingNearby: 'Still having a look further afield',
-    workingLabel: 'HOW WE GOT THERE',
-    working: ({ total, eligible }) => `We looked at all ${total} MINIs in stock here. `
-      + `${eligible} were in budget and roomy enough.`,
-    workingMargin: ({ margin }) => ` Nothing else here got within ${margin} points.`,
-    workingWeak: ({ top }) => ` The best of the lot got to ${top}%.`,
-    workingScore: ' A match score is how well a MINI fits your answers, nothing else, '
-      + 'so ones that suit you equally share a number.',
-    searchedWider: ({ model, miles, where }) => 'We had a look further afield, too. '
-      + `The ${model} at ${where} comes out ahead, and it’s ${miles}.`,
-  },
-};
-
-/*
- * Honda's voice: plain, warm and practical, sentence-case throughout. It sits
- * between BMW's terse authority and MINI's uppercase play — it talks about
- * running costs, space and reliability rather than driving pleasure or kerb
- * appeal, and it never oversells (see docs/tone-style-guide.md). Built on the
- * BMW base (spread first) so every key is present — the resolver is all-or-
- * nothing, BRAND_COPY[brand] || BRAND_COPY.bmw — then only the lines that carry
- * Honda's marque or register are overridden. No em dashes in any of it.
- */
-BRAND_COPY.honda = {
-  ...BRAND_COPY.bmw,
-  name: 'Honda',
-  title: 'Find the right Honda for you.',
-  cta: 'Find my Honda',
-  // Honda's plain, practical register: no superlative ("best"), lead on the
-  // sensible fit (life, running, budget) and the reassurance of approved-used.
-  // See docs/tone-style-guide.md (Honda).
-  lede: ({ questions, retailer }) => `${questions} quick questions about your days, `
-    + 'your mileage and what you want to spend. We’ll find the approved-used '
-    + `Hondas at ${retailer} that genuinely suit how you live, and show our working.`,
-  unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
-    + 'These are the closest to everything else you told us.',
-  tiedTitle: ({ count }) => `${cardinal(count)} of these fit you just as well.`,
-  tiedTitleHere: ({ count, retailer }) => `At ${retailer}, ${cardinal(count)} of these `
-    + 'fit you just as well.',
-  tasteTitle: ({ model }) => `Your best match is the ${model}.`,
-  tasteTitleHere: ({ model, retailer }) => `Your best match at ${retailer} is the ${model}.`,
-  tasteLede: () => 'A few of these suit you equally well on paper. This one lines up '
-    + 'best with what you said matters most.',
-  tiedLede: () => 'On your answers we can’t separate them: each suits you as well as '
-    + 'the next. It comes down to which you prefer the look of.',
-  refineLabel: ({ count }) => (count > 1 ? `Narrow these ${count} down` : 'Narrow this one down'),
-  refineStatus: ({ shown, wants }) => (shown === 1
-    ? `One car still fits, with ${wants}.`
-    : `${shown} cars still fit, with ${wants}.`),
-  refineStatusPlain: ({ shown }) => (shown === 1 ? 'One car still fits.' : `${shown} cars still fit.`),
-  refineEmpty: ({ wants }) => `Nothing here has ${wants} together. `
-    + 'Drop one of those and we’ll show you what does.',
-  refineEmptyHidden: 'That’s all of them ruled out. Bring one back, or start over.',
-  tiedEmptyTitle: 'Nothing left to show.',
-  rejectOpen: 'Not this one',
-  rejectPrompt: 'What put you off?',
-  rejectJust: 'Just not this one',
-  pickLabel: 'Choose yours',
-  kitLabel: 'What’s fitted',
-  briefLabel: 'What I’ve picked up',
-  closestTitle: ({ retailer }) => `The closest matches at ${retailer}.`,
-  closestLede: () => 'Nothing here ticks every box you gave us. Each card says what it '
-    + 'gets right, and what it doesn’t.',
-  closestSettled: ({ model }) => `Your closest match here is the ${model}.`,
-  closestSettledHere: ({ model, retailer }) => `Your closest match at ${retailer} is the ${model}.`,
-  weakTitle: ({ retailer }) => `Nothing at ${retailer} is close to what you asked for.`,
-  weakLede: () => 'These are the nearest we hold, and each one misses something you '
-    + 'said mattered. If none of them works, nothing here does.',
-  rescueNote: ({ list, retailer, miles, where }) => `No ${list} at ${retailer} right now. `
-    + `The nearest is ${miles} away at ${where}, and it’s in the list below.`,
-  driveLede: {
-    empty: ({ retailer }) => `Nothing at ${retailer} fits those answers, so these are the `
-      + 'closest matches at other retailers instead.',
-  },
-  hereHeading: ({ retailer }) => `AT ${retailer.toUpperCase()}`,
-  awayHeading: 'AT OTHER RETAILERS',
-  rejectHint: 'Turned down? We’ll bring the next one up.',
-  searchingNearby: 'Still checking other retailers within reach',
-  workingLabel: 'HOW WE GOT HERE',
-  working: ({ total, eligible }) => `We went through all ${total} Hondas in stock here. `
-    + `${eligible} were in budget and big enough for you.`,
-  workingMargin: ({ margin }) => ` Nothing else here came within ${margin} points.`,
-  workingWeak: ({ top }) => ` The best of them reached ${top}%.`,
-  workingScore: ' A match score is how well a car fits your answers, nothing else, '
-    + 'so cars that suit you equally share one.',
-  searchedWider: ({ model, miles, where }) => 'We looked further afield too. '
-    + `The ${model} at ${where} scores higher, and it’s ${miles}.`,
-};
-
-/*
- * Ford copy. Built the same all-or-nothing way as Honda's: spread the complete
- * BMW base so every key resolves, then override only the lines that carry Ford's
- * marque or its register. Ford's voice is confident, friendly and plainly
- * British — proud of being the sensible, well-priced choice, but with a real
- * spirited streak (ST, Mustang) it's allowed to enjoy. No em dashes anywhere.
- */
-BRAND_COPY.ford = {
-  ...BRAND_COPY.bmw,
-  name: 'Ford',
-  title: 'Find the right Ford for you.',
-  cta: 'Find my Ford',
-  // Ford's confident, friendly, plainly-British register: upbeat and direct,
-  // proud of being the sensible, well-priced choice with room for the spirited
-  // side. See docs/tone-style-guide.md (Ford).
-  lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
-    + 'your miles and your budget. We’ll pull together the approved-used '
-    + `Fords at ${retailer} that make real sense for you, and back it up with the reasons.`,
-  unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
-    + 'These are the closest to everything else you told us.',
-  tiedTitle: ({ count }) => `${cardinal(count)} of these fit you just as well.`,
-  tiedTitleHere: ({ count, retailer }) => `At ${retailer}, ${cardinal(count)} of these `
-    + 'fit you just as well.',
-  tasteTitle: ({ model }) => `Your best match is the ${model}.`,
-  tasteTitleHere: ({ model, retailer }) => `Your best match at ${retailer} is the ${model}.`,
-  tasteLede: () => 'A few of these suit you equally well on paper. This one lines up '
-    + 'best with what you said matters most.',
-  tiedLede: () => 'On your answers we can’t separate them: each suits you as well as '
-    + 'the next. It comes down to which you prefer the look of.',
-  refineLabel: ({ count }) => (count > 1 ? `Narrow these ${count} down` : 'Narrow this one down'),
-  refineStatus: ({ shown, wants }) => (shown === 1
-    ? `One car still fits, with ${wants}.`
-    : `${shown} cars still fit, with ${wants}.`),
-  refineStatusPlain: ({ shown }) => (shown === 1 ? 'One car still fits.' : `${shown} cars still fit.`),
-  refineEmpty: ({ wants }) => `Nothing here has ${wants} together. `
-    + 'Drop one of those and we’ll show you what does.',
-  refineEmptyHidden: 'That’s all of them ruled out. Bring one back, or start over.',
-  tiedEmptyTitle: 'Nothing left to show.',
-  rejectOpen: 'Not this one',
-  rejectPrompt: 'What put you off?',
-  rejectJust: 'Just not this one',
-  pickLabel: 'Choose yours',
-  kitLabel: 'What’s fitted',
-  briefLabel: 'What I’ve picked up',
-  closestTitle: ({ retailer }) => `The closest matches at ${retailer}.`,
-  closestLede: () => 'Nothing here ticks every box you gave us. Each card says what it '
-    + 'gets right, and what it doesn’t.',
-  closestSettled: ({ model }) => `Your closest match here is the ${model}.`,
-  closestSettledHere: ({ model, retailer }) => `Your closest match at ${retailer} is the ${model}.`,
-  weakTitle: ({ retailer }) => `Nothing at ${retailer} is close to what you asked for.`,
-  weakLede: () => 'These are the nearest we hold, and each one misses something you '
-    + 'said mattered. If none of them works, nothing here does.',
-  rescueNote: ({ list, retailer, miles, where }) => `No ${list} at ${retailer} right now. `
-    + `The nearest is ${miles} away at ${where}, and it’s in the list below.`,
-  driveLede: {
-    empty: ({ retailer }) => `Nothing at ${retailer} fits those answers, so these are the `
-      + 'closest matches at other retailers instead.',
-  },
-  hereHeading: ({ retailer }) => `AT ${retailer.toUpperCase()}`,
-  awayHeading: 'AT OTHER RETAILERS',
-  rejectHint: 'Turned down? We’ll bring the next one up.',
-  searchingNearby: 'Still checking other retailers within reach',
-  workingLabel: 'HOW WE GOT HERE',
-  working: ({ total, eligible }) => `We went through all ${total} Fords in stock here. `
-    + `${eligible} were in budget and big enough for you.`,
-  workingMargin: ({ margin }) => ` Nothing else here came within ${margin} points.`,
-  workingWeak: ({ top }) => ` The best of them reached ${top}%.`,
-  workingScore: ' A match score is how well a car fits your answers, nothing else, '
-    + 'so cars that suit you equally share one.',
-  searchedWider: ({ model, miles, where }) => 'We looked further afield too. '
-    + `The ${model} at ${where} scores higher, and it’s ${miles}.`,
-};
-
-/*
- * Motorrad copy. Same all-or-nothing build as Honda/Ford: spread the BMW base so
- * every key resolves, then override the marque lines AND the ones that say "car"
- * or "drive" (a rider reads "bike" and "ride"). Motorrad's voice is rider-first
- * and technical, confident and a little adrenaline-forward. No em dashes.
- *
- * Note on "big enough for you" in `working`: for a bike that phrasing is wrong
- * (a bike isn't judged on space), so Motorrad re-voices it to "a match for your
- * licence and riding" - the real gate a rider cares about. No em dashes.
- */
-BRAND_COPY.motorrad = {
-  ...BRAND_COPY.bmw,
-  name: 'BMW Motorrad',
-  title: 'Find your perfect BMW Motorrad.',
-  cta: 'Find my bike',
-  // Motorrad's rider-first, technical, adrenaline-forward register ("Make Life
-  // a Ride"): lead on the riding, not "your life", and on the machine under you
-  // rather than a soft "suit you best". See docs/tone-style-guide.md (Motorrad).
-  lede: ({ questions, retailer }) => `${questions} quick questions about your riding, `
-    + 'your licence and your budget. We’ll match you to the approved-used '
-    + `BMW Motorrad bikes at ${retailer} built for the road you ride, and tell you why.`,
-  unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
-    + 'These are the closest matches to everything else you asked for.',
-  refineStatus: ({ shown, wants }) => (shown === 1
-    ? `One bike still matches, with ${wants}.`
-    : `${shown} bikes still match, with ${wants}.`),
-  refineStatusPlain: ({ shown }) => (shown === 1
-    ? 'One bike still matches.'
-    : `${shown} bikes still match.`),
-  working: ({ total, eligible }) => `We went through all ${total} BMW Motorrad bikes in stock here. `
-    + `${eligible} were in budget and a match for your licence and riding.`,
-  workingScore: ' A match score is how well a bike fits your answers, nothing else, '
-    + 'so bikes that suit you equally share one.',
-};
-
-/*
- * Ferrari copy. Same all-or-nothing build as Honda/Ford/Motorrad: spread the BMW
- * base so every key resolves, then re-voice the lines that carry the marque or
- * its register. Ferrari's voice is Italian, romantic and heritage-proud, and it
- * speaks to a Ferrarista joining a family, not a shopper making a purchase (per
- * ferrari.com / preowned.ferrari.com: "Join the world of Ferraristi", "La nuova
- * dolce vita", "Configure your dreams", the Prancing Horse, Maranello, Italian
- * excellence since 1947). It leads on emotion and the drive, never on value or
- * spec, and it stays warm and unhurried rather than clipped. Where the honesty
- * frames (unmet / closest / weak) must stay plain and true, they keep their
- * candour but in Ferrari's fuller cadence. No em dashes anywhere.
- */
-BRAND_COPY.ferrari = {
-  ...BRAND_COPY.bmw,
-  name: 'Ferrari',
-  title: 'Find the Ferrari that’s yours.',
-  cta: 'Find my Ferrari',
-  // Romantic, insider, heritage-led: the car is a thoroughbred, the buyer is
-  // joining a bloodline. Lead on the drive and the feeling, name the official
-  // Ferrari Approved programme rather than "approved-used". See DECISIONS.md and
-  // docs/tone-style-guide.md (Ferrari).
-  lede: ({ questions, retailer }) => `${questions} quick questions about how you drive, `
-    + 'the roads you love and your budget. We’ll match you with the Ferrari Approved '
-    + `cars at ${retailer} that were made for you, and tell you why.`,
-  unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby just now. `
-    + 'These are the closest to everything else you told us.',
-  tasteTitle: ({ model }) => `The one for you is the ${model}.`,
-  tasteTitleHere: ({ model, retailer }) => `The one for you at ${retailer} is the ${model}.`,
-  tasteLede: () => 'A few of these suit you equally well on paper. This one speaks most '
-    + 'to what you said matters.',
-  tiedLede: () => 'On your answers we can’t choose between them: each suits you as well as '
-    + 'the next. Now it comes down to the one that moves you.',
-  closestLede: () => 'None of these is everything you asked for. Each card says what it '
-    + 'gets right, and where it falls short.',
-  weakLede: () => 'These are the nearest we hold, and each one misses something you '
-    + 'said mattered. If none of them stirs you, nothing here will.',
-  workingLabel: 'HOW WE GOT HERE',
-  working: ({ total, eligible }) => `We went through every one of the ${total} Ferraris in stock here. `
-    + `${eligible} were in budget and roomy enough for you.`,
-  workingMargin: ({ margin }) => ` Nothing else here came within ${margin} points.`,
-  workingWeak: ({ top }) => ` The best of them reached ${top}%.`,
-  workingScore: ' A match score is how well a car fits your answers, nothing else, '
-    + 'so cars that suit you equally share one.',
-};
-
-/*
- * How an unmet want is named in the results note, per brand — plural noun
- * phrases that drop into "No ___ at <retailer>…". Per-brand because MINI
- * names its own shapes (a Countryman, not an SUV) and calls its EVs
- * all-electric, exactly as the quiz options do. Keyed by question id then
- * answer value; an unrecognised value (an old shared link) falls back to the
- * raw value rather than dropping the warning.
- */
-const UNMET_PHRASES = {
-  bmw: {
-    fuel: {
-      petrol: 'petrol cars', diesel: 'diesels', phev: 'plug-in hybrids', ev: 'fully electric cars',
-    },
-    bodyStyles: {
-      hatchback: 'hatchbacks', saloon: 'saloons', estate: 'estates', suv: 'SUVs',
-      coupe: 'coupés', convertible: 'convertibles', mpv: 'family carriers',
-    },
-  },
-  mini: {
-    fuel: {
-      petrol: 'petrol MINIs', phev: 'plug-in hybrid MINIs', ev: 'all-electric MINIs',
-    },
-    bodyStyles: {
-      hatchback: 'hatchbacks', estate: 'Clubman estates', suv: 'Countryman crossovers',
-      convertible: 'convertibles',
-    },
-  },
-  honda: {
-    // Honda's self-charging hybrids score as petrol on the engine's fuel axis
-    // (see hondaFuel in mapping.js), so the fuel warnings only ever name petrol,
-    // diesel or fully electric — the values the quiz collects.
-    fuel: {
-      petrol: 'petrol Hondas', diesel: 'diesel Hondas', ev: 'fully electric Hondas',
-    },
-    bodyStyles: {
-      hatchback: 'hatchbacks', suv: 'SUVs',
-    },
-  },
-  ford: {
-    // Ford's used range spans the full fuel spread (petrol/mHEV, diesel, the
-    // Kuga PHEV, and the Mach-E / Explorer / Capri / Puma Gen-E EVs) and every
-    // body from a supermini to a pickup.
-    fuel: {
-      petrol: 'petrol Fords', diesel: 'diesel Fords', phev: 'plug-in hybrid Fords',
-      ev: 'fully electric Fords',
-    },
-    bodyStyles: {
-      hatchback: 'hatchbacks', estate: 'estates', suv: 'SUVs', coupe: 'coupés',
-      convertible: 'convertibles', mpv: 'people carriers', pickup: 'pickups',
-    },
-  },
-  motorrad: {
-    // Motorrad is petrol plus one electric (the CE 04); no diesel/PHEV. The
-    // bodyStyles keys here are the bike categories the mapper emits as `body`
-    // (see MODEL_SPECS_MOTORRAD), not car shapes.
-    fuel: {
-      petrol: 'petrol bikes', ev: 'electric bikes',
-    },
-    bodyStyles: {
-      naked: 'naked bikes', roadster: 'roadsters', adventure: 'adventure bikes',
-      tourer: 'tourers', sport: 'sports bikes', heritage: 'heritage bikes',
-      scooter: 'electric scooters',
-    },
-  },
-  ferrari: {
-    // Ferrari's used range is petrol plus the 296/SF90 plug-in hybrids; no
-    // diesel or fully electric. Its three bodies are named the way the quiz
-    // names them: the Spider for a convertible, the Purosangue for the SUV.
-    fuel: {
-      petrol: 'petrol Ferraris', phev: 'plug-in hybrid Ferraris',
-    },
-    bodyStyles: {
-      coupe: 'coupés', convertible: 'Spiders', suv: 'the Purosangue',
-    },
-  },
-};
-
-/*
- * How the hero card owns a want it doesn't meet — "Petrol, where you asked
- * for all-electric." Singular phrases (UNMET_PHRASES above are plurals for
- * the pool-level note), same per-brand vocabulary rules: MINI names its own
- * shapes and calls its EVs all-electric. `label` is the section eyebrow that
- * mirrors "Why it suits you"; the CSS uppercases it, so it's authored plain.
- */
-const TRADE_COPY = {
-  bmw: {
-    label: 'The trade-off',
-    fuel: {
-      petrol: 'petrol', diesel: 'diesel', phev: 'a plug-in hybrid', ev: 'fully electric',
-    },
-    bodyStyles: {
-      hatchback: 'a hatchback', saloon: 'a saloon', estate: 'an estate', suv: 'an SUV',
-      coupe: 'a coupé', convertible: 'a convertible', mpv: 'a family carrier',
-    },
-  },
-  mini: {
-    label: 'The trade',
-    fuel: { petrol: 'petrol', phev: 'a plug-in hybrid', ev: 'all-electric' },
-    bodyStyles: {
-      hatchback: 'a hatchback', estate: 'a Clubman', suv: 'a Countryman',
-      convertible: 'a convertible',
-    },
-    // The `got` side describes the car itself, not a quiz option — and MINI's
-    // suv bucket holds the Aceman as well as the Countryman, so naming the
-    // Countryman there would mislabel an Aceman on its own card. The want
-    // side stays "a Countryman": that's the word the quiz option used.
-    got: { bodyStyles: { suv: 'a crossover' } },
-  },
-  honda: {
-    label: 'The trade-off',
-    fuel: { petrol: 'petrol', diesel: 'diesel', ev: 'fully electric' },
-    bodyStyles: { hatchback: 'a hatchback', suv: 'an SUV' },
-  },
-  ford: {
-    label: 'The trade-off',
-    fuel: {
-      petrol: 'petrol', diesel: 'diesel', phev: 'a plug-in hybrid', ev: 'fully electric',
-    },
-    bodyStyles: {
-      hatchback: 'a hatchback', estate: 'an estate', suv: 'an SUV', coupe: 'a coupé',
-      convertible: 'a convertible', mpv: 'a people carrier', pickup: 'a pickup',
-    },
-  },
-  motorrad: {
-    label: 'The trade-off',
-    fuel: { petrol: 'petrol', ev: 'electric' },
-    bodyStyles: {
-      naked: 'a naked bike', roadster: 'a roadster', adventure: 'an adventure bike',
-      tourer: 'a tourer', sport: 'a sports bike', heritage: 'a heritage bike',
-      scooter: 'an electric scooter',
-    },
-  },
-  ferrari: {
-    label: 'The trade-off',
-    fuel: { petrol: 'petrol', phev: 'a plug-in hybrid' },
-    bodyStyles: {
-      coupe: 'a coupé', convertible: 'a Spider', suv: 'the Purosangue',
-    },
-  },
-};
-
-/** "a", "a or b", "a, b or c" — the natural spoken list. */
-function orList(items) {
-  if (items.length < 2) return items[0] || '';
-  return `${items.slice(0, -1).join(', ')} or ${items[items.length - 1]}`;
-}
-
-/** The same, for things that hold at once: "a and b", "a, b and c". Applied
- * refinements are ANDed, and "with a pano roof or grey" would describe a
- * different, looser search than the one actually run. */
-function andList(items) {
-  if (items.length < 2) return items[0] || '';
-  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
-}
-
-/*
- * The hero card's trade-off line(s): one short declarative per missed want,
- * in the engine's fuel-then-shape order — "Petrol, where you asked for fully
- * electric. A saloon, where you asked for an estate." Both brands share the
- * sentence shape (short, factual, full stop — the shared signature); the
- * vocabulary and the eyebrow above carry the brand difference. An
- * unrecognised value (an old shared link) falls back to the raw value rather
- * than dropping the admission.
- */
-function tradeLines(brandKey, trades) {
-  const vocab = TRADE_COPY[brandKey] || TRADE_COPY.bmw;
-  return trades.map(({ dim, wants, got }) => {
-    const gotPhrase = vocab.got?.[dim]?.[got] || vocab[dim]?.[got] || got;
-    const wantList = orList(wants.map((w) => vocab[dim]?.[w] || w));
-    const line = `${gotPhrase}, where you asked for ${wantList}.`;
-    return line.charAt(0).toUpperCase() + line.slice(1);
-  });
 }
 
 /**
@@ -1662,14 +1030,9 @@ function rescueNote(ctx, rescued, nearest) {
 }
 
 /* The engine client (apiGetQuestions, apiMatch, apiNearby, apiPreview) is
- * shared across modes and lives in ../engine.js — imported at the top. */
-
-/** Is question `q` shown given the current answers? Uses SHOW_IF by id. */
-function isVisible(q, answers) {
-  if (!q.conditional) return true;
-  const predicate = SHOW_IF[q.id];
-  return predicate ? predicate(answers) : true;
-}
+ * shared across modes and lives in ../engine.js — imported at the top, or via
+ * ./preview-feed.js for the debounced preview. The question widgets themselves
+ * (visibility, the sliders, the option list) are shared too: ./question-ui.js. */
 
 function encodeAnswers(answers) {
   const json = JSON.stringify(answers);
@@ -1694,112 +1057,6 @@ function answersFromHash(questions) {
   return match ? decodeAnswers(match[1], questions) : null;
 }
 
-function visibleQuestions(questions, answers) {
-  return questions.filter((q) => isVisible(q, answers));
-}
-
-/**
- * Format a slider value for its readout, per the question's `format` hint:
- *   'gbp' → "£62,000", 'int' → "12,000" (with an optional `unit` suffix).
- * At the ceiling of a `plusAtMax` slider, append "+" ("£150,000+", "25,000+").
- */
-function formatSliderValue(value, q) {
-  const base = q.format === 'gbp' ? gbp(value) : `${value.toLocaleString('en-GB')}${q.unit || ''}`;
-  return q.plusAtMax && value >= q.max ? `${base}+` : base;
-}
-
-/** Readout for a dual-thumb range slider, e.g. "£40,000 – £75,000". */
-function formatRange([lo, hi], q) {
-  return `${formatSliderValue(lo, q)} – ${formatSliderValue(hi, q)}`;
-}
-
-const SPEC_LABELS = {
-  hatchback: 'Hatchback', saloon: 'Saloon', estate: 'Estate', suv: 'SUV',
-  coupe: 'Coupé', convertible: 'Convertible', mpv: 'Family carrier',
-};
-const FUEL_SPEC = { petrol: 'Petrol', diesel: 'Diesel', phev: 'Plug-in hybrid', ev: 'Electric' };
-/*
- * Gearbox, stated rather than implied. It was already on the wire and already
- * a reject reason and a refine chip, and it was never printed anywhere — so a
- * buyer whose dealbreaker it is (Meg's clause is explicit that implied is not
- * good enough) had to infer it from a control that only appears when the stock
- * happens to be mixed. Same closed set as transmissionFor in server/mapping.js;
- * a car the feed gave no gearbox for simply says nothing.
- */
-const GEARBOX_SPEC = { auto: 'Automatic', manual: 'Manual' };
-
-/*
- * Representative hex per basic colour, for the little swatch beside the paint
- * name. Keyed by the feed's normalised `colour.colour` — a closed set of basic
- * names, which is what makes a hand-authored table viable. Deliberately NOT
- * the actual paint (the feed gives "Ocean Wave Green", not a hex): the swatch
- * says "this one's the green one" at a glance, the name and photo carry the
- * truth. An unknown name renders no swatch rather than a wrong one.
- */
-const SWATCH_HEX = {
-  black: '#1d1d1f',
-  grey: '#8e9094',
-  silver: '#c8cacc',
-  white: '#f4f4f2',
-  blue: '#33567d',
-  red: '#a03236',
-  green: '#4a6b58',
-  orange: '#c47a3a',
-  yellow: '#d9b13b',
-  brown: '#6b543f',
-  beige: '#cfc3a8',
-  bronze: '#9c7a5b',
-  gold: '#b3945c',
-  purple: '#5d4a72',
-};
-
-/*
- * Human names for the equipment concepts the server parses out of the feed's
- * factory options list (mapping.js FEATURE_CONCEPTS). Display-only, so they
- * live here rather than on the wire — and only concepts a buyer would
- * recognise by name are listed: an unlabelled key is silently skipped, which
- * is how a concept can be parsed and measured long before it's offered as a
- * refinement.
- */
-const CONCEPT_LABELS = {
-  panoRoof: 'Panoramic roof',
-  contrastRoof: 'Contrast roof',
-  sunroof: 'Sunroof',
-  heatedSeats: 'Heated seats',
-  heatedWheel: 'Heated steering wheel',
-  // "Points", not "rear ISOFIX": the concept folds BMW's rear ISOFIX system
-  // and both brands' front i-Size attachment, which are different fitments
-  // (see FEATURE_CONCEPTS in server/mapping.js). Claiming the rear one would
-  // be claiming more than the feed says.
-  isofix: 'ISOFIX child seat points',
-  sportsSeats: 'Sports seats',
-  electricSeats: 'Electric seats',
-  leatherWheel: 'Leather steering wheel',
-  parkingCamera: 'Parking camera',
-  parkingSensors: 'Parking sensors',
-  navigation: 'Navigation',
-  smartphoneIntegration: 'Apple CarPlay',
-  premiumAudio: 'Premium audio',
-  headUpDisplay: 'Head-up display',
-  cruiseControl: 'Cruise control',
-  adaptiveLights: 'Adaptive LED lights',
-  keylessEntry: 'Keyless entry',
-  climateControl: 'Climate control',
-  ambientLighting: 'Ambient lighting',
-  tintedGlass: 'Privacy glass',
-  towbar: 'Tow bar',
-};
-
-/*
- * How many of those a card names before it starts counting. The order above is
- * the order they print in, which puts the distinctive kit (roof, seats, child
- * seats) ahead of the near-ubiquitous (cruise control, climate), so the six
- * that show are the six worth reading. The remainder is counted rather than
- * dropped, because a card that quietly truncates is a card making a claim
- * about what a car does not have.
- */
-const KIT_SHOWN = 6;
-
 /*
  * What actually separates a set of cars the engine scored the same.
  *
@@ -1823,12 +1080,6 @@ const KIT_SHOWN = 6;
  *
  * @returns {Array<{ id, label, test(car), have }>}
  */
-/**
- * The individual cars behind a card. The API sends this for every match, one
- * entry for an ungrouped car and N for a grouped one, so nothing downstream
- * has to care which it is holding.
- */
-const listingsOf = (m) => m.listings || [];
 
 /** A listing's normalised shade ("Blue"), falling back to its marketing name. */
 const shadeOf = (l) => l.shade || l.colour;
@@ -1946,9 +1197,9 @@ function renderIntro(root, ctx) {
 
 /* -------------------------- live "best guess" preview ---------------------- */
 
-// How long after an answer changes before the preview refetches. Multi-select
-// rapid taps collapse into one call; a fresh answer resets the timer.
-const PREVIEW_DEBOUNCE_MS = 250;
+// The debounce and the latest-wins guard live in ./preview-feed.js, shared with
+// the other modes that show a running guess. Everything below is this mode's
+// own: the strip, where it mounts, and what it paints.
 // Cross-fade duration when the tile row re-ranks (kept in sync with the CSS
 // transition on .vm-preview-track). Disabled under prefers-reduced-motion.
 const PREVIEW_FADE_MS = 150;
@@ -2051,26 +1302,24 @@ function showPreview(ctx) {
 }
 
 /**
- * Debounced, latest-wins preview refresh. Refetches the retailer's top matches
- * for the current answers and mounts/updates the on-screen strip when it lands —
- * unless a newer schedule has superseded it (seq guard). A no-op until a budget
- * is chosen. Never surfaces an empty/loading state: the strip only appears once
- * there are real matches.
+ * Ask the feed for a fresh guess and paint it when it lands. A no-op until a
+ * budget is chosen, since the engine hard-requires one.
+ *
+ * The feed drops a response a newer answer has already superseded; `ctx.preview.seq`
+ * is the coarser guard on top of it, for the run itself. Starting over
+ * (see the retake button) bumps it, so a request from the finished run cannot
+ * repopulate the strip of the new one — a fresh run must start empty even if
+ * the old one's answers are still in flight.
  */
 function schedulePreviewRefresh(ctx) {
   if (!canPreview(ctx)) return;
-  clearTimeout(ctx.previewTimer);
-  ctx.previewTimer = setTimeout(() => {
-    const seq = (ctx.preview.seq += 1);
-    const answers = { ...ctx.answers };
-    apiPreview(ctx.api, answers, ctx.retailer, ctx.brand).then((matches) => {
-      // A newer answer already superseded this request — drop the stale result.
-      if (seq !== ctx.preview.seq) return;
-      ctx.preview.matches = matches;
-      ctx.preview.loaded = true; // first (and every) response has now landed
-      showPreview(ctx);
-    });
-  }, PREVIEW_DEBOUNCE_MS);
+  const run = ctx.preview.seq;
+  ctx.previewFeed.schedule(ctx.answers, (matches) => {
+    if (run !== ctx.preview.seq) return;
+    ctx.preview.matches = matches;
+    ctx.preview.loaded = true; // first (and every) response has now landed
+    showPreview(ctx);
+  });
 }
 
 /**
@@ -2103,82 +1352,9 @@ function renderAnswerPills(ctx, questions, index) {
   return row.children.length ? row : null;
 }
 
-/**
- * A dual-thumb range slider (budget): two native range inputs overlaid on one
- * track, writing a [min, max] pair to ctx.answers[q.id]. The thumbs can't cross
- * (kept at least one step apart). Appends readout + track + bounds to `list`.
- */
-function renderRangeSlider(list, q, ctx) {
-  const stored = ctx.answers[q.id];
-  const start = Array.isArray(stored) && stored.length === 2
-    ? [Number(stored[0]), Number(stored[1])]
-    : (Array.isArray(q.default) ? [...q.default] : [q.min, q.max]);
-  let [lo, hi] = [Math.min(...start), Math.max(...start)];
-  // Persist immediately so Next is enabled even without a drag.
-  ctx.answers[q.id] = [lo, hi];
-
-  const readout = el('output', 'vm-slider-value', formatRange([lo, hi], q));
-
-  const track = el('div', 'vm-range');
-  const fill = el('div', 'vm-range-fill');
-  const mkInput = (cls, label, value) => {
-    const input = el('input', `vm-slider-input ${cls}`);
-    input.type = 'range';
-    input.min = String(q.min);
-    input.max = String(q.max);
-    input.step = String(q.step);
-    input.value = String(value);
-    input.setAttribute('aria-label', label);
-    input.setAttribute('aria-valuetext', formatSliderValue(value, q));
-    return input;
-  };
-  const minInput = mkInput('vm-range-min', 'Minimum budget', lo);
-  const maxInput = mkInput('vm-range-max', 'Maximum budget', hi);
-
-  const span = q.max - q.min || 1;
-  const paintFill = () => {
-    const a = ((lo - q.min) / span) * 100;
-    const b = ((hi - q.min) / span) * 100;
-    fill.style.left = `${a}%`;
-    fill.style.right = `${100 - b}%`;
-  };
-  const sync = () => {
-    // Clamp so the thumbs never cross (keep a one-step gap).
-    lo = Math.min(Number(minInput.value), hi - q.step);
-    hi = Math.max(Number(maxInput.value), lo + q.step);
-    lo = Math.max(q.min, lo);
-    hi = Math.min(q.max, hi);
-    minInput.value = String(lo);
-    maxInput.value = String(hi);
-    ctx.answers[q.id] = [lo, hi];
-    const text = formatRange([lo, hi], q);
-    readout.textContent = text;
-    minInput.setAttribute('aria-valuetext', formatSliderValue(lo, q));
-    maxInput.setAttribute('aria-valuetext', formatSliderValue(hi, q));
-    paintFill();
-    schedulePreviewRefresh(ctx);
-  };
-  minInput.addEventListener('input', sync);
-  maxInput.addEventListener('input', sync);
-
-  paintFill();
-  track.append(fill, minInput, maxInput);
-
-  const bounds = el('div', 'vm-slider-bounds');
-  bounds.append(
-    el('span', 'vm-slider-min', formatSliderValue(q.min, q)),
-    el('span', 'vm-slider-max', formatSliderValue(q.max, q)),
-  );
-
-  list.append(readout, track, bounds);
-}
-
 function renderQuestion(root, ctx, index) {
   const questions = visibleQuestions(ctx.questions, ctx.answers);
   const q = questions[index];
-  const selected = new Set(
-    q.multi ? (ctx.answers[q.id] || []) : (ctx.answers[q.id] != null ? [ctx.answers[q.id]] : []),
-  );
 
   root.replaceChildren();
   const screen = el('div', 'vm-screen');
@@ -2198,12 +1374,6 @@ function renderQuestion(root, ctx, index) {
   screen.append(el('h2', 'vm-question', q.title));
   if (q.help) screen.append(el('p', 'vm-help', q.help));
 
-  const list = el('div', 'vm-options');
-  // A slider is a single labelled input (its own role), not a radio/checkbox
-  // group — only set the group role for option lists.
-  if (q.type !== 'slider') list.setAttribute('role', q.multi ? 'group' : 'radiogroup');
-  const optionButtons = [];
-
   const advance = () => {
     const total = visibleQuestions(ctx.questions, ctx.answers).length;
     // Editing a pill sets a return point: once this (earlier) question is
@@ -2221,15 +1391,22 @@ function renderQuestion(root, ctx, index) {
   };
 
   const isSlider = q.type === 'slider';
+  // A slider is a single labelled input (its own role), not a radio/checkbox
+  // group, so it gets a bare container; an option list builds its own and
+  // arrives with the group role already on it (see question-ui.js).
+  let list;
+  // The option list's live selection, which is what the Next button below is
+  // enabled by. A slider always has a value, so it has no such set.
+  let selected = null;
   if (isSlider && q.range) {
     // Dual-thumb range (budget): two overlaid inputs writing a [min, max] pair.
-    list.classList.add('vm-slider');
-    renderRangeSlider(list, q, ctx);
+    list = el('div', 'vm-options vm-slider');
+    renderRangeSlider(list, q, ctx.answers, { onChange: () => schedulePreviewRefresh(ctx) });
   } else if (isSlider) {
     // A range input plus a live value readout. The whole thing writes a number
     // to ctx.answers[q.id] and, unlike a single-select, never auto-advances —
     // the Next button (below) is the commit point, since any drag would fire.
-    list.classList.add('vm-slider');
+    list = el('div', 'vm-options vm-slider');
     const stored = ctx.answers[q.id];
     const startValue = typeof stored === 'number'
       ? stored
@@ -2265,42 +1442,18 @@ function renderQuestion(root, ctx, index) {
 
     list.append(readout, input, bounds);
   } else {
-    q.options.forEach((opt) => {
-      const btn = el('button', 'vm-option');
-      btn.type = 'button';
-      btn.setAttribute('role', q.multi ? 'checkbox' : 'radio');
-      btn.setAttribute('aria-checked', String(selected.has(opt.value)));
-      if (selected.has(opt.value)) btn.classList.add('is-selected');
-      btn.append(el('span', 'vm-option-label', opt.label));
-      if (opt.sub) btn.append(el('span', 'vm-option-sub', opt.sub));
-      btn.addEventListener('click', () => {
-        if (q.multi) {
-          if (selected.has(opt.value)) selected.delete(opt.value);
-          else {
-            if (opt.value === 'any') selected.clear();
-            else selected.delete('any');
-            if (q.max && selected.size >= q.max) return;
-            selected.add(opt.value);
-          }
-          ctx.answers[q.id] = [...selected];
-          optionButtons.forEach(({ button, value }) => {
-            button.classList.toggle('is-selected', selected.has(value));
-            button.setAttribute('aria-checked', String(selected.has(value)));
-          });
-          next.disabled = selected.size === 0;
-          schedulePreviewRefresh(ctx);
-        } else {
-          ctx.answers[q.id] = opt.value;
-          // Refresh before advancing: the debounced fetch is scheduled on ctx, so
-          // the next question's freshly-built drawer picks up the result (via the
-          // seq guard) even though this screen is about to be replaced.
-          schedulePreviewRefresh(ctx);
-          advance();
-        }
-      });
-      optionButtons.push({ button: btn, value: opt.value });
-      list.append(btn);
-    });
+    ({ list, selected } = renderOptionList(q, ctx.answers, {
+      onChange: () => {
+        // Multi-select commits via Next, so the button tracks the selection.
+        if (q.multi) next.disabled = selected.size === 0;
+        // Refresh before advancing: the debounced fetch belongs to the mode
+        // rather than to this screen, so the next question's freshly-built
+        // drawer picks up the result (via the feed's latest-wins guard) even
+        // though this screen is about to be replaced.
+        schedulePreviewRefresh(ctx);
+      },
+      onPick: advance,
+    }));
   }
   screen.append(list);
 
@@ -2337,464 +1490,6 @@ function renderQuestion(root, ctx, index) {
   // already set) updates the guess even without changing an answer. Cheap: the
   // stock is served from the warmed cache and the call is debounced.
   schedulePreviewRefresh(ctx);
-}
-
-/** Miles from the configured retailer, e.g. "18.1 miles away". */
-function distanceLabel(distance) {
-  const miles = Math.round(distance * 10) / 10;
-  return `${miles} ${miles === 1 ? 'mile' : 'miles'} away`;
-}
-
-/**
- * The photo band every card surface shares: the retailer's picture when the
- * feed supplied one, the "Images coming soon" placeholder when it didn't, and
- * the line label pinned in the corner. Mirrors usedcars.bmw.co.uk's own PDP
- * for a photo-less listing — a white bold caption centred on the dark field.
- *
- * Returns the element and a `showPhoto` to change it later. The swap exists
- * because a hero card's listing picker can change which car the card is
- * describing, and colour is usually the entire reason that choice exists: a
- * card that renames the paint over a picture of the old one has argued against
- * itself. Tiles never call it a second time, but they get it from here anyway
- * — this was two near-identical copies, and the copy the picker didn't use was
- * the copy that quietly stopped matching.
- */
-function mediaWell(car, extraClass = '') {
-  const media = el('div', `vm-card-media${extraClass ? ` ${extraClass}` : ''}`);
-  media.append(
-    el('span', 'vm-card-soon', 'Images coming soon'),
-    el('span', 'vm-card-line', car.line),
-  );
-
-  function showPhoto(src) {
-    media.querySelector('.vm-card-photo')?.remove();
-    media.classList.toggle('has-photo', Boolean(src));
-    if (!src) return;
-    const img = el('img', 'vm-card-photo');
-    img.src = src;
-    img.alt = car.name;
-    img.loading = 'lazy';
-    // A broken image URL shouldn't leave a half-rendered card — drop back to
-    // the placeholder, exactly as a photo-less car shows.
-    img.addEventListener('error', () => {
-      media.classList.remove('has-photo');
-      img.remove();
-    });
-    // Ahead of the caption and the line label, both of which sit over it.
-    media.prepend(img);
-  }
-  showPhoto(car.photo);
-
-  return { media, showPhoto };
-}
-
-/**
- * One result card.
- * `big` adds the "why it suits you" reasons; `compact` is the carousel tile —
- * same anatomy, but trades the blurb and reasons for a distance line.
- */
-function matchCard(match, {
-  big = false, compact = false, brand: brandKey = 'bmw',
-  rejectOptions, rejectLabel, rejectPrompt,
-} = {}) {
-  const { car, score, reasons } = match;
-  const copy = BRAND_COPY[brandKey] || BRAND_COPY.bmw;
-  const card = el('article', `vm-card${big ? ' vm-card-big' : ''}${compact ? ' vm-card-compact' : ''}`);
-
-  const { media, showPhoto } = mediaWell(car);
-  card.append(media);
-
-  const body = el('div', 'vm-card-body');
-  const head = el('div', 'vm-card-head');
-  head.append(el('h3', 'vm-card-name', car.name));
-  const badge = el('span', 'vm-score', `${score}%`);
-  // The number has been unexplained since fit and taste were split, and two
-  // cards sharing one reads as a bug unless you know it is a claim that they
-  // suit you equally. Said properly in the working note under the cards; this
-  // is the affordance for the reader who points at the badge itself.
-  badge.title = 'Match score: how well this car fits the answers you gave. Cars that '
-    + 'suit you equally get the same score.';
-  head.append(badge);
-  body.append(head);
-
-  // Single used price when min === max (live stock), else the range.
-  // A grouped card prices the whole group; a single listing prices itself.
-  const price = car.listingCount > 1 && car.priceFrom !== car.priceTo
-    ? `from ${gbp(car.priceFrom)}`
-    : (car.priceMin === car.priceMax
-      ? gbp(car.priceMin)
-      : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`);
-  const specs = el('p', 'vm-specs');
-  // Paint, by its marketing name ("Legend Grey"), when the detail lookup got
-  // one. It reads as a spec, but it's carrying more weight than that: when the
-  // engine can't separate the cars, colour is very often the actual difference
-  // between them — so it belongs on the card, not buried on the retailer's PDP.
-  const lead = [SPEC_LABELS[car.body], FUEL_SPEC[car.fuel]].filter(Boolean);
-  /*
-   * The spec line, rebuilt rather than written once, because the listing
-   * picker below can change what this card is describing. It used to be built
-   * inline, so choosing a listing updated the mileage and the link but left
-   * the paint saying "Chili Red" next to the black car's mileage — a card
-   * describing two different cars at once, which is worse than not offering
-   * the choice at all.
-   */
-  /*
-   * `gearbox` is passed in rather than read off `car` because it is a property
-   * of one listing: a card speaking for four cars can hold three autos and a
-   * manual, so the gearbox has to follow the picker exactly as the paint does.
-   * Seats and boot are per-model and constant across a group, so they are read
-   * straight off the car.
-   *
-   * Boot is qualified with "seats up". It comes from MODEL_SPECS, not from the
-   * feed, and an unqualified litre figure is precisely the kind of claim Priya
-   * says she cannot picture: the number people distrust is the one that might
-   * quietly be the seats-down figure.
-   */
-  function renderSpecs(paint, shade, priceText, gearbox) {
-    specs.replaceChildren();
-    const head = [...lead, GEARBOX_SPEC[gearbox]].filter(Boolean);
-    // Compact tiles are narrow — the headline specs only, no practicality,
-    // 0–62 or economy.
-    const tail = (compact ? [priceText] : [
-      priceText,
-      car.seats ? `${car.seats} seats` : null,
-      car.boot ? `${car.boot}-litre boot, seats up` : null,
-      `0–62 ${car.zeroTo62}s`,
-      car.fuel === 'ev' ? `${car.evRange} mi range` : `${car.mpg} mpg`,
-    ]).filter(Boolean);
-    if (!paint || compact) {
-      specs.textContent = [...head, ...tail].join('  ·  ');
-      return;
-    }
-    // Paint gets a swatch as well as its name: in a tie the colour is very
-    // often the actual difference between the cars, and a dot you can see
-    // beats a name you have to read. No hex for the name → name alone.
-    specs.append(`${head.join('  ·  ')}  ·  `);
-    const hex = SWATCH_HEX[(shade || '').toLowerCase()];
-    if (hex) {
-      const dot = el('span', 'vm-swatch');
-      dot.style.background = hex;
-      specs.append(dot);
-    }
-    specs.append(`${paint}  ·  ${tail.join('  ·  ')}`);
-  }
-  renderSpecs(
-    car.colour?.manufacturerColour || car.colour?.colour,
-    car.colour?.colour,
-    price,
-    car.transmission,
-  );
-  body.append(specs);
-
-  // The whole point of the carousel: how far away is it, and whose is it?
-  // Distance comes from the live feed, so omit the line rather than invent
-  // one if the feed didn't supply it.
-  /*
-   * Where this car is, on every card rather than only the compact ones.
-   *
-   * This is what lets the page be one ranked list instead of three. When
-   * "at the retailer" and "23 miles away" were separate SECTIONS, each needed
-   * its own caption, and those captions contradicted each other as soon as a
-   * distant car outscored a local one. Make it a property of the card and the
-   * sections stop being necessary: the list is just sorted, and each row says
-   * where you'd go.
-   */
-  const where = el('p', 'vm-distance');
-  if (car.distance != null) {
-    where.append(el('span', 'vm-distance-miles', distanceLabel(car.distance)));
-    if (car.retailerName) where.append(el('span', null, ` · ${car.retailerName}`));
-    body.append(where);
-  } else if (car.retailerName) {
-    where.append(el('span', 'vm-distance-here', `At ${car.retailerName}`));
-    body.append(where);
-  }
-
-  // When repeat listings of the same car were grouped into this card, say so:
-  // how many, the price spread, and the colours they come in. Without this the
-  // page showed four identical iX2 cards and looked like it was stuttering.
-  if (car.listingCount > 1) {
-    const avail = el('p', 'vm-avail');
-    const span = car.priceFrom === car.priceTo
-      ? gbp(car.priceFrom)
-      : `${gbp(car.priceFrom)}–${gbp(car.priceTo)}`;
-    avail.append(el('span', 'vm-avail-count', `${car.listingCount} available`));
-    avail.append(el('span', null, ` · ${span}`));
-    if (car.colours?.length) avail.append(el('span', null, ` · ${orList(car.colours)}`));
-    body.append(avail);
-  }
-
-  // Real used-car detail from the live feed, when present.
-  const detailBits = [];
-  if (car.plate) detailBits.push(`’${car.plate} reg`);
-  if (car.mileage != null) detailBits.push(`${car.mileage.toLocaleString('en-GB')} miles`);
-  const usedMeta = detailBits.length ? el('p', 'vm-usedmeta', detailBits.join('  ·  ')) : null;
-  if (usedMeta) body.append(usedMeta);
-
-  if (!compact) body.append(el('p', 'vm-blurb', car.blurb));
-
-  /*
-   * What is actually on this car, from the feed's factory options list.
-   *
-   * The equipment concepts have been parsed since the refinement work and had
-   * exactly one surface: a chip, offered only where the stock happens to split
-   * on them. That is the wrong surface for confirming a fact. Priya walks away
-   * from "ISOFIX she cannot confirm", and on her page every lead car has it,
-   * so the chip is correctly suppressed and she learns nothing. Meg's clause
-   * wants the comfort equipment "stated where she can see it", not inferred
-   * from which filters are on offer.
-   *
-   * It claims PRESENCE and never absence. The feed lists factory options, so a
-   * car can carry standard kit this never mentions — which is why the label is
-   * "what's fitted" rather than a spec sheet, and why nothing anywhere says a
-   * car lacks something. Capped, with the remainder counted rather than
-   * silently dropped, and rebuilt by the picker because equipment belongs to a
-   * listing rather than to the model.
-   */
-  const kit = el('p', 'vm-kit');
-  const kitLabel = el('p', 'vm-why-label vm-kit-label', copy.kitLabel);
-  function renderKit(chosen) {
-    const have = new Set(chosen?.features || car.features || []);
-    const named = Object.entries(CONCEPT_LABELS)
-      .filter(([key]) => have.has(key))
-      .map(([, label]) => label);
-    kit.hidden = !named.length;
-    kitLabel.hidden = !named.length;
-    if (!named.length) return;
-    const shown = named.slice(0, KIT_SHOWN);
-    const rest = named.length - shown.length;
-    kit.textContent = shown.join(', ')
-      + (rest > 0 ? copy.kitMore({ count: rest }) : '');
-  }
-  if (!compact) {
-    renderKit(listingsOf(match)[0]);
-    body.append(kitLabel, kit);
-  }
-
-  /*
-   * The reasons, on every card that leads the page rather than only on a hero.
-   *
-   * Same argument the trade-off line was widened on: a tie renders several
-   * lead cards and none of them is "big", so the page's entire case for the
-   * cars it is recommending vanished in exactly the state where the buyer has
-   * most to choose between. Sam & Jordan Reyes walk away when the practicality
-   * claims read like brochure copy, and their page is a five-card taste pick,
-   * so until now their clause could not even be tested.
-   *
-   * Trimmed to two on a multi-card page. Four bullets across five cards is a
-   * wall, and the reasons are sorted by how much they contributed, so the top
-   * two are the case and the rest are corroboration.
-   */
-  if (!compact && reasons.length) {
-    const why = el('ul', 'vm-reasons');
-    reasons.slice(0, big ? reasons.length : 2).forEach((r) => why.append(el('li', null, r)));
-    body.append(el('p', 'vm-why-label', 'Why it suits you'), why);
-  }
-
-  // Owning the trade-off: when a recommendation misses a stated want (it's
-  // petrol and they asked for electric), the card says so itself, right under
-  // the case for it — not only the page-level unmet note, which fires solely
-  // when the whole reachable pool is short, and in practice almost never does.
-  //
-  // Every card that leads the page, not just the hero: a tie renders medium
-  // cards, and that's precisely where the admission matters most — six coupés
-  // offered to someone who asked for a convertible should say so on each of
-  // them, not go quiet because none of them is a "hero". Only the compact
-  // carousel tiles skip it, and they already state the shape in their specs.
-  if (!compact && match.tradeOffs?.length) {
-    const { label } = TRADE_COPY[brandKey] || TRADE_COPY.bmw;
-    body.append(
-      el('p', 'vm-why-label vm-trade-label', label),
-      el('p', 'vm-trade-text', tradeLines(brandKey, match.tradeOffs).join(' ')),
-    );
-  }
-
-  // Set by the reject block below, called by the listing picker further down:
-  // the two are built in DOM order but have to stay in step, because a reason
-  // for turning a car down is only usable if it is about the car on screen.
-  let onPick = null;
-
-  // "Not this one" — the other half of choosing. Rejecting a car is the
-  // highest-signal thing a buyer does, because it's a reaction to a real car
-  // rather than an answer about a hypothetical one; the menu is what turns it
-  // into something actionable (see rejectOptions). Only offered where a
-  // caller supplies the options, so it appears in a tie and nowhere else.
-  if (rejectOptions) {
-    const rejectWrap = el('div', 'vm-reject');
-    const open = el('button', 'vm-reject-open', rejectLabel || 'Not this one');
-    open.type = 'button';
-    open.setAttribute('aria-expanded', 'false');
-    // Says what the control DOES. It was a small underlined link that looked
-    // like a disclaimer, and nothing on the page suggested that turning a
-    // car down would bring another one in — so the most conversational thing
-    // the tool can do read as the least important.
-    if (copy.rejectHint) open.append(el('span', 'vm-reject-hint', copy.rejectHint));
-    const menu = el('div', 'vm-reject-menu');
-    menu.hidden = true;
-    open.addEventListener('click', () => {
-      menu.hidden = !menu.hidden;
-      open.setAttribute('aria-expanded', String(!menu.hidden));
-    });
-
-    /*
-     * Rebuilt whenever the card changes which car it is describing.
-     *
-     * The menu used to be built once, from the group's representative, and the
-     * listing picker only repainted the DOM — so switching a four-colour card
-     * from red to green left "Not the red" on offer, and taking it removed the
-     * green car the buyer was actually looking at. The reason has to be about
-     * the car in front of them, or it is worse than no reason at all.
-     */
-    function renderRejectMenu(chosen) {
-      const options = rejectOptions(match, chosen);
-      rejectWrap.hidden = !options.length;
-      menu.replaceChildren(el('p', 'vm-reject-prompt', rejectPrompt || 'What put you off?'));
-      options.forEach((o) => {
-        const b = el('button', 'vm-reject-option', o.label);
-        b.type = 'button';
-        b.addEventListener('click', o.apply);
-        menu.append(b);
-      });
-    }
-    renderRejectMenu(listingsOf(match)[0]);
-    onPick = renderRejectMenu;
-
-    rejectWrap.append(open, menu);
-    body.append(rejectWrap);
-  }
-
-  /*
-   * Which one, though?
-   *
-   * Grouping repeat listings fixed the page reading as a stutter, but it also
-   * ended the journey a step early: it narrowed to a model and trim, then
-   * quietly handed over whichever listing happened to rank first. That's the
-   * step Chloe and Meg actually care about — the same Cooper C in Ocean Wave
-   * Green or Melting Silver is the whole decision for them.
-   *
-   * So a card that speaks for several cars lets the buyer pick the actual one.
-   * Choosing swaps the photo, price, mileage and the link out, so the card
-   * always describes the car they'd be going to see. Hero cards only: the
-   * compact tiles are a glance, not a decision.
-   */
-  // Every card that speaks for several cars, not just the hero. The picker
-  // was `big`-only, so a tie — where grouped cards are commonest — showed
-  // "4 available … Portimao Blue, Brooklyn Grey or Alpine White" with no way
-  // to choose between them. Compact tiles stay out: they're a glance.
-  if (!compact && match.listings?.length > 1) {
-    body.append(el('p', 'vm-why-label', copy.pickLabel));
-    const picker = el('div', 'vm-pick');
-    match.listings.forEach((listing, i) => {
-      const opt = el('button', `vm-pick-opt${i === 0 ? ' is-on' : ''}`);
-      opt.type = 'button';
-      opt.setAttribute('aria-pressed', String(i === 0));
-      // Marketing names bury the basic colour anywhere in the string, and not
-      // always last ("Midnight Black II", "Chili Red"), so try every word.
-      const hex = (listing.colour || '')
-        .toLowerCase().split(/[^a-z]+/)
-        .map((word) => SWATCH_HEX[word])
-        .find(Boolean);
-      if (hex) {
-        const dot = el('span', 'vm-swatch');
-        dot.style.background = hex;
-        opt.append(dot);
-      }
-      // Paint is fetched per car and can be missing (an unreachable page, or
-      // the request's colour budget running out). Naming the row "Colour n/a"
-      // told the buyer nothing; mileage is the next thing that actually
-      // separates two otherwise identical cars.
-      const label = listing.colour
-        || (listing.mileage != null ? `${listing.mileage.toLocaleString('en-GB')} miles` : `Option ${i + 1}`);
-      opt.append(el('span', 'vm-pick-colour', label));
-      const bits = [gbp(listing.priceMin)];
-      if (listing.colour && listing.mileage != null) {
-        bits.push(`${listing.mileage.toLocaleString('en-GB')} mi`);
-      }
-      opt.append(el('span', 'vm-pick-meta', bits.join(' · ')));
-      opt.addEventListener('click', () => {
-        picker.querySelectorAll('.vm-pick-opt').forEach((b) => {
-          b.classList.remove('is-on');
-          b.setAttribute('aria-pressed', 'false');
-        });
-        opt.classList.add('is-on');
-        opt.setAttribute('aria-pressed', 'true');
-        // Re-describe the card as the chosen car: paint, swatch, price,
-        // gearbox, mileage and where the link goes. Anything left showing the
-        // previous listing's values is a card describing two cars at once.
-        showPhoto(listing.photo);
-        renderSpecs(
-          listing.colour, listing.shade, gbp(listing.priceMin),
-          listing.transmission ?? car.transmission,
-        );
-        renderKit(listing);
-        if (usedMeta) {
-          const bits = [];
-          if (car.plate) bits.push(`’${car.plate} reg`);
-          if (listing.mileage != null) {
-            bits.push(`${listing.mileage.toLocaleString('en-GB')} miles`);
-          }
-          usedMeta.textContent = bits.join('  ·  ');
-        }
-        const cta = card.querySelector('.vm-card-link');
-        if (cta && listing.link) cta.href = listing.link;
-        // Re-offer reasons about the car now being shown.
-        onPick?.(listing);
-      });
-      picker.append(opt);
-    });
-    body.append(picker);
-  }
-
-  // Link out to the retailer's live stock, when the feed gave us one.
-  if (car.link) {
-    const cta = el('a', 'vm-card-link', `View at ${car.retailerName || 'the retailer'} ›`);
-    cta.href = car.link;
-    cta.target = '_blank';
-    cta.rel = 'noopener noreferrer';
-    body.append(cta);
-  }
-
-  card.append(body);
-  return card;
-}
-
-/**
- * A small "mini" tile for the live preview strip — deliberately lighter than the
- * results-page compact card (matchCard): a small photo (or the "Images coming
- * soon" placeholder), the model name + match score, and one spec line. The whole
- * tile is a link to the live listing when the feed gave us one.
- */
-function previewTile(match) {
-  const { car, score } = match;
-  // A grouped card prices the whole group; a single listing prices itself.
-  const price = car.listingCount > 1 && car.priceFrom !== car.priceTo
-    ? `from ${gbp(car.priceFrom)}`
-    : (car.priceMin === car.priceMax
-      ? gbp(car.priceMin)
-      : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`);
-
-  // Whole tile is the tap target — an <a> when we have a link, else a plain
-  // article (still a valid tile, just not clickable).
-  const tag = car.link ? 'a' : 'article';
-  const tile = el(tag, 'vm-ptile vm-ptile-mini');
-  if (car.link) {
-    tile.href = car.link;
-    tile.target = '_blank';
-    tile.rel = 'noopener noreferrer';
-    tile.setAttribute('aria-label', `${car.name}, ${price}, ${score}% match. View at ${car.retailerName || 'the retailer'}`);
-  }
-
-  const { media } = mediaWell(car, 'vm-ptile-media');
-
-  const body = el('div', 'vm-ptile-body');
-  const head = el('div', 'vm-ptile-head');
-  const badge = el('span', 'vm-score vm-ptile-score', `${score}%`);
-  badge.title = 'Match score';
-  head.append(el('span', 'vm-ptile-name', car.name.replace(/^BMW /, '')), badge);
-  const specs = el('span', 'vm-ptile-specs',
-    [SPEC_LABELS[car.body], FUEL_SPEC[car.fuel], price].filter(Boolean).join(' · '));
-  body.append(head, specs);
-  tile.append(media, body);
-  return tile;
 }
 
 /** Full-screen status message (loading / error), optionally with a retry button. */
@@ -3175,7 +1870,7 @@ async function renderResults(root, ctx, answers) {
     // Clear the strip's carried-over guess so a fresh run starts empty, and
     // drop any in-flight/debounced refresh from the finished run (bump seq so a
     // late-landing response from the old run is ignored).
-    clearTimeout(ctx.previewTimer);
+    ctx.previewFeed.cancel();
     ctx.preview = { matches: [], seq: ctx.preview.seq + 1, loaded: false };
     ctx.editReturnIndex = null;
     window.history.replaceState(null, '', window.location.pathname);
@@ -3310,12 +2005,17 @@ function mount(root, ctx) {
   ctx.answers = {};
   ctx.questions = [];
   // Live "best guess" strip state, kept on ctx so it survives the per-question
-  // re-render (see renderPreviewSection / schedulePreviewRefresh). `seq` is the
-  // latest-wins guard for the debounced refetch. `loaded` flips true once the
-  // first /api/preview response lands, so the strip can tell "still loading"
-  // (show skeleton) from "loaded, no matches" (hide the strip).
+  // re-render (see renderPreviewSection / schedulePreviewRefresh). `seq` counts
+  // the RUN, so starting over can disown a response the finished run is still
+  // waiting on; ordering within a run is the feed's own guard. `loaded` flips
+  // true once the first /api/preview response lands, so the strip can tell
+  // "still loading" (show skeleton) from "loaded, no matches" (hide the strip).
   ctx.preview = { matches: [], seq: 0, loaded: false };
-  ctx.previewTimer = null;
+  // No `group`: the questions drawer shows individual cars, so its requests are
+  // exactly what they always were.
+  ctx.previewFeed = createPreviewFeed({
+    api: ctx.api, retailer: ctx.retailer, brand: ctx.brand,
+  });
   // Set when a summary pill is tapped to edit an earlier answer: the index to
   // return to once that answer is re-submitted (see renderAnswerPills /
   // advance). Null the rest of the time.

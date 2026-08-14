@@ -3334,3 +3334,632 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   .vm-knockout-interstitial.is-revealing { animation: none; }
   .vm-knockout-skel-card { animation: none; background-image: none; }
 }
+
+/* ======================================================================
+   Podium (the `podium` mode, modes/podium.js)
+   ----------------------------------------------------------------------
+   The everything-on-screen surface: the brief on the left, a live ranked
+   podium on the right that re-orders as answers land. Unlike the two games
+   this mode renders the SHARED card vocabulary (.vm-card / .vm-card-compact
+   from result-card.js) and the SHARED question controls (.vm-options /
+   .vm-slider from question-ui.js), so almost everything below is either
+   layout, rank weight, or a size adjustment for the narrower column. Where a
+   rule touches a shared class it is scoped under .vm-podium so the
+   questionnaire is untouched.
+
+   Rank is expressed as WEIGHT, never as medal colour: gold, silver and bronze
+   hex would fight BMW blue, MINI green, Honda red, Ford blue, Motorrad red and
+   Ferrari red in turn. The ladder is four honest signals instead, all from
+   tokens: the length of the rule before the rank label, how far the step is
+   inset from the column edge, the card border (accent versus hairline) and the
+   depth of its shadow. A tie flattens all of them, because a joint first must
+   not have a visible winner.
+
+   Every animation is disabled in the reduced-motion block at the end.
+   ====================================================================== */
+
+/* The two-pane grid. One column below 720px (the brief first, then the
+   podium, which is DOM order, so no reordering is needed), two above. The
+   block is capped at 880px, so the left column takes a fixed reading measure
+   and the podium takes the rest. min-width: 0 on both panes because a grid
+   item defaults to min-content width, and a long unbroken model name in a card
+   would otherwise push the whole track wider than the block. */
+.vm-podium {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: var(--vm-space-8);
+  animation: vm-in 0.25s ease;
+  /* The stage is also the confetti host: celebrate() drops an absolutely
+     positioned layer into it, so it needs to be the containing block or the
+     burst escapes to the nearest positioned ancestor and fires somewhere up
+     the page. The stage rather than the results pane on purpose, since that
+     pane scrolls internally above 720px and would clip the burst. */
+  position: relative;
+}
+.vm-podium-ask,
+.vm-podium-results { min-width: 0; }
+
+@media (min-width: 720px) {
+  .vm-podium {
+    grid-template-columns: minmax(280px, 320px) 1fr;
+    gap: var(--vm-space-8);
+  }
+  /* A hairline seam rather than a filled panel: the two panes are one surface
+     with two jobs, not two cards sitting next to each other. */
+  .vm-podium-ask {
+    border-right: var(--vm-border-width) solid var(--vm-line);
+    padding-right: var(--vm-space-6);
+  }
+  /* The podium is the mode: it has to stay in view while the brief is filled
+     in. Clamped and internally scrollable rather than a bare sticky, because a
+     sticky pane taller than the viewport pins its top and strands its own
+     lower half. The small inline padding keeps the gold card shadow off the
+     scroll container edge. */
+  .vm-podium-results {
+    position: sticky;
+    top: var(--vm-space-4);
+    max-height: calc(100vh - var(--vm-space-8));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-inline: var(--vm-space-1);
+  }
+}
+
+/* ---------------------------- left pane: the brief ------------------- */
+
+.vm-podium-wordmark {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  line-height: 1.2;
+  color: var(--vm-accent-spot);
+  margin: 0 0 var(--vm-space-2);
+}
+
+/* Sized off .vm-title but two steps down: this headline lives in a 320px
+   column beside a live result, so the questionnaire's 40px would take four
+   lines and push the first question below the fold. */
+.vm-podium-title {
+  font-family: var(--vm-font-heading);
+  font-size: var(--vm-text-h2);
+  font-weight: 300;
+  line-height: 1.15;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  margin: 0 0 var(--vm-space-3);
+}
+
+/* The lede sets in the BODY font at every brand, not the heading font that
+   .vm-lede uses. Four of the six brands already override .vm-lede back to body
+   copy, and the two that do not (BMW, Motorrad) set it in a light grotesque
+   that reads thin at this size in a narrow column. One rule beats six. */
+.vm-podium-lede {
+  font-family: var(--vm-font-body);
+  font-weight: 400;
+  font-size: var(--vm-text-body);
+  line-height: 1.4;
+  color: var(--vm-ink-muted);
+  margin: 0 0 var(--vm-space-5);
+}
+
+.vm-podium-progress {
+  height: 4px;
+  background: var(--vm-surface-alt);
+  border-radius: var(--vm-radius);
+  overflow: hidden;
+  margin: 0 0 var(--vm-space-2);
+}
+.vm-podium-progress-bar {
+  height: 100%;
+  width: 0;
+  background: var(--vm-accent-spot);
+  border-radius: var(--vm-radius);
+  transition: width 0.3s ease;
+}
+
+/* A live region, so it gains and loses text as the brief fills in. The
+   reserved min-height stops that from nudging the first question up and down
+   under the reader. */
+.vm-podium-banner {
+  margin: 0 0 var(--vm-space-6);
+  min-height: 1.4em;
+  font-size: var(--vm-text-label);
+  line-height: 1.4;
+  color: var(--vm-ink-muted);
+}
+/* Once the brief is committed the banner is reporting a result, not nudging
+   for more answers, so it takes the accent and the bold face. */
+.vm-podium.is-committed .vm-podium-banner {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  color: var(--vm-accent-spot);
+}
+
+/* One block per visible question. Conditional questions are spliced in and out
+   here, so the separation is a hairline between siblings rather than a border
+   on the block itself: adding or removing a block never leaves a stray rule at
+   the top or bottom of the list. */
+.vm-podium-questions {
+  display: flex;
+  flex-direction: column;
+}
+.vm-podium-q { padding: var(--vm-space-5) 0; }
+.vm-podium-q + .vm-podium-q { border-top: var(--vm-border-width) solid var(--vm-line); }
+
+.vm-podium-q-label {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--vm-ink-muted);
+  margin: 0 0 var(--vm-space-1);
+}
+
+/* Quieter than the questionnaire's 26px .vm-question, deliberately: that mode
+   asks one question at a time and the question IS the screen. Here eight of
+   them share a column with a live result, so they read as a form, not as eight
+   consecutive headlines. */
+.vm-podium-q-title {
+  font-family: var(--vm-font-heading);
+  font-weight: 300;
+  font-size: var(--vm-text-body-lg);
+  line-height: 1.25;
+  margin: 0;
+}
+
+.vm-podium-q-help {
+  margin: var(--vm-space-1) 0 0;
+  font-size: var(--vm-text-label);
+  line-height: 1.4;
+  color: var(--vm-ink-muted);
+}
+
+/* The shared option list carries the questionnaire's generous margins, which
+   were measured for a full-width screen with one question on it. */
+.vm-podium-q .vm-options { margin: var(--vm-space-3) 0 0; }
+.vm-podium-q .vm-options.vm-slider { padding-top: var(--vm-space-1); }
+.vm-podium-q .vm-slider-value { font-size: var(--vm-text-body-lg); margin-bottom: var(--vm-space-3); }
+
+@media (min-width: 720px) {
+  /* .vm-options goes 2-up from a 560px VIEWPORT, but from 720px this pane is a
+     320px column, so the two-up grid would put two labels in ~150px each. */
+  .vm-podium-q .vm-options { grid-template-columns: 1fr; }
+  .vm-podium-q .vm-option { padding: var(--vm-space-3) var(--vm-space-4); }
+}
+
+.vm-podium-commit {
+  width: 100%;
+  max-width: 100%;
+  margin-top: var(--vm-space-6);
+}
+/* Committed and disabled is a DONE state, not a broken one, so it drops out of
+   the accent rather than sitting there at the base 0.35 opacity looking like a
+   button that failed. Editing an answer re-arms it and this stops applying. */
+.vm-podium.is-committed .vm-podium-commit:disabled {
+  opacity: 1;
+  background: var(--vm-surface-alt);
+  border-color: var(--vm-line);
+  color: var(--vm-ink-muted);
+}
+
+/* ---------------------------- right pane: the podium ----------------- */
+
+/* The re-rank announcement. Visible, not screen-reader-only: seeing "the
+   podium changed" is the whole feedback loop, and hiding it would leave a
+   sighted reader guessing whether their answer did anything. Height is
+   reserved so an announcement arriving does not shove the podium down. */
+.vm-podium-live {
+  margin: 0 0 var(--vm-space-3);
+  min-height: 1.2em;
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  line-height: 1.2;
+  color: var(--vm-ink-muted);
+}
+
+.vm-podium-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vm-space-4);
+  transition: opacity 0.18s ease;
+}
+/* The re-rank cross-fade. Plain `ease`, not --vm-ease: a springy brand curve
+   on an opacity dip reads as a flicker rather than a settle. */
+.vm-podium-steps.is-updating { opacity: 0.45; }
+
+/* A step is a frame around a shared card, not a card itself, so it paints no
+   background or border of its own (that would double every card edge). It is
+   the positioning context for the reject trigger, and it carries the dismissal
+   transition for the whole tile. */
+.vm-podium-step {
+  position: relative;
+  transition: opacity 0.35s var(--vm-ease), transform 0.35s var(--vm-ease);
+}
+.vm-podium-step .vm-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+/* --- the rank ladder: weight, not medal colour ---
+   First takes the accent edge, a ring that reads as a doubled border, and the
+   deepest lift. Second keeps the hairline and a shallower shadow. Third sits
+   flat on the quiet band. The inset narrows as the rank drops, which is the
+   shape of an actual podium read top to bottom. The insets are small enough
+   that the third step still has ~248px of card at a 320px viewport. */
+.vm-podium-step.is-gold .vm-card {
+  border-color: var(--vm-accent);
+  box-shadow: 0 0 0 1px var(--vm-accent), 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+.vm-podium-step.is-silver {
+  margin-inline: var(--vm-space-2);
+}
+.vm-podium-step.is-silver .vm-card {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+.vm-podium-step.is-bronze {
+  margin-inline: var(--vm-space-4);
+}
+.vm-podium-step.is-bronze .vm-card {
+  background: var(--vm-surface-alt);
+}
+
+/* Committing firms the winner up: the ring thickens and the lift deepens, so
+   pressing the CTA visibly resolves the podium instead of only swapping copy
+   inside the hero. */
+.vm-podium.is-committed .vm-podium-step.is-gold .vm-card {
+  box-shadow: 0 0 0 2px var(--vm-accent), 0 14px 34px rgba(0, 0, 0, 0.14);
+}
+
+/* Joint first: every tied step carries .is-gold, so they already share the
+   accent edge. Flatten the lift as well, because an elevation difference
+   between two cards the engine rates level is exactly the fabricated
+   distinction the tie state exists to avoid. */
+.vm-podium-steps.is-tied .vm-podium-step.is-gold .vm-card {
+  box-shadow: 0 0 0 1px var(--vm-accent);
+}
+
+/* The rank eyebrow. The rule before the label is the quietest of the four rank
+   signals and the one that survives any brand palette, because it inherits the
+   label colour rather than picking one. */
+.vm-podium-rank {
+  --vm-podium-rule: var(--vm-space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--vm-space-2);
+  margin: 0 0 var(--vm-space-2);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  line-height: 1.2;
+  color: var(--vm-ink-muted);
+}
+.vm-podium-rank::before {
+  content: '';
+  flex: none;
+  width: var(--vm-podium-rule);
+  height: 2px;
+  background: currentcolor;
+}
+.vm-podium-step.is-gold .vm-podium-rank {
+  --vm-podium-rule: var(--vm-space-6);
+  font-size: var(--vm-text-label);
+  color: var(--vm-accent-spot);
+}
+.vm-podium-step.is-silver .vm-podium-rank { --vm-podium-rule: var(--vm-space-4); }
+
+/* --- the tail: also worth a look --- */
+
+.vm-podium-tail { margin-top: var(--vm-space-8); }
+/* .vm-subhead brings a 32px top margin for the results page it was built for;
+   the tail owns its own spacing above. */
+.vm-podium-tail-head {
+  margin: 0 0 var(--vm-space-3);
+  font-size: var(--vm-text-body-lg);
+}
+/* min() on the track floor so the grid can still collapse below 160px rather
+   than forcing the column wider than the block at the narrowest viewports. */
+.vm-podium-tail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
+  gap: var(--vm-space-3);
+}
+/* Tail tiles are shared compact cards, which are built for the horizontal
+   nearby rail: reset the flex sizing that a grid track ignores anyway, give
+   each one a positioning context for its reject trigger, and let it shrink. */
+.vm-podium-tail-grid > * {
+  position: relative;
+  min-width: 0;
+  flex: none;
+  transition: opacity 0.35s var(--vm-ease), transform 0.35s var(--vm-ease);
+}
+
+/* The honest note, only painted when it applies. Same quiet grey field with a
+   spot edge as .vm-unmet and the swipe mode weak note, because it is the same
+   register: an aside, never an apology. */
+.vm-podium-note {
+  margin: var(--vm-space-6) 0 0;
+  padding: var(--vm-space-3) var(--vm-space-4);
+  background: var(--vm-surface-alt);
+  border-left: 3px solid var(--vm-accent-spot);
+  border-radius: var(--vm-radius);
+  font-size: var(--vm-text-label);
+  line-height: 1.5;
+  color: var(--vm-ink-muted);
+}
+
+/* --- dismissal: committed, then gone --- */
+
+.vm-podium-step.is-dismissing,
+.vm-podium-tail-grid > .is-dismissing { opacity: 0.25; }
+.vm-podium-step.is-dismissed,
+.vm-podium-tail-grid > .is-dismissed {
+  opacity: 0;
+  transform: scale(0.93);
+}
+
+/* ---------------------------- "not this one" ------------------------- */
+
+/* Deliberately a small corner chip, not a red X: turning a car down is normal
+   browsing, the same judgement the questionnaire reject control makes. It
+   paints a solid surface rather than a translucent one so it stays legible
+   over any photo the feed happens to return. */
+.vm-podium-reject {
+  position: absolute;
+  top: var(--vm-space-2);
+  right: var(--vm-space-2);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vm-space-1);
+  padding: 3px var(--vm-space-2);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius-control);
+  background: var(--vm-surface);
+  color: var(--vm-ink-muted);
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-eyebrow);
+  line-height: 1.4;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.vm-podium-reject:hover {
+  color: var(--vm-ink);
+  border-color: var(--vm-ink-muted);
+}
+.vm-podium-reject:focus-visible {
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: 2px;
+}
+/* While its popover is open the chip stays visibly the anchor, so the dialog
+   is not floating free of the card it is about. */
+.vm-podium-reject[aria-expanded='true'] {
+  color: var(--vm-ink);
+  border-color: var(--vm-accent);
+}
+.vm-podium-reject-icon { line-height: 1; }
+.vm-podium-reject-label { letter-spacing: 0.2px; }
+
+/* The popover. Fixed and 272px per the PRD, positioned in JS from the trigger
+   rect; the max-width is the 8px viewport margin the contract asks for, so a
+   chip near the screen edge still gets a full dialog. z-index clears the
+   in-card chrome (the deck stamps and knockout badges top out at 4). */
+.vm-podium-pop {
+  position: fixed;
+  z-index: 50;
+  width: 272px;
+  max-width: calc(100vw - 16px);
+  padding: var(--vm-space-4);
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.18);
+}
+/* Both the dialog and step 2 are toggled with the hidden attribute, and any
+   display value set in a stylesheet beats the browser default rule for it. */
+.vm-podium-pop[hidden],
+.vm-podium-pop-step2[hidden] { display: none; }
+
+.vm-podium-pop-title {
+  margin: 0 0 var(--vm-space-3);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink);
+}
+
+/* One reason per row, matching .vm-reject-option: they are read, not scanned,
+   and a wrapped row of pills invites a fast mis-tap on something that teaches
+   the engine a dealbreaker. */
+.vm-podium-pop-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vm-podium-pop-reason {
+  display: block;
+  width: 100%;
+  padding: var(--vm-space-2) var(--vm-space-3);
+  border: 0;
+  border-radius: var(--vm-radius);
+  background: var(--vm-surface-alt);
+  color: var(--vm-ink);
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-label);
+  text-align: left;
+  cursor: pointer;
+}
+.vm-podium-pop-reason:hover {
+  background: var(--vm-accent-spot);
+  color: var(--vm-accent-ink);
+}
+.vm-podium-pop-reason:focus-visible {
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: -2px;
+}
+
+/* Cancel and Back are quiet text buttons: the loud control in this dialog is
+   the one that removes a car, and there should only be one of those. */
+.vm-podium-pop-cancel,
+.vm-podium-pop-back {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--vm-ink-muted);
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-label);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.vm-podium-pop-cancel { margin-top: var(--vm-space-3); }
+.vm-podium-pop-back { margin-bottom: var(--vm-space-3); }
+.vm-podium-pop-cancel:hover,
+.vm-podium-pop-back:hover { color: var(--vm-ink); }
+.vm-podium-pop-cancel:focus-visible,
+.vm-podium-pop-back:focus-visible {
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: 2px;
+}
+
+/* Step 2 reuses the shared question controls so the follow-up looks like the
+   left pane rather than a second, unrelated widget. They arrive sized for a
+   full-width screen, so everything here is a fit for 240px of usable width. */
+.vm-podium-pop-body .vm-options {
+  grid-template-columns: 1fr;
+  margin: 0;
+}
+.vm-podium-pop-body .vm-option {
+  padding: var(--vm-space-2) var(--vm-space-3);
+  font-size: var(--vm-text-label);
+}
+.vm-podium-pop-body .vm-options.vm-slider { padding: 0; }
+.vm-podium-pop-body .vm-slider-value {
+  font-size: var(--vm-text-body-lg);
+  margin-bottom: var(--vm-space-3);
+}
+.vm-podium-pop-body .vm-slider-bounds { font-size: var(--vm-text-eyebrow); }
+.vm-podium-pop-done {
+  width: 100%;
+  max-width: 100%;
+  margin-top: var(--vm-space-4);
+}
+
+/* ---------------------------- first paint ---------------------------- */
+
+/* The skeleton reuses .vm-skel / .vm-skel-line wholesale. A bare .vm-skel has
+   no intrinsic height (its callers give it one via an aspect ratio or a text
+   line), so any placeholder here that is not a text line gets a card-sized
+   floor, otherwise the first paint collapses to nothing and the podium drops
+   in from zero height. */
+.vm-podium-skeleton {
+  display: grid;
+  gap: var(--vm-space-4);
+}
+.vm-podium-skeleton .vm-skel:not(.vm-skel-line) { min-height: 120px; }
+.vm-podium-skeleton .vm-skel-line:last-child { margin-bottom: 0; }
+
+/* ---------------------------- brand fit ------------------------------ */
+
+/* Each brand keys its headline treatment to the questionnaire class list
+   (.vm-title, .vm-question, .vm-subhead and friends), so podium headings have
+   to opt in by name or MINI loses its serif caps, Motorrad loses its weight,
+   and Honda, Ford and Ferrari inherit an uppercase register that is not
+   theirs. .vm-podium-tail-head is absent from these rules on purpose: it also
+   carries .vm-subhead, so it is already covered.
+
+   Button casing needs nothing here: .vm-btn reads --vm-btn-transform, so
+   Ferrari's uppercase CTA and Motorrad's uppercase labels reach the commit
+   button and the popover Done button on their own. Geometry likewise, so the
+   reject chip is a MINI pill, a Ford 4px chip and a square Ferrari one from
+   --vm-radius-control without a rule per brand. */
+.vm.vm-mini .vm-podium-title,
+.vm.vm-mini .vm-podium-q-title {
+  font-family: var(--vm-font-heading);
+  text-transform: uppercase;
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+}
+.vm.vm-honda .vm-podium-title,
+.vm.vm-honda .vm-podium-q-title {
+  font-family: var(--vm-font-heading);
+  text-transform: none;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+.vm.vm-ford .vm-podium-title,
+.vm.vm-ford .vm-podium-q-title {
+  font-family: var(--vm-font-heading);
+  text-transform: none;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+.vm.vm-motorrad .vm-podium-title,
+.vm.vm-motorrad .vm-podium-q-title {
+  font-family: var(--vm-font-heading);
+  text-transform: uppercase;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.005em;
+}
+.vm.vm-ferrari .vm-podium-title,
+.vm.vm-ferrari .vm-podium-q-title {
+  font-family: var(--vm-font-heading);
+  text-transform: none;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+/* Ferrari keeps the spare, unhurried register it uses everywhere else, so the
+   rank label gets air instead of shouting a position. */
+.vm.vm-ferrari .vm-podium-rank {
+  font-family: var(--vm-font-heading);
+  letter-spacing: 1.5px;
+}
+
+/* MINI reserves solid black for buttons and selected states, so the podium
+   winner takes the green spot edge rather than a near-black one that would
+   read as a heavy box around the top card and lose the rank signal entirely
+   (--vm-accent is near-black for MINI, unlike every other brand). */
+.vm.vm-mini .vm-podium-step.is-gold .vm-card {
+  border-color: var(--vm-accent-spot);
+  box-shadow: 0 0 0 1px var(--vm-accent-spot), 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+.vm.vm-mini .vm-podium.is-committed .vm-podium-step.is-gold .vm-card {
+  box-shadow: 0 0 0 2px var(--vm-accent-spot), 0 14px 34px rgba(0, 0, 0, 0.14);
+}
+.vm.vm-mini .vm-podium-steps.is-tied .vm-podium-step.is-gold .vm-card {
+  box-shadow: 0 0 0 1px var(--vm-accent-spot);
+}
+.vm.vm-mini .vm-podium-reject[aria-expanded='true'] { border-color: var(--vm-accent-spot); }
+
+/* --- reduced motion: no entrance, no cross-fade, no dismissal travel. Every
+   state stays reachable and legible, and the JS commits instantly, so the only
+   thing removed here is the transition between two states, never a state. --- */
+@media (prefers-reduced-motion: reduce) {
+  .vm-podium { animation: none; }
+  .vm-podium-steps,
+  .vm-podium-step,
+  .vm-podium-step .vm-card,
+  .vm-podium-tail-grid > *,
+  .vm-podium-progress-bar,
+  .vm-podium-reject { transition: none; }
+  /* No re-rank cross-fade: the new order simply appears, which is the honest
+     version of the same information. */
+  .vm-podium-steps.is-updating { opacity: 1; }
+  /* Dismissal keeps its opacity STATES (they say which card is going) but
+     loses the scale travel, so nothing slides under the reader. */
+  .vm-podium-step.is-dismissed,
+  .vm-podium-tail-grid > .is-dismissed { transform: none; opacity: 0; }
+  .vm-podium-skeleton .vm-skel { animation: none; background-image: none; }
+}
