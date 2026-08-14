@@ -228,7 +228,7 @@ Three client edits, all one-liners, none optional:
 - `KNOWN_BRANDS` in `blocks/vehicle-matcher/vehicle-matcher.js` — add the key, or the shell
   rejects it and falls back to bmw. The block then applies `vm vm-<brand>` classes, which is
   what the theme (Layer 4) hangs off.
-- `BRAND_COPY.<brand>` in `blocks/vehicle-matcher/modes/questions.js` (and the sibling copy
+- `BRAND_COPY.<brand>` in `blocks/vehicle-matcher/modes/brand-copy.js` (and the sibling copy
   maps in `mingle.js`/`knockout.js` if those modes ship for the brand). This is the CLIENT
   copy map, separate from the server's `BRAND_COPY` in `questions.js`. It resolves
   **all-or-nothing** (`BRAND_COPY[brand] || BRAND_COPY.bmw`), so a missing entry silently
@@ -304,7 +304,7 @@ the engine**:
 - [ ] `.vm.vm-<brand>` theme block defines the full token contract (Section 3, Layer 4).
 - [ ] SERVER `BRAND_COPY.<brand>` (server/questions.js) in the brand's voice, no em dashes.
 - [ ] CLIENT copy wired (Section 4a): `KNOWN_BRANDS` includes the key; `BRAND_COPY.<brand>`
-      in modes/questions.js (+ mingle/knockout if shipped) spreads the BMW base and overrides
+      in modes/brand-copy.js (+ mingle/knockout/podium if shipped) spreads the BMW base and overrides
       the marque/register lines — else the intro/results silently show BMW's "cars at
       Grassicks BMW".
 - [ ] Intro `lede` (and `title`/`cta`, `tasteLede`/`tiedLede`, `working*`) actually rewritten

@@ -180,13 +180,13 @@ inference idiom shared between the two games, not two that can drift. `budget` a
 ```
 blocks/vehicle-matcher/modes/knockout.js       # the whole mode
 blocks/vehicle-matcher/modes/match-signal.js   # shared helpers + bracketToAnswers (also used by Swipe)
-blocks/vehicle-matcher/modes/index.js          # registry — MODES = [questions, mingle, knockout]
+blocks/vehicle-matcher/modes/index.js          # registry — MODES = [questionnaire, mingle, knockout, podium]
 blocks/vehicle-matcher/modes/engine.js         # +apiField (the roster read; sibling to apiPreview)
 blocks/vehicle-matcher/vehicle-matcher.css     # a scoped .vm-knockout-* section (reuses .vm-mingle-* for card/hero/why/CTA/confetti/seed)
 server/index.js                                # +/api/field (FIELD_MAX=16, opt-in colour enrich)
 ```
 
-`ui.js`, `questions.js`, the engine/scoring, and `/api/preview` (the questions drawer) are
+`ui.js`, `questionnaire.js`, the engine/scoring, and `/api/preview` (the questionnaire drawer) are
 untouched. The face-off card's colour bar is best-effort: the knockout asks `/api/field`
 for its 16-car roster **without** paint (`enrich` omitted) — painting all 16 would fetch a
 PDP for cars that lose in round one — so `swatchFor` falls back to a neutral swatch. Any

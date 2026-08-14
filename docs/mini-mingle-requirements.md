@@ -118,8 +118,8 @@ built in the prep pass.
 ```
 blocks/vehicle-matcher/
   modes/
-    index.js        # + import mingle;  MODES = [questions, mingle]
-    questions.js    # unchanged
+    index.js        # + import mingle;  MODES = [questionnaire, mingle, knockout, podium]
+    questionnaire.js # unchanged
     mingle.js       # NEW — everything in this document
   engine.js         # apiField drives the deck (roster read); apiMatch the result
   ui.js             # reused (el, cardinal, gbp); add shared helpers only if a 3rd mode needs them
