@@ -241,7 +241,16 @@
         const b = BRANDS[key];
         const tile = document.createElement('a');
         tile.className = 'demo-picker-tile';
-        tile.href = `?brand=${key}`;
+        // Carry the current query through the hop, overriding only the brand.
+        // These are plain links that reload the page, so a hand-built
+        // `?brand=x` silently dropped every other param: ?api= pointed the demo
+        // at a specific backend, then the first tile click sent it back to the
+        // default. ?retailer=, ?retailerName= and ?mode= were lost the same way.
+        // ?key= is already stripped from params below (it moves into
+        // sessionStorage), so the password cannot leak back into a URL here.
+        const query = new URLSearchParams(params);
+        query.set('brand', key);
+        tile.href = `?${query}`;
         // The mark sits on a white plate so it reads on the dark tile (see
         // .demo-picker-logo). Its error-fallback wordmark lands on that same
         // plate, so it carries the label class that the plate darkens.
@@ -362,7 +371,26 @@
     // The backend the block will talk to. Authored as the shell's data-api and
     // resolved up front too, so the gate can tell local dev from a deployed API
     // before there is a block to read it off.
-    const DEFAULT_API = 'http://localhost:8787';
+    //
+    // Derived from where the PAGE is served rather than hardcoded, because the
+    // Pages deploy rewrite cannot reach this value. That step seds a data-api
+    // attribute whose value is the localhost URL spelled out in full, which
+    // index.html has but this file does not: the shell authors it as the
+    // ${DEFAULT_API} placeholder, which the pattern never matches. So the
+    // published homepage kept calling localhost from an https origin, which the
+    // browser reports as a CORS failure, and the gate below read the same stale
+    // value and skipped the password prompt while the block called a keyed API
+    // bare. Reading window.location is right on every host with no build step
+    // involved. (Do not write that attribute-and-value literal anywhere in this
+    // file: the deploy would rewrite it, including inside a comment.)
+    //
+    // Keep REMOTE_API in step with API_URL in .github/workflows/pages.yml; that
+    // env var still drives index.html's rewrite.
+    const LOCAL_API = 'http://localhost:8787';
+    const REMOTE_API = 'https://bmw-matcher-api.onrender.com';
+    const pageIsLocal = window.location.protocol === 'file:'
+      || ['localhost', '127.0.0.1', '::1', '[::1]', ''].includes(window.location.hostname);
+    const DEFAULT_API = pageIsLocal ? LOCAL_API : REMOTE_API;
 
     const keyFromUrl = params.get('key');
     if (keyFromUrl) {
