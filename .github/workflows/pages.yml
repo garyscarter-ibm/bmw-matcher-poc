@@ -42,11 +42,18 @@ jobs:
       # Only the files a browser actually asks for. The repo root also holds
       # server/, scripts/ and ~16MB of stock fixtures, none of which a static
       # page needs — publishing `.` would ship the lot on every deploy.
+      #
+      # assets/ carries the brand logos (and hero photos when present) that
+      # homepage.html requests at assets/brand-logos/<brand>.svg. It is small
+      # (~56K) and must ship, or every mark 404s and the picker/nav silently
+      # fall back to their text wordmarks. The block's fonts need no entry here:
+      # they live inside blocks/vehicle-matcher/fonts/ behind relative ./fonts/
+      # urls, so cp -R blocks already takes them.
       - name: Assemble the site
         run: |
           set -euo pipefail
           mkdir -p _site
-          cp -R index.html homepage.html blocks _site/
+          cp -R index.html homepage.html blocks assets _site/
           if [ -n "${API_URL}" ]; then
             # The harness hardcodes the local default; point it at the deployed
             # backend. Exact match, so only that one attribute is ever rewritten.
@@ -56,6 +63,26 @@ jobs:
           echo "Published tree:"
           find _site -maxdepth 2 -name '*.html' | sort
           du -sh _site
+
+          # Fail the deploy if a logo homepage.html asks for is missing, rather
+          # than publishing a build whose marks 404 into text fallbacks (the
+          # fallback is deliberate for an unsourced brand, but it must not be
+          # how we find out the copy step regressed). Brands are read from the
+          # page itself, so a newly-onboarded marque is covered automatically.
+          echo "Checking brand logos shipped:"
+          missing=0
+          for b in $(grep -o "^\s*[a-z]\+: {$" homepage.html | tr -d ' :{'); do
+            if [ -f "_site/assets/brand-logos/${b}.svg" ]; then
+              echo "  ok       ${b}.svg"
+            else
+              echo "  MISSING  ${b}.svg"
+              missing=$((missing + 1))
+            fi
+          done
+          if [ "${missing}" -gt 0 ]; then
+            echo "::error::${missing} brand logo(s) missing from _site/assets/brand-logos/"
+            exit 1
+          fi
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
