@@ -812,7 +812,7 @@ export const ALTERNATIVES = 6;
  * chips filter on what's actually AVAILABLE in that model, not on whichever
  * listing happened to rank first.
  */
-function groupListings(ranked) {
+export function groupListings(ranked) {
   const key = (c) => [c.line, c.body, c.fuel, c.zeroTo62, c.styleLine ?? ''].join('|');
   const groups = new Map();
   for (const match of ranked) {

@@ -108,13 +108,24 @@ export async function apiNearby(base, answers, retailer, brandKey) {
  * a wider slice than /api/match, refetched as answers change. Like apiNearby
  * it NEVER throws: a failed preview must never break the surface around it, so
  * any error/non-ok resolves to an empty list and the caller keeps its last state.
+ *
+ * `group` collapses repeat listings of the same model into one result, and is
+ * opt-in for the same reason apiField's `enrich` is: what counts as a duplicate
+ * depends on the interface reading the list. The questions drawer scrolls a
+ * strip of nine, where two Countrymans side by side read as stock depth, so it
+ * omits the flag and keeps today's listing-level results. A podium cannot
+ * afford that: first, second and third are three distinct verdicts, and
+ * awarding all three to one model in three colours says nothing, so a podium
+ * passes true.
  */
-export async function apiPreview(base, answers, retailer, brandKey) {
+export async function apiPreview(base, answers, retailer, brandKey, group = false) {
   try {
     const res = await fetch(`${base}/api/preview`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ answers, retailer, brand: brandKey }),
+      body: JSON.stringify({
+        answers, retailer, brand: brandKey, group,
+      }),
     });
     if (!res.ok) return [];
     const data = await res.json();

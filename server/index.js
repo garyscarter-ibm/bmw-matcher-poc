@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { timingSafeEqual } from 'node:crypto';
 
 import {
-  matchCars, rankCars, budgetRange, unmetWants, TOP_MATCHES,
+  matchCars, rankCars, groupListings, budgetRange, unmetWants, TOP_MATCHES,
 } from './engine.js';
 import {
   fetchRetailerStock, fetchNearbyStock, startStockWarmer, StockUnavailableError, enrichColours,
@@ -286,10 +286,11 @@ function readJsonBody(req) {
 
 /**
  * Parse + validate the { answers, retailer } POST body shared by /api/match,
- * /api/nearby and /api/field. Returns { answers, retailer, brand, size, enrich }
- * on success, or { error, status } for the caller to send. Kept in one place so
- * every endpoint validates identically. `size`/`enrich` are only meaningful to
- * /api/field (the game-mode roster); the match/nearby handlers ignore them.
+ * /api/nearby and /api/field. Returns { answers, retailer, brand, size, enrich,
+ * group } on success, or { error, status } for the caller to send. Kept in one
+ * place so every endpoint validates identically. `size`/`enrich` are only
+ * meaningful to /api/field (the game-mode roster) and `group` only to
+ * /api/preview; the match/nearby handlers ignore them.
  */
 async function readMatchRequest(req) {
   let body;
@@ -318,8 +319,13 @@ async function readMatchRequest(req) {
   // knockout doesn't pay for 16 PDP fetches on round-one losers).
   const size = clampFieldSize(body.size);
   const enrich = body.enrich === true;
+  // `group` opts a caller into one-card-per-model results (see handlePreview).
+  // Opt-in rather than default, and strict `=== true` like `enrich`, because the
+  // questions drawer's top-9 is tuned around listings and must not shift under
+  // it: an absent or garbage flag has to leave that response untouched.
+  const group = body.group === true;
   return {
-    answers, retailer, brand, size, enrich,
+    answers, retailer, brand, size, enrich, group,
   };
 }
 
@@ -423,10 +429,17 @@ async function handleMatch(req, res, deps) {
  * cache key with /api/match, so a quiz's stream of refreshes hits the warmed
  * cache and adds no upstream traffic. Requires a budget (readMatchRequest
  * enforces it) — the block only calls this once budget is set.
+ *
+ * Collapsing repeat listings into one card per model is opt-in (`group: true`),
+ * following the same precedent as /api/field's `enrich`. The drawer is a
+ * horizontal strip where the same model appearing twice in nine reads as stock
+ * depth, so it takes the raw listings and is deliberately unchanged. A podium
+ * cannot: three medals awarded to the same Countryman in three colours is not a
+ * result, it's a rounding error, so that caller asks for grouping.
  */
 async function handlePreview(req, res, deps) {
   const {
-    answers, retailer, brand, error, status,
+    answers, retailer, brand, group, error, status,
   } = await readMatchRequest(req);
   if (error) return sendJson(res, status, { error });
 
@@ -446,7 +459,12 @@ async function handlePreview(req, res, deps) {
   // never take the process down with an uncaught throw.
   let matches = [];
   try {
-    matches = rankCars(applyBespokeAnswers(brand, answers), cars, brandTuning(brand)).slice(0, PREVIEW_COUNT);
+    const ranked = rankCars(applyBespokeAnswers(brand, answers), cars, brandTuning(brand));
+    // Group the WHOLE ranking before slicing. Slicing first would hand
+    // groupListings nine listings that might be three cars, and the caller
+    // would get three cards where it asked for nine — the shortfall growing
+    // with exactly the stock depth that made grouping worth asking for.
+    matches = (group ? groupListings(ranked) : ranked).slice(0, PREVIEW_COUNT);
   } catch (err) {
     console.warn('[preview] ranking failed:', err?.message);
   }
