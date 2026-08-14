@@ -112,6 +112,9 @@ export function bmwFeedVehicle(overrides = {}) {
     cash_price: { value: 42000 },
     mileage: 15000,
     identification: { plate: '72' },
+    // Real per-listing figures mapVehicle now surfaces (engine cc + reg year).
+    engine: { cc: 1995, litres: 2 },
+    registration: { date: '2022-09-30T00:00:00Z' },
     consumption: { fuel: { values: { combined: 48.0 } } },
     media: { items: [{ type: 'image', url: `https://img/bmw-${id}.jpg` }] },
     retailer_site: { id: 96, name: 'Grassicks BMW', dealer_number: '11107' },
@@ -130,6 +133,9 @@ export function miniFeedVehicle(overrides = {}) {
     cash_price: { value: 27000 },
     mileage: 12000,
     identification: { plate: '73' },
+    // Real per-listing figures mapVehicle now surfaces (engine cc + reg year).
+    engine: { cc: 1499, litres: 1.5 },
+    registration: { date: '2023-03-01T00:00:00Z' },
     consumption: { fuel: { values: { combined: 44.0 } } },
     media: { items: [{ type: 'image', url: `https://img/mini-${id}.jpg` }] },
     retailer_site: { id: 92, name: 'Sytner Luton MINI', dealer_number: '15127' },

@@ -823,15 +823,19 @@ export const BRANDS = {
     defaultRetailer: 'ferrari-approved',
     // Ferrari's listing is server-rendered Next.js: the whole result set is
     // PUBLIC JSON in __NEXT_DATA__, so the CARS are cold-fetchable with no token
-    // (the live adapter in stock.js walks all ~15 pages). It ships fixtures for
-    // one reason: the PHOTOS are Thron DAM galleries resolved only through the
-    // site's runtime SDK session, which a cold script can't turn into an image
-    // URL. So this brand bakes the real 148-car snapshot (real prices, years,
-    // mileages, colours, engines, per-listing power and displacement, real
-    // dealer) and serves photo-less cards that degrade cleanly. Flip to
-    // `source: 'live-ferrari'` and the wired adapter goes live with the identical
-    // mapper. See the Ferrari section of DECISIONS.md.
-    source: 'fixtures',
+    // (the live adapter in stock.js walks all ~15 pages), and the card COVER photo
+    // is a token-free Thron /delivery/public/ asset — both verified reachable from
+    // here with the browser UA httpsGet already sends (real prices, years,
+    // mileages, colours, engines, per-listing power and displacement, real dealer,
+    // and 148/148 real cover photos). The only genuinely session-gated asset is the
+    // detail-page multi-image gallery, which the card doesn't use. Running live: the
+    // wired adapter fetches preowned.ferrari.com in real time through the identical
+    // mapFerrariRaw the snapshot was baked with, so a live car is indistinguishable
+    // from a fixture car; a fetch failure throws StockUnavailableError (→ 502), no
+    // silent fallback. The baked snapshot (fixtures/ferrari-cars.json) remains for
+    // offline/dev — set `source: 'fixtures'` to use it. See the Ferrari section of
+    // DECISIONS.md.
+    source: 'live-ferrari',
     // Ferrari approved-used runs from a ~£90k California T to a seven-figure
     // classic (a £3.3m 275 GTB in the current pool). Cap at £750k (headroom for a
     // 458 Speciale / Pista Spider without letting a single classic distort the
