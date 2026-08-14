@@ -46,7 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p _site
-          cp -R index.html blocks _site/
+          cp -R index.html homepage.html blocks _site/
           if [ -n "${API_URL}" ]; then
             # The harness hardcodes the local default; point it at the deployed
             # backend. Exact match, so only that one attribute is ever rewritten.
