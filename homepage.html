@@ -411,14 +411,28 @@
       applyOverrides(block);
 
       // A 401 on a load-bearing call clears the stored key and fires
-      // vm-auth-failed; re-prompt and remount.
+      // vm-auth-failed; re-prompt and remount. This is the real gate: it fires
+      // whenever the server actually rejects a request, whatever we assumed
+      // below — so a keyed server still prompts even on localhost.
       window.addEventListener('vm-auth-failed', () => {
         if (document.querySelector('.vm-gate')) return;
         askForPassword('That password was not right. Please try again.')
           .then(() => decorate(block));
       });
 
-      if (sessionStorage.getItem(ACCESS_KEY_STORAGE)) {
+      // Whether to prompt for the password up front. A local dev backend runs
+      // keyless (DEMO_ACCESS_KEY unset -> auth off, see server/index.js), so a
+      // pre-emptive prompt on localhost is pure friction: the server returns 200
+      // without a key. So against a localhost API we mount straight away and let
+      // the vm-auth-failed handler above catch the (unexpected) case where that
+      // local server *is* keyed. A remote/deployed API keeps the up-front prompt.
+      const apiHost = (() => {
+        try { return new URL(block.dataset.api, window.location.href).hostname; }
+        catch { return ''; }
+      })();
+      const apiIsLocal = apiHost === 'localhost' || apiHost === '127.0.0.1' || apiHost === '::1';
+
+      if (sessionStorage.getItem(ACCESS_KEY_STORAGE) || apiIsLocal) {
         decorate(block);
       } else {
         askForPassword().then(() => decorate(block));

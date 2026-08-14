@@ -276,6 +276,11 @@
   --vm-pop: 0.42s;                             /* reveal/entrance duration */
   --vm-btn-padding: 12px 20px 15px;
   --vm-btn-min-width: 232px;
+  /* Button label casing/tracking. Default is the natural label (BMW/MINI/etc.
+     don't uppercase their CTAs here); Ferrari overrides to uppercase to match
+     its own button component. */
+  --vm-btn-transform: none;
+  --vm-btn-letter-spacing: normal;
   --vm-border-width: 1px;
 
   /* --- type scale (line-height 1.2× unless noted) --- */
@@ -404,6 +409,9 @@
      buttons + selected states, applied explicitly below), so the quiz doesn't
      read as a grid of heavy black boxes. */
   --vm-line: #cfcfcf;
+  /* dark band (footer): MINI reserves solid near-black for its heavy surfaces,
+     so the footer is black rather than the base's #262626 grey. */
+  --vm-surface-dark: #111111;
 
   /* geometry: fully-round pill controls, softly-rounded cards */
   --vm-radius: 6px;
@@ -522,6 +530,9 @@
   --vm-accent-secondary: #333333; /* graphite — secondary spot */
   --vm-accent-soft: rgba(204, 0, 0, 0.06);
   --vm-line: #d9d9d9;
+  /* dark band (footer): a plain near-black, matching Honda's own dark footers
+     rather than the base's #262626 grey. */
+  --vm-surface-dark: #1a1a1a;
 
   /* geometry: softly rounded, between BMW's sharp 0 and MINI's full pill. */
   --vm-radius: 8px;
@@ -628,6 +639,9 @@
   --vm-accent-secondary: #1700f4; /* Ford's brighter digital blue — secondary spot */
   --vm-accent-soft: rgba(0, 52, 120, 0.06);
   --vm-line: #d5dae0;
+  /* dark band (footer): Ford's dark surfaces are a deep navy, not neutral grey
+     (its ink-strong is #00142e); the footer takes that navy. */
+  --vm-surface-dark: #00142e;
 
   /* geometry: lightly rounded, crisper than Honda's 8px (Ford's UI runs ~4px). */
   --vm-radius: 4px;
@@ -729,6 +743,9 @@
   --vm-accent-spot: var(--vm-accent-secondary); /* red spot: progress, score, slider */
   --vm-accent-soft: rgba(0, 102, 177, 0.07);
   --vm-line: #d2d2d2;
+  /* dark band (footer): near-black, matching Motorrad's hard, machined dark
+     surfaces rather than the base's #262626 grey. */
+  --vm-surface-dark: #0a0a0a;
 
   /* geometry: sharp. A bike's design language is hard edges and machined metal,
      so square corners like BMW (not Ford/Honda's rounding). */
@@ -858,11 +875,31 @@
   --vm-accent-secondary: #ffde00; /* Ferrari shield yellow — rare secondary spot */
   --vm-accent-soft: rgba(218, 41, 28, 0.06);
   --vm-line: #d0dddd;
+  /* dark band (footer): Ferrari's own global black (#181818, their
+     --f-color-global-black), the ground their dark UI uses, not #262626 grey. */
+  --vm-surface-dark: #181818;
 
-  /* geometry: crisp, lightly softened (2px). Sharper than Ford/Honda but not
-     the hard 0px of BMW/Motorrad — Ferrari's web UI runs a small radius. */
+  /* geometry: crisp, lightly softened (2px) on cards/panels. The BUTTON is a
+     hard-edged rectangle, matching ferrari.com's own .f-button (border: 0 and
+     no border-radius in any of its 24 variants). */
   --vm-radius: 2px;
-  --vm-radius-control: 2px;
+  --vm-radius-control: 0;
+
+  /* buttons: taken from ferrari.com's own .f-button component — UPPERCASE
+     12px/16px FerrariSans, 0.6px tracking (.f-button__text), padding 24px/32px
+     off their 8px space scale (--f-space-s / --f-space-m), and min-width 200px
+     (.f-button--width-min). Two deliberate adaptations: their 24px vertical
+     padding wraps 12px chrome type where ours wraps larger 14px label type, so
+     vertical is scaled to 16/18px (a literal 24px would stand ~64px tall beside
+     the other brands' 44-48px); horizontal 32px is kept exactly, since the
+     generous side padding is the signature of the mark. The fill is a red
+     gradient (a00c01 -> da291c), not flat red — applied in the
+     .vm-ferrari .vm-btn-primary rule below. */
+  --vm-btn-height: 52px;
+  --vm-btn-padding: 16px 32px 18px;
+  --vm-btn-min-width: 200px;
+  --vm-btn-transform: uppercase;
+  --vm-btn-letter-spacing: 0.05em;   /* 0.6px on their 12px; em-scaled for ours */
 
   /* motion: composed and unhurried. A clean ease-out, a fraction slower than
      Ford, no overshoot — luxury moves calmly, it doesn't bounce. */
@@ -895,13 +932,21 @@
   text-transform: none;
 }
 
-/* Ferrari buttons: red primary fill. The base .vm-btn-primary already uses the
-   accent, so the token override does most of the work; nudge the hover to a
-   deeper red rather than the base's filter so it stays on-brand. */
+/* Ferrari buttons: the real fill is a vertical red gradient (a00c01 -> da291c),
+   taken from Ferrari's own button component (--f-color-gradient-red), not a flat
+   red. The uppercase label + tracking come from the --vm-btn-* tokens in the
+   scope above. Border matches the gradient's lower stop so the 1px edge doesn't
+   read as a lighter halo. */
+.vm.vm-ferrari .vm-btn-primary {
+  background: linear-gradient(180deg, #a00c01, #da291c 64%);
+  border-color: #a00c01;
+}
+/* Hover deepens the whole gradient rather than the base's brightness filter, so
+   it stays on-brand (a filter would just wash the red out). */
 .vm.vm-ferrari .vm-btn-primary:not(:disabled):hover {
   filter: none;
-  background: #b31f14;
-  border-color: #b31f14;
+  background: linear-gradient(180deg, #7d0a01, #b31f14 64%);
+  border-color: #7d0a01;
 }
 
 /* Ferrari red spot touches: progress bar, score badge, slider fill and focus
@@ -974,6 +1019,8 @@
   min-height: var(--vm-btn-height);
   padding: var(--vm-btn-padding);
   border-radius: var(--vm-radius-control);
+  text-transform: var(--vm-btn-transform);
+  letter-spacing: var(--vm-btn-letter-spacing);
   cursor: pointer;
   border: var(--vm-border-width) solid transparent;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
