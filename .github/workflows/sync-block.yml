@@ -1,6 +1,6 @@
-name: Sync bmw-matcher block to the EDS site
+name: Sync vehicle-matcher block to the EDS site
 
-# Copies blocks/bmw-matcher/ from THIS repo into the repo your Adobe Edge
+# Copies blocks/vehicle-matcher/ from THIS repo into the repo your Adobe Edge
 # Delivery (EDS) site is connected to. EDS auto-loads a block when its files
 # land in /blocks/<name>/, so a push to the target repo is the whole deploy —
 # no build step.
@@ -19,9 +19,18 @@ name: Sync bmw-matcher block to the EDS site
 # 1. The block reads its backend URL from an authored "API" row, NOT from a
 #    data-api attribute (authored EDS content can't set attributes). If that
 #    wiring isn't in apiBase yet, the deployed block falls back to localhost.
-# 2. The block ships NO font files: it names the host site's own licensed
-#    families (verified resolving on the live BMW and MINI pages), so there is
-#    nothing font-related to copy or license here.
+# 2. The block SHIPS all four brands' fonts, under blocks/vehicle-matcher/fonts/
+#    (declared via @font-face in vehicle-matcher.css). The mirror step below is
+#    a full recursive copy, so those files sync to the EDS site automatically —
+#    no extra step. Faces: BMW Type Next (BMW + Motorrad), MINI Serif / MINI Sans
+#    (MINI), FordF1 + Ford Antenna (Ford), Proxima Nova (Honda). This deployment
+#    must therefore stay within a licence that permits self-hosting them; confirm
+#    before syncing to a public production site. NOTE THE WEAK LINK: Honda's face
+#    is Proxima Nova, a COMMERCIAL third-party retail typeface Honda licenses (not
+#    a brand-owned asset like the others), self-hosted here by owner decision on
+#    shaky licence footing — see DECISIONS.md [fonts-honda-proxima-caveat]. If a
+#    public sync needs to be licence-clean, swap Honda to a free condensed sans
+#    (same family names, @font-face src only) before running this.
 
 on:
   # Manual: Actions tab → this workflow → Run workflow. The Run button appears
@@ -39,7 +48,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'blocks/bmw-matcher/**'
+      - 'blocks/vehicle-matcher/**'
 
 # Least privilege for the built-in token; the cross-repo write uses the secret.
 permissions:
@@ -48,7 +57,7 @@ permissions:
 env:
   # The repo your EDS instance is connected to. owner/name.
   TARGET_REPO: garyscarter-ibm/poc-ret-eds-sites
-  BLOCK_DIR: blocks/bmw-matcher
+  BLOCK_DIR: blocks/vehicle-matcher
 
 # Never let two syncs race a push to the same target branch.
 concurrency:
@@ -93,7 +102,7 @@ jobs:
         working-directory: target
         run: |
           set -euo pipefail
-          git config user.name  "bmw-matcher block-sync"
+          git config user.name  "vehicle-matcher block-sync"
           git config user.email "block-sync@users.noreply.github.com"
 
           # Stages adds, edits AND deletions under the block path.
@@ -103,6 +112,6 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Sync bmw-matcher block from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
+          git commit -m "Sync vehicle-matcher block from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
           git push origin "HEAD:${{ github.event.inputs.target_ref || 'main' }}"
           echo "Pushed to ${TARGET_REPO}@${{ github.event.inputs.target_ref || 'main' }}."

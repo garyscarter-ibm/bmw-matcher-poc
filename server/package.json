@@ -1,5 +1,5 @@
 {
-  "name": "bmw-matcher-server",
+  "name": "vehicle-matcher-server",
   "version": "0.1.0",
   "description": "Matching-engine API for Find My Perfect BMW — keeps the dataset and weights off the client",
   "type": "module",

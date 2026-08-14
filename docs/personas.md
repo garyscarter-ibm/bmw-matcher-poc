@@ -1,9 +1,12 @@
 # Buyer personas — BMW & MINI approved used
 
 Status: research-informed working personas, created 2026-07-22, revised the
-same day after a source audit (below). Seven personas: four BMW, three MINI.
-The machine-readable answer sets live in `fixtures/personas.json` and replay
-against a running API with `node scripts/persona-check.mjs`.
+same day after a source audit (below), and again on 2026-07-29 after an
+external review (triggers and money added to every persona, a rejector added
+to the set, weighting assumptions written down). Eight personas: four BMW,
+three MINI, one rejector. The machine-readable answer sets live in
+`fixtures/personas.json` and replay against a running API with
+`node scripts/persona-check.mjs`.
 
 **This document is pure persona.** Who these people are, what they want, and
 what would win them over. Everything the tool got right or wrong for them,
@@ -22,6 +25,16 @@ interview-based. Strong, testable hypotheses; not ground truth.
 ---
 
 ## The shape of the set, and why
+
+**One pack, two retailer instances.** The matcher is a per-retailer block:
+each deployment is anchored to a single retailer's stock and its 40–50 mile
+radius. This pack covers two live instances, Grassick's of Perth for BMW
+(retailer 96) and Sytner Luton MINI (retailer 92). The BMW personas live
+inside the first instance's radius and the MINI personas inside the
+second's; no persona shops both, and nothing here assumes a retailer that
+holds both franchises. An earlier draft of the shareable pack said "anchored
+to one retailer", which read as one retailer for all seven and drew a fair
+challenge in review; the pack now names both anchors.
 
 **Four BMW personas to MINI's three, by design rather than symmetry.**
 Persona count should track the breadth of *need-space*, not the size of the
@@ -68,7 +81,18 @@ the certainty.
 - **Actually decides on:** total cost of ownership and the absence of doubt.
   He will read every line of the history and warranty pages, and he budgets
   in monthly outgoings as much as in sticker price.
+- **Trigger:** the company car goes back on a fixed date in November 2026,
+  replacement found or not. That hand-back date makes him the most
+  time-pressured buyer in the set, and the single most actionable fact
+  about him.
+- **Money:** a cash allowance replacing the scheme car, so he is weighing a
+  new monthly outgoing against a benefit he has just lost. Deposit from
+  savings; no part exchange, because the current car belongs to the fleet.
 - **Digital behaviour:** desktop, evenings, spreadsheet open in the next tab.
+- **Walks away when:** there is a gap in the service history, or the
+  warranty detail sits behind a lead form. He is buying the programme;
+  asking for his phone number before showing him what he is buying reads
+  as a trick.
 - **What winning him over looks like:** a sensible high-mileage answer with
   the economy argued in his terms — what this car costs to run at his
   mileage — and the programme's certainty visible, not assumed.
@@ -83,10 +107,20 @@ the car they're replacing.
 - **Says she wants:** an electric or plug-in SUV/estate, £25–45k, safe and
   big enough for the dog *and* the buggy.
 - **Actually decides on:** whether she believes the boot claim (she thinks in
-  buggies-plus-dog, not litres), rear-seat ISOFIX, and what the range really
-  is on a cold Glasgow run.
+  buggies-plus-dog, not litres), rear-seat ISOFIX, what the range really
+  is on a cold Glasgow run, and, buying used electric, what the battery has
+  left in it: state of health, degradation, and whether the battery
+  warranty carries over.
+- **Trigger:** the second car failed its MOT in June 2026 and is not worth
+  fixing. The household decided then to go from two cars to one good one
+  rather than replace like with like.
+- **Money:** the surviving car goes in part exchange; the rest is a PCP she
+  budgets monthly, because that is how the household maths already works.
 - **Digital behaviour:** mobile in stolen moments, then desktop with partner
   to decide. Shares links.
+- **Walks away when:** a boot claim she cannot picture, ISOFIX she cannot
+  confirm, or a range figure that smells like summer. Any one of those and
+  the shortlist link never gets sent to her partner.
 - **What winning her over looks like:** a shortlist she can defend to her
   partner — practicality reasons front and centre, honest range numbers, and
   nothing that smells like it's hiding a compromise.
@@ -101,8 +135,17 @@ open-minded about almost everything else.
 - **Says he wants:** a petrol convertible, £30–60k, quick enough to feel it.
 - **Actually decides on:** how it makes him feel; the sound; the colour
   against his gravel drive. Will happily drive 50 miles for the right car.
+- **Trigger:** the sale of his share of the firm completed in spring 2026.
+  The money has been sitting in the account being sensible ever since,
+  which is exactly what he promised it would not be.
+- **Money:** cash buyer, no finance. There is a five-year-old 5 Series on
+  the drive that could go in part exchange, but he would as happily keep it
+  as the sensible one.
 - **Digital behaviour:** desktop, decisive; he'll ring the dealer rather than
   fill in a form.
+- **Walks away when:** he is handled. Upsell, manufactured urgency, or a
+  result that ignores what he asked for, and he rings a dealer who will
+  just talk to him instead.
 - **What winning him over looks like:** being told straight. If the right car
   isn't at his local dealer, say so and say where it is — he has the time and
   the tank to go and get it.
@@ -119,8 +162,17 @@ generation, even if nobody markets it to him that way.
 - **Actually decides on:** the monthly payment his bank app tolerates and the
   insurance quote it doesn't; how it looks in his building's car park; what
   the YouTube reviewers he trusts said about the exact engine.
+- **Trigger:** first full commission quarter banked in July 2026, and the
+  ten-year-old Fiesta's MOT is due before Christmas. The number that used
+  to be aspiration is now a bank balance.
+- **Money:** roughly £2k deposit, the Fiesta as a part exchange worth
+  barely a grand, and a monthly ceiling around £300 before insurance.
+  Insurance is the ambush: the quote decides between the exact engines he
+  is watching reviews of.
 - **Digital behaviour:** entirely phone, late night, YouTube and TikTok
   reviews running while he scrolls listings. Zero tolerance for forms.
+- **Walks away when:** the total monthly (payment plus insurance) crosses
+  the line, or anything asks for his details before showing the numbers.
 - **What winning him over looks like:** the M Sport car in the right colour
   with numbers he can say out loud: the monthly, the insurance group, the
   0–62. Speed and zero friction; one whiff of brochure-speak and he's gone.
@@ -138,8 +190,17 @@ a MINI or a Fiat 500, and the 500 is losing on the go-kart thing.
 - **Says she wants:** a petrol 3-door hatch, £14–22k, Classic trim is fine.
 - **Actually decides on:** the colour and the roof. Full stop. She has a
   Pinterest board. The one that photographs best outside her flat wins.
+- **Trigger:** hit her savings target in June 2026. The deposit fund she
+  has been building since she started commuting is finally the size she
+  told herself it needed to be.
+- **Money:** her own deposit, a PCP monthly she has already decided, no
+  part exchange (this is her first car). The budget is real but it is the
+  second gate, not the first: the wrong colour at the right price is still
+  the wrong car.
 - **Digital behaviour:** entirely mobile, 9pm, three tabs of the same car in
   different colours.
+- **Walks away when:** she is told which car is "best", or the choice on
+  offer is a wall of grey.
 - **What winning her over looks like:** getting to make the final call
   herself, between real cars whose paint she can see — not being told which
   one is "best" by a spreadsheet.
@@ -155,8 +216,18 @@ or Clubman keeps the self-image intact while fitting the buggy.
 - **Actually decide on:** whether the buggy fits with the weekly shop; rear
   doors that open wide in tight car parks; and it still has to *look* like
   theirs, which the contrast roof carries.
+- **Trigger:** the toddler kit outgrew their ten-year-old three-door in
+  spring 2026. The buggy goes in sideways and the allotment haul does not
+  go in at all; the car seat made this decision, they just haven't said it
+  out loud.
+- **Money:** the three-door in part exchange, a small shared deposit, and a
+  monthly they stress-test against a paramedic's shift pattern and a
+  freelancer's invoices. Cheap to run is load-bearing, not a nice-to-have.
 - **Digital behaviour:** mobile, in shifts, sending each other links with
   "this one?".
+- **Walks away when:** the practicality claims read like brochure copy, or
+  every honest answer turns out to be a grey crossover. They came to MINI
+  so parenthood would not look like surrender.
 - **What winning them over looks like:** practicality they believe, in their
   own terms, from a car that still says MINI on the outside and in the
   photos.
@@ -172,10 +243,92 @@ charming version of it.
 - **Says she wants:** a small electric automatic, £15–25k, comfortable.
 - **Actually decides on:** trust. Real-world range said plainly, heated seats
   and parking sensors present, an automatic gearbox confirmed rather than
-  assumed, a dealer she can reach, a warranty page she reads twice.
+  assumed, a dealer she can reach, a warranty page she reads twice, and
+  what the battery has left in it, said plainly: state of health and
+  whether the battery warranty transfers to her.
+- **Trigger:** the X1's insurance renewal and a large service quote landed
+  in the same week in spring 2026, just after the wallbox went in. The
+  arithmetic of keeping a big car for a small life stopped working on
+  paper, which is where she does her deciding.
+- **Money:** the X1 in part exchange covers most of it; she tops up from
+  savings and would rather not finance at all. If she does, she reads the
+  agreement the way she reads the warranty: twice.
 - **Digital behaviour:** desktop, daytime, methodical; prints things.
+- **Walks away when:** the gearbox is implied rather than stated, the range
+  smells optimistic, or anything about the battery's condition is left for
+  her to ask about.
 - **What winning her over looks like:** plain numbers, no cleverness, and the
   comfort equipment stated where she can see it.
+
+---
+
+## The rejector
+
+### 8. Rob Jennings, 41 — "The Whole-Market Shopper"
+
+Project manager outside Perth. Added 2026-07-29 because everyone else in
+this pack buys, and the most useful persona for a matcher is often the one
+who bounces. Rob shops the entire market: he has three tabs open, and the
+retailer's own site is the one holding the fewest cars. He is not hostile,
+he is unpersuaded, and his defaults are set by Auto Trader.
+
+- **Says he wants:** a 3 Series Touring, under £25k, petrol or diesel, and
+  he is not fussy about the badge if the numbers are better elsewhere.
+- **Actually decides on:** price against the whole market. He knows what
+  the same car costs forty miles away and what the aggregators call a
+  "good price", and he treats a single retailer's stock as a sample, not a
+  market.
+- **Trigger:** none he would name; he is permanently half in the market,
+  and a price-drop alert is what converts him from browsing to phoning.
+- **Money:** part exchange plus a modest deposit; will take dealer finance
+  only if it beats his bank loan, and he will check.
+- **Digital behaviour:** desktop and phone interchangeably; saved searches
+  and price-drop alerts on everything.
+- **Walks away when:** the tool recommends rather than filters. A matcher
+  operated by the seller is a sales instrument, and he assumes it ranks on
+  margin, not on fit. He is not wrong to assume that.
+- **What winning him over looks like:** the tool saying "we do not have the
+  right car for you this week" when that is true. A tool that will admit a
+  miss earns the right to be believed on a hit. Martin gets a version of
+  this as tone; Rob needs it as a system property.
+
+---
+
+## Where the volume sits (assumptions, not findings)
+
+Added 2026-07-29 after external review. The pack was careful about the
+evidence behind its facts and silent about the evidence behind its
+emphasis, and emphasis is what determines where build effort lands: an
+unweighted pack invites over-investment in Martin (rare, high value, fun to
+design for) at the expense of whoever pays the bills. Every number below is
+an **assumption with a label on it**, written down so the build order can
+be argued with. Replace with the retailer's DMS and enquiry-log data when
+available; until then treat differences of five points as noise.
+
+**Grassick's of Perth (BMW instance), share of approved-used activity:**
+
+| Persona | Enquiries (est.) | Units (est.) | Gross per unit | Finance penetration | Confidence |
+|---|---|---|---|---|---|
+| Daniel | 20% | 30% | Medium-high | Medium: allowance buyers often bring their own money | Low |
+| Priya | 25% | 30% | Medium | High | Low |
+| Martin | 5% | 5% | Highest in the set | Low: cash | Low |
+| Tyler | 35% | 25% | Low-medium | Highest in the set | Low |
+| Rob | 15% | ~5% | Low when he does buy | Low | Low |
+
+**Sytner Luton MINI instance:**
+
+| Persona | Enquiries (est.) | Units (est.) | Gross per unit | Finance penetration | Confidence |
+|---|---|---|---|---|---|
+| Chloe | 45% | 40% | Medium | High | Low |
+| Reyes | 30% | 35% | Medium-high | High | Low |
+| Meg | 15% | 20% | Medium | Low: part exchange plus savings | Low |
+
+Residual shares are out-of-scope buyers (trade, export, sub-£14k, the
+deliberately unrepresented segments above). Two readings worth stating:
+Tyler enquires the most and converts the least, so his 35% of enquiries
+must not be read as 35% of value; and the work he needs (numbers up front,
+zero friction) is also what Rob needs, so it double-counts. Falsify all of
+this against enquiry logs before believing any of it.
 
 ---
 

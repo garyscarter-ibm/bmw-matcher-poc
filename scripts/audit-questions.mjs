@@ -16,19 +16,28 @@
  *          large), which is the test for stock-*level*-dependent questions.
  *   fuel   Does a named fuel bind? Tests engine.js's own claim that a
  *          wrong-fuel car shouldn't top a matching-fuel one.
+ *   stick  Does the winner ever change? Perturbs REAL persona answers one at
+ *          a time — the "it always recommends the same car" test.
+ *   taste  Inside a fit tie, how far ahead is #1 on taste? The distribution
+ *          TASTE_PTS is a threshold on, and what each candidate value does.
+ *   conf   Where does "nothing here is close" start? The top-score distribution
+ *          of the pages the low-confidence state divides, which is what
+ *          WEAK_SCORE (the block) is a threshold on.
  *
  * Findings + the adapt-to-which-pool decision framework are written up in
  * docs/question-stock-audit.md — re-run this after a fixture refresh to see
  * whether they still hold. Zero-dep; seeded PRNG so runs are reproducible.
  *
- * Run:  node scripts/audit-questions.mjs [dead|sens|size|all]
+ * Run:  node scripts/audit-questions.mjs [dead|sens|size|fuel|stick|taste|conf|all]
  */
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { rankCars, TOP_MATCHES } from '../server/engine.js';
+import {
+  rankCars, matchCars, TOP_MATCHES, TASTE_PTS,
+} from '../server/engine.js';
 import { questionsForBrand, applyBespokeAnswers } from '../server/questions.js';
 import { brandTuning, brandConfig } from '../server/brands.js';
 
@@ -368,6 +377,217 @@ function auditFuel(brand) {
     .forEach(([k, n]) => console.log(`    ${k.padEnd(26)} ${String(n).padStart(4)}  ${pct(n, violations)}`));
 }
 
+
+// --------------------------------------------------------------- stick ----
+
+/*
+ * "It always recommends the same car."
+ *
+ * The other passes sample answer sets UNIFORMLY AT RANDOM, which is the wrong
+ * model of a human: a real person answers as themselves, then tweaks one thing
+ * and looks again. Uniform sampling pairs extreme combinations nobody actually
+ * picks, and it flatters the question set — `style` measures 63% sensitive
+ * under random answers and 0% under realistic ones.
+ *
+ * So this pass starts from the personas (fixtures/personas.json — real-shaped
+ * answer sets), changes exactly ONE answer at a time to every other value it
+ * could take, and asks: did the WINNER change? Two numbers come out:
+ *
+ *   stickiness   how often the same car wins anyway. High = the tool looks
+ *                deaf to the user's input, which is what the stakeholder
+ *                complaint actually describes.
+ *   per question how often changing THAT question moves the winner. A question
+ *                at 0% cannot change the recommendation for these buyers, no
+ *                matter what they pick.
+ */
+function auditStickiness(brand) {
+  const { byRetailer, tuning, questions: qs } = loadBrand(brand);
+  const personasPath = join(FIXTURES, 'personas.json');
+  const { personas } = JSON.parse(readFileSync(personasPath, 'utf8'));
+  const people = personas.filter((p) => p.brand === brand);
+
+  const perQuestion = new Map(qs.map((q) => [q.id, { moved: 0, tried: 0 }]));
+  let same = 0;
+  let total = 0;
+  const lines = [];
+
+  for (const p of people) {
+    const stock = byRetailer.get(Number(p.retailer)) || byRetailer.get(p.retailer);
+    if (!stock?.length) continue;
+    const winner = (answers) => {
+      const { matches } = matchCars(applyBespokeAnswers(brand, answers), stock, tuning);
+      return matches.length ? matches[0].car.name : '(none)';
+    };
+    const base = winner(p.answers);
+    let pSame = 0;
+    let pTotal = 0;
+
+    for (const q of qs) {
+      let values = [];
+      if (q.id === 'budget') values = [[10000, 25000], [15000, 35000], [25000, 50000], [40000, 80000]];
+      else if (q.id === 'mileage') values = [4000, 9000, 15000, 25000];
+      else if (q.options) values = q.multi ? q.options.map((o) => [o.value]) : q.options.map((o) => o.value);
+      for (const v of values) {
+        const answers = { ...p.answers, [q.id]: v };
+        if (JSON.stringify(answers) === JSON.stringify(p.answers)) continue;
+        const stat = perQuestion.get(q.id);
+        stat.tried += 1;
+        pTotal += 1;
+        if (winner(answers) === base) { pSame += 1; } else { stat.moved += 1; }
+      }
+    }
+    same += pSame;
+    total += pTotal;
+    lines.push(`    ${p.key.padEnd(8)} ${pct(pSame, pTotal).padStart(4)} unchanged over ${String(pTotal).padStart(3)} tweaks  (${base.slice(0, 34)})`);
+  }
+
+  console.log(`\n${'='.repeat(72)}\n${brand.toUpperCase()} — winner stickiness under realistic answers`);
+  console.log(`\n  Change ONE answer, same car still wins: ${pct(same, total)} of ${total} tweaks`);
+  lines.forEach((l) => console.log(l));
+  console.log('\n  How often changing a question moves the WINNER:');
+  [...perQuestion.entries()]
+    .map(([id, s]) => [id, s.tried ? s.moved / s.tried : 0])
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([id, rate]) => {
+      const bar = '█'.repeat(Math.round(rate * 26)).padEnd(26, '·');
+      console.log(`    ${id.padEnd(12)} ${bar} ${(rate * 100).toFixed(0)}%`);
+    });
+}
+
+
+/*
+ * Taste pass — is TASTE_PTS set anywhere useful?
+ *
+ * TASTE_PTS is consulted in exactly one situation: a fit tie, deciding whether
+ * #1 is far enough ahead on TASTE to be named ("We'd go for the Countryman C")
+ * rather than handing the choice to the refine chips. So the only measurement
+ * that means anything is the distribution of that gap across real ties, which
+ * is what this prints, plus what each candidate threshold would do to it.
+ *
+ * It exists because the post-grouping review predicted the gaps would collapse
+ * to 1–2 points and suppress the state. They don't — the prediction came from
+ * one unrepresentative pair. Re-run this after a fixture refresh rather than
+ * reasoning about it from a sample of one.
+ */
+function auditTaste(brand) {
+  const { byRetailer, tuning: t, budgetCfg, questions: qs } = loadBrand(brand);
+  const gaps = [];
+  let decisive = 0;
+  let ties = 0;
+  for (const stock of sampleRetailers(byRetailer, N_RETAILERS)) {
+    if (stock.length < 15) continue; // too thin to produce a meaningful tie
+    for (let i = 0; i < 40; i += 1) {
+      const answers = applyBespokeAnswers(brand, randomAnswers(qs, budgetCfg));
+      const r = matchCars(answers, stock, t);
+      if (!r.matches.length) continue;
+      if (r.decisive) { decisive += 1; continue; }
+      ties += 1;
+      if (r.matches.length >= 2) gaps.push(r.matches[0].taste - r.matches[1].taste);
+    }
+  }
+  gaps.sort((a, b) => a - b);
+  const share = (n) => pct(n, gaps.length);
+  console.log(`\n${brand.toUpperCase()} — ${decisive} decisive, ${ties} ties`);
+  console.log(`  taste gap in a tie: median ${median(gaps).toFixed(1)}`
+    + `  p75 ${quantile(gaps, 0.75).toFixed(1)}  p90 ${quantile(gaps, 0.9).toFixed(1)}`);
+  console.log('  distribution:');
+  for (const [lo, hi] of [[0, 1], [1, 2], [2, 3], [3, 4], [4, 6], [6, 8], [8, 12], [12, 20], [20, Infinity]]) {
+    const n = gaps.filter((g) => g >= lo && g < hi).length;
+    const label = `${String(lo).padStart(2)}–${hi === Infinity ? ' ∞' : String(hi).padStart(2)}`;
+    console.log(`    ${label}  ${'█'.repeat(Math.round((n / gaps.length) * 60)).padEnd(30)} ${share(n)}`);
+  }
+  console.log(`  threshold → share of ties given a named pick (TASTE_PTS is ${TASTE_PTS}):`);
+  for (const th of [1, 2, 3, 4, 5, 6, 8, 10, 12]) {
+    const n = gaps.filter((g) => g >= th).length;
+    console.log(`    ${String(th).padStart(2)}${th === TASTE_PTS ? ' ←' : '  '} `
+      + `${'█'.repeat(Math.round((n / gaps.length) * 30)).padEnd(30)} ${share(n)}`);
+  }
+}
+
+/*
+ * Confidence pass — where does "nothing here is close" begin?
+ *
+ * The results page has a state below `closest` that stops presenting the
+ * leader as an answer at all (see WEAK_SCORE in blocks/vehicle-matcher). It fires
+ * on the top score, and only over a leader that already carries a trade-off,
+ * because "nothing here matches your brief" is plainly false about a car that
+ * meets every stated want.
+ *
+ * So the only population that matters is the CLOSEST pages, and the only
+ * measurement that means anything is their top-score distribution — which is
+ * what this prints, both ways the harness knows how to sample:
+ *
+ *   uniform   random answer sets over sampled retailers. Broad, and (per the
+ *             `stick` pass's argument) not how anyone actually answers.
+ *   personas  each persona's real answers with ONE question changed at a time.
+ *             Realistic in shape, and the sample the threshold was set on.
+ *
+ * Findings, 2026-07-29: the distribution has no cliff, so the threshold is a
+ * policy choice and the defensible place for it is the middle of the
+ * population it divides. Three samples put that median at 67, 68 and 69.
+ */
+const WEAK_SCORE = 68; // mirrors blocks/vehicle-matcher/vehicle-matcher.js
+
+function auditConfidence(brand) {
+  const {
+    byRetailer, tuning: t, budgetCfg, questions: qs,
+  } = loadBrand(brand);
+  const { personas } = JSON.parse(readFileSync(join(FIXTURES, 'personas.json'), 'utf8'));
+  const pages = { uniform: [], personas: [] };
+
+  const record = (bucket, stock, answers, tag) => {
+    const r = matchCars(applyBespokeAnswers(brand, answers), stock, t);
+    if (!r.matches.length) return;
+    pages[bucket].push({
+      score: r.matches[0].score,
+      closest: (r.matches[0].tradeOffs || []).length > 0,
+      tag,
+    });
+  };
+
+  for (const stock of sampleRetailers(byRetailer, N_RETAILERS)) {
+    for (let i = 0; i < 25; i += 1) record('uniform', stock, randomAnswers(qs, budgetCfg));
+  }
+  for (const p of personas.filter((x) => x.brand === brand)) {
+    const stock = byRetailer.get(Number(p.retailer)) || byRetailer.get(p.retailer);
+    if (!stock?.length) continue;
+    record('personas', stock, p.answers, p.key);
+    for (const q of qs) {
+      let values = [];
+      if (q.id === 'budget') values = [[10000, 25000], [15000, 35000], [25000, 50000], [40000, 80000]];
+      else if (q.id === 'mileage') values = [4000, 9000, 15000, 25000];
+      else if (q.options) values = q.multi ? q.options.map((o) => [o.value]) : q.options.map((o) => o.value);
+      for (const v of values) record('personas', stock, { ...p.answers, [q.id]: v });
+    }
+  }
+
+  console.log(`\n${'='.repeat(72)}\n${brand.toUpperCase()}`);
+  for (const [bucket, rows] of Object.entries(pages)) {
+    const closest = rows.filter((r) => r.closest);
+    const scores = closest.map((r) => r.score);
+    if (!scores.length) { console.log(`\n  ${bucket}: no closest pages`); continue; }
+    console.log(`\n  ${bucket}: ${rows.length} pages, ${closest.length} of them CLOSEST (${pct(closest.length, rows.length)})`);
+    console.log(`    closest-page top score: p25 ${quantile(scores, 0.25)}`
+      + `  MEDIAN ${median(scores)}  p75 ${quantile(scores, 0.75)}`);
+    for (let lo = 35; lo < 100; lo += 5) {
+      const n = scores.filter((s) => s >= lo && s < lo + 5).length;
+      console.log(`      ${String(lo).padStart(2)}–${lo + 4}  ${'█'.repeat(Math.round((n / scores.length) * 60)).padEnd(30)} ${pct(n, scores.length)}`);
+    }
+    console.log(`    threshold → share of ALL pages that say "nothing here is close" (WEAK_SCORE is ${WEAK_SCORE}):`);
+    for (const th of [60, 62, 64, 66, 68, 70, 72, 75]) {
+      const n = closest.filter((r) => r.score < th).length;
+      console.log(`      ${th}${th === WEAK_SCORE ? ' ←' : '  '} `
+        + `${'█'.repeat(Math.round((n / rows.length) * 60)).padEnd(30)} ${pct(n, rows.length)}`
+        + `   (${pct(n, closest.length)} of closest pages)`);
+    }
+  }
+  const named = pages.personas.filter((r) => r.tag);
+  console.log('\n  personas as answered:');
+  named.forEach((r) => console.log(`    ${r.tag.padEnd(8)} ${String(r.score).padStart(3)}%  `
+    + `${r.closest ? 'misses a stated want' : 'meets the brief'}  →  `
+    + `${r.closest && r.score < WEAK_SCORE ? 'NOTHING HERE IS CLOSE' : (r.closest ? 'closest here' : '—')}`));
+}
+
 // ----------------------------------------------------------------- run ----
 
 const PASSES = {
@@ -375,11 +595,17 @@ const PASSES = {
   sens: [auditSensitivity],
   size: [auditBySize],
   fuel: [auditFuel],
-  all: [auditDead, auditSensitivity, auditBySize, auditFuel],
+  stick: [auditStickiness],
+  taste: [auditTaste],
+  conf: [auditConfidence],
+  all: [
+    auditDead, auditSensitivity, auditBySize, auditFuel,
+    auditStickiness, auditTaste, auditConfidence,
+  ],
 };
 const passes = PASSES[MODE];
 if (!passes) {
-  console.error('Usage: node scripts/audit-questions.mjs [dead|sens|size|fuel|all]');
+  console.error('Usage: node scripts/audit-questions.mjs [dead|sens|size|fuel|stick|taste|conf|all]');
   process.exit(1);
 }
 for (const pass of passes) {

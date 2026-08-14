@@ -1,0 +1,73 @@
+name: Deploy engine-relayer to GitHub Pages
+
+# Publishes THIS branch (engine-relayer) to the Pages site when it changes.
+#
+# How the pair works: a repo has one Pages site, and Actions runs the workflow
+# file as it exists on the branch that triggered the run. So —
+#
+#   push to main             → main's pages.yml runs        → main is published
+#   push to engine-relayer   → THIS file runs               → this branch is published
+#
+# Last push wins, which is what you want while comparing the two: push whichever
+# branch you want the live site to show. `actions/checkout` with no `ref` takes
+# the triggering branch, so this file needs no branch name in its build step.
+#
+# NOTE this file does not exist on main, and main's workflow doesn't trigger on
+# this branch, so a push can never set off both.
+#
+# One-time setup: repo Settings → Environments → github-pages → Deployment
+# branches must allow `engine-relayer` (or be set to "All branches"), otherwise
+# the deploy is rejected before it runs.
+
+on:
+  push:
+    branches: [engine-relayer]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  # IMPORTANT: the re-layered engine is SERVER-side. This workflow publishes
+  # only the static block, so pointing it at a backend running the old engine
+  # shows the old behaviour — no taste-led picks, no re-weighted scoring.
+  # To see the change, point this at a Render service deployed from
+  # `engine-relayer`. ?api=<url> on the published URL overrides it either way.
+  API_URL: https://bmw-matcher-api.onrender.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # Only the files a browser actually asks for — the repo root also holds
+      # server/, scripts/ and ~16MB of stock fixtures.
+      - name: Assemble the site
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp -R index.html blocks _site/
+          if [ -n "${API_URL}" ]; then
+            find _site -maxdepth 1 -name '*.html' -exec \
+              sed -i "s|data-api=\"http://localhost:8787\"|data-api=\"${API_URL}\"|g" {} +
+          fi
+          echo "Published tree (from ${GITHUB_REF_NAME}):"
+          find _site -maxdepth 2 -name '*.html' | sort
+          du -sh _site
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

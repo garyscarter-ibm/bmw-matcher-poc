@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Find My Perfect BMW</title>
-  <meta name="description" content="Answer ten quick questions and get matched with your perfect BMW from the current UK range.">
-  <meta property="og:title" content="Find My Perfect BMW">
-  <meta property="og:description" content="Ten questions. Three matches. Your perfect Approved UsedBMW from your local retailer.">
+  <title>Find Your Car</title>
+  <meta name="description" content="A few quick questions about your life, your miles and your budget. We match you against the approved-used cars your retailer actually has, and tell you why.">
+  <meta property="og:title" content="Find Your Car">
+  <meta property="og:description" content="A few questions. Then the approved-used cars at your retailer that genuinely suit you, the reasons why, and a straight answer when none of them do.">
   <meta property="og:type" content="website">
-  <link rel="stylesheet" href="./blocks/bmw-matcher/bmw-matcher.css">
+  <link rel="stylesheet" href="./blocks/vehicle-matcher/vehicle-matcher.css">
   <style>
     body {
       margin: 0;
@@ -18,9 +18,6 @@
       box-sizing: border-box;
       font-family: 'Helvetica Neue', helvetica, arial, sans-serif;
     }
-    /* Normal flow + auto side margins centre the column without a grid track
-       that would size to the block's 880px max-content and overflow narrow
-       viewports (the grid centring did exactly that on mobile). */
     /* The harness stands in for a host page, so IT owns the page surface.
        The block itself is transparent (the host section decides its
        background), which is why this white lives here and not there. */
@@ -28,25 +25,64 @@
       width: 100%; max-width: 880px; margin: 0 auto; box-sizing: border-box;
       background: #fff;
     }
+    /* Shared-password gate: a full-screen overlay over the harness's dark
+       surface. Purely for capturing the demo password (see the module script);
+       the server is the real gate. */
+    .vm-gate {
+      position: fixed; inset: 0; z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px; background: #0d0f12;
+    }
+    .vm-gate-card {
+      width: 100%; max-width: 360px; box-sizing: border-box;
+      display: flex; flex-direction: column; gap: 12px;
+      padding: 32px 28px; border-radius: 12px;
+      background: #16191e; color: #f2f4f7;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+    .vm-gate-title { margin: 0; font-size: 22px; font-weight: 600; }
+    .vm-gate-lede { margin: 0; font-size: 14px; line-height: 1.4; color: #aeb4bd; }
+    .vm-gate-error { margin: 0; font-size: 14px; color: #ff8a80; }
+    .vm-gate-input {
+      box-sizing: border-box; width: 100%; margin-top: 4px;
+      padding: 12px 14px; font-size: 16px;
+      border: 1px solid #3a3f47; border-radius: 8px;
+      background: #0d0f12; color: #f2f4f7;
+    }
+    .vm-gate-input:focus { outline: 2px solid #4c8bf5; outline-offset: 1px; }
+    .vm-gate-btn {
+      padding: 12px 14px; font-size: 15px; font-weight: 600; cursor: pointer;
+      border: 0; border-radius: 8px; background: #4c8bf5; color: #fff;
+    }
+    .vm-gate-btn:hover { background: #3f79db; }
   </style>
 </head>
 <body>
   <main>
     <!-- Standalone harness: mounts the block exactly as EDS would.
+         The block is brand-agnostic — the "Brand" config row (below) chooses
+         which marque it themes and sources stock for. This demo defaults to
+         BMW; ?brand=mini (or any registered brand) switches it at runtime.
+
          data-api points the block at the matching backend; in a live EDS site
          you'd set this per-environment. Defaults to http://localhost:8787.
          Override at runtime with ?api=<url> — used by the GitHub Pages build to
-         point the static page at the deployed Render backend without a rebuild.
+         point the static page at the deployed backend without a rebuild.
 
-         The "Retailer ID" row below simulates what Adobe DA (Document
-         Authoring) renders from an authored block-config table row: each row
-         under the block name becomes a child <div> with two nested <div>
-         cells (key, value) — the same shape aem-boilerplate's
-         readBlockConfig() reads. A real retailer page would set this row's
-         value in their DA document; here it's hardcoded for local dev, and
-         can be overridden with ?retailer=<id> on this harness's URL for a
-         quick multi-retailer demo without editing HTML. -->
-    <div class="bmw-matcher block" data-block-name="bmw-matcher" data-api="http://localhost:8787">
+         The config rows below simulate what Adobe DA (Document Authoring)
+         renders from an authored block-config table: each row under the block
+         name becomes a child <div> with two nested <div> cells (key, value) —
+         the same shape aem-boilerplate's readBlockConfig() reads. A real
+         retailer page would set these in their DA document; here they're
+         defaults for local dev, overridable via the query string:
+           ?brand=bmw|mini   — which brand to theme + source
+           ?retailer=<id>    — which retailer's stock
+           ?mode=<key>       — lock to one interface (else the switcher shows)
+           ?api=<url>        — point at a deployed backend
+
+         No "Mode" row is authored here on purpose: unlocked, the block shows
+         its mode switcher — this page IS the multi-interface showcase. -->
+    <div class="vehicle-matcher block" data-block-name="vehicle-matcher" data-api="http://localhost:8787">
       <div>
         <div>Brand</div>
         <div>BMW</div>
@@ -62,9 +98,10 @@
     </div>
   </main>
   <script type="module">
-    import decorate from './blocks/bmw-matcher/bmw-matcher.js';
+    import decorate from './blocks/vehicle-matcher/vehicle-matcher.js';
+    import { ACCESS_KEY_STORAGE } from './blocks/vehicle-matcher/engine.js';
 
-    const block = document.querySelector('.bmw-matcher');
+    const block = document.querySelector('.vehicle-matcher');
     const params = new URLSearchParams(window.location.search);
 
     // ?api=<url> points the block at a deployed backend (e.g. Render) — else it
@@ -74,17 +111,124 @@
       block.dataset.api = apiOverride;
     }
 
-    // ?retailer=<id> overrides the authored Retailer ID row (find it by its
-    // label so it isn't confused with the Brand / Retailer Name rows).
-    const override = params.get('retailer');
-    if (override) {
+    // Rewrite an authored config row's value in place, found by its label so
+    // the right row is hit regardless of order. Used by the ?brand / ?retailer
+    // overrides below. (?mode is read by the block itself from the query string,
+    // so it needs no row here.)
+    const setRow = (label, value) => {
       const row = [...block.children].find(
-        (r) => r.firstElementChild?.textContent.trim().toLowerCase() === 'retailer id',
+        (r) => r.firstElementChild?.textContent.trim().toLowerCase() === label,
       );
-      if (row) row.lastElementChild.textContent = override;
+      if (row) row.lastElementChild.textContent = value;
+    };
+
+    // ?brand=bmw|mini|honda|ford|motorrad overrides the authored Brand row.
+    const brandOverride = params.get('brand');
+    if (brandOverride) setRow('brand', brandOverride);
+
+    // ?retailer=<id> overrides the authored Retailer ID row.
+    const retailerOverride = params.get('retailer');
+    if (retailerOverride) setRow('retailer id', retailerOverride);
+
+    // Retailer *Name* is a third authored row, hardcoded to "Grassicks BMW" in
+    // the markup above (the BMW default). It is NOT the brand row, so switching
+    // brand with ?brand= alone used to leave the name as "Grassicks BMW" — every
+    // non-BMW brand then read "...at Grassicks BMW", and Motorrad additionally
+    // "...bikes at Grassicks BMW". Fix: each brand carries its own default demo
+    // retailer name, applied whenever ?brand= is set. Honda/Ford/Motorrad are
+    // national approved-used programmes, not a single named dealer, so they use
+    // the programme name. Precedence: ?retailerName= (explicit) beats the
+    // ?retailer= ID map beats the ?brand= default.
+    const BRAND_RETAILER_NAMES = {
+      bmw: 'Grassicks BMW', // Grassicks Garage, Perth (retailer 96)
+      mini: 'Sytner Luton MINI', // retailer 92
+      honda: 'Honda Approved Used',
+      ford: 'Ford Approved Used',
+      motorrad: 'BMW Motorrad Approved Used',
+      ferrari: 'Ferrari Approved',
+    };
+    const RETAILER_NAMES = {
+      96: 'Grassicks BMW', // Grassicks Garage, Perth
+      92: 'Sytner Luton MINI',
+    };
+    const nameOverride = params.get('retailerName')
+      || RETAILER_NAMES[retailerOverride]
+      || (brandOverride && BRAND_RETAILER_NAMES[brandOverride.toLowerCase()]);
+    if (nameOverride) setRow('retailer name', nameOverride);
+
+    // ---- Shared-password gate ---------------------------------------------
+    // This overlay is UX only, not a security boundary: it captures the shared
+    // demo password so engine.js can send it as X-Access-Key on every API call.
+    // The real gate is the server, which 401s any /api/* call without a matching
+    // key (see server/index.js isAuthorized). So bypassing this overlay just
+    // yields an empty shell that can't load questions or matches. When the
+    // deployed backend has no DEMO_ACCESS_KEY set, any password (or none) works
+    // and the app runs open, exactly as before.
+    //
+    // ?key=<password> lets a single shareable link carry the password: we store
+    // it and strip it from the visible URL so it isn't shoulder-surfed or left in
+    // history/bookmarks. Rotating the server key invalidates old links, which is
+    // the point.
+    const keyFromUrl = params.get('key');
+    if (keyFromUrl) {
+      sessionStorage.setItem(ACCESS_KEY_STORAGE, keyFromUrl);
+      params.delete('key');
+      const clean = params.toString();
+      window.history.replaceState(
+        {},
+        '',
+        window.location.pathname + (clean ? `?${clean}` : '') + window.location.hash,
+      );
     }
 
-    decorate(block);
+    // Build (or re-build) the password overlay. `message` shows the wrong-password
+    // note on a retry. Resolves once the user submits a non-empty password, which
+    // is stored before the promise resolves.
+    function askForPassword(message) {
+      return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'vm-gate';
+        overlay.innerHTML = `
+          <form class="vm-gate-card" autocomplete="off">
+            <h1 class="vm-gate-title">Private demo</h1>
+            <p class="vm-gate-lede">Enter the password you were given to continue.</p>
+            ${message ? `<p class="vm-gate-error">${message}</p>` : ''}
+            <input class="vm-gate-input" type="password" name="vm-access"
+                   placeholder="Password" aria-label="Password" autofocus>
+            <button class="vm-gate-btn" type="submit">Enter</button>
+          </form>`;
+        const form = overlay.querySelector('.vm-gate-card');
+        const input = overlay.querySelector('.vm-gate-input');
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const value = input.value.trim();
+          if (!value) return;
+          sessionStorage.setItem(ACCESS_KEY_STORAGE, value);
+          overlay.remove();
+          resolve();
+        });
+        document.body.append(overlay);
+        input.focus();
+      });
+    }
+
+    // A 401 from a load-bearing call means the stored password was wrong or has
+    // been rotated: engine.js clears it and fires vm-auth-failed. Re-prompt with
+    // the error, then remount the block against the fresh key.
+    window.addEventListener('vm-auth-failed', () => {
+      // Guard against re-entrancy if two calls 401 at once.
+      if (document.querySelector('.vm-gate')) return;
+      askForPassword('That password was not right. Please try again.')
+        .then(() => decorate(block));
+    });
+
+    // Have a key already (this session, or just set from ?key=)? Mount straight
+    // away. Otherwise prompt first, then mount.
+    if (sessionStorage.getItem(ACCESS_KEY_STORAGE)) {
+      decorate(block);
+    } else {
+      askForPassword().then(() => decorate(block));
+    }
   </script>
 </body>
 </html>

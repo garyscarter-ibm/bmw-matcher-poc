@@ -157,7 +157,9 @@ test('rankCars returns every survivor, not just the headline matches', () => {
   const all = rankCars(base, CARS);
   const { matches } = run(base);
   assert.ok(all.length > matches.length, 'ranking is wider than the headline matches');
-  assert.deepEqual(matches, all.slice(0, matches.length), 'matches are the head of the full ranking');
+  // matches are GROUPED (repeat listings of one car collapse into one card),
+  // so compare identities rather than objects.
+  assert.equal(matches[0].car.name, all[0].car.name, 'the best car still leads');
 });
 
 /* ---- clusters: only claim a winner when there is one ---- */
@@ -179,8 +181,9 @@ test('a clear winner is decisive and shows the usual three', () => {
   assert.equal(matches.length, 3, 'a decisive result is the familiar hero + two');
 });
 
-test('a tie is reported as a tie, and stops hiding the rest of it', () => {
-  // Five identical cars: the engine cannot separate them, and shouldn't pretend.
+test('repeat listings of one car collapse into a single card', () => {
+  // Five identical cars are not five choices — they're one car the retailer
+  // has five of. Showing five cards read as the page stuttering.
   const clone = (id) => ({
     id, name: `BMW 320i ${id}`, line: '3 Series', body: 'saloon', fuel: 'petrol',
     priceMin: 30000, priceMax: 30000, sizeClass: 2, seats: 5, boot: 480, zeroTo62: 7.4,
@@ -188,16 +191,33 @@ test('a tie is reported as a tie, and stops hiding the rest of it', () => {
   });
   const fivesome = ['a', 'b', 'c', 'd', 'e'].map(clone);
   const { matches, decisive, clusterSize } = matchCars({ ...base, budget: [25000, 35000] }, fivesome);
-  assert.equal(decisive, false);
-  assert.equal(clusterSize, 5, 'the whole tie is counted, not just what fits');
-  assert.equal(matches.length, 5, 'and shown — the old 3-car cap hid two of them');
-  assert.equal(new Set(matches.map((m) => m.score)).size, 1, 'fixture sanity: genuinely tied');
+  assert.equal(clusterSize, 1, 'one car, not five');
+  assert.equal(decisive, true, 'and naming it is honest');
+  assert.equal(matches[0].car.listingCount, 5, 'the card speaks for all five');
+  assert.equal(matches[0].car.priceFrom, 30000);
+});
+
+test('genuinely different cars still tie, and the whole tie is shown', () => {
+  // Different models that happen to score alike — a real choice, unlike clones.
+  const variant = (id, zeroTo62, tags) => ({
+    id, name: `BMW ${id}`, line: `${id} Series`, body: 'saloon', fuel: 'petrol',
+    priceMin: 30000, priceMax: 30000, sizeClass: 2, seats: 5, boot: 480, zeroTo62,
+    mpg: 45, tags, blurb: '', styleLine: null, doors: null,
+  });
+  const pool = [variant('a', 7.4, ['cruiser']), variant('b', 7.5, ['cruiser']),
+    variant('c', 7.6, ['cruiser']), variant('d', 7.7, ['cruiser'])];
+  const { matches, decisive, clusterSize } = matchCars({ ...base, budget: [25000, 35000] }, pool);
+  assert.equal(decisive, false, 'four different cars scoring alike is a real tie');
+  assert.ok(clusterSize > 1);
+  assert.equal(matches.length, clusterSize, 'the whole tie is shown, not a 3-car slice');
 });
 
 test('a tie wider than MAX_SHOWN is capped for display but counted in full', () => {
+  // Distinct 0-62s keep these as separate cars rather than one grouped listing.
   const many = Array.from({ length: 10 }, (_, i) => ({
     id: `c${i}`, name: `BMW 320i ${i}`, line: '3 Series', body: 'saloon', fuel: 'petrol',
-    priceMin: 30000, priceMax: 30000, sizeClass: 2, seats: 5, boot: 480, zeroTo62: 7.4,
+    priceMin: 30000, priceMax: 30000, sizeClass: 2, seats: 5, boot: 480,
+    zeroTo62: 7.4 + i * 0.05,
     mpg: 45, tags: ['cruiser'], blurb: '', styleLine: null, doors: null,
   }));
   const { matches, clusterSize } = matchCars({ ...base, budget: [25000, 35000] }, many);
@@ -206,7 +226,16 @@ test('a tie wider than MAX_SHOWN is capped for display but counted in full', () 
 });
 
 test('an empty pool is decisive by vacuum, not by claim', () => {
-  assert.deepEqual(matchCars(base, []), { matches: [], decisive: true, clusterSize: 0 });
+  // `searched` reports the funnel the page shows its working with. On an empty
+  // pool it must still be present and still be honest: nothing searched,
+  // nothing eligible, and no margin to claim over a car that isn't there.
+  assert.deepEqual(matchCars(base, []), {
+    matches: [],
+    decisive: true,
+    clusterSize: 0,
+    tasteLead: false,
+    searched: { total: 0, eligible: 0, margin: null },
+  });
 });
 
 test('every dataset entry has the fields the engine needs', () => {

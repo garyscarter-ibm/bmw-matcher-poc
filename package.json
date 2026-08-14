@@ -1,5 +1,5 @@
 {
-  "name": "bmw-matcher",
+  "name": "vehicle-matcher",
   "version": "0.1.0",
   "description": "Find My Perfect BMW — a UK car-matching quiz built as a portable Adobe EDS block",
   "type": "module",
@@ -12,5 +12,8 @@
     "audit:refine": "node scripts/audit-refinement.mjs",
     "personas": "node scripts/persona-check.mjs",
     "test": "node --test server/test/**/*.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1"
   }
 }
