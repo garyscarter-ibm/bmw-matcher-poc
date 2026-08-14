@@ -287,7 +287,7 @@
           </section>
 
           <section class="demo-tool" id="demo-tool">
-            <div class="vehicle-matcher block" data-block-name="vehicle-matcher" data-api="http://localhost:8787">
+            <div class="vehicle-matcher block" data-block-name="vehicle-matcher" data-api="${DEFAULT_API}">
               <div><div>Brand</div><div>${brandKey}</div></div>
               <div><div>Retailer ID</div><div>${esc(retailerId)}</div></div>
               <div><div>Retailer Name</div><div>${esc(retailerName)}</div></div>
@@ -354,8 +354,16 @@
     }
 
     // ------------------------------------------------------------------
-    // Password gate — carried over verbatim from index.html.
+    // Password gate — carried over from index.html, but here it runs before
+    // ANY view renders, picker included: the whole demo sits behind the shared
+    // password, so a visitor sees the prompt rather than the brand tiles.
     // ------------------------------------------------------------------
+
+    // The backend the block will talk to. Authored as the shell's data-api and
+    // resolved up front too, so the gate can tell local dev from a deployed API
+    // before there is a block to read it off.
+    const DEFAULT_API = 'http://localhost:8787';
+
     const keyFromUrl = params.get('key');
     if (keyFromUrl) {
       sessionStorage.setItem(ACCESS_KEY_STORAGE, keyFromUrl);
@@ -396,15 +404,20 @@
     }
 
     // ------------------------------------------------------------------
-    // Boot: pick the view, then mount the block behind the password gate.
+    // Boot: gate first, then pick the view.
     // ------------------------------------------------------------------
-    const brandParam = (params.get('brand') || '').toLowerCase();
 
-    if (!brandParam) {
-      // No brand chosen — show the neutral picker and stop. The picker makes no
-      // API calls, so it needs no password.
-      renderPicker();
-    } else {
+    // Render the chosen view. Called only once the gate has cleared, so neither
+    // the picker tiles nor a branded shell is ever painted behind the overlay.
+    function render() {
+      const brandParam = (params.get('brand') || '').toLowerCase();
+
+      if (!brandParam) {
+        // No brand chosen — show the neutral picker and stop.
+        renderPicker();
+        return;
+      }
+
       // Unknown brand falls back to bmw, matching the block's own DEFAULT_BRAND.
       const brandKey = BRANDS[brandParam] ? brandParam : 'bmw';
       const block = renderShell(brandKey);
@@ -420,23 +433,26 @@
           .then(() => decorate(block));
       });
 
-      // Whether to prompt for the password up front. A local dev backend runs
-      // keyless (DEMO_ACCESS_KEY unset -> auth off, see server/index.js), so a
-      // pre-emptive prompt on localhost is pure friction: the server returns 200
-      // without a key. So against a localhost API we mount straight away and let
-      // the vm-auth-failed handler above catch the (unexpected) case where that
-      // local server *is* keyed. A remote/deployed API keeps the up-front prompt.
-      const apiHost = (() => {
-        try { return new URL(block.dataset.api, window.location.href).hostname; }
-        catch { return ''; }
-      })();
-      const apiIsLocal = apiHost === 'localhost' || apiHost === '127.0.0.1' || apiHost === '::1';
+      decorate(block);
+    }
 
-      if (sessionStorage.getItem(ACCESS_KEY_STORAGE) || apiIsLocal) {
-        decorate(block);
-      } else {
-        askForPassword().then(() => decorate(block));
-      }
+    // Whether to prompt for the password up front. A local dev backend runs
+    // keyless (DEMO_ACCESS_KEY unset -> auth off, see server/index.js), so a
+    // pre-emptive prompt on localhost is pure friction: the server returns 200
+    // without a key. So against a localhost API we render straight away and let
+    // the vm-auth-failed handler in render() catch the (unexpected) case where
+    // that local server *is* keyed. A remote/deployed API keeps the up-front
+    // prompt, and now it lands before the brand tiles rather than after.
+    const apiHost = (() => {
+      try { return new URL(params.get('api') || DEFAULT_API, window.location.href).hostname; }
+      catch { return ''; }
+    })();
+    const apiIsLocal = apiHost === 'localhost' || apiHost === '127.0.0.1' || apiHost === '::1';
+
+    if (sessionStorage.getItem(ACCESS_KEY_STORAGE) || apiIsLocal) {
+      render();
+    } else {
+      askForPassword().then(render);
     }
   </script>
 </body>
