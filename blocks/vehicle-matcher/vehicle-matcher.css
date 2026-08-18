@@ -1723,6 +1723,16 @@
   overflow: hidden;
 }
 
+/* A 16:9 band is a photo at 880px and a wall at 1184: held to its aspect ratio
+   the results hero's media alone was 665px tall, more than a laptop fold, and
+   the card it heads came to 1194px. Capped, so the hero crops to a cinematic
+   band (the photo is object-fit: cover, so it crops rather than squashes) and
+   the specs under it stay on screen with it. Only the full-width hero needs
+   this: every other card sits in a column narrow enough that 16:9 is a photo. */
+@media (min-width: 1024px) {
+  .vm-results .vm-card-big > .vm-card-media { max-height: 480px; }
+}
+
 /* Real retailer photo fills the media slot; the line label sits over it. */
 .vm-card-photo {
   position: absolute;
