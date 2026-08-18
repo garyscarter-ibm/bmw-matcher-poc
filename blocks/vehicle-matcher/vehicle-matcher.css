@@ -306,15 +306,40 @@
   /* Cap the width on large screens, but fill (never exceed) a narrow viewport:
      box-sizing keeps the side padding inside the 100%, so the block can't push
      past the screen edge on mobile. Without width:100% a centred flex/grid
-     parent sizes the block to its 880px max-content and it overflows. */
+     parent sizes the block to its max-content and it overflows.
+     ---------------------------------------------------------------------
+     The cap is a 1280px COLUMN, not a reading measure. It used to be 880px,
+     which was set when every mode was a single centred column of copy — but
+     podium puts a brief and a live podium side by side, and at 880 that meant a
+     320px pane holding a card the size of the fold, so one car at a time was
+     all you could see. 1280 is the number the host pages already use: MINI's
+     own sections sit in a 1280px column (see the wrapper rule below) and the
+     BMW retailer sections in a 1200px one, and with the 48px gutter added at
+     900px up the content lands at 1184 — within a couple of pixels of the demo
+     shell's own 1180px hero and footer inners, so the tool lines up with the
+     furniture around it instead of reading as an inset panel.
+     Single-column modes keep their own measures (`.vm-lede` is capped in ch,
+     the swipe deck in px), so widening the column does not widen prose. */
   box-sizing: border-box;
   width: 100%;
-  max-width: 880px;
+  max-width: 1280px;
   margin: 0 auto;
   line-height: 1.5;
 }
 
 .vm * { box-sizing: border-box; }
+
+/* The standalone gutter, matching the one the wrapper rule below gives the
+   block on a host page: 48px is what the host's own sections use, so the
+   content column is the same width in the harness, on the Pages demo and in
+   EDS. Kept off small screens, where the 20px base padding is the right edge
+   distance and 48px would eat a fifth of a phone. */
+@media (min-width: 900px) {
+  .vm {
+    padding-left: var(--vm-space-12);
+    padding-right: var(--vm-space-12);
+  }
+}
 
 /*
  * Inside an EDS page the section already provides the content column, so the
