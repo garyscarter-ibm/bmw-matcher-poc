@@ -3411,11 +3411,11 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    ====================================================================== */
 
 /* The two-pane grid. One column below 720px (the brief first, then the
-   podium, which is DOM order, so no reordering is needed), two above. The
-   block is capped at 880px, so the left column takes a fixed reading measure
-   and the podium takes the rest. min-width: 0 on both panes because a grid
-   item defaults to min-content width, and a long unbroken model name in a card
-   would otherwise push the whole track wider than the block. */
+   podium, which is DOM order, so no reordering is needed), two above: the left
+   column takes a fixed reading measure and the podium takes the rest.
+   min-width: 0 on both panes because a grid item defaults to min-content width,
+   and a long unbroken model name in a card would otherwise push the whole track
+   wider than the block. */
 .vm-podium {
   display: grid;
   grid-template-columns: 1fr;
