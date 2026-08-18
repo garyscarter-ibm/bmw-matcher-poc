@@ -3753,6 +3753,22 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body > * {
     break-inside: avoid;
   }
+  /* Put the seam where the register changes instead of wherever the balancer
+     lands: the blurb is the last thing the card says about the car itself, and
+     it is present on every non-compact card, so it is the reliable hinge.
+     Skipped when the blurb is the last child — a payload with no kit, reasons or
+     link would otherwise force an empty second column. */
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body
+    > .vm-blurb:not(:last-child) {
+    break-after: column;
+  }
+  /* Belt and braces for the browsers that ignore a forced column break: a
+     balanced split put "What's fitted" at the foot of one column and the kit it
+     labels at the head of the next. A label is part of the thing it labels. */
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body
+    > .vm-why-label {
+    break-after: avoid;
+  }
 }
 
 /* The rank eyebrow. The rule before the label is the quietest of the four rank
