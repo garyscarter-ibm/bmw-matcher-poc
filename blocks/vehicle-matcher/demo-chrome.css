@@ -270,7 +270,10 @@
  * The band the real block sits in. Painted in the brand's plain page surface
  * (white for every brand today) so the tool reads on a clean white ground
  * rather than the grey section band the earlier draft used. The block paints
- * its own transparent background and keeps its 880px measure, centred here.
+ * its own transparent background and keeps its 1280px column, centred here.
+ * The band's own side padding is small on purpose: the block's column is what
+ * sets the content's distance from the edge, and doubling the two gutters would
+ * pull the tool in from the hero and footer it is meant to align with.
  */
 .demo-tool {
   flex: 1 1 auto;
