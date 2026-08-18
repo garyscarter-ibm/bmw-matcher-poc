@@ -1239,6 +1239,13 @@
   padding: var(--vm-space-2) var(--vm-space-1) 0;
 }
 
+/* A slider is a TRAVEL, not a field: dragged across the block's full 1184px
+   column, a budget thumb has to cross most of the desk to add £5k, and the £0 /
+   £150,000+ end labels end up a screen apart. Capped where the drag still feels
+   proportionate. Scoped to a direct child of a screen so the podium's own panes
+   (a 360px column and a 272px popover) are untouched. */
+.vm-screen > .vm-options.vm-slider { max-width: 760px; }
+
 /* Big live value readout above the track. */
 .vm-slider-value {
   display: block;
