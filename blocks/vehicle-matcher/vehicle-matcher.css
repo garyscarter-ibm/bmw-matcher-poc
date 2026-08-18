@@ -3456,6 +3456,25 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
     overscroll-behavior: contain;
     padding-inline: var(--vm-space-1);
   }
+
+  /* "Choose yours" prints one row per grouped listing, and the count comes from
+     the feed: a retailer with 24 of the same model gives a 1192px list, one with
+     47 gives 2342px. On the questionnaire's results PAGE that is fine — the page
+     scrolls. Here the pane is a fixed-height viewport (above), so an unbounded
+     list is the one thing that can push the next option off the bottom however
+     the steps are laid out: measured, a 24-row picker took the winner to 1712px
+     in an 868px pane and put the runner-up 896px below the fold.
+
+     So the list gets a height and scrolls inside the card. 212px is four rows
+     and a sliver of the fifth — the clipped row is the affordance, the same way
+     the nearby track lets the next tile peek rather than printing a scrollbar
+     hint. Nothing is hidden: every listing is still reachable, and the picker
+     chains its scroll to the pane at both ends (no overscroll-behavior here, on
+     purpose). Podium only; the questionnaire's hero keeps the full list. */
+  .vm-podium-step .vm-pick {
+    max-height: 212px;
+    overflow-y: auto;
+  }
 }
 
 /* Wide: the brief gets a slightly longer measure and a wider seam, and the
