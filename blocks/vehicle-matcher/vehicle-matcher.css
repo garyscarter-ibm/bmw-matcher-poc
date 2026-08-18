@@ -3458,6 +3458,20 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   }
 }
 
+/* Wide: the brief gets a slightly longer measure and a wider seam, and the
+   podium gets everything that buys. Every extra pixel the block gained goes to
+   the RESULTS pane on purpose — the brief is eight short questions in a single
+   column and reads worse the wider it gets, while the podium is the mode. At a
+   1184px content column this leaves the pane ~784px, which is what makes the
+   two-per-row step layout below possible. */
+@media (min-width: 1080px) {
+  .vm-podium {
+    grid-template-columns: minmax(320px, 360px) 1fr;
+    gap: var(--vm-space-10);
+  }
+  .vm-podium-ask { padding-right: var(--vm-space-8); }
+}
+
 /* ---------------------------- left pane: the brief ------------------- */
 
 .vm-podium-wordmark {
