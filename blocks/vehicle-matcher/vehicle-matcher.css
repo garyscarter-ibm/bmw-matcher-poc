@@ -1181,6 +1181,16 @@
   .vm-options { grid-template-columns: 1fr 1fr; }
 }
 
+/* Three up once the block has its full 1184px content column, because two would
+   make a 580px-wide box for the word "SUV". Three keeps the option a
+   button-sized target (~380px), and it shortens the form: eight body styles are
+   three rows instead of four. The podium's left pane overrides this back to one
+   column (it is a 360px column, not the full width) and the slider variant is
+   never a grid — see `.vm-options.vm-slider` below. */
+@media (min-width: 1024px) {
+  .vm-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 .vm-option {
   font-family: var(--vm-font-body);
   font-size: var(--vm-text-body);
