@@ -172,6 +172,16 @@ export function renderOptionList(q, answers, { onChange, onPick } = {}) {
         onChange?.();
       } else {
         answers[q.id] = opt.value;
+        // Reflect the pick in the UI. The questionnaire auto-advances on a
+        // single-select tap so the un-highlighted button is never seen, but a
+        // mode that keeps every question on screen (podium) needs the selected
+        // state painted here. Single-select, so exactly one button is on.
+        selected.clear();
+        selected.add(opt.value);
+        optionButtons.forEach(({ button, value }) => {
+          button.classList.toggle('is-selected', value === opt.value);
+          button.setAttribute('aria-checked', String(value === opt.value));
+        });
         onChange?.();
         onPick?.();
       }
