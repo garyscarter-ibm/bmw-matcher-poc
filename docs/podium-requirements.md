@@ -240,6 +240,13 @@ grid:
   narrower card reads as a step down; side by side they read as two mismatched cards
   and knock the row out of alignment. Rank still carries on its other three signals:
   the rule before the label, the card border, and the shadow depth.
+- **Cards in a row keep their natural height**, deliberately, even though matching
+  bottoms looks tidier. Card length here is content: "Choose yours" prints one row per
+  grouped listing, and a national feed returned 47 rows for one joint first against 24
+  for the other. Stretched to a shared height, the shorter card measured 1875px of
+  content inside a 3026px card — 1151px of bordered blank white, which reads as a
+  broken card. Height is not one of the rank signals, so nothing is claimed by letting
+  it vary.
 - Below 1080px the steps stay stacked one per row: at 1024 the pane is only ~544px, so
   two-up would be ~264px columns.
 
