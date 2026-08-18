@@ -3705,17 +3705,18 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   .vm-podium-steps {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: stretch;
+    /* Each card takes its natural height rather than the row's.
+       Matching the bottoms was the first instinct — two cards in a row that end
+       on the same line look composed — but card length here is CONTENT, and the
+       content varies enormously: "Choose yours" prints one row per grouped
+       listing, so a national feed returned 47 rows for one joint first against
+       24 for the other. Stretched, the shorter card measured 1875px of content
+       inside a 3026px card: 1151px of blank white with a hairline border round
+       it, which reads as a broken card, not a tidy row. Ragged bottoms are the
+       honest version — one of those cars genuinely has twice as much to choose
+       between — and nothing in the rank ladder is carried by height. */
+    align-items: start;
   }
-  /* Steps in a row are as tall as their neighbour; the card fills the step so
-     the two card bottoms line up instead of one hanging off a taller rank
-     eyebrow. .vm-card-body pins its link with margin-top: auto, so the extra
-     height goes to whitespace above the link, not to a stretched photo. */
-  .vm-podium-step {
-    display: flex;
-    flex-direction: column;
-  }
-  .vm-podium-step > .vm-card { flex: 1 1 auto; }
 
   /* The insets are the rank ladder's third signal, and they were measured for a
      stack, where a narrower card reads as a step down. Side by side they read
