@@ -57,8 +57,15 @@ flag) lives on a fresh local object, never on the shared `ctx`, so a re-mount fr
 switcher starts clean.
 
 Layout is a CSS grid the mode owns: one column on mobile (questions above, podium
-below), `minmax(320px, 380px) 1fr` at 720px and up. The shell contributes no layout,
-exactly as with Swipe and Head to head.
+below), `minmax(280px, 320px) 1fr` at 720px and up, opening to
+`minmax(320px, 360px) 1fr` with a wider seam at 1080px. The shell contributes no
+layout, exactly as with Swipe and Head to head.
+
+Every pixel the block's own column gained beyond the brief's measure goes to the
+**results** pane, not the brief: the brief is eight short questions in one column and
+reads worse the wider it gets, while the podium is the mode. At the block's 1184px
+content column that leaves the pane ~784px, which is what makes the row layout in §5
+possible.
 
 ## 3. The decisions (locked)
 
