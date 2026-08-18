@@ -348,7 +348,7 @@
  * the block's content started at 304px while every host section started at
  * 160–270px, because an 880px centred box sat inside EDS's 1200px column — it
  * read as inset and bolted-on. Standalone (the local harness / Pages demo)
- * there's no wrapper, so the block keeps its own 880px reading measure.
+ * there's no wrapper, so the block keeps its own 1280px column.
  */
 .vehicle-matcher-wrapper .vm {
   max-width: none;
