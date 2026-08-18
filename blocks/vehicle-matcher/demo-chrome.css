@@ -172,8 +172,62 @@
   max-width: 42ch;
   opacity: 0.95;
 }
-/* MINI's homepage headline beat: uppercase serif. */
-.vm-mini .demo-hero-title { text-transform: uppercase; letter-spacing: 0.01em; }
+/*
+ * Per-brand hero headline treatment. Each mirrors the brand's own in-tool
+ * .vm-title identity (case, weight, tracking) from vehicle-matcher.css, so the
+ * hero band and the matcher below it read as the same brand rather than a
+ * generic light headline sitting above branded chrome. The heading FACE is
+ * already per-brand (the title inherits --vm-font-heading from .demo-hero), so
+ * these rules only set the case/weight/tracking each brand headline needs, plus
+ * the two size beats that genuinely differ: Motorrad shouts bigger, Ferrari is
+ * quieter and more editorial.
+ */
+/* BMW: light grotesque, uppercase, airy (the base .vm-title beat). */
+.vm-bmw .demo-hero-title {
+  text-transform: uppercase;
+  font-weight: 300;
+  letter-spacing: 0;
+}
+/* MINI: heavy display serif, uppercase, tight leading. */
+.vm-mini .demo-hero-title {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.02;
+}
+/* Motorrad: the loudest hero of the set. Heavy uppercase, bigger than the rest,
+   matching bmw-motorrad.co.uk's "MAKE LIFE A RIDE" register. */
+.vm-motorrad .demo-hero-title {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  line-height: 1.02;
+  font-size: clamp(38px, 7vw, 76px);
+}
+/* Honda: friendly sentence case in the condensed grotesque, semibold. */
+.vm-honda .demo-hero-title {
+  text-transform: none;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+/* Ford: plain-spoken sentence case, medium weight. */
+.vm-ford .demo-hero-title {
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+/* Ferrari: restrained, editorial sentence case with air. Never shouted, so it
+   sits a touch smaller and lighter than the uppercase brands, with a hair of
+   tracking for the luxury register. */
+.vm-ferrari .demo-hero-title {
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  line-height: 1.1;
+  font-size: clamp(30px, 5.2vw, 58px);
+}
 
 /* An optional hero CTA — reads the same brand button tokens the tool's own
    buttons do, so its size/shape/colour match the tool automatically. */
@@ -210,26 +264,44 @@
 /* ================= tool section ================= */
 
 /*
- * The band the real block sits in. A light section band (alt surface) sets the
- * tool apart from the white nav above and the dark footer below, the rhythm the
- * real homepages use. The block paints its own transparent background and keeps
- * its 880px measure, centred here.
+ * The band the real block sits in. Painted in the brand's plain page surface
+ * (white for every brand today) so the tool reads on a clean white ground
+ * rather than the grey section band the earlier draft used. The block paints
+ * its own transparent background and keeps its 880px measure, centred here.
  */
 .demo-tool {
   flex: 1 1 auto;
   padding: var(--vm-space-12) var(--vm-space-4) var(--vm-space-16);
-  background: var(--vm-surface-alt);
+  background: var(--vm-surface);
 }
 
 /* ================= footer ================= */
 
+/*
+ * Each brand's real footer is its dark ground (--vm-surface-dark, already set
+ * per brand: BMW charcoal, Ford navy, Ferrari's global black, …) topped by a
+ * thin keyline in the brand's spot colour, so the footer reads unmistakably as
+ * that marque rather than a generic dark slab shared across all six.
+ *
+ * The keyline uses --vm-accent-spot, NOT --vm-accent: the spot token is the one
+ * built to carry a small highlight, so it is legible on the dark ground for
+ * every brand (BMW blue, Honda/Ferrari red, MINI racing green, Motorrad
+ * motorsport red). --vm-accent would be near-black on MINI (invisible) and the
+ * footer's own navy on Ford (no contrast). Ford is the single override below:
+ * its spot is that same navy, so the keyline switches to the brand's brighter
+ * digital blue (--vm-accent-secondary) to actually show.
+ */
 .demo-footer {
   padding: var(--vm-space-10) var(--vm-space-6) var(--vm-space-8);
   background: var(--vm-surface-dark);
+  border-top: 3px solid var(--vm-accent-spot);
   color: #fff;
   font-family: var(--vm-font-body);
   font-size: 14px;
 }
+/* Ford's spot colour is the same navy as its footer ground, so the shared
+   keyline would vanish. Use the brand's brighter digital blue instead. */
+.vm-ford .demo-footer { border-top-color: var(--vm-accent-secondary); }
 .demo-footer-inner {
   max-width: 1180px;
   margin: 0 auto;
