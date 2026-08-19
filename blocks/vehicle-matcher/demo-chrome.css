@@ -4,7 +4,7 @@
  * This is DEMO-ONLY chrome, kept out of the portable block CSS on purpose. It
  * lets a stakeholder see the tool sitting inside convincing (not pixel-perfect)
  * brand-homepage furniture: a top nav, a photographic hero band, and a footer,
- * all wrapping the real block. Loaded only by homepage.html; index.html and any
+ * all wrapping the real block. Loaded only by index.html; block.html and any
  * real EDS page never see it.
  *
  * How the theming works — the trick that makes ONE shell serve five brands:
@@ -23,7 +23,7 @@
  * homepage look. So `.demo-shell.vm` below RESETS exactly those four layout
  * properties on the wrapper only. The inner `.vehicle-matcher.block` is a
  * separate element decorated on its own, so it re-applies `.vm`'s 880px measure
- * to itself and keeps the standalone reading width — same as index.html.
+ * to itself and keeps the standalone reading width — same as block.html.
  *
  * Guardrail (see vehicle-matcher.css:323): no element here is named
  * `.vehicle-matcher-wrapper` — that selector strips the block's 880px measure,
@@ -331,7 +331,7 @@
   background: #fff;
   border-radius: 8px;
 }
-.demo-picker-logo img { max-height: 40px; max-width: 100%; width: auto; }
+.demo-picker-logo img { max-height: 40px; max-width: 80%; width: auto; }
 /* Text-wordmark fallback sits on the same white plate, so it needs dark ink. */
 .demo-picker-logo .demo-picker-tile-label { color: #16191e; }
 .demo-picker-tile-label { font-size: 15px; font-weight: 600; }
