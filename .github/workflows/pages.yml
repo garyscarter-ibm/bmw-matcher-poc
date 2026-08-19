@@ -1,7 +1,8 @@
 name: Deploy to GitHub Pages
 
-# Publishes the static block + harness (index.html, blocks/) to GitHub Pages
-# on every push to main. The one harness is brand-agnostic — ?brand=bmw|mini
+# Publishes the static site to GitHub Pages on every push to main: the branded
+# demo homepage (index.html, served at /), the standalone harness (block.html),
+# and the block itself (blocks/). Both pages are brand-agnostic — ?brand=bmw|mini
 # picks the marque. No build step — the EDS block's paths
 # are relative, so the files serve as-is. The backend URL is baked into the
 # harness at deploy time, so a shared link needs no ?api= query string.
@@ -44,7 +45,7 @@ jobs:
       # page needs — publishing `.` would ship the lot on every deploy.
       #
       # assets/ carries the brand logos (and hero photos when present) that
-      # homepage.html requests at assets/brand-logos/<brand>.svg. It is small
+      # index.html requests at assets/brand-logos/<brand>.svg. It is small
       # (~56K) and must ship, or every mark 404s and the picker/nav silently
       # fall back to their text wordmarks. The block's fonts need no entry here:
       # they live inside blocks/vehicle-matcher/fonts/ behind relative ./fonts/
@@ -53,7 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p _site
-          cp -R index.html homepage.html blocks assets _site/
+          cp -R index.html block.html blocks assets _site/
           if [ -n "${API_URL}" ]; then
             # The harness hardcodes the local default; point it at the deployed
             # backend. Exact match, so only that one attribute is ever rewritten.
@@ -74,14 +75,14 @@ jobs:
           find _site -maxdepth 2 -name '*.html' | sort
           du -sh _site
 
-          # Fail the deploy if a logo homepage.html asks for is missing, rather
+          # Fail the deploy if a logo index.html asks for is missing, rather
           # than publishing a build whose marks 404 into text fallbacks (the
           # fallback is deliberate for an unsourced brand, but it must not be
           # how we find out the copy step regressed). Brands are read from the
           # page itself, so a newly-onboarded marque is covered automatically.
           echo "Checking brand logos shipped:"
           missing=0
-          for b in $(grep -o "^\s*[a-z]\+: {$" homepage.html | tr -d ' :{'); do
+          for b in $(grep -o "^\s*[a-z]\+: {$" index.html | tr -d ' :{'); do
             if [ -f "_site/assets/brand-logos/${b}.svg" ]; then
               echo "  ok       ${b}.svg"
             else

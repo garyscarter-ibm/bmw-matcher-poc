@@ -1,6 +1,6 @@
 # Brand hero photos (drop-in)
 
-The demo homepage ([homepage.html](../../homepage.html)) shows a full-bleed hero
+The demo homepage ([index.html](../../index.html)) shows a full-bleed hero
 band behind each brand's headline. If a photo is present here it is used as the
 hero background; if not, the band falls back to a flat brand-accent colour panel
 (`.demo-hero.is-plain`) so the demo never looks broken. **No code change is
@@ -19,7 +19,7 @@ One landscape photo per brand, named exactly:
 | `motorrad.jpg` | BMW Motorrad |
 
 The shell probes `assets/brand-hero/<brand>.jpg` at load; the filename is the
-only wiring. (To change it, see `renderShell`'s `heroUrl` in homepage.html.)
+only wiring. (To change it, see `renderShell`'s `heroUrl` in index.html.)
 
 ## Specs
 

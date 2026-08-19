@@ -59,9 +59,10 @@ npm run serve          # http://localhost:3000  (zero-dep Node static server)
 cd server && npm test
 ```
 
-`index.html` is a standalone harness that mounts the block exactly the way EDS
+`block.html` is a standalone harness that mounts the block exactly the way EDS
 would; its `data-api` points at `http://localhost:8787`. Open it via the local
-server — ES modules don't load from `file://`.
+server — ES modules don't load from `file://`. (The site root `/` — `index.html` —
+is the branded demo homepage/picker.)
 
 > `npm run preview` (Python `http.server`) is kept as an alternative static
 > server, but `npm run serve` (Node) works in more environments.
@@ -117,7 +118,8 @@ server/
   data.js           # test fixture cars (~35)                (server/test only)
   test/engine.test.js # engine tests (node --test)
   package.json      # server: start / test scripts
-index.html          # standalone preview harness (brand-agnostic; ?brand=bmw|mini)
+index.html          # site root: branded demo homepage / brand picker (?brand=bmw|mini)
+block.html          # standalone preview harness (brand-agnostic; ?brand=bmw|mini)
 scripts/serve.js    # zero-dep static server for the block (npm run serve)
 scripts/dump-stock.js         # national stock snapshot -> fixtures/ (--remap: no network)
 scripts/audit-questions.mjs   # do the QUESTIONS earn their screen? (npm run audit)
@@ -188,7 +190,7 @@ first (`--heading-font-family` / `--body-font-family` on BMW, MINI's own faces
 on MINI), so it inherits the site's typeface and falls back to a neutral stack
 when run standalone.
 
-The standalone `index.html` harness uses a `data-api` attribute + `?api=`
+The standalone `block.html` harness uses a `data-api` attribute + `?api=`
 override instead (no DA needed); `?retailer=<id>` tries a different retailer
 without editing the file. Both paths resolve through the same `apiBase()`.
 

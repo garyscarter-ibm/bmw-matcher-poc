@@ -243,11 +243,12 @@ and warmer still wrap it. A fixtures-backed source reads `fixtures/<brand>-cars.
 (already-mapped car objects) and needs no network.
 
 ### 4c. The demo harness retailer name
-`index.html` (the standalone/Pages demo) hardcodes a **"Retailer Name" row = "Grassicks
+`block.html` (the standalone harness) hardcodes a **"Retailer Name" row = "Grassicks
 BMW"**, the BMW default. It is a *separate* row from Brand, so `?brand=<key>` alone does
 NOT change it — every non-BMW brand then reads "...at Grassicks BMW" in the intro and
 results (Motorrad compounds it: "...bikes at Grassicks BMW"). Add the new brand to
-`BRAND_RETAILER_NAMES` in index.html so `?brand=<key>` applies a matching demo retailer
+`BRAND_RETAILER_NAMES` in block.html (and the same map in index.html, the demo
+homepage) so `?brand=<key>` applies a matching demo retailer
 name (a single dealer where the brand has one, else the national programme name, e.g.
 "Ford Approved Used"). Precedence is `?retailerName=` > `?retailer=<id>` map > `?brand=`
 default. On a real EDS page the author sets the row, so this is a demo-harness fix — but
@@ -310,8 +311,8 @@ the engine**:
 - [ ] Intro `lede` (and `title`/`cta`, `tasteLede`/`tiedLede`, `working*`) actually rewritten
       in the brand's voice, not the BMW sentence with the noun swapped. Read all brands' ledes
       side by side (Section 6 step 7): indistinguishable-but-for-the-noun means not done.
-- [ ] Demo harness (Section 4c): `BRAND_RETAILER_NAMES[<brand>]` added in index.html so
-      `?brand=<key>` shows the brand's own retailer, not "Grassicks BMW".
+- [ ] Demo harness (Section 4c): `BRAND_RETAILER_NAMES[<brand>]` added in block.html and
+      index.html so `?brand=<key>` shows the brand's own retailer, not "Grassicks BMW".
 - [ ] Fuel detection keys on a spec property, not a model name; every EV in the spec table
       asserted to resolve to `ev` in a test.
 - [ ] No option label asserts a fuel/size/capability its members don't all share; help text

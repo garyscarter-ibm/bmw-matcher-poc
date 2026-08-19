@@ -15,7 +15,7 @@
  * BMW and MINI use proprietary typefaces (BMW Type Next, MINI Serif, MINI
  * Sans). Earlier revisions of this block were *host-first only*: the tokens
  * named the host page's font variables and fell through to Helvetica in the
- * standalone harness (index.html / GitHub Pages), where there is no host to
+ * standalone harness (block.html / GitHub Pages), where there is no host to
  * inherit from. That is why the fonts didn't render outside an EDS site.
  *
  * We now SHIP the fonts with the block (see ./fonts/), so it renders in the
@@ -3664,6 +3664,12 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-podium-step {
   position: relative;
   transition: opacity 0.35s var(--vm-ease), transform 0.35s var(--vm-ease);
+}
+/* Wraps the card + reject chip below the rank eyebrow. It, not the step, is the
+   chip's positioning context, so the absolutely-positioned chip hugs the card's
+   top-right corner instead of floating in the eyebrow band (tallest on gold). */
+.vm-podium-card {
+  position: relative;
 }
 .vm-podium-step .vm-card {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;

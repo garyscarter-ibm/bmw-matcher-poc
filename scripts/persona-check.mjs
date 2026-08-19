@@ -89,6 +89,6 @@ for (const p of selected) {
   // (index-mini.html is gone, and the page no longer hardcodes a per-brand
   // retailer, so the persona's own retailer must ride along in the link).
   const hash = Buffer.from(JSON.stringify(answers)).toString('base64url');
-  console.log(`  view: http://localhost:3000/index.html?brand=${brand}&retailer=${retailer}&api=${API}#m=${hash}`);
+  console.log(`  view: http://localhost:3000/block.html?brand=${brand}&retailer=${retailer}&api=${API}#m=${hash}`);
 }
 console.log();
