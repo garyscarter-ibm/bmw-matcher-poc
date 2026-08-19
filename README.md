@@ -330,3 +330,9 @@ simply stops appearing in the live feed.
   the scores.
 - **Real images:** each card has a media slot (`.vm-card-media`) ready for
   licensed imagery.
+
+## Conventions
+
+- **Comments: 2 lines max.** Keep code comments to two lines unless a longer note is
+  genuinely unavoidable, and explain *why* rather than *what*. When you edit code near a
+  verbose comment, tighten it as part of the change. Applies to every file and contributor.

@@ -228,6 +228,27 @@ main {
       return img;
     }
 
+    // Resolve a brand's picker-accent straight from the CSS design tokens, so the
+    // picker keeps no second copy of the palette (demo-chrome.css's guiding rule:
+    // one source of truth, zero duplicated colour). The tokens live on
+    // `.vm.vm-<brand>` in tokens.css; the neutral picker deliberately sits OUTSIDE
+    // that scope, so read them off a throwaway, unrendered probe that carries those
+    // classes. We use --vm-accent-spot, NOT --vm-accent: spot is the highlight-safe
+    // variant built to stay legible on a dark ground for every brand (the raw
+    // accent is near-black for MINI, invisible here). Base `.vm` defaults spot to
+    // var(--vm-accent), so every brand — including a future one that only sets
+    // --vm-accent — resolves a value. Falls back to the neutral blue if a brand
+    // somehow resolves nothing.
+    function brandAccent(key) {
+      const probe = document.createElement('span');
+      probe.className = `vm vm-${key}`;
+      probe.style.display = 'none';
+      document.body.append(probe);
+      const spot = getComputedStyle(probe).getPropertyValue('--vm-accent-spot').trim();
+      probe.remove();
+      return spot || '#4c8bf5';
+    }
+
     // ------------------------------------------------------------------
     // Brand picker: the neutral landing splash (no ?brand=). Plain links reload
     // into the themed shell, so no history juggling.
@@ -245,6 +266,10 @@ main {
         const b = BRANDS[key];
         const tile = document.createElement('a');
         tile.className = 'demo-picker-tile';
+        // Paint this tile's hover highlight in the brand's own spot colour,
+        // resolved from the CSS tokens (see brandAccent). The hover rule in
+        // demo-chrome.css reads it back as var(--tile-accent).
+        tile.style.setProperty('--tile-accent', brandAccent(key));
         // Carry the current query through the hop, overriding only the brand.
         // These are plain links that reload the page, so a hand-built
         // `?brand=x` silently dropped every other param: ?api= pointed the demo

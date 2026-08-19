@@ -1224,6 +1224,7 @@ function mount(root, ctx) {
 // The switcher tab is brand-agnostic shell UI, so its label is neutral —
 // "Swipe", not "MINI Mingle". The campaign name lives as the wordmark INSIDE
 // the stage (MINGLE_COPY[brand].wordmark), where it can vary by brand; the
-// mode's static `label` can't (spec §9). key stays 'mingle' — the ?mode= and
-// authored "Mode" value are unchanged.
-export default { key: 'mingle', label: 'Swipe', mount };
+// mode's static `label` can't (spec §9). The key mirrors that label
+// ('swipe') so ?mode=swipe and the authored "Mode" value read the same as the
+// tab — the file is still mingle.js, but the mode a visitor addresses is "swipe".
+export default { key: 'swipe', label: 'Swipe', mount };

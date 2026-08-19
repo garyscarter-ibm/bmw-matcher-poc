@@ -101,15 +101,28 @@ scale than a big fast BMW; a mainstream brand leans on economy/practicality over
 Every field maps to a specific scorer — see the commentary in `brands.js`. Also set
 `budget: { max, default }` to the brand's real price range.
 
-### Layer 4 — Theme (`blocks/vehicle-matcher/vehicle-matcher.css`, `.vm.vm-<brand>`)
-A token override block. The **contract a theme must define** (see `.vm.vm-mini` for a
-worked example):
+### Layer 4 — Theme (`blocks/vehicle-matcher/tokens.css` + `vehicle-matcher.css`, `.vm.vm-<brand>`)
+The `--vm-*` design tokens live in **`blocks/vehicle-matcher/tokens.css`**, which
+`vehicle-matcher.css` pulls in with `@import url('./tokens.css')` as its first rule — that
+import is the only thing that carries the tokens onto a real EDS page (EDS auto-loads *only*
+the block's own `vehicle-matcher.css`; nothing else pulls in a sibling). So a brand's
+**`.vm.vm-<brand>` token block goes in `tokens.css`**, while its brand-scoped **component
+rules**, the `@font-face` run, and the base `.vm` layout stay in `vehicle-matcher.css`. Only
+brand-**invariant** tokens (the `--vm-space-*` / `--vm-text-*` scales, `--vm-radius-soft`,
+`--vm-border-width`, `--vm-surface-alt-2`) sit on `:root` in `tokens.css` — that `:root`
+promotion is what lets the marque-neutral brand picker (which renders outside `.vm`) reuse
+the spacing scale. Never move a brand-overridden token to `:root`, or every brand collapses
+to BMW's palette.
+
+A token override block. The **contract a theme must define** (see the `.vm.vm-mini` block in
+`tokens.css` for a worked example):
 - Colour: `--vm-ink`, `--vm-ink-strong`, `--vm-ink-muted`, `--vm-accent`,
   `--vm-accent-ink`, `--vm-accent-spot`, `--vm-accent-secondary`, `--vm-accent-soft`,
   `--vm-line`.
 - Fonts: `--vm-font-heading`, `--vm-font-body`, `--vm-font-bold`. **Package the brand's
-  real typeface** (`@font-face` at the top of the CSS, files under
-  `blocks/vehicle-matcher/fonts/`) and name that packaged family *first* in the stack, so
+  real typeface** (`@font-face` at the top of `vehicle-matcher.css` — the font declarations
+  stay there, since their `./fonts/` paths are relative to that file, not `tokens.css`; files
+  under `blocks/vehicle-matcher/fonts/`) and name that packaged family *first* in the stack, so
   the block renders in the brand face everywhere — inside an EDS host AND in the standalone
   harness, which has no host typography to inherit. BMW, MINI, Honda and Ford are all
   packaged this way; a sub-brand reuses its parent's files (BMW Motorrad points at the same
@@ -177,6 +190,20 @@ signatures you must set deliberately, not inherit**:
   edge. (The tab *labels* stay brand-neutral by design — "Questionnaire"/"Swipe"/"Head to head" —
   the brand name lives in the in-stage wordmark, spec §9; this bullet is about colour/font, not
   copy.)
+
+**The neutral brand picker themes itself from the tokens — no picker edit needed.** The
+landing splash shown with no `?brand=` (demo-chrome.css `.demo-picker`) renders *outside*
+`.vm`, so it can't see brand tokens; instead index.html's `brandAccent()` reads each
+brand's `--vm-accent-spot` off a hidden `.vm.vm-<brand>` probe and sets it as the tile's
+`--tile-accent` (hover border), which the picker rules paint. So a new brand gets a branded
+tile hover for free — the one requirement is that its **`--vm-accent-spot` is legible on a
+dark ground**.
+That's why the picker uses spot, not raw `--vm-accent`: MINI's accent is near-black (invisible
+on the dark picker), so MINI's spot is British Racing Green. The base `.vm` defaults
+`--vm-accent-spot` to `--vm-accent`, so a brand that doesn't set one still resolves a value —
+just confirm that value shows up on the dark tile. (Note several brands' spot colours are reds
+close enough to be hard to tell apart on hover — Honda `#cc0000`, Motorrad `#e2001a`, Ferrari
+`#da291c` — so don't rely on the picker hover alone to distinguish a brand.)
 
 ### Layer 5 — Copy (`server/questions.js`, `BRAND_COPY[brand]`; per-brand `questions{}`)
 The brand's voice. `BRAND_COPY[brand]` overrides question/option **text only** — ids and
@@ -275,7 +302,7 @@ the engine**:
 
 1. `cd server && npm test` — green, and BMW/MINI output unchanged (no regression).
 2. `node --check` every edited `.js`; check CSS brace balance.
-3. Local run: `npm run serve`, open `?brand=<key>&mode=questionnaire|mingle|knockout` — each
+3. Local run: `npm run serve`, open `?brand=<key>&mode=questionnaire|swipe|head-to-head` — each
    mode paints, populates from the brand's stock, photos de-prioritised, knockout reads
    head-to-head, reveal fires, reduced-motion safe, re-mount safe.
 4. Headless DOM harness (jsdom): mount each mode per brand and assert rendered output.
