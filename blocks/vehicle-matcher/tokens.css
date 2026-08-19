@@ -1,30 +1,6 @@
 /*
- * Design tokens for the Vehicle Matcher — the single source of truth for every
- * --vm-* custom property, split out of vehicle-matcher.css so they can be shared
- * across files (the block's own component CSS, the demo chrome, and the neutral
- * brand picker). vehicle-matcher.css @imports this at its very top, which is the
- * only wiring that survives on a real EDS page: EDS auto-loads ONLY the block's
- * own <name>.css and nothing pulls in a sibling file, so the @import is what
- * keeps the block self-contained. Both demo pages load vehicle-matcher.css, so
- * they inherit these tokens too — no extra <link> needed.
- *
- * Two scopes, on purpose:
- *   :root          — brand-INVARIANT tokens (the spacing + type scales, plus a
- *                    few one-off constants). They never change per brand, so
- *                    they sit on :root and are therefore available to ANY element
- *                    on the page — including the marque-neutral brand picker,
- *                    which renders OUTSIDE .vm and so cannot see .vm-scoped
- *                    tokens. (That was the bug: the picker's var(--vm-space-*)
- *                    resolved to nothing and its spacing silently collapsed.)
- *   .vm /          — brand-SPECIFIC tokens (fonts, colour, geometry, buttons,
- *   .vm.vm-<brand>   motion). The base .vm block IS the BMW theme; each
- *                    .vm.vm-<brand> block below overrides it. These MUST stay
- *                    scoped — flatten them onto :root and every brand would
- *                    collapse to BMW's palette.
- *
- * The @font-face rules for the packaged brand faces stay in vehicle-matcher.css
- * (their ./fonts/ paths are relative to that file); this file is pure
- * custom-property declarations.
+ * Single source of truth for every --vm-* token, @imported by vehicle-matcher.css.
+ * :root = brand-INVARIANT (reaches outside .vm); .vm / .vm.vm-<brand> = brand-SPECIFIC and must stay scoped.
  */
 
 :root {
@@ -59,16 +35,8 @@
 
 /* ===================== base theme (BMW) ===================== */
 .vm {
-  /* --- font ---
-     Packaged-first. 'BMW Type Next' is declared via @font-face at the top of
-     vehicle-matcher.css and shipped with the block (./fonts/), so it renders in
-     the BMW typeface everywhere — inside an EDS host AND in the standalone
-     harness, which has no host typography to inherit. One family, real weights:
-     300 Light for headings, 400 Regular for body, 700 Bold for emphasis; weight
-     is carried by font-weight, never by a per-weight family name (naming
-     families like 'BMWTypeNextLatin-Light' is what silently fell through to
-     Helvetica before). The host var is kept as a bridge and the system stack as
-     the last resort if the woff2 fails to load. */
+  /* --- font: packaged 'BMW Type Next', one family with weight via font-weight
+     (a per-weight family name silently fell through to Helvetica); host + system fallbacks --- */
   --vm-font-heading: 'BMW Type Next', var(--heading-font-family, 'Helvetica Neue'), arial, sans-serif;
   --vm-font-body: 'BMW Type Next', var(--body-font-family, 'Helvetica Neue'), arial, sans-serif;
   --vm-font-bold: 'BMW Type Next', var(--body-font-family, 'Helvetica Neue'), arial, sans-serif;
@@ -84,8 +52,7 @@
   --vm-accent-ink: #ffffff;   /* text/icon colour on the accent */
   --vm-accent-secondary: #0085ac; /* BMW i teal */
   /* Spot accent for small highlights (progress bar, score badge, slider fill).
-     BMW = the same blue; MINI overrides this to British Racing Green so its
-     buttons can be black while the green still appears, sparingly. */
+     BMW reuses the blue; other brands override it. */
   --vm-accent-spot: var(--vm-accent);
   /* A soft wash of the accent, for the selected answer's fill. Kept as a
      token so each brand tints with its own colour. */
@@ -103,18 +70,14 @@
   --vm-radius-control: 0px;   /* buttons/pills — MINI overrides to a pill */
   --vm-btn-height: 46px;
 
-  /* --- motion character (the game modes lean on these) ---
-     One easing + one "pop" duration, referenced by the swipe/knockout
-     animations so the SAME keyframes read differently per brand. BMW is
-     precise and decisive: a tight ease-out, no overshoot. MINI overrides
-     --vm-ease to a springy curve (go-kart energy) further down. */
+  /* --- motion character: one easing + one "pop" duration so the SAME keyframes
+     read differently per brand. BMW is precise: tight ease-out, no overshoot. --- */
   --vm-ease: cubic-bezier(0.2, 0.6, 0.2, 1);   /* BMW: crisp, no bounce */
   --vm-pop: 0.42s;                             /* reveal/entrance duration */
   --vm-btn-padding: 12px 20px 15px;
   --vm-btn-min-width: 232px;
-  /* Button label casing/tracking. Default is the natural label (BMW/MINI/etc.
-     don't uppercase their CTAs here); Ferrari overrides to uppercase to match
-     its own button component. */
+  /* Button label casing/tracking. Default keeps the natural label; Ferrari
+     overrides to uppercase to match its own button component. */
   --vm-btn-transform: none;
   --vm-btn-letter-spacing: normal;
 }
@@ -122,21 +85,14 @@
 /* ===================== per-brand overrides ===================== */
 
 .vm.vm-mini {
-  /* fonts: serif headings, sans body. Both are PACKAGED with the block
-     (@font-face at the top of vehicle-matcher.css: 'MINI Serif' and 'MINI Sans',
-     the exact woff files the live MINI retailer site loads), so they render on a
-     host page and in the standalone harness alike. One family per typeface,
-     weight carried by font-weight (MINI titles set 700 below) — never a
-     per-weight family name, which is what silently fell through to Helvetica
-     before and left MINI's buttons and eyebrow labels un-branded. */
+  /* fonts: serif headings, sans body, both packaged ('MINI Serif'/'MINI Sans').
+     Weight via font-weight, never a per-weight family name (fell through to Helvetica). */
   --vm-font-heading: 'MINI Serif', Georgia, 'Times New Roman', serif;
   --vm-font-body: 'MINI Sans', 'Helvetica Neue', arial, sans-serif;
   --vm-font-bold: var(--vm-font-body);
 
-  /* colour: black-on-white. The "accent" (primary button fill, selected-state
-     border) is near-black — that's MINI's primary. British Racing Green + teal
-     are SPOT colours applied only to small highlights (see --vm-accent-spot
-     rules below), not the button colour. */
+  /* colour: black-on-white; the accent (button fill, selected border) is
+     near-black. Green + teal are SPOT colours for small highlights only. */
   --vm-ink: #000000;
   --vm-ink-strong: #000000;
   --vm-ink-muted: #555555;
@@ -147,9 +103,8 @@
   /* Tinted with the green spot rather than the near-black accent, which
      would just read as grey. */
   --vm-accent-soft: rgba(1, 105, 62, 0.07);
-  /* Card/tile hairlines stay a soft grey (MINI reserves solid black for
-     buttons + selected states, applied explicitly below), so the quiz doesn't
-     read as a grid of heavy black boxes. */
+  /* Card/tile hairlines stay soft grey (MINI reserves solid black for buttons +
+     selected states) so the quiz isn't a grid of heavy black boxes. */
   --vm-line: #cfcfcf;
   /* dark band (footer): MINI reserves solid near-black for its heavy surfaces,
      so the footer is black rather than the base's #262626 grey. */
@@ -159,16 +114,14 @@
   --vm-radius: 6px;
   --vm-radius-control: 999px;
 
-  /* buttons: MINI's pills read taller and rounder than BMW's flat slab, with
-     more horizontal breathing room and a slightly narrower min-width (a pill
-     doesn't want BMW's wide rectangular measure). */
+  /* buttons: MINI's pills are taller, rounder and roomier than BMW's flat slab,
+     with a narrower min-width (a pill doesn't want BMW's wide measure). */
   --vm-btn-height: 48px;
   --vm-btn-padding: 13px 26px 14px;
   --vm-btn-min-width: 208px;
 
-  /* motion: MINI is playful — the same game animations get a springy
-     overshoot (a little go-kart bounce as cards settle and stamps land),
-     and a slightly longer pop so the bounce has room to read. */
+  /* motion: MINI is playful — a springy overshoot (go-kart bounce) and a
+     slightly longer pop so the bounce has room to read. */
   --vm-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
   --vm-pop: 0.52s;
 }
@@ -180,9 +133,8 @@
   --vm-font-body: 'Proxima Nova', var(--body-font-family, 'Helvetica Neue'), arial, sans-serif;
   --vm-font-bold: var(--vm-font-body);
 
-  /* colour: dark-ink-on-white with Honda Red as the primary accent. Red is the
-     CTA/link/highlight colour (Honda leads with it far more than BMW leads with
-     blue), so unlike MINI the accent IS the button colour here. */
+  /* colour: dark-ink-on-white with Honda Red as the primary accent. Unlike MINI
+     the accent IS the button colour (CTA/link/highlight). */
   --vm-ink: #1a1a1a;
   --vm-ink-strong: #000000;
   --vm-ink-muted: #5a5a5a;
@@ -251,10 +203,8 @@
 }
 
 .vm.vm-motorrad {
-  /* Motorrad uses the SAME BMW Type Next family as BMW cars, packaged with the
-     block (@font-face at the top of vehicle-matcher.css), so it inherits the
-     base .vm stack. Redeclared here for clarity: packaged family first, then a
-     neutral system sans if the woff2 fails to load. */
+  /* Same packaged 'BMW Type Next' family as BMW cars; redeclared here for
+     clarity, with a neutral system sans fallback. */
   --vm-font-heading: 'BMW Type Next', 'Helvetica Neue', arial, sans-serif;
   --vm-font-body: 'BMW Type Next', 'Helvetica Neue', arial, sans-serif;
   --vm-font-bold: var(--vm-font-body);
@@ -292,10 +242,8 @@
 }
 
 .vm.vm-ferrari {
-  /* Ferrari Sans for both headings and body (there is no display serif).
-     Packaged family first so the standalone harness renders, then the host
-     bridge, then Noto/​system sans — the same fallback family the site pairs
-     it with. Bold requests resolve to the Medium woff (see @font-face note). */
+  /* Ferrari Sans for headings and body (no display serif); packaged first, then
+     host bridge, then Noto/system sans. Bold resolves to the Medium woff. */
   --vm-font-heading: 'Ferrari Sans', var(--heading-font-family, 'Noto Sans'), 'Helvetica Neue', arial, sans-serif;
   --vm-font-body: 'Ferrari Sans', var(--body-font-family, 'Noto Sans'), 'Helvetica Neue', arial, sans-serif;
   --vm-font-bold: var(--vm-font-body);
@@ -317,22 +265,13 @@
      --f-color-global-black), the ground their dark UI uses, not #262626 grey. */
   --vm-surface-dark: #181818;
 
-  /* geometry: crisp, lightly softened (2px) on cards/panels. The BUTTON is a
-     hard-edged rectangle, matching ferrari.com's own .f-button (border: 0 and
-     no border-radius in any of its 24 variants). */
+  /* geometry: cards lightly softened (2px); the BUTTON is a hard-edged
+     rectangle, matching ferrari.com's own .f-button (no border-radius). */
   --vm-radius: 2px;
   --vm-radius-control: 0;
 
-  /* buttons: taken from ferrari.com's own .f-button component — UPPERCASE
-     12px/16px FerrariSans, 0.6px tracking (.f-button__text), padding 24px/32px
-     off their 8px space scale (--f-space-s / --f-space-m), and min-width 200px
-     (.f-button--width-min). Two deliberate adaptations: their 24px vertical
-     padding wraps 12px chrome type where ours wraps larger 14px label type, so
-     vertical is scaled to 16/18px (a literal 24px would stand ~64px tall beside
-     the other brands' 44-48px); horizontal 32px is kept exactly, since the
-     generous side padding is the signature of the mark. The fill is a red
-     gradient (a00c01 -> da291c), not flat red — applied in the
-     .vm-ferrari .vm-btn-primary rule below. */
+  /* buttons: from ferrari.com's .f-button — uppercase, 0.6px tracking, horizontal 32px kept exactly.
+     Vertical scaled to 16/18px (a literal 24px would stand ~64px tall beside other brands); red gradient in .vm-btn-primary. */
   --vm-btn-height: 52px;
   --vm-btn-padding: 16px 32px 18px;
   --vm-btn-min-width: 200px;

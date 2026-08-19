@@ -1,20 +1,6 @@
 /*
- * Fetch the WHOLE BMW Motorrad approved-used deck COLD — no browser, no pasted
- * cURL. This supersedes fetch-motorrad-all-pages.mjs (which replayed a
- * human-captured cURL): the feed's GMB-SID session is not minted by JS, the
- * server embeds a fresh one in the results landing page as a hidden field
- * <input id="hfSID" value="…"> (UTF-16LE base64 of "<caller-ip>;<guid>"). So the
- * whole chain self-issues: GET the landing page, scrape #hfSID, send it as the
- * GMB-SID header, loop POST ShowResults by selectedPage. This is the same
- * self-mint the live adapter (server/stock.js mintMotorradSid) uses, wired to
- * full pagination + the shared parser/mapper so the committed fixture matches
- * what the live feed serves, real per-listing photos, cc and power included.
- *
- * Run:  node scripts/fetch-motorrad-all-pages-cold.mjs
- * Out:  fixtures/motorrad-bikes.json   (every mappable bike)
- *
- * Build-time tool, not a live server path. If a page returns a null ResTable the
- * minted session was refused (rare, egress-IP bound); just re-run.
+ * Fetch the WHOLE BMW Motorrad approved-used deck COLD — no browser, no pasted cURL (supersedes fetch-motorrad-all-pages.mjs). Self-mints the GMB-SID by scraping the landing page's hidden #hfSID (same path as server/stock.js mintMotorradSid), then loops POST ShowResults through full pagination and the shared parser/mapper. Build-time tool; a null ResTable means the egress-IP-bound session was refused, so just re-run.
+ * Run:  node scripts/fetch-motorrad-all-pages-cold.mjs   ->  fixtures/motorrad-bikes.json
  */
 
 import { writeFileSync } from 'node:fs';

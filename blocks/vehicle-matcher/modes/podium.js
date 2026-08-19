@@ -1,43 +1,6 @@
 /*
- * Podium — the matcher as a live readout: the brief on the left, a ranked
- * podium on the right that re-orders while you fill it in.
- *
- * One of several interchangeable interface "modes" over the shared engine (see
- * ../modes/index.js and the shell in ../vehicle-matcher.js). It is the fourth
- * sibling, not a rewrite of the questionnaire: that mode asks one question at a
- * time and hands off to a deep refinement page, this one puts every question on
- * screen at once and keeps an answer visible from the first paint. See
- * docs/podium-requirements.md.
- *
- * The flow:
- *   1. LEFT PANE: every visible question, all at once, using the same widgets
- *      the questionnaire uses (./question-ui.js). The budget slider persists its
- *      default the moment it renders, which is all /api/preview needs, so there
- *      is no "answer three things first" gate.
- *   2. RIGHT PANE: a grouped /api/preview after every answer change, debounced
- *      and latest-wins (./preview-feed.js). Grouped because a podium of three
- *      medals reads as three CHOICES, and gold/silver/bronze all being the same
- *      model in three colours is a lie the layout tells.
- *   3. COMMIT: the CTA calls the real /api/match. That is a genuine second call,
- *      not a submit: only matchCars knows `unmet`, `decisive` and `clusterSize`,
- *      so only after it can the hero show the engine's real reasons, the tie be
- *      checked exactly, and the honest note fire.
- *
- * Two honesty rules do most of the work here:
- *
- *   - A MEDAL IS A CLAIM OF DIFFERENCE. When the engine considers the top cars
- *     level, the podium says "joint first" rather than inventing a silver and a
- *     bronze (see tiedLeaders). Same discipline as the knockout's verdict tag,
- *     which stays quiet when two scores are equal.
- *   - A DISMISSAL MUST DO SOMETHING. "Not this one" only offers a reason whose
- *     follow-up can actually move the result FOR THIS BRAND, derived from the
- *     fetched question set (see reasonsFor). MINI drops the mileage question, so
- *     MINI is never offered Mileage.
- *
- * This mode owns its copy (PODIUM_COPY) and its layout, and nothing else: the
- * cards, the question widgets, the preview schedule, the brand voice and the
- * celebration are all shared modules, so it and the questionnaire cannot drift
- * into describing the same car two different ways.
+ * Podium — the matcher as a live readout: all questions on the left, a ranked podium re-ordering
+ * per answer (grouped /api/preview), COMMIT to /api/match for real reasons. See docs/podium-requirements.md.
  */
 
 import { apiGetQuestions, apiMatch } from '../engine.js';
@@ -53,11 +16,8 @@ import {
 } from './match-signal.js';
 
 /*
- * How far apart two scores may be and still count as a tie. Mirrors the
- * engine's own CLUSTER_PTS, exactly as questionnaire.js does: the LIVE state has
- * only `score` to go on (/api/preview carries no `decisive`), so it re-derives
- * the tie with the same threshold the server used. The committed state does not
- * infer anything, because /api/match hands us the real answer.
+ * How far apart two scores may be and still count as a tie. Mirrors the engine's own
+ * CLUSTER_PTS, so the LIVE state (only `score`, no `decisive`) re-derives the tie the server would.
  */
 const CLUSTER_PTS = 3;
 
@@ -82,18 +42,8 @@ const UPDATE_MS = 180;
 /* ------------------------------ copy ------------------------------ */
 
 /*
- * Display copy, keyed by brand with a `bmw` fallback (every read is
- * PODIUM_COPY[brand] || PODIUM_COPY.bmw). Written out per brand rather than
- * spread from a base, matching MINGLE_COPY / KNOCKOUT_COPY: this is the mode's
- * own campaign voice, and a brand whose register differs in one line usually
- * differs in five. Functions take a single args object, the convention every
- * other copy table here follows.
- *
- * What is NOT here: anything a card says (that is ./brand-copy.js, so the
- * questionnaire and the podium describe a car identically), and the tie copy,
- * which is BRAND_COPY.tiedTitle / tiedLede for the same reason.
- *
- * Voices follow docs/tone-style-guide.md.
+ * Display copy, keyed by brand with a `bmw` fallback, written out per brand (the mode's own
+ * campaign voice). Card copy and tie copy live in brand-copy.js so both modes describe cars alike.
  */
 const PODIUM_COPY = {
   // MINI: the primary written voice. Uppercase-with-a-full-stop title, warm and
@@ -343,10 +293,8 @@ const PODIUM_COPY = {
     errLede: 'The matching service didn’t respond. Check your connection and try again.',
     retryLabel: 'Try again',
   },
-  // Ferrari: warm, unhurried and heritage-proud, and the one brand for which
-  // "podium" is native language rather than a metaphor, hence P1/P2/P3. Its
-  // three bodies are a coupé, a Spider and the Purosangue, so the shape reason
-  // is body style, never "size".
+  // Ferrari: warm, unhurried, heritage-proud, and the one brand for which "podium" is
+  // native (hence P1/P2/P3); its shape reason is body style (coupé/Spider/Purosangue), not "size".
   ferrari: {
     wordmark: 'The Podium',
     title: 'Your top three, live.',
@@ -402,14 +350,8 @@ const PODIUM_COPY = {
 const copyFor = (brand) => PODIUM_COPY[brand] || PODIUM_COPY.bmw;
 
 /*
- * The eyebrow above each question block ("02 / Fuel type").
- *
- * The question's own `title` is the question ("What fuel types suit you?"), and
- * on a single-scroll pane the eyebrow's job is to be scannable, so it needs a
- * short NOUN instead. Keyed by the ids the brands actually ship (including the
- * per-brand additions in server/brands.js). An unknown id falls back to its own
- * name, spaced and capitalised, so a future question labels itself rather than
- * printing an empty eyebrow.
+ * The scannable short NOUN eyebrow above each question block ("02 / Fuel type"), since the
+ * `title` is the full question. Unknown ids fall back to their spaced, capitalised name.
  */
 const Q_LABELS = {
   budget: 'Budget',
@@ -442,14 +384,8 @@ function shortLabel(q, brand) {
 }
 
 /*
- * A single-thumb slider (mileage), writing a NUMBER to answers[q.id].
- *
- * question-ui.js exports the dual-thumb range (budget) because both modes need
- * it; the single-value one is still inline in questionnaire.js, and this mode
- * may not edit that file. So it is reimplemented here to the same contract:
- * same `.vm-options.vm-slider` markup, same immediate persistence of the start
- * value (a mode that previews its answers wants that first value as much as any
- * later one), same `onChange` injection.
+ * A single-thumb slider (mileage) writing a NUMBER to answers[q.id]. Reimplemented here to
+ * questionnaire.js's contract (same markup, immediate persistence, onChange) since it's not shared.
  */
 function renderValueSlider(list, q, answers, { onChange } = {}) {
   const stored = answers[q.id];
@@ -509,19 +445,15 @@ function mount(root, ctx) {
   const copy = copyFor(ctx.brand);
   const brandCopy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
 
-  // Per-run state — a fresh local object, NOT hung on the shared ctx, so a mode
-  // swap and re-mount (the switcher re-calls mount with the same ctx) starts
-  // clean. Nothing here is allowed to outlive this mount.
+  // Per-run state — a fresh local object, NOT hung on the shared ctx, so a mode swap and
+  // re-mount starts clean. Nothing here is allowed to outlive this mount.
   const state = {
     questions: [], // the engine's per-brand question set
     answers: {}, // the brief, written by the widgets themselves
     live: [], // latest grouped /api/preview result
     committed: null, // latest /api/match result, or null while live
-    // A dismissal made AFTER committing (only "just not for me" can, since every
-    // other branch edits an answer and drops back to live). It invalidates the
-    // engine's `decisive`/`clusterSize`, because those describe a list whose
-    // leader may no longer be on screen — so the tie check falls back to the
-    // inferred one rather than quoting a stale exact answer.
+    // A dismissal made AFTER committing invalidates the engine's `decisive`/`clusterSize`
+    // (their list's leader may be gone), so the tie check falls back to the inferred one.
     dismissedSinceCommit: false,
     dismissed: new Set(), // idOf(car) for cards turned down this run
     shadeBan: new Set(), // shades ruled out by the colour branch (client-side)
@@ -533,9 +465,8 @@ function mount(root, ctx) {
   const reducedMotion = window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Grouped: a podium of three medals reads as three choices, so gold, silver
-  // and bronze must not be the same model in three colours (§3.4). One feed for
-  // the whole run, so its debounce and its in-flight requests are its own.
+  // Grouped: three medals read as three choices, so they mustn't be one model in three
+  // colours (§3.4). One feed for the whole run owns its debounce and in-flight requests.
   const feed = createPreviewFeed({
     api: ctx.api, retailer: ctx.retailer, brand: ctx.brand, group: true,
   });
@@ -649,17 +580,8 @@ function mount(root, ctx) {
   /* --------------------------- the questions --------------------------- */
 
   /*
-   * Recompute what is visible and splice the difference in, IN PLACE.
-   *
-   * SHOW_IF.charging and SHOW_IF.doors mean the visible set moves as answers
-   * change, and rebuilding the pane is one line that throws away scroll position
-   * and focus: on a long single-scroll pane that means answering a question can
-   * move the next one out from under the reader's thumb, and it re-fires every
-   * block's entrance animation on every tap. So blocks are keyed by data-qid,
-   * gone ones are removed, new ones are inserted at their quiz-order index, and
-   * everything else is left exactly as the reader left it. Only the ordinal in
-   * the eyebrow is refreshed, because inserting a conditional renumbers the
-   * blocks below it.
+   * Recompute the visible set and splice the difference in IN PLACE (blocks keyed by data-qid)
+   * — a full rebuild would throw away scroll/focus and re-fire every entrance animation on each tap.
    */
   const syncQuestions = () => {
     const visible = visibleQuestions(state.questions, state.answers);
@@ -703,10 +625,8 @@ function mount(root, ctx) {
   };
 
   /*
-   * The control for one question, in the same three shapes the questionnaire
-   * uses, so keyboard and screen-reader behaviour is inherited rather than
-   * re-invented. Shared by the left pane and by the popover's follow-ups, which
-   * is what makes a follow-up look identical to the question it edits.
+   * The control for one question, in the questionnaire's same three shapes so a11y is
+   * inherited. Shared by the left pane and the popover, so a follow-up matches its question.
    */
   const buildControl = (q, answers, onChange) => {
     if (q.type === 'slider') {
@@ -719,9 +639,8 @@ function mount(root, ctx) {
     return list;
   };
 
-  /** Answered = a value that would actually reach the engine. Both sliders
-   *  persist on render, so the bar starts honestly above zero rather than
-   *  pretending nothing is known. */
+  /** Answered = a value that would actually reach the engine. Both sliders persist on
+   *  render, so the bar starts honestly above zero rather than pretending nothing is known. */
   const isAnswered = (q) => {
     const v = state.answers[q.id];
     if (Array.isArray(v)) return v.length > 0;
@@ -738,11 +657,8 @@ function mount(root, ctx) {
   };
 
   /*
-   * Every answer change, wherever it came from (a left-pane control or a
-   * popover follow-up): drop out of the committed state, re-diff the visible
-   * set, and schedule the debounced preview. In that order, because a committed
-   * podium showing /api/match results must not keep claiming them once the
-   * brief underneath has moved.
+   * Every answer change (left pane or popover): drop the committed state, re-diff the visible
+   * set, schedule the preview — in that order, so a committed podium stops claiming stale results.
    */
   function answerChanged() {
     if (state.committed) dropToLive();
@@ -753,9 +669,8 @@ function mount(root, ctx) {
   const scheduleRefresh = () => {
     feed.schedule(state.answers, (matches) => {
       state.live = Array.isArray(matches) ? matches : [];
-      // A preview that lands after a commit is kept but not painted: the
-      // committed state is the more informed answer, and it stays until an
-      // answer actually changes.
+      // A preview landing after a commit is kept but not painted: the committed state is
+      // the more informed answer, and it stays until an answer actually changes.
       if (!state.committed) paintResults();
     });
   };
@@ -816,16 +731,8 @@ function mount(root, ctx) {
   };
 
   /*
-   * How many cars are JOINT FIRST.
-   *
-   * A medal asserts a strict 1 > 2 > 3, and the engine frequently returns cars
-   * it considers level. Awarding silver to a car the engine rates identically
-   * invents a distinction the buyer will act on.
-   *
-   * Committed: /api/match already answered this (`decisive`, `clusterSize`), so
-   * quote it. Live, or once a post-commit dismissal has changed which cars are
-   * on screen: infer it from the scores with the engine's own CLUSTER_PTS.
-   * Exact beats inferred, but a stale exact answer beats nothing.
+   * How many cars are JOINT FIRST (silver on a level car invents a distinction the buyer acts on).
+   * Committed quotes /api/match's `decisive`/`clusterSize`; live infers from scores via CLUSTER_PTS.
    */
   const tiedLeaders = (list) => {
     if (list.length < 2) return 1;
@@ -874,10 +781,8 @@ function mount(root, ctx) {
     const joint = tied > 1;
     stepsEl.classList.toggle('is-tied', joint);
 
-    // Joint first shows ONLY the tied cars as steps. A third medal under two
-    // joint winners would have to be called second or third, and both are
-    // claims the engine did not make; the rest of the field is still on screen,
-    // in the tail, where nothing is ranked.
+    // Joint first shows ONLY the tied cars as steps — a third medal would be a second/third
+    // the engine never claimed. The rest of the field stays on screen in the (unranked) tail.
     const leaders = list.slice(0, joint ? tied : STEP_MAX);
     leaders.forEach((m, i) => stepsEl.append(buildStep(m, i, joint)));
 
@@ -887,11 +792,8 @@ function mount(root, ctx) {
       tail.forEach((m) => tailGrid.append(buildTailTile(m)));
     }
 
-    // The announcement. In a tie it is the tie itself, in the shared brand
-    // voice, because that is the only thing about the order worth saying.
-    // Capitalised on the way out: BMW's tiedTitle opens on a spelled-out number
-    // ("three of these fit you equally well"), which is a headline in the
-    // questionnaire and the first word of a sentence here.
+    // The announcement — in a tie, the tie itself in the shared brand voice. Capitalised on
+    // the way out, since a brand's tiedTitle may open on a spelled-out number as a sentence here.
     liveEl.textContent = joint
       ? cap(`${brandCopy.tiedTitle({ count: tied })} ${brandCopy.tiedLede()}`)
       : copy.liveUpdated({ model: list[0].car.name });
@@ -911,15 +813,8 @@ function mount(root, ctx) {
     const gold = joint || i === 0;
     step.classList.add(gold ? 'is-gold' : (i === 1 ? 'is-silver' : 'is-bronze'));
     step.append(el('p', 'vm-podium-rank', joint ? copy.jointRank : copy.ranks[i]));
-    // The committed hero upgrades to the big card, which is what surfaces the
-    // engine's real "why it suits you" reasons. That upgrade is the visible
-    // payoff for pressing the button, and the reason the button is honest.
-    //
-    // Card and reject chip share a positioned wrapper *below* the rank eyebrow,
-    // so the absolutely-positioned chip anchors to the card's top-right corner
-    // (like the tail tiles) rather than the whole step — whose first child is
-    // the eyebrow, tallest on the gold tile, which is where the chip used to
-    // float. The dismissal target stays the step so the whole tile still fades.
+    // The committed hero upgrades to the big card, surfacing the engine's real reasons. Card +
+    // reject chip share a positioned wrapper below the eyebrow so the chip anchors to the card corner.
     const cardWrap = el('div', 'vm-podium-card');
     cardWrap.append(
       matchCard(safeMatch(m), {
@@ -971,11 +866,8 @@ function mount(root, ctx) {
   };
 
   /*
-   * One popover per mount, moved and positioned on open.
-   *
-   * Deliberately NOT matchCard's `rejectOptions` hook: that renders an inline
-   * disclosure inside the card body, and this is the PRD's floating two-step
-   * dialog. Building it here keeps result-card.js untouched and shared.
+   * One popover per mount, moved and positioned on open. Deliberately NOT matchCard's inline
+   * `rejectOptions` hook — this is the PRD's floating two-step dialog, kept out of result-card.js.
    */
   const buildPopover = () => {
     pop = el('div', 'vm-podium-pop');
@@ -1010,15 +902,8 @@ function mount(root, ctx) {
   const questionById = (id) => state.questions.find((q) => q.id === id);
 
   /*
-   * Which reasons this brand may offer for THIS card.
-   *
-   * Only a branch that can actually change the result: every reason but the
-   * last writes to a real answer key, so a key this brand doesn't ask about has
-   * nowhere to write. MINI drops `mileage` in brands.js, so MINI never offers
-   * Mileage. Colour is the exception in the other direction: there is no colour
-   * answer key at all, so it is offered only when we can actually read a shade
-   * off this car and filter on it. Same rule as the knockout's stat rows, which
-   * return null when the metric is missing rather than printing a zero.
+   * Which reasons this brand may offer for THIS card — only branches that can change the result.
+   * Each writes a real answer key (MINI drops `mileage`); colour has none, so needs a readable shade.
    */
   const reasonsFor = (match) => {
     const out = [];
@@ -1109,11 +994,8 @@ function mount(root, ctx) {
   };
 
   /*
-   * Step two: the card is committed to the dismissal (it fades to about 0.25)
-   * and the popover shows the follow-up. Every branch but "just not for me"
-   * reuses the SAME widget the left pane draws, on the SAME question object, so
-   * it reads as the question it is editing rather than a second control that
-   * happens to agree with it.
+   * Step two: the card fades toward dismissal and the popover shows the follow-up. Every branch
+   * but "just not for me" reuses the SAME widget/question the left pane draws, so it reads as an edit.
    */
   function chooseReason(key) {
     const { target } = state.pop;
@@ -1142,12 +1024,8 @@ function mount(root, ctx) {
   }
 
   /*
-   * The colour branch. There is no colour answer key, so this cannot write to
-   * the brief: it rules the shade out on the client, over the pool the engine
-   * returned, reusing the shadeOf axis the games already read. Staged rather
-   * than applied on tap, because Back / Esc / an outside click have to restore
-   * the card fully, and a filter that survived a cancel would be a dismissal
-   * the buyer never confirmed.
+   * The colour branch. With no colour answer key, it rules the shade out client-side over the
+   * returned pool (reusing shadeOf). Staged not applied on tap, so a cancel/Back/Esc restores fully.
    */
   const buildColourFilter = () => {
     const shade = shadeOf(state.pop.match.car);
@@ -1179,10 +1057,8 @@ function mount(root, ctx) {
   }
 
   /*
-   * Done. The card fades out, the staged colour filter (if any) lands, and the
-   * podium re-ranks a beat later. Any answer the follow-up changed has already
-   * been written and scheduled, so the re-rank is the engine's, not a local
-   * reshuffle. The re-rank is the point; the fade is just the handover.
+   * Done. The card fades, the staged colour filter (if any) lands, the podium re-ranks a beat
+   * later. Any changed answer was already written/scheduled, so the re-rank is the engine's.
    */
   function applyDismissal() {
     const { match, target } = state.pop;
@@ -1199,11 +1075,8 @@ function mount(root, ctx) {
   }
 
   /*
-   * Close. `restore` puts the card back exactly as it was (cancel, Back, Esc,
-   * outside click); the dismissal path passes false because the card is on its
-   * way out. Either way the left pane is re-synced for the question the
-   * follow-up edited, so the popover's slider and the pane's slider cannot end
-   * up showing different numbers for the same answer.
+   * Close. `restore` puts the card back (cancel/Back/Esc/outside click); the dismissal path passes
+   * false. Either way the edited question is re-synced so the popover and pane can't disagree.
    */
   function closePop({ restore }) {
     if (!state.pop) return;
@@ -1243,11 +1116,8 @@ function mount(root, ctx) {
   };
 
   /* ------------------------------ boot ------------------------------
-   * The question set is per-brand and lives behind apiGetQuestions, so, like
-   * every other mode, we fetch it first. mount stays synchronous: it paints the
-   * skeleton now and does the fetch in this detached boot(), so the shell never
-   * awaits a cold backend. apiGetQuestions THROWS on failure (it is load-bearing
-   * here: no questions, no brief), so guard it and offer a retry that re-boots. */
+   * Fetch the per-brand question set in this detached async boot() so mount stays synchronous
+   * (skeleton now). apiGetQuestions THROWS — guard it and offer a re-boot retry. */
   const boot = async () => {
     try {
       const { questions } = await apiGetQuestions(ctx.api, ctx.retailer, ctx.brand);
@@ -1263,7 +1133,6 @@ function mount(root, ctx) {
   boot();
 }
 
-// The switcher tab is brand-agnostic shell UI, so its label is neutral. The
-// campaign wordmark lives INSIDE the stage (PODIUM_COPY[brand].wordmark), where
-// it can vary by brand; the mode's static `label` can't.
+// The switcher tab is brand-agnostic shell UI, so its label stays neutral; the campaign
+// wordmark lives inside the stage (PODIUM_COPY[brand].wordmark), where it can vary by brand.
 export default { key: 'podium', label: 'Podium', mount };

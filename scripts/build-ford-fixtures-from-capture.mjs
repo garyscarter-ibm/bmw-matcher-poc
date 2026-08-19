@@ -1,33 +1,6 @@
 /*
- * Build fixtures/ford-cars.json from a REAL captured feed response.
- *
- * Ford's live approved-used feed (servicescache.ford.com/api/eUsed/v1) turned out
- * to be reachable after all — the historical HTTP 000 "Akamai block" was a missing
- * browser header block, not a hard edge drop (see the [ford-feed-is-live-reachable]
- * memo). With the full header set plus the x-eusl-consumer / x-eusl-k pair the POST
- * /searchVehicles endpoint returns real listings, real per-listing photos included.
- *
- * We do NOT run an ongoing live adapter for Ford (the x-eusl-k token is minted
- * client-side and expires; we do not forge it). Instead this script bakes a ONE-OFF
- * legitimate capture into the committed fixtures, the same way
- * build-motorrad-fixtures-from-capture.mjs does: it projects each nested API record
- * to the FLAT-raw shape mapFordRaw() reads, then runs it through mapFordRaw() — the
- * exact production projection — so the snapshot is identical in shape to what a live
- * Ford adapter would emit, real images/prices/registration dates and all. Model
- * figures (boot, seats, 0-62, sizeClass, mpg/evRange) come from MODEL_SPECS_FORD in
- * server/mapping.js, honest-but-generic per line; the per-LISTING facts (price,
- * mileage, reg, registration month, photo) are the real captured values.
- *
- * Capture recipe (browser, one minute) — the feed needs a fresh token:
- *   1. Open https://secure.ford.co.uk/ approved-used search and let results load.
- *   2. DevTools > Network > filter "searchVehicles".
- *   3. Right-click the request > Copy > Copy as cURL, and run it (paginate
- *      startingRecord 0 then 48 for the full pool) saving each response to a file.
- *   4. Pass the saved response file(s) to this script. Each file is the raw JSON
- *      envelope: { data: { VehicleInventoryList: { VehicleInventoryItem: [...] } } }.
- *
- * Run:  node scripts/build-ford-fixtures-from-capture.mjs /tmp/ford-capture/page0.json /tmp/ford-capture/page1.json
- * Out:  fixtures/ford-cars.json  (mapped cars the engine scores)
+ * Build fixtures/ford-cars.json from a REAL one-off capture of Ford's approved-used feed (servicescache.ford.com /searchVehicles; reachable with the full header set + x-eusl token, which we don't forge, so this bakes a capture rather than running a live adapter). Projects each nested record to the flat-raw shape and runs it through the production mapFordRaw(); model specs from MODEL_SPECS_FORD, per-listing facts real. See [ford-feed-is-live-reachable] memo; capture via DevTools "Copy as cURL" of searchVehicles, paginating startingRecord 0 then 48.
+ * Run:  node scripts/build-ford-fixtures-from-capture.mjs /tmp/ford-capture/page0.json [page1.json ...]  ->  fixtures/ford-cars.json
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -57,10 +30,8 @@ function itemsFrom(path) {
   return list;
 }
 
-/* "Apr 2025" -> "01/04/2025" (first of the month, dd/mm/yyyy as registrationDate
- * reads it). The feed dates a registration to the month, not the day, so the 1st
- * is an honest midpoint that still beats the year-only fallback. Returns null when
- * the string is absent or unparseable (never guess a date). */
+/* "Apr 2025" -> "01/04/2025": the feed dates registration to the month, so the 1st
+ * is an honest midpoint beating the year-only fallback. Returns null when unparseable (never guess). */
 const MONTHS = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
   jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
@@ -74,9 +45,8 @@ function firstRegFrom(dateOfRegistration = '') {
   return `01/${String(mm).padStart(2, '0')}/${yyyy}`;
 }
 
-/* Project one nested Ford API record to the FLAT-raw shape mapFordRaw() reads.
- * mapFordRaw derives line/body/fuel/specs/performance from title+derivative and
- * carries the per-listing facts straight through. */
+/* Project one nested Ford API record to the FLAT-raw shape mapFordRaw() reads
+ * (it derives line/body/fuel/specs from title+derivative, carrying per-listing facts through). */
 function toFlatRaw(item) {
   const v = item?.Vehicle || {};
   const cfg = v.Configuration || {};
@@ -88,11 +58,8 @@ function toFlatRaw(item) {
   const image = ((cfg.Appearance?.ImageRef || [])[0]?.value || '').replace(/\?$/, '') || undefined;
   const history = v.History || {};
   const year = parseInt(history.YearOfProduction, 10);
-  // Real per-listing colour. The feed carries a rich marketing name
-  // (Appearance.ExteriorColor.ShortDescription, e.g. "Solar Silver (metallic)")
-  // on some records and a coarse token (ExteriorColor.Code.value, e.g. "WHITE")
-  // on all of them; prefer the rich name, fall back to a tidied token so every
-  // real listing surfaces its own paint. Both are captured values, not invented.
+  // Real per-listing colour: prefer the rich marketing name (ExteriorColor.ShortDescription)
+  // and fall back to a tidied coarse token (ExteriorColor.Code.value). Both captured, not invented.
   const ec = cfg.Appearance?.ExteriorColor || {};
   const colourShort = String(ec.ShortDescription || '').trim();
   const colourToken = String(ec.Code?.value || '').trim();
@@ -129,9 +96,8 @@ function toFlatRaw(item) {
     // Real per-listing dealer name (VendorInformation.VendorName, e.g. "Lawtons of
     // Tadcaster") — the actual retailer holding this car, not the Ford-wide constant.
     dealer: vi.VendorName || undefined,
-    // The feed carries no per-listing detail URL (the real pages live on
-    // individual dealer sites, not derivable from this payload), so mapFordRaw
-    // defaults link to the Ford homepage rather than fabricate a deep link.
+    // The feed carries no per-listing detail URL (pages live on dealer sites), so
+    // mapFordRaw defaults link to the Ford homepage rather than fabricate a deep link.
   };
 }
 
@@ -154,9 +120,8 @@ for (const item of rawItems) {
   cars.push(car);
 }
 
-// Same engine-validity gate as the synthetic + Motorrad-capture builders: a
-// combustion car needs mpg>0, an EV needs evRange>0, the engine-required fields
-// must all be present, and no user-facing string may carry an em dash.
+// Same engine-validity gate as the synthetic + Motorrad-capture builders: combustion
+// needs mpg>0, EV needs evRange>0, required fields all present, no em dash in user strings.
 const REQUIRED = ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax',
   'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb'];
 for (const c of cars) {

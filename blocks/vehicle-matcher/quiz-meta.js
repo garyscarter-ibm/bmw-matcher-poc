@@ -1,25 +1,11 @@
 /*
- * Client-only quiz metadata.
- *
- * The quiz definition itself is fetched from the API (GET /api/questions), but
- * two things can't cross JSON and are needed on the client:
- *
- *  - SHOW_IF: the conditional-visibility predicates, keyed by question id.
- *    The API marks conditional questions with `conditional: true`; the block
- *    looks up the matching predicate here to decide whether to show them.
- *  - BUDGET_BANDS: needed synchronously to decode/validate a shared #m=… link
- *    before any network request completes.
- *
- * This is deliberately NOT the car dataset or the scoring weights — those stay
- * server-side. Keep SHOW_IF in sync with the `showIf` functions in
- * server/questions.js (there's only one conditional question today).
+ * Client-only quiz metadata that can't cross JSON: SHOW_IF predicates and BUDGET_BANDS
+ * (needed synchronously to validate a shared #m=… link). Keep in sync with server/questions.js.
  */
 
 /**
- * Conditional-visibility predicates, keyed by question id. Mirror of the
- * `showIf` functions in server/questions.js. `fuel` is multi-select (an array),
- * so test membership: show charging when any electric-adjacent fuel (or "help me
- * decide") is picked, or while fuel is still unanswered.
+ * Conditional-visibility predicates by question id; mirror of server/questions.js
+ * `showIf`. Show charging when an electric-adjacent fuel is picked or fuel is unset.
  */
 export const SHOW_IF = {
   charging: (a) => {
@@ -27,9 +13,8 @@ export const SHOW_IF = {
     const picks = Array.isArray(f) ? f : (f != null ? [f] : []);
     return picks.length === 0 || picks.some((v) => v === 'ev' || v === 'phev' || v === 'open');
   },
-  // MINI-only (see brands.js questions.add): the door count is only a real
-  // choice for the Hatch, so ask it only once a hatchback (or "any") is in play.
-  // Mirror of the `showIf` on the doors question in server/brands.js.
+  // MINI-only: door count only matters for the Hatch, so ask it once a hatchback
+  // (or "any") is in play. Mirror of the doors `showIf` in server/brands.js.
   doors: (a) => {
     const b = a.bodyStyles;
     const picks = Array.isArray(b) ? b : (b != null ? [b] : []);
@@ -47,16 +32,8 @@ export const BUDGET_BANDS = {
 };
 
 /*
- * Short pill summaries of a chosen answer, keyed by question id then value.
- * These are deliberately terse noun-phrases ("Home charging", "Balanced") — a
- * *record* of the choice, not the option's own prompt text ("Yes, at home",
- * "A bit of both"), which reads oddly as a summary. Kept client-side (like
- * SHOW_IF) since the option labels themselves live server-side in the fetched
- * quiz. Keep the values in sync with server/questions.js option values.
- *
- * `budget` is derived from BUDGET_BANDS below rather than listed here, and the
- * multi-select questions (bodyStyles, priorities) collapse to "First +N" in
- * pillFor — so this map only needs the single-select questions.
+ * Terse pill summaries of a chosen answer, keyed by question id then value (a
+ * record of the choice, not the prompt). Single-select only; keep values in sync with server/questions.js.
  */
 export const PILL_LABEL = {
   fuel: {
@@ -123,12 +100,8 @@ function mileageValueLabel(value, question) {
 }
 
 /**
- * A short pill summary of the current answer to `question`, or null if it isn't
- * answered yet. `question` is the fetched quiz object (has id, multi, options);
- * `answers` is the running ctx.answers.
- *   single-select → PILL_LABEL[id][value] (or the raw value as a fallback)
- *   budget        → derived band, e.g. "£50–70k"
- *   multi-select  → "First +N" (e.g. "SUV +1"), or "Any body" when 'any' picked
+ * A short pill summary of the current answer to `question`, or null if unanswered.
+ * Dispatches by id/type: budget → band, multi-select → "First +N", else PILL_LABEL.
  */
 export function pillFor(question, answers) {
   const { id, multi } = question;

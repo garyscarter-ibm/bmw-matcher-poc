@@ -1,15 +1,6 @@
 /*
- * Matching engine — pure, deterministic, dependency-free.
- *
- * Input:  answers object produced by the quiz (see questions.js) + a per-brand
- *         `tuning` object (see brands.js) holding every calibration constant.
- * Output: ranked matches with 0–100 scores and human-readable reasons
- *         generated from the actual score components.
- *
- * The engine is brand-agnostic: every magic number lives in `tuning`, so a
- * brand is calibrated by config, not by forking the scorers. `tuning` defaults
- * to BMW's values (the engine's original constants), so a caller that omits it
- * gets the original behaviour.
+ * Matching engine — pure, deterministic, brand-agnostic: every magic number
+ * lives in the per-brand `tuning` arg, which defaults to BMW's constants.
  */
 
 import { BUDGET_BANDS } from './questions.js';
@@ -19,9 +10,8 @@ import { brandTuning } from './brands.js';
 const DEFAULT_TUNING = brandTuning('bmw');
 
 /*
- * Base weight of each scoring dimension. The engine itself reads the weights
- * off the per-brand `tuning` argument (brands.js) — this export is the same
- * table under the name the README points tuners at, so keep the two in step.
+ * Base weight of each scoring dimension. Duplicates the per-brand `tuning`
+ * table under the name the README points tuners at — keep the two in step.
  */
 export const WEIGHTS = {
   budget: 3.0,
@@ -50,11 +40,8 @@ const clamp = (v, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 const gbp = (n) => `£${Math.round(n / 1000)}k`;
 
 /**
- * Resolve a budget answer to a [min, max] £ range. Budget is a dual-thumb range
- * from the quiz slider — a [min, max] pair — but we also accept a bare number
- * (→ [0, n], the earlier single-slider shape) and the legacy b1–b5 band keys, so
- * old shared #m= links (and existing callers/tests) keep working. Returns null
- * for anything unusable, which the caller turns into a 400.
+ * Resolve a budget answer to a [min, max] £ range. Accepts a [min, max] pair, a
+ * bare number (→ [0, n]) or the legacy b1–b5 band keys; null for anything unusable.
  */
 export function budgetRange(answers) {
   const b = answers.budget;
@@ -70,11 +57,8 @@ export function budgetRange(answers) {
 }
 
 /**
- * Annual mileage as a 0..1 fraction along the brand's ramp: at/under lowMiles
- * → 0, at/over highMiles → 1. Drives how much running costs matter (see
- * scoreEconomy / effectiveWeights) — for EVERY fuel now, not just diesel. The
- * legacy string band 'vhigh' maps to 1; an unanswered mileage → 0 (no strong
- * running-cost signal yet).
+ * Annual mileage as a 0..1 fraction along the brand's ramp (lowMiles → 0,
+ * highMiles → 1). Drives running-cost weight for every fuel; unanswered → 0.
  */
 function mileageFraction(answers, tuning) {
   const { lowMiles, highMiles } = tuning.mileage;
@@ -118,13 +102,8 @@ function scoreBudget(car, answers) {
     return { score: 1, reason: budgetReason };
   }
   if (car.priceMax < min) {
-    // Below the user's minimum. When there's no real floor (min 0, the old
-    // "up to £X" slider) this is fine — just mildly off-target. But when the
-    // user has deliberately set a min (a range), a car well under it is NOT
-    // what they asked for, so penalise in proportion to how far below the floor
-    // it sits: right at the floor ≈ 0.7, half the floor ≈ 0.35, far below → ~0.1.
-    // Without this, a car £50k under a £92k floor still scored 0.7 and, since
-    // budget is only ~1/5 of the blend, out-ranked in-budget cars on merit.
+    // Below the user's minimum. With no real floor (min 0) that's fine; with a
+    // deliberate min, penalise in proportion to how far under the floor it sits.
     if (!min) return { score: 0.7, reason: 'Comes in under budget' };
     const shortfall = (min - car.priceMax) / min; // 0 at the floor → 1 at £0
     const score = clamp(0.7 - shortfall, 0.1, 0.7);
@@ -150,25 +129,8 @@ function scoreBody(car, answers, tuning) {
 const FUEL_LABELS = { petrol: 'petrol', diesel: 'diesel', phev: 'plug-in hybrid', ev: 'fully electric' };
 
 /*
- * How acceptable each fuel is as a substitute for the one asked for, read as
- * rows of "wanted → offered".
- *
- * The substitute scores used to sit around 0.5–0.7, which read as "a diesel is
- * 70% as good as the petrol you asked for". Combined with fuelStrictBoost that
- * still left a wrong-fuel car only ~8 points behind, so a car that was strong
- * on economy and character routinely beat one that actually matched: measured
- * at 15% of BMW cases and 8% of MINI's where a matching car was available and
- * lost anyway (`npm run audit fuel`). That directly contradicted the promise
- * made just below at fuelStrictBoost.
- *
- * Body style had the same flaw and was fixed the same way in July (miss → 0,
- * honesty 53% → 67%, diversity rose). Fuel can't go to zero — the degrees of
- * similarity are real, a plug-in genuinely is the closest thing to an EV — so
- * the ordering is kept and the scale compressed: a substitute now has to be
- * overwhelmingly better elsewhere to win, rather than merely better.
- *
- * "Help me decide" (`open`) never reads this table; it's scored by
- * circumstance in scoreOneFuel, and is unaffected.
+ * How acceptable each fuel is as a substitute for the one wanted: compressed but
+ * not zeroed (a PHEV is the closest thing to an EV), so a wrong fuel must win big.
  */
 const FUEL_TABLE = {
   petrol: { petrol: 1, diesel: 0.25, phev: 0.3, ev: 0.1 },
@@ -214,11 +176,8 @@ function scoreOneFuel(pref, car, answers, tuning) {
 }
 
 function scoreFuel(car, answers, tuning) {
-  // Fuel is multi-select: the user can pick several fuels (or none, which reads
-  // as "help me decide"). Score the car against each chosen fuel and take the
-  // best — a petrol car matching "Petrol + EV" scores on its petrol merit. An
-  // unanswered set falls back to ['open'] (fuelPrefs), so a partial answer set
-  // still ranks instead of throwing on FUEL_TABLE[undefined].
+  // Fuel is multi-select: score against each chosen fuel and take the best.
+  // Unanswered falls back to ['open'] (fuelPrefs) so a partial set still ranks.
   const prefs = fuelPrefs(answers);
   let best = { score: -1 };
   for (const pref of prefs) {
@@ -229,32 +188,8 @@ function scoreFuel(car, answers, tuning) {
 }
 
 /*
- * How much luggage space this buyer needs, expressed as one of the per-brand
- * bootNeed keys (small/medium/big — see tuning.practicality.bootNeed).
- *
- * There is no "how much boot space?" question any more: it changed the top 3
- * in only 13% of BMW cases and ~25% of MINI's (docs/question-stock-audit.md),
- * because it asked for something the rest of the answers already imply. The
- * need is instead derived from the two answers that genuinely carry it, each
- * scored 0/1/2 and summed:
- *
- *   people      solo 0, family 1, crew 2 — people displace luggage, and a
- *               "full crew" is the one answer that asks for everything a car
- *               has (it already drives the seat/boot hard filters too).
- *   primaryUse  family duties and long motorway trips 1 (buggies, weekly
- *               shops, a week's luggage); city, commuting and weekend
- *               driving 0 — those are a bag and a coat.
- *
- * Summing rather than taking the larger is what preserves the discrimination
- * the question used to provide: a small family on the school run (1+1 → big)
- * genuinely needs more room than the same family commuting (1+0 → medium),
- * a distinction the old three-way question could only capture if the user
- * stopped to think about it. Unanswered ⇒ 0 ⇒ "small" ⇒ no space requirement,
- * so a partial answer set (the mid-quiz preview) still scores a real number.
- *
- * A legacy shared link may still carry a `boot` answer. It is deliberately
- * ignored, not honoured: every buyer's need is derived the same way, so two
- * people who answer identically get identical results.
+ * Luggage need as a per-brand bootNeed key, derived from people + primaryUse
+ * (each scored 0/1/2 and summed to preserve discrimination). Unanswered ⇒ small.
  */
 const PEOPLE_SPACE = { solo: 0, family: 1, crew: 2 };
 const USE_SPACE = {
@@ -268,9 +203,8 @@ function bootNeedKey(answers) {
 }
 
 /*
- * A reason phrase in the brand's own register (see `reasons` in brands.js).
- * Falls back to BMW's, which is the base every brand merges onto, so a brand
- * that overrides nothing still says something.
+ * A reason phrase in the brand's own register (see `reasons` in brands.js),
+ * falling back to BMW's base so a brand that overrides nothing still speaks.
  */
 function phrase(tuning, key, car) {
   const say = tuning.reasons?.[key] ?? DEFAULT_TUNING.reasons[key];
@@ -286,18 +220,13 @@ function scorePracticality(car, answers, tuning) {
   let score = need === 0 ? 1 : clamp(car.boot / need);
   if (!seatsOk) score *= 0.3;
   // A crew buyer with the bonus seats gets a perfect practicality score; the
-  // shortfall for a sub-7-seat crew car is applied as a whole-score penalty in
-  // rankCars (crewSeatShortfall), not here — practicality alone is too small a
-  // lever to overcome a 7-seater's budget/economy headwind.
+  // sub-7-seat shortfall is a whole-score penalty in rankCars, not here.
   if (answers.people === 'crew' && car.seats >= crewBonusSeats) {
     return { score: 1, reason: phrase(tuning, 'crew', car) };
   }
   /*
-   * Both variants state the litres AND that the figure is seats-up, because
-   * that qualifier is what makes a boot number believable — an unqualified one
-   * might quietly be the seats-down figure, which is exactly the sort of claim
-   * Priya says she cannot picture. The card prints the same number in its spec
-   * line, so the reason and the spec can be checked against each other.
+   * Both variants state litres AND that it's seats-up — the qualifier is what
+   * makes a boot number believable, and it matches the card's spec line.
    */
   let reason;
   if (need > 0 && car.boot >= need) {
@@ -311,15 +240,8 @@ function scorePracticality(car, answers, tuning) {
 function scorePerformance(car, answers, tuning) {
   const { zeroBase, span } = tuning.performance;
   const wantsIt = Number(answers.style) >= 4 || (answers.priorities || []).includes('performance');
-  // Per-brand 0-62 curve: a MINI is quick for its class but never fast in
-  // absolute BMW terms, so its curve tops out at a slower time.
-  //
-  // Two curves, because one can't serve both buyers. The default is generous:
-  // to someone who didn't ask for speed, anything reasonably brisk is fine.
-  // But it clamps everything under ~4.5s to a flat 1.0, so to an enthusiast a
-  // 3.5s M2 and a 5.0s grand tourer scored within 8% of each other — and the
-  // tourer won on practicality, which is not the car that buyer asked for.
-  // When performance is explicitly wanted, resolve the fast end properly.
+  // Per-brand 0-62 curve, plus a second faster curve when speed is wanted: the
+  // generous default clamps sub-4.5s cars flat, hiding real gaps between fast cars.
   const base = wantsIt ? zeroBase - 3 : zeroBase;
   const range = wantsIt ? span - 2 : span;
   const score = clamp((base - car.zeroTo62) / range);
@@ -332,10 +254,8 @@ function scorePerformance(car, answers, tuning) {
 
 function scoreEconomy(car, answers, tuning) {
   const canCharge = canChargeAt(answers.charging);
-  // How much running costs matter, 0..1 by annual mileage. High-mileage buyers
-  // want genuinely cheap-per-mile cars; low-mileage buyers can indulge a
-  // thirsty one. `miles` scales the reward for efficiency and the penalty for a
-  // gas-guzzler, so mileage now moves the ranking for EVERY fuel.
+  // How much running costs matter, 0..1 by annual mileage: scales the reward for
+  // efficiency and the penalty for a guzzler, so mileage now moves every fuel.
   const miles = mileageFraction(answers, tuning);
   let score;
   let reason;
@@ -351,11 +271,8 @@ function scoreEconomy(car, answers, tuning) {
     score = canCharge ? clamp(0.85 + 0.1 * miles) : clamp(0.6 - 0.1 * miles);
     if (canCharge && car.evRange) reason = `Around ${car.evRange} electric miles covers most daily driving`;
   } else {
-    // Petrol/diesel: base on mpg, then tilt by mileage — a frugal car is worth
-    // more the further you drive, a thirsty one worth less. A car the feed
-    // gave no consumption figure for (7 of 13k) scores neutral rather than
-    // NaN — unknown is not the same as thirsty, and a NaN here poisons the
-    // whole blend and can sort the car to the top.
+    // Petrol/diesel: base on mpg, then tilt by mileage. No consumption figure →
+    // neutral 0.5, not NaN (unknown ≠ thirsty, and NaN poisons the whole blend).
     const mpg = Number(car.mpg);
     if (!Number.isFinite(mpg)) return { score: 0.5 };
     const base = clamp((mpg - 25) / 35);
@@ -382,9 +299,8 @@ function scoreSize(car, answers, tuning) {
   }
   if (answers.primaryUse === 'roadtrips') {
     const big = car.sizeClass >= roadtripMinClass;
-    // Was "Big-car refinement for long motorway days", which asserts a quality
-    // nothing in the data supports. Size is all we actually know here, so size
-    // is all the reason claims.
+    // Was "Big-car refinement for long motorway days", a claim the data can't
+    // support. Size is all we know here, so size is all the reason claims.
     return { score: big ? 1 : 0.6, reason: big ? phrase(tuning, 'roadtrip', car) : undefined };
   }
   return { score: 0.7 };
@@ -399,10 +315,8 @@ const USE_TAGS = {
 };
 
 /**
- * The character phrases, brand by brand. Merged key-by-key onto BMW's rather
- * than taken wholesale, so a brand overriding three tags keeps BMW's wording
- * for the other five instead of silently losing them — mergeTuning's shallow
- * merge would do the latter.
+ * Character phrases merged key-by-key onto BMW's, so a brand overriding a few
+ * tags keeps BMW's wording for the rest (a shallow merge would lose them).
  */
 function tagReasons(tuning) {
   return { ...DEFAULT_TUNING.reasons.tags, ...(tuning.reasons?.tags || {}) };
@@ -430,14 +344,8 @@ const STYLE_LINE_LABEL = {
 };
 
 /**
- * Trim-character match (MINI). The user's vibe answer arrives as answers.styleLine
- * (folded in by applyBespokeAnswers); the car carries its own from the derivative.
- * A "sport" want is satisfied by a JCW too — JCW is the sport line's extreme, so a
- * go-kart-minded buyer shouldn't be marked down for landing on one.
- *
- * No-ops safely for any brand that doesn't tune it (no tuning.styleLine → neutral,
- * multiplied by a zero weight), and treats an unknown car trim as neutral, never a
- * miss — an unparsed derivative isn't a wrong answer. See docs/mini-first-questions.md.
+ * Trim-character match (MINI). A "sport" want is also satisfied by a JCW (the
+ * sport line's extreme); unknown trim and untuned brands score neutral, never a miss.
  */
 function scoreStyleLine(car, answers, tuning) {
   const cfg = tuning.styleLine;
@@ -452,10 +360,8 @@ function scoreStyleLine(car, answers, tuning) {
 }
 
 /**
- * Door-count preference (MINI Hatch only). answers.doors is '3' | '5' | 'either';
- * 'either' (or unanswered, or a non-hatch car with no door count) scores neutral.
- * A soft preference: a wrong count is a gentle miss, never a hard filter, and an
- * unknown car door count is neutral, not penalised.
+ * Door-count preference (MINI Hatch only). 'either'/unanswered/unknown scores
+ * neutral; a wrong count is a gentle miss, never a hard filter.
  */
 function scoreDoors(car, answers, tuning) {
   const cfg = tuning.doors;
@@ -471,43 +377,20 @@ function scoreDoors(car, answers, tuning) {
  * ---------------------------------------------------------------- */
 
 /*
- * Constraints eliminate. Fit ranks. Taste chooses.
- *
- * The dimensions below are the SUBJECTIVE ones — what a buyer likes, as
- * opposed to what actually suits them. They're scored separately and never
- * enter the match %, because a weighted sum that blends the two can't tell a
- * constraint ("it must be a convertible") from a preference ("I like
- * comfort"), and so fails in both directions: preferences out-voting a stated
- * fuel, or — measured at 77% winner-stickiness — constraints drowning the
- * preference questions until four of nine could never change the answer.
- *
- * Everything not listed here is fit: budget, body, fuel, practicality,
- * economy, size, doors. See docs/engine-relayer-design.md.
+ * Constraints eliminate. Fit ranks. Taste chooses. These are the SUBJECTIVE
+ * dimensions, scored separately so preferences can't out-vote stated needs.
  */
 const TASTE_DIMENSIONS = new Set(['character', 'performance', 'styleLine']);
 
 /*
- * How much of the match score is "what you'd like" rather than "what suits
- * you". Fixed deliberately: as a share of one big weighted sum, taste got
- * squeezed to nothing every time a constraint was made to bind harder (the
- * fuel fix did exactly that), which is how four questions ended up unable to
- * change the recommendation. A guaranteed share can't be squeezed.
- *
- * 0.2 is calibrated, not chosen. Swept 0.15/0.2/0.25/0.3 against the whole
- * harness: below it the preference questions stay inert, above it constraint
- * honesty starts to go (fuel violations 3% at 0.2, 8% at 0.3). Overridable via
- * TASTE_SHARE for further sweeps.
- *
- * Worth noting the split IMPROVED fuel binding rather than costing it (5% → 3%):
- * fuel is now a share of the smaller fit-only total, so it binds harder inside
- * fit while taste is capped at its own 20%.
+ * Taste's guaranteed share of the match score, fixed so hardening a constraint
+ * can't squeeze it to nothing. 0.2 is calibrated (swept against the harness).
  */
 const TASTE_SHARE = Number(process.env.TASTE_SHARE ?? 0.2);
 
 /**
- * Weights for the objective half: how well the car suits the buyer's stated
- * needs and circumstances. Deliberately free of `priorities` — what someone
- * *likes* must not change how well a car actually fits them.
+ * Weights for the objective half: how well the car suits stated needs. Free of
+ * `priorities` — what someone likes must not change how well a car fits them.
  */
 function fitWeights(answers, tuning) {
   const w = {};
@@ -526,11 +409,8 @@ function fitWeights(answers, tuning) {
 }
 
 /**
- * Weights for the subjective half. `priorities` drives this — and ONLY this,
- * which is the change that gives the preference questions something to decide.
- * Boosts that used to land on fit dimensions (budget, economy, size) are
- * dropped: those priorities still speak through `character`, which tags cars
- * as efficient / cruiser / drivers-car / tech / image from the same answers.
+ * Weights for the subjective half — the only place `priorities` acts, which is
+ * what gives the preference questions something to decide.
  */
 function tasteWeights(answers, tuning) {
   const w = {};
@@ -558,25 +438,18 @@ function effectiveWeights(answers, tuning) {
     const boosts = tuning.priorityBoosts[p] || {};
     for (const [dim, add] of Object.entries(boosts)) w[dim] += add;
   }
-  // Running costs matter more the further you drive — a smooth ramp (0..1)
-  // rather than the old diesel-only step, so it moves the ranking for every
-  // fuel. At max mileage the economy dimension gains a full +1.
+  // Running costs matter more the further you drive — a smooth 0..1 ramp, so it
+  // moves every fuel; at max mileage the economy dimension gains a full +1.
   w.economy += mileageFraction(answers, tuning);
   if (Number(answers.style) >= 4) w.performance += 1;
   if (Number(answers.style) <= 2) w.performance = Math.max(0.5, w.performance - 0.5);
-  // When the user names specific fuel(s) — not "help me decide" — fuel binds
-  // hard: a car of the wrong fuel (however strong elsewhere) shouldn't top a
-  // matching-fuel car. Without this boost fuel is only ~14% of the blend, so an
-  // EV flagship could out-rank the petrol saloon a petrol buyer asked for.
-  // "open"/unanswered leaves fuel at its base weight (a range of fuels is fine).
+  // A named fuel binds hard: without this boost fuel is only ~14% of the blend,
+  // so an EV flagship could out-rank the petrol saloon a petrol buyer asked for.
   const prefs = fuelPrefs(answers);
   const specificFuel = prefs.length > 0 && !prefs.includes('open');
   if (specificFuel) w.fuel += tuning.fuelStrictBoost;
-  // styleLine/doors only weigh in when their question was actually answered —
-  // an unasked (BMW never sets them) or no-preference dimension stays fully
-  // inert rather than diluting every score toward neutral. Once answered, the
-  // scorer still returns neutral for a car whose own trim/doors are unknown
-  // (unknown ≠ wrong), just at the now-active weight.
+  // styleLine/doors only weigh in when their question was answered — an unasked
+  // or no-preference dimension stays inert rather than diluting toward neutral.
   if (!answers.styleLine) delete w.styleLine;
   if (!answers.doors || answers.doors === 'either') delete w.doors;
   return w;
@@ -601,21 +474,14 @@ const SCORERS = {
   size: scoreSize,
   character: scoreCharacter,
   // Brand-optional dimensions: only weighted where a brand's tuning names them
-  // (MINI). A brand without the weight contributes 0 (see the `?? 0` in rankCars),
-  // so BMW's blend is unchanged and the scorers above never fire for it.
+  // (MINI). A brand without the weight contributes 0, so BMW's blend is unchanged.
   styleLine: scoreStyleLine,
   doors: scoreDoors,
 };
 
 /**
  * Rank every car that survives the hard filters, best first.
- *
- * Callers slice this to taste: the block's hero grid takes the top 3 of the
- * configured retailer's stock, while the "worth the drive" carousel ranks a
- * separate pool (nearby retailers) through the same scoring.
- *
- * @returns {Match[]} Match: { car, score (0–100), stretch, reasons: string[],
- *   tradeOffs: see tradeOffs() }
+ * @returns {Match[]} { car, score (0–100), stretch, reasons, tradeOffs }
  */
 export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
   const fitW = fitWeights(answers, tuning);
@@ -631,9 +497,8 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
       let stretch = false;
       const candidates = [];
       for (const [dim, scorer] of Object.entries(SCORERS)) {
-        // A dimension a brand doesn't weight (e.g. styleLine/doors for BMW)
-        // contributes nothing and can't surface a reason — so adding a scorer
-        // is inert for every brand that doesn't opt in via its tuning weights.
+        // A dimension a brand doesn't weight (styleLine/doors for BMW) contributes
+        // nothing and surfaces no reason, so adding a scorer is inert until opted in.
         const weight = (fitW[dim] ?? 0) + (tasteW[dim] ?? 0);
         if (weight === 0) continue;
         const r = scorer(car, answers, tuning);
@@ -648,14 +513,12 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
         .sort((a, b) => b.rank - a.rank)
         .slice(0, 4)
         .map((c) => c.reason);
-      // "…but maybe worth it" was a nudge, and a nudge is the thing a buyer
-      // who assumes the tool ranks on margin is watching for. State the fact
-      // and let them price it.
+      // "…but maybe worth it" was a nudge, exactly what a margin-watching buyer
+      // reads into it. State the fact and let them price it.
       if (stretch) reasons.push(`A stretch at ${gbp(car.priceMin)}+, over the budget you set`);
       let ratio = fitWeighted / fitTotal;
-      // Whole-score penalty for a "crew" buyer's sub-7-seat car: strong enough
-      // that genuine 7-seaters top when in stock, but 5-seaters still rank (and
-      // win when no 7-seater exists) — so it's stock-safe, not a hard filter.
+      // Whole-score penalty for a crew buyer's sub-7-seat car: strong enough that
+      // real 7-seaters top when in stock, but 5-seaters still rank — not a filter.
       if (answers.people === 'crew' && car.seats < tuning.practicality.crewBonusSeats) {
         ratio *= tuning.crewSeatShortfall ?? 1;
       }
@@ -663,11 +526,7 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
       return {
         car,
         // The match %: mostly how well the car suits them, plus a guaranteed
-        // slice of how much they'd like it. The fixed TASTE_SHARE is the point.
-        // Before, taste dimensions were nominally ~16-25% of a single weighted
-        // sum, but fuelStrictBoost inflated the fit side until the preference
-        // questions couldn't move the answer at all. Pinning the ratio means
-        // taste keeps its say no matter how hard the constraints bind.
+        // TASTE_SHARE of how much they'd like it, which constraints can't squeeze.
         score: Math.round((ratio * (1 - TASTE_SHARE) + tasteRatio * TASTE_SHARE) * 100),
         // The two halves kept separately: `fit` is what the honesty layer talks
         // about, `taste` orders cars the fit score can't separate.
@@ -678,9 +537,8 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
         tradeOffs: tradeOffs(answers, car),
       };
     })
-    // Fit first, then taste — so within a group of equally suitable cars the
-    // buyer's stated preferences pick the order. Price and name remain as the
-    // final deterministic tie-break.
+    // Fit first, then taste — within a group of equally suitable cars the buyer's
+    // preferences pick the order. Price then name are the deterministic tie-break.
     .sort(
       (a, b) =>
         b.score - a.score ||
@@ -691,24 +549,8 @@ export function rankCars(answers, cars, tuning = DEFAULT_TUNING) {
 }
 
 /*
- * Which of the user's stated wants have NO car behind them in this pool.
- *
- * The engine already drags a wrong-fuel or wrong-shape car's score down, but a
- * results page that silently shows petrol heroes to someone who asked for
- * electric is quietly dishonest — the same family of sin as inventing a
- * distance. So each pool reports what it couldn't offer, and the page says so
- * (see the unmet note in vehicle-matcher.js).
- *
- * Scoped to the two wants that are genuine stock facts: fuel and body style.
- * "No preference" values (`any`, `open`) state no want and can never be unmet.
- *
- * Measured against the pool as fetched, NOT the survivors of the hard filters:
- * "no fully electric cars at this retailer" is a fact about the stock, and
- * saying it because the only EV happened to sit above the budget would be a
- * different lie. Budget mismatch is already visible in the results themselves.
- *
- * @returns {Object} question id → the unmet values, omitting met ones entirely.
- *   An empty object means every stated want has something behind it.
+ * Which stated wants (fuel, body style) have NO car behind them in this pool,
+ * measured against the pool as fetched. Returns { question id → unmet values }.
  */
 export function unmetWants(answers, cars) {
   const unmet = {};
@@ -725,18 +567,8 @@ export function unmetWants(answers, cars) {
 }
 
 /*
- * The stated wants THIS car fails to meet — the per-car companion to
- * unmetWants. unmetWants tells the page "the pool has no fully electric cars
- * at all"; tradeOffs tells one card "this car is petrol and you asked for
- * electric" — which is still true, and still worth owning, when the pool DOES
- * have EVs but a petrol car out-ranked them anyway. Same scope as unmetWants
- * (fuel and body style, the two wants that are plain stock facts) and the
- * same no-preference rule: `open`/`any` state no want, so nothing can be
- * traded away. Structured facts, not prose — the block phrases them in the
- * brand's voice, exactly as it does the unmet note.
- *
- * @returns {Array<{ dim: string, wants: string[], got: string }>} in the
- *   note's fuel-then-shape order; empty when the car meets every stated want.
+ * The stated wants THIS car fails to meet — the per-car companion to unmetWants
+ * (same fuel/body scope). Returns [{ dim, wants, got }] in fuel-then-shape order.
  */
 export function tradeOffs(answers, car) {
   const trades = [];
@@ -755,36 +587,15 @@ export function tradeOffs(answers, car) {
 export const TOP_MATCHES = 3;
 
 /*
- * When the engine can't actually separate the top cars.
- *
- * Measured over both national dumps (docs/refinement-audit.md): the #1 and #2
- * scores land within 3 points in 52-67% of rankings and are EXACTLY equal in
- * 19-35% — where the winner is whatever the tie-break in rankCars preferred,
- * not a judgement. Naming one of those "your perfect BMW" states a preference
- * the model doesn't hold, and at the same time hides the rest of the tie
- * behind a 3-car cap (the tie runs deeper than 3 in up to 32% of cases).
- *
- * So the results are described by what the engine can honestly claim:
- *   cluster    every car within CLUSTER_PTS of the top score — the set it is
- *              treating as interchangeable.
- *   decisive   true only when nothing else is within reach of #1, i.e. the
- *              "your perfect X is…" headline is earned.
- *
- * A decisive result shows TOP_MATCHES as before. A tied one shows the cluster
- * (capped at MAX_SHOWN, floored at TOP_MATCHES so the page never gets thinner
- * than it is today) and lets the page say so. CLUSTER_PTS is the one judgement
- * call here — 3 points out of 100, chosen because it's the median gap; the
- * dead-tie half of the finding needs no threshold at all.
+ * When the engine can't separate the top cars (#1 and #2 tie often), results are
+ * described by `cluster` (within CLUSTER_PTS of top) and `decisive`, not a "perfect" lie.
  */
 export const CLUSTER_PTS = 3;
 export const MAX_SHOWN = 6;
 
 /*
  * How far ahead on TASTE a car must be, inside a fit-tie, before we'll name it.
- * Below this the cars are alike on what suits them AND on what they like, so
- * there is genuinely nothing left for the engine to say and the page hands the
- * choice over (the refine chips). Meg's two identical MINI Electrics in
- * different colours are the case this protects.
+ * Below this the cars are alike on needs AND likes, so the page hands over to refine.
  */
 export const TASTE_PTS = 6;
 
@@ -792,25 +603,8 @@ export const TASTE_PTS = 6;
 export const ALTERNATIVES = 6;
 
 /*
- * Collapse repeat listings of the same car into one match.
- *
- * A retailer holding four iX2 eDrive20 M Sports produced four cards, all at
- * 96%, the top two in the same colour and £1,400 apart. The page said "six of
- * these fit you equally well" when it meant two models and six listings, which
- * reads as the page stuttering rather than as a choice. It also suppressed the
- * taste pick entirely: the top two matches were usually the SAME model, which
- * scores identically on character, performance and trim by definition, so
- * there was never a taste gap to name a winner on.
- *
- * Grouped on line + body + fuel + 0-62 + trim, which is "the same car" as a
- * buyer means it — deliberately not on `name`, because the feed writes the
- * same car two ways ("BMW iX2 eDrive20 M Sport" and "BMW iX2 20 66.5kWh M
- * Sport SUV 5dr Electric Auto"). The best-scoring listing represents the
- * group and carries the spread: how many, what price range, which colours.
- *
- * The union of the group's equipment goes on the representative so the refine
- * chips filter on what's actually AVAILABLE in that model, not on whichever
- * listing happened to rank first.
+ * Collapse repeat listings of the same car into one match, grouped on
+ * line+body+fuel+0-62+trim (not `name`, which the feed writes two ways).
  */
 export function groupListings(ranked) {
   const key = (c) => [c.line, c.body, c.fuel, c.zeroTo62, c.styleLine ?? ''].join('|');
@@ -843,13 +637,8 @@ export function groupListings(ranked) {
 }
 
 /**
- * The user's top matches from a pool of cars, plus whether picking a single
- * winner out of them is honest.
- *
- * @returns {{ matches: Match[], decisive: boolean, clusterSize: number }}
- *   `clusterSize` is the true size of the tie, which can exceed matches.length
- *   when it runs past MAX_SHOWN — the page can say "six of these fit" while
- *   showing what fits on screen.
+ * The user's top matches from a pool, plus whether naming one winner is honest.
+ * @returns {{ matches, decisive, clusterSize }} clusterSize can exceed matches.length.
  */
 export function matchCars(answers, cars, tuning = DEFAULT_TUNING) {
   // Group first, so everything downstream — the cluster count, the headline,
@@ -857,15 +646,8 @@ export function matchCars(answers, cars, tuning = DEFAULT_TUNING) {
   const scored = rankCars(answers, cars, tuning);
   const ranked = groupListings(scored);
   /*
-   * The working, so the page can show it.
-   *
-   * `total` is everything in this retailer's feed, `eligible` what survived
-   * the hard filters (over budget, too few seats, too small a boot). The
-   * difference between them is the elimination step, which the page otherwise
-   * has no way to mention: it can show the answer but not the search, so a
-   * result with one card looks like thin stock rather than like a clear
-   * winner. `margin` is how far ahead the leader is of the next DIFFERENT car
-   * — grouped, so four copies of one model do not make it look close.
+   * The working, so the page can show it: `total` is the whole feed, `eligible`
+   * what survived the hard filters, `margin` the lead over the next different car.
    */
   const searched = {
     total: cars.length,
@@ -882,20 +664,16 @@ export function matchCars(answers, cars, tuning = DEFAULT_TUNING) {
   const cluster = ranked.filter((m) => top - m.score <= CLUSTER_PTS);
   const clusterSize = cluster.length;
   const decisive = clusterSize === 1;
-  // Fit can't separate them, but taste can: rankCars has already sorted the
-  // cluster by taste, so the leader is the one that best matches what they
-  // said matters. Naming it is honest — and it's the only thing that makes
-  // the preference questions capable of changing the recommendation.
+  // Fit can't separate them but taste can: the cluster is already taste-sorted,
+  // so naming the leader is honest and lets the preference questions matter.
   const tasteLead = !decisive && (cluster[0].taste - cluster[1].taste) >= TASTE_PTS;
   const shown = decisive
     ? TOP_MATCHES
     : Math.min(Math.max(clusterSize, TOP_MATCHES), MAX_SHOWN);
   return {
     matches: ranked.slice(0, shown),
-    // The next-best cars, held back rather than shown. "Not this one" needs
-    // somewhere to go: without these, rejecting the cars on screen empties the
-    // page instead of offering the next one down, which makes the whole
-    // gesture a dead end.
+    // The next-best cars, held back so "not this one" has somewhere to go —
+    // without them, rejecting the shown cars empties the page.
     alternatives: ranked.slice(shown, shown + ALTERNATIVES),
     decisive,
     clusterSize,

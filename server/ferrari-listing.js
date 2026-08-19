@@ -1,28 +1,6 @@
 /*
- * Ferrari approved-used listing parser — shared by the live adapter (stock.js)
- * and the offline capture builder (scripts/build-ferrari-fixtures.mjs).
- *
- * preowned.ferrari.com is a server-rendered Next.js app: every listing page
- * ships the full result set as JSON in a <script id="__NEXT_DATA__">. The ads
- * live at props.pageProps.initialState.search.searchResults.ads, each a rich
- * record carrying price (GBP), year, odometer (mi), power, engine, colour,
- * gearbox, a per-listing total displacement (cc) and body style, plus a real
- * dealer with a name, address and geo. Parsing that JSON yields the exact flat
- * raw shape mapFerrariRaw consumes, so the same records feed the engine whether
- * they came from a live fetch or a committed snapshot.
- *
- * This file is pure (no network): callers fetch the HTML and hand it in. It is
- * proven against real listing HTML captured across the whole 15-page inventory.
- *
- * Two feed quirks the projection smooths over, both real and both load-bearing:
- *   - `bodyStyle` lies. GTS and Spider cars routinely report "coupè"; the model
- *     NAME is the truer body signal, so we surface the raw bodyStyle but let the
- *     mapper key body off the name (see ferrariBody in mapping.js).
- *   - `fuelType` is often empty (12Cilindri, 296, Purosangue), and `power` comes
- *     in four shapes ("492 (670) at 8000 rpm", "830", "570 ** at 9000 rpm",
- *     "588 (800) at 8500 rpm"). We parse HP defensively here and never let the
- *     card's fuelType decide the drivetrain — that keys on the spec table so the
- *     296/SF90 plug-in hybrids can't be mis-read as pure petrol.
+ * Ferrari approved-used listing parser. preowned.ferrari.com is a Next.js app
+ * shipping the result set as JSON in <script id="__NEXT_DATA__">; this is pure.
  */
 
 /** The results-feed base. Pagination is a `?pl=N` query param (NOT `?page=N`,
@@ -34,21 +12,14 @@ export const FERRARI_LISTING_BASE =
 export const FERRARI_ORIGIN = 'https://preowned.ferrari.com';
 
 /*
- * Thron DAM public delivery. The site's own JS hardcodes these two as plain
- * public constants (clientId "ferrari", sessId "3zayf6") — they are NOT
- * per-session values, and the card image is served from the token-free
- * /delivery/public/ path. So a cover photo is cold-resolvable from the
- * cardImages.thronGalleryId alone, no SDK session and no token (that concern
- * applies only to the detail-page full gallery/video, which we don't touch).
- * The delivery verb for a GALLERY id is `thumbnail` — it returns the gallery's
- * cover frame as a real JPEG; a single-image id would use `image` instead.
+ * Thron DAM public delivery: clientId "ferrari" and sessId "3zayf6" are public
+ * constants, so a cover photo is cold-resolvable from the gallery id, no token.
  */
 const THRON_CLIENT = 'ferrari';
 const THRON_SESS = '3zayf6';
 
 /** Build the public card-cover URL for a Thron gallery id, or null if none.
- *  `size` is a WxH box the CDN scales into (the returned JPEG's long edge is
- *  ~that many px). `slug` is cosmetic (the file-name tail) and safe to omit. */
+ *  `size` is a WxH box the CDN scales into; `slug` is cosmetic and safe to omit. */
 export function thronCardImage(galleryId, size = '600x400', slug = 'car') {
   if (!galleryId) return null;
   const tail = slugify(slug) || 'car';
@@ -109,10 +80,8 @@ const numOr = (v) => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-/** Power comes in four shapes across the feed. Prefer the parenthesised HP
- *  ("492 (670) …" -> 670); else the leading integer ("830", "570 ** …" -> the
- *  first, larger number, which is HP when there's no kW prefix). Returns HP or
- *  null. The mapper still backfills from the spec table when this is null. */
+/** Power comes in four shapes; prefer the parenthesised HP ("492 (670)" -> 670),
+ *  else the leading integer. Returns HP or null (mapper backfills when null). */
 export function parsePowerHp(power) {
   const s = String(power || '');
   const paren = s.match(/\(([\d.]+)\)/);
@@ -121,9 +90,8 @@ export function parsePowerHp(power) {
   return lead ? numOr(lead[1]) : null;
 }
 
-/** Build the per-listing detail URL from the ad's own fields. The path uses the
- *  dealer NAME slug (meridien-modena), the car-name slug, then the raw (already
- *  URL-encoded) id. */
+/** Build the per-listing detail URL from the ad's fields: dealer-name slug,
+ *  car-name slug, then the raw (already URL-encoded) id. */
 function detailLink(ad) {
   const dealerSlug = slugify(ad?.dealer?.name);
   const carSlug = slugify(ad?.carName || ad?.model?.name);
@@ -169,11 +137,8 @@ export function projectAd(ad) {
     trimColor: ad.trimColor || ov.trimColor || null,
     ferrariApproved: ad.ferrariApproved === true,
     specialOrLimitedSerie: ad.specialOrLimitedSerie === true,
-    // The Thron gallery id, and the public cover photo we build from it. The
-    // card image lives on Thron's token-free /delivery/public/ path (see
-    // thronCardImage), so this is a real cover frame, no SDK session needed.
-    // It's a single cover shot, not the swipeable multi-image gallery (that
-    // still needs the runtime session and we don't fetch it).
+    // The Thron gallery id and the public cover photo built from it (token-free
+    // /delivery/public/ path). A single cover shot, not the swipeable gallery.
     thronGalleryId: ad.cardImages?.thronGalleryId || null,
     photo: thronCardImage(ad.cardImages?.thronGalleryId, '600x400', name) || undefined,
     // Real dealer: name, address, city and geo. The geo powers a genuine

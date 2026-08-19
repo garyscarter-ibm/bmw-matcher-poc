@@ -1,15 +1,6 @@
 /*
- * Persona replay — run every persona in fixtures/personas.json through a
- * LIVE matcher API and report what each of them would actually see.
- *
- * For each persona: the result state the page would render (decree / tie /
- * closest-here / unmet / empty), the lead cars, whether their stated wants
- * were honoured, and a deep-link hash for eyeballing the real page. The
- * narrative half of each persona (who they are, what success looks like)
- * lives in docs/personas.md; judgement against THAT stays human.
- *
- * Needs the API up:  cd server && PORT=8787 node index.js
- * Run:               node scripts/persona-check.mjs [key ...]
+ * Persona replay — run every persona in fixtures/personas.json through a LIVE matcher API and report the result state each would see (decree/tie/closest/unmet/empty), lead cars, honoured wants and a deep-link hash. The narrative half of each persona lives in docs/personas.md; judgement against that stays human.
+ * Needs the API up (cd server && PORT=8787 node index.js).  Run:  node scripts/persona-check.mjs [key ...]
  */
 
 import { readFileSync } from 'node:fs';
@@ -34,9 +25,8 @@ const post = async (path, body) => {
 };
 
 /*
- * Below this the page stops calling the leader a match at all. Mirrors
- * WEAK_SCORE in blocks/vehicle-matcher/vehicle-matcher.js, which carries the
- * measurement behind the number; re-measure with `npm run audit conf`.
+ * Below this the page stops calling the leader a match at all. Mirrors WEAK_SCORE
+ * in blocks/vehicle-matcher/vehicle-matcher.js (re-measure with `npm run audit conf`).
  */
 const WEAK_SCORE = 68;
 
@@ -85,9 +75,8 @@ for (const p of selected) {
     console.log(`  nearby #1: ${first.score}% ${first.car.name.slice(0, 34)} (${first.car.distance ?? '?'} mi, ${first.car.retailerName || '?'})`);
   }
 
-  // One generic harness now; ?brand= picks the marque and ?retailer= the pool
-  // (index-mini.html is gone, and the page no longer hardcodes a per-brand
-  // retailer, so the persona's own retailer must ride along in the link).
+  // One generic harness now; ?brand= picks the marque and ?retailer= the pool, so
+  // the persona's own retailer must ride along in the link (no per-brand hardcode).
   const hash = Buffer.from(JSON.stringify(answers)).toString('base64url');
   console.log(`  view: http://localhost:3000/block.html?brand=${brand}&retailer=${retailer}&api=${API}#m=${hash}`);
 }

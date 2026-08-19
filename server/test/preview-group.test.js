@@ -1,18 +1,6 @@
 /*
- * HTTP tests for /api/preview's opt-in `group` flag.
- *
- * The endpoint has two consumers with opposite needs, which is why grouping is
- * a flag rather than a default. The questions drawer scrolls a strip of nine
- * where the same model twice reads as stock depth; a podium hands out three
- * distinct verdicts and cannot award all three to one car in three colours.
- *
- * The interesting bug is ordering, not grouping: rank → slice → group would
- * hand groupListings nine listings that might be two models and return two
- * cards, so these tests use a pool deep enough (ten models, three listings
- * each) that a slice-first implementation visibly under-fills the response.
- *
- * The second test is a regression guard, not a feature test: the drawer sends
- * no flag today and its results must not move.
+ * HTTP tests for /api/preview's opt-in `group` flag. The bug that matters is
+ * ordering: rank must group before slice, so the pool is deep enough to expose it.
  */
 
 import { test } from 'node:test';
@@ -28,9 +16,8 @@ import { mapVehicle } from '../mapping.js';
  * reaches the ranking, so the counts below are about grouping alone. */
 const OPEN_BRIEF = { budget: [10000, 60000] };
 
-/* Ten models that map to ten distinct grouping identities (line + body + fuel
- * + 0-62 + trim). More than PREVIEW_COUNT on purpose: grouping the full
- * ranking must still fill all nine slots. */
+/* Ten models with distinct grouping identities (line + body + fuel + 0-62 + trim).
+ * More than PREVIEW_COUNT on purpose: grouping the full ranking must fill nine slots. */
 const MODELS = [
   ['BMW X1', 'X1 sDrive18i M Sport'],
   ['BMW X2', 'X2 sDrive20i M Sport'],
@@ -45,10 +32,8 @@ const MODELS = [
 ];
 
 /**
- * A pool where every model appears `copies` times at different prices — the
- * shape of a real retailer feed, which the standard bmwPool deliberately isn't
- * (its cars are all one derivative, so it groups to a single card and can't
- * show a nine-slot response being filled).
+ * A pool where every model appears `copies` times at different prices — the shape
+ * of a real retailer feed, so grouping a nine-slot response can be observed filling.
  */
 function repeatedListingsPool(copies = 3) {
   return MODELS.flatMap(([title, derivative], m) => Array.from(
@@ -60,9 +45,8 @@ function repeatedListingsPool(copies = 3) {
   ));
 }
 
-/* Built once and shared. bmwFeedVehicle mints a fresh advert id per call, so
- * rebuilding it per request would give every response different car ids and
- * make the byte-identical comparison below meaningless. */
+/* Built once and shared: bmwFeedVehicle mints a fresh advert id per call, so
+ * rebuilding per request would break the byte-identical comparison below. */
 const POOL = repeatedListingsPool();
 
 /** The identity groupListings folds on, as far as a public card exposes it. */
@@ -87,9 +71,8 @@ test('POST /api/preview with group: true returns one card per model', async () =
   const ids = json.matches.map((m) => identity(m.car));
   assert.equal(new Set(ids).size, ids.length, 'no two grouped matches are the same model');
 
-  // Grouping the full ranking, then slicing: ten models means all nine slots
-  // fill. Slicing first would group nine listings down to three or four cards
-  // and silently return a short podium.
+  // Grouping the full ranking then slicing: ten models fill all nine slots.
+  // Slicing first would group nine listings to a few cards and return short.
   assert.equal(json.matches.length, PREVIEW_COUNT, 'grouping the whole ranking still fills the slice');
 
   // Proof the fold actually happened rather than the pool happening to be
@@ -109,9 +92,8 @@ test('POST /api/preview without the flag is unchanged: raw listings, repeats and
   assert.equal(status, 200);
   assert.equal(json.matches.length, PREVIEW_COUNT);
 
-  // The drawer's contract: individual listings, so the same model may appear
-  // more than once in the nine. With three copies of every model in the pool,
-  // a duplicate-free response would mean grouping had leaked into the default.
+  // The drawer's contract: individual listings, so a model may appear more than
+  // once. A duplicate-free response would mean grouping leaked into the default.
   const ids = json.matches.map((m) => identity(m.car));
   assert.ok(new Set(ids).size < ids.length, 'repeat listings still come through as separate cards');
   assert.ok(

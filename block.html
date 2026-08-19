@@ -18,16 +18,14 @@
       box-sizing: border-box;
       font-family: 'Helvetica Neue', helvetica, arial, sans-serif;
     }
-    /* The harness stands in for a host page, so IT owns the page surface.
-       The block itself is transparent (the host section decides its
-       background), which is why this white lives here and not there. */
+    /* The harness stands in for a host page, so IT owns the page surface. The block
+       itself is transparent (the host section decides its background), so this white lives here. */
     main {
       width: 100%; max-width: 880px; margin: 0 auto; box-sizing: border-box;
       background: #fff;
     }
-    /* Shared-password gate: a full-screen overlay over the harness's dark
-       surface. Purely for capturing the demo password (see the module script);
-       the server is the real gate. */
+    /* Shared-password gate: a full-screen overlay over the harness's dark surface,
+       purely for capturing the demo password (see the module script). The server is the real gate. */
     .vm-gate {
       position: fixed; inset: 0; z-index: 1000;
       display: flex; align-items: center; justify-content: center;
@@ -59,30 +57,8 @@
 </head>
 <body>
   <main>
-    <!-- Standalone harness: mounts the block exactly as EDS would.
-         The block is brand-agnostic — the "Brand" config row (below) chooses
-         which marque it themes and sources stock for. This demo defaults to
-         BMW; ?brand=mini (or any registered brand) switches it at runtime.
-
-         data-api points the block at the matching backend; in a live EDS site
-         you'd set this per-environment. Defaults to http://localhost:8787.
-         Override at runtime with ?api=<url> — used by the GitHub Pages build to
-         point the static page at the deployed backend without a rebuild.
-
-         The config rows below simulate what Adobe DA (Document Authoring)
-         renders from an authored block-config table: each row under the block
-         name becomes a child <div> with two nested <div> cells (key, value) —
-         the same shape aem-boilerplate's readBlockConfig() reads. A real
-         retailer page would set these in their DA document; here they're
-         defaults for local dev, overridable via the query string:
-           ?brand=bmw|mini   — which brand to theme + source
-           ?retailer=<id>    — which retailer's stock
-           ?mode=<key>       — lock to one interface, else the switcher shows.
-                               Keys: questionnaire, swipe, head-to-head, podium.
-           ?api=<url>        — point at a deployed backend
-
-         No "Mode" row is authored here on purpose: unlocked, the block shows
-         its mode switcher — this page IS the multi-interface showcase. -->
+    <!-- Standalone harness: mounts the block as EDS would, simulating the block-config table Adobe DA renders (each row -> key/value <div>s, per aem-boilerplate's readBlockConfig). Brand-agnostic; defaults to BMW/Grassicks with data-api at localhost:8787.
+         Query-string overrides: ?brand=bmw|mini|... ?retailer=<id> ?mode=<questionnaire|swipe|head-to-head|podium> ?api=<url>. No Mode row is authored on purpose: unlocked, the block shows its mode switcher — this page IS the multi-interface showcase. -->
     <div class="vehicle-matcher block" data-block-name="vehicle-matcher" data-api="http://localhost:8787">
       <div>
         <div>Brand</div>
@@ -112,10 +88,8 @@
       block.dataset.api = apiOverride;
     }
 
-    // Rewrite an authored config row's value in place, found by its label so
-    // the right row is hit regardless of order. Used by the ?brand / ?retailer
-    // overrides below. (?mode is read by the block itself from the query string,
-    // so it needs no row here.)
+    // Rewrite an authored config row's value in place, found by its label so the
+    // right row is hit regardless of order. (?mode is read by the block itself, no row needed.)
     const setRow = (label, value) => {
       const row = [...block.children].find(
         (r) => r.firstElementChild?.textContent.trim().toLowerCase() === label,
@@ -131,15 +105,8 @@
     const retailerOverride = params.get('retailer');
     if (retailerOverride) setRow('retailer id', retailerOverride);
 
-    // Retailer *Name* is a third authored row, hardcoded to "Grassicks BMW" in
-    // the markup above (the BMW default). It is NOT the brand row, so switching
-    // brand with ?brand= alone used to leave the name as "Grassicks BMW" — every
-    // non-BMW brand then read "...at Grassicks BMW", and Motorrad additionally
-    // "...bikes at Grassicks BMW". Fix: each brand carries its own default demo
-    // retailer name, applied whenever ?brand= is set. Honda/Ford/Motorrad are
-    // national approved-used programmes, not a single named dealer, so they use
-    // the programme name. Precedence: ?retailerName= (explicit) beats the
-    // ?retailer= ID map beats the ?brand= default.
+    // Retailer *Name* is a separate authored row, so ?brand= alone would leave it as the
+    // BMW default; each brand carries its own default name (national programmes for Honda/Ford/Motorrad). Precedence: ?retailerName= > ?retailer= ID map > ?brand= default.
     const BRAND_RETAILER_NAMES = {
       bmw: 'Grassicks BMW', // Grassicks Garage, Perth (retailer 96)
       mini: 'Sytner Luton MINI', // retailer 92
@@ -158,18 +125,8 @@
     if (nameOverride) setRow('retailer name', nameOverride);
 
     // ---- Shared-password gate ---------------------------------------------
-    // This overlay is UX only, not a security boundary: it captures the shared
-    // demo password so engine.js can send it as X-Access-Key on every API call.
-    // The real gate is the server, which 401s any /api/* call without a matching
-    // key (see server/index.js isAuthorized). So bypassing this overlay just
-    // yields an empty shell that can't load questions or matches. When the
-    // deployed backend has no DEMO_ACCESS_KEY set, any password (or none) works
-    // and the app runs open, exactly as before.
-    //
-    // ?key=<password> lets a single shareable link carry the password: we store
-    // it and strip it from the visible URL so it isn't shoulder-surfed or left in
-    // history/bookmarks. Rotating the server key invalidates old links, which is
-    // the point.
+    // UX only, not a security boundary: captures the shared demo password so engine.js sends it as X-Access-Key. The server is the real gate (401s /api/* without a matching key; runs open when DEMO_ACCESS_KEY is unset).
+    // ?key=<password> lets a shareable link carry the password: we store it and strip it from the visible URL so it isn't shoulder-surfed or left in history.
     const keyFromUrl = params.get('key');
     if (keyFromUrl) {
       sessionStorage.setItem(ACCESS_KEY_STORAGE, keyFromUrl);
@@ -182,9 +139,8 @@
       );
     }
 
-    // Build (or re-build) the password overlay. `message` shows the wrong-password
-    // note on a retry. Resolves once the user submits a non-empty password, which
-    // is stored before the promise resolves.
+    // Build (or re-build) the password overlay. `message` shows the wrong-password note
+    // on a retry. Resolves once the user submits a non-empty password (stored before resolving).
     function askForPassword(message) {
       return new Promise((resolve) => {
         const overlay = document.createElement('div');
@@ -213,9 +169,8 @@
       });
     }
 
-    // A 401 from a load-bearing call means the stored password was wrong or has
-    // been rotated: engine.js clears it and fires vm-auth-failed. Re-prompt with
-    // the error, then remount the block against the fresh key.
+    // A 401 from a load-bearing call means the stored password was wrong or rotated:
+    // engine.js clears it and fires vm-auth-failed. Re-prompt, then remount against the fresh key.
     window.addEventListener('vm-auth-failed', () => {
       // Guard against re-entrancy if two calls 401 at once.
       if (document.querySelector('.vm-gate')) return;
@@ -223,13 +178,8 @@
         .then(() => decorate(block));
     });
 
-    // Skip the up-front prompt when running locally. A local dev backend runs
-    // keyless (DEMO_ACCESS_KEY unset -> auth off, see server/index.js), so a
-    // pre-emptive password prompt on localhost is pure friction — the server
-    // returns 200 without a key. We treat both a locally-served page and a
-    // localhost API as "local" so the bypass holds however the harness is run;
-    // the vm-auth-failed handler above stays the real gate and catches the
-    // (unexpected) case where a local server *is* keyed. Mirrors index.html.
+    // Skip the up-front prompt when running locally: a keyless local backend returns 200 without a key, so a prompt is pure friction. Both a locally-served page and a localhost API count as "local".
+    // The vm-auth-failed handler above stays the real gate for the (unexpected) case where a local server is keyed. Mirrors index.html.
     const pageIsLocal = window.location.protocol === 'file:'
       || ['localhost', '127.0.0.1', '::1', '[::1]', ''].includes(window.location.hostname);
     const apiHost = (() => {

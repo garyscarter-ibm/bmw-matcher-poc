@@ -1,25 +1,6 @@
 /*
- * Vehicle Matcher — Adobe Edge Delivery Services (EDS) block. The shell.
- *
- * A brand-agnostic matcher: the brand (BMW, MINI, …) is authored config, not
- * baked in. This file is the SHELL around one or more interchangeable interface
- * "modes" (see modes/) that all drive the same engine (server/, via engine.js):
- *
- *   - It reads authored block config (brand, retailer, copy overrides, API base).
- *   - It applies the brand theme and builds the mode switcher + a stage element.
- *   - It picks which mode to mount:
- *       • a "Mode" config row (or ?mode=) locks the block to one interface and
- *         hides the switcher — the production case, one interface per page;
- *       • with no lock, every registered mode gets a switcher tab and the
- *         visitor can flip between them — the showcase case.
- *
- * The shell knows nothing about any mode's internals: a mode is just
- * { key, label, mount(root, ctx) }. Adding an interface touches modes/, not here.
- *
- * The API base comes from an authored "API" config row when running on EDS
- * (authored content can set config rows but not HTML attributes), or from a
- * `data-api` attribute for the local harness and the GitHub Pages build,
- * falling back to http://localhost:8787 for local preview. See apiBase.
+ * Vehicle Matcher — an Adobe EDS block. The SHELL around interchangeable interface "modes"
+ * (see modes/) driving one engine: it reads authored config, themes, and mounts a mode.
  */
 
 import { MODES, DEFAULT_MODE, modeByKey } from './modes/index.js';
@@ -27,15 +8,8 @@ import { MODES, DEFAULT_MODE, modeByKey } from './modes/index.js';
 const DEFAULT_API = 'http://localhost:8787';
 
 /**
- * API base for this block, in precedence order:
- *   1. the `data-api` attribute — the local harness and the Pages build set
- *      it (the harness's ?api= override writes here too), so a query override
- *      always wins;
- *   2. an authored "API" config row — the EDS path, because authored content
- *      can produce config rows but not HTML attributes;
- *   3. the localhost default, for `npm run serve`.
- * Trailing slashes are trimmed so `${base}/api/...` never doubles up. An empty
- * or absent row is falsy and simply falls through.
+ * API base for this block, in precedence order: the `data-api` attribute (harness/Pages, and
+ * the ?api= override), then an authored "API" config row (EDS), then the localhost default.
  */
 function apiBase(block) {
   const authored = readBlockConfig(block).api;
@@ -43,10 +17,8 @@ function apiBase(block) {
 }
 
 /**
- * Read authored block config the standard EDS way: each row below the block
- * name becomes a child `<div>` with two nested `<div>` cells (key, value).
- * See aem-boilerplate's `readBlockConfig()` — same shape, same convention,
- * so a page author sets config in their DA table, not in code.
+ * Read authored block config the standard EDS way: each row is a `<div>` with two cells
+ * (key, value). See aem-boilerplate's `readBlockConfig()` — same shape, same convention.
  */
 function readBlockConfig(block) {
   const config = {};
@@ -68,16 +40,8 @@ function retailerSite(block) {
 }
 
 /**
- * An authored copy override, with three distinct states:
- *   undefined — no row authored, so the block's own default is used;
- *   null      — row authored but blank (or "none"), so the line is SUPPRESSED;
- *   string    — the authored replacement.
- *
- * Suppression is the point: on a real retailer's page the block is usually
- * placed under the site's own section heading, and repeating a title inside
- * the block reads as a stutter. The same mechanism lets a dealer drop the
- * "unofficial" framing, which is right for a public demo and wrong on their
- * own site.
+ * An authored copy override with three states: undefined (no row → default), null (blank
+ * or "none" → SUPPRESSED), or a string (the replacement). Suppression avoids a stutter.
  */
 function copyRow(config, key) {
   if (!(key in config)) return undefined;
@@ -97,10 +61,8 @@ function copyOverrides(block) {
 
 const DEFAULT_RETAILER_NAME = 'our retailer network';
 
-/** Retailer display name for this block instance: authored "Retailer Name"
- * config row. Required alongside Retailer ID so the copy can name the
- * retailer the stock is actually sourced from; falls back to a generic
- * phrase (and warns) if the page author forgot to set it. */
+/** Retailer display name for this block: authored "Retailer Name" config row. Required so
+ * copy can name the source retailer; falls back to a generic phrase (and warns) if unset. */
 function retailerName(block) {
   const config = readBlockConfig(block);
   const name = config['retailer-name'];
@@ -111,19 +73,13 @@ function retailerName(block) {
   return name;
 }
 
-/** The brand keys this block knows how to theme. The server registry
- * (server/brands.js) is the source of truth for behaviour; this list is the
- * client mirror the shell needs to pick a theme class and reject typos. Keep it
- * in step when a brand is onboarded — one line per brand, no other client edit.
- * DEFAULT_BRAND is the fallback when no (or an unknown) "Brand" row is set. */
+/** The brand keys this block knows how to theme — the client mirror of the server registry
+ * (server/brands.js, the source of truth). DEFAULT_BRAND is the fallback for an unknown row. */
 const KNOWN_BRANDS = ['bmw', 'mini', 'ford', 'honda', 'motorrad', 'ferrari'];
 const DEFAULT_BRAND = 'bmw';
 
-/** Brand for this block instance: authored "Brand" config row, lower-cased,
- * validated against KNOWN_BRANDS. Defaults to bmw. Drives both the visual theme
- * (a body class) and which live feed the server queries. Brand is authored data,
- * not baked in — the app is brand-agnostic; bmw is just the default when no row
- * is set or the row names a brand the block doesn't know. */
+/** Brand for this block: authored "Brand" row, lower-cased, validated against KNOWN_BRANDS.
+ * Drives the theme class and which live feed the server queries; defaults to bmw. */
 function brand(block) {
   const config = readBlockConfig(block);
   const b = (config.brand || '').toLowerCase();
@@ -131,13 +87,8 @@ function brand(block) {
 }
 
 /**
- * Which interface mode to run, and whether the switcher is shown:
- *   - an authored "Mode" config row, or a ?mode= query override, LOCKS the
- *     block to that mode (switcher hidden) — the production case;
- *   - anything absent/blank/unrecognised leaves it unlocked (switcher shown,
- *     defaulting to DEFAULT_MODE) — the showcase case.
- * ?mode= wins over the authored row so a single deployed page can demo any mode
- * by URL. Returns { mode, locked }.
+ * Which interface mode to run, and whether the switcher shows: an authored "Mode" row or a
+ * ?mode= override LOCKS to that mode (switcher hidden); absent/unknown leaves it unlocked.
  */
 function resolveMode(block) {
   const params = new URLSearchParams(window.location.search);
@@ -147,9 +98,8 @@ function resolveMode(block) {
 }
 
 /**
- * The mode switcher: one tab per registered mode. Clicking a tab re-mounts the
- * selected mode into the stage. Only rendered when the block is unlocked and
- * there's more than one mode to choose between — a single mode needs no switch.
+ * The mode switcher: one tab per registered mode; clicking re-mounts it into the stage.
+ * Only rendered when the block is unlocked and there's more than one mode to choose.
  */
 function renderSwitcher(block, stage, ctx, current) {
   if (MODES.length < 2) return null;
@@ -197,9 +147,8 @@ export default async function decorate(block) {
   const { mode, locked } = resolveMode(block);
 
   block.replaceChildren();
-  // Base class + brand theme class ('vm-bmw' | 'vm-mini' | 'vm-ford' | …). Each
-  // brand's theme (vehicle-matcher.css) overrides the design tokens under its
-  // own .vm-<brand> scope; the base .vm block is the BMW-default look.
+  // Base class + brand theme class ('vm-bmw' | 'vm-mini' | …). Each brand's theme overrides
+  // the design tokens under its own .vm-<brand> scope; the base .vm block is the BMW look.
   block.classList.add('vm', `vm-${brandKey}`);
 
   // The context every mode receives. Config the shell resolved once; each mode
@@ -213,27 +162,20 @@ export default async function decorate(block) {
     overrides,
   };
 
-  // The stage the active mode renders into — its own element so a switcher can
-  // sit above it and survive a mode swap (a mode may replaceChildren() the
-  // stage, but never the block).
+  // The stage the active mode renders into — its own element so a switcher can sit above it
+  // and survive a mode swap (a mode may replaceChildren() the stage, but never the block).
   const stage = document.createElement('div');
   stage.className = 'vm-stage';
 
-  // Unlocked: offer the switcher above the stage. Locked (authored Mode row or
-  // ?mode=): mount that one mode with no switcher, so a production page looks
-  // exactly as it did before modes existed.
+  // Unlocked: switcher above the stage. Locked (authored Mode row or ?mode=):
+  // mount that one mode with no switcher, as a production page looked pre-modes.
   if (!locked) {
     const switcher = renderSwitcher(block, stage, ctx, mode);
     if (switcher) block.append(switcher);
   }
   block.append(stage);
 
-  // Deliberately NOT awaited. EDS awaits every block's decorate() before it
-  // reveals the page (body gains `appear`), so awaiting a network round-trip
-  // here holds the WHOLE document hostage — including scrolling. Against a cold
-  // backend that's 30–50s of a page that looks broken: content visible, scroll
-  // dead. A mode paints its own skeleton immediately and swaps in the real
-  // thing when its data lands, so decorate() returns now and lets the page
-  // finish loading.
+  // Deliberately NOT awaited: EDS awaits decorate() before revealing the page, so awaiting a
+  // network round-trip here holds the whole document hostage. Modes paint a skeleton instead.
   mode.mount(stage, ctx);
 }

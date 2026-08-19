@@ -1,17 +1,6 @@
 /*
- * HTTP API-layer tests for the matcher engine.
- *
- * The engine's scoring is covered by engine.test.js / brand.test.js (pure
- * functions against fixtures). This suite covers the *server contract* every
- * interface mode depends on: route dispatch, request validation, response
- * shape and status codes, brand/retailer plumbing, and the size/enrich field
- * controls the game modes (swipe deck, knockout bracket) rely on.
- *
- * All of it runs against a real buildServer() instance on an ephemeral port
- * with an injected in-memory stock source (see helpers.js) — the true handler
- * code path, no live feed, no network. This is the layer whose absence let the
- * /api/field incident ship (a mode calling an endpoint the deployed backend
- * didn't serve); the contract-guard test below is the direct regression for it.
+ * HTTP API-layer tests: the server contract every mode depends on (routing,
+ * validation, response shape, brand/retailer plumbing) via a real buildServer().
  */
 
 import { test } from 'node:test';
@@ -94,12 +83,8 @@ test('OPTIONS preflight → 204 with CORS headers', async () => {
 });
 
 /* ------------------------------------------------------------------ *
- * Shared-password gate (DEMO_ACCESS_KEY)
- *
- * When the env var is unset, auth is off and the whole suite above runs open.
- * These tests set it around a single server instance (isAuthorized reads it
- * per-request) and restore it in a finally so it never leaks to sibling tests
- * — node --test runs them all in one process.
+ * Shared-password gate (DEMO_ACCESS_KEY). Set per-server and restored in a
+ * finally so it never leaks to sibling tests (all run in one process).
  * ------------------------------------------------------------------ */
 
 /** Run `fn` with DEMO_ACCESS_KEY set to `key`, restoring the prior value after. */
@@ -182,10 +167,8 @@ test('gated: /health stays open with no key (platform health check must not brea
 });
 
 test('every endpoint the client calls exists (contract guard for the /api/field-class bug)', async () => {
-  // Enumerate exactly what blocks/vehicle-matcher/engine.js talks to. If a mode
-  // depends on an endpoint the server doesn't serve, one of these 404s — which
-  // is precisely the failure that shipped when /api/field went live before the
-  // backend served it. A valid request to each must NOT come back 404.
+  // Enumerate what blocks/vehicle-matcher/engine.js talks to: if a mode depends on
+  // an endpoint the server doesn't serve, one of these 404s (the /api/field bug).
   const enrich = fakeEnrich();
   await withServer(
     { fetchRetailerStock: fakeStock(), fetchNearbyStock: fakeStock(), enrichColours: enrich },
@@ -381,9 +364,7 @@ test('POST /api/preview accepts a partial brief (budget only) → 200', async ()
 
 test('POST /api/preview degrades a ranking failure to { matches: [] } 200, never 5xx', async () => {
   // A scorer that trips on a partial answer set must not take the drawer down.
-  // Inject a pool whose ranking throws by handing rankCars a car it chokes on:
-  // simplest reliable trigger is a stock fn returning a non-array, which makes
-  // rankCars throw inside the guarded try. The handler must swallow it.
+  // A stock fn returning a non-array makes rankCars throw; the handler must swallow it.
   await withServer(
     { fetchRetailerStock: async () => ({ not: 'an array' }), enrichColours: fakeEnrich() },
     async (base) => {

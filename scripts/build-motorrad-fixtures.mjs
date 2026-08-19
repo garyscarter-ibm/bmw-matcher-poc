@@ -1,29 +1,6 @@
 /*
- * Build fixtures/motorrad-bikes.json — curated, not scraped.
- *
- * BMW Motorrad's live approved-used feed (approvedused.bmw-motorrad.co.uk) is an
- * AngularJS SPA whose only data path is a session-bound POST
- * (ResultOverview/ShowResultsFilterChanged) that needs a live GMB-SID cookie the
- * server issues to a real browser session; harvested out-of-band it 302s to a
- * not-found (see the [motorrad-data] entry in DECISIONS.md). So, like Ford, there
- * is no raw dump to replay. This script SYNTHESISES a realistic flat-raw dataset
- * — a spread of models across every category, with representative used prices,
- * mileages and plates — and projects it through mapMotorradRaw(), the SAME
- * flat-raw -> mapped-bike projection the live adapter will use once a session is
- * reachable. The fixtures are deterministic, regenerable, and exercise the whole
- * range: the GS adventure line, RT/K tourers, S/M sport, the naked/roadster
- * street bikes, R heritage boxers, and the electric CE 04 scooter.
- *
- * Model figures live in server/mapping.js (MODEL_SPECS_MOTORRAD); this file only
- * decides WHICH bikes exist and at what price/mileage, so a mapping change
- * re-projects here for free. Spec figures were reconciled against BMW Motorrad UK
- * / MCN / Bennetts (see the Motorrad section of DECISIONS.md).
- *
- * Deterministic: no Date.now()/Math.random() — a fixed mulberry32 seeded per
- * index — so the committed JSON is stable across runs and diffs stay readable.
- *
- * Run:  node scripts/build-motorrad-fixtures.mjs
- * Out:  fixtures/motorrad-bikes.json  (mapped bikes the engine scores)
+ * Build fixtures/motorrad-bikes.json — curated/synthetic, not scraped (the live BMW Motorrad feed is session-gated, see DECISIONS.md [motorrad-data]). Synthesises a varied flat-raw deck across every category and projects it through mapMotorradRaw() (specs from MODEL_SPECS_MOTORRAD); deterministic via a per-index mulberry32 (no Date/Math.random) so diffs stay readable.
+ * Run:  node scripts/build-motorrad-fixtures.mjs   ->  fixtures/motorrad-bikes.json
  */
 
 import { writeFileSync } from 'node:fs';
@@ -47,15 +24,8 @@ function rng(seed) {
   };
 }
 
-/* Each line: how many to emit, the model title as an approved-used listing reads
- * it, and a price band [min, max] for a 1-4 year-old example. The mapper derives
- * category, specs, fuel and tags from the title alone (motorradLine ->
- * MODEL_SPECS_MOTORRAD), so this table just populates a realistic, varied deck
- * spanning every riding style a rider might pick.
- *
- * Prices reflect the UK approved-used market: a 3-year-old R 1250 GS around
- * £13-16k, a current R 1300 GS £17-19k, the halo M 1000 RR north of £25k, the
- * learner-friendly G 310s under £5k. */
+/* Each line: count, model title (as an approved-used listing reads it) and a used-price
+ * band. The mapper derives category/specs/fuel/tags from the title alone (motorradLine -> MODEL_SPECS_MOTORRAD); prices track the real UK approved-used market. */
 const LINES = [
   // Adventure / GS — the core of the range, the widest spread of ages/prices.
   { title: 'BMW R 1300 GS', count: 4, priceBand: [17000, 19500] },

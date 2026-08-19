@@ -1,29 +1,6 @@
 /*
- * BMW Matcher API — zero-dependency Node HTTP server.
- *
- * Runs the matching engine server-side so the scoring weights (engine.js)
- * never reach the browser, and fetches live used-car stock from a real BMW
- * retailer (stock.js) so matches are cars you can actually buy today. The
- * EDS block calls:
- *
- *   GET  /api/questions  → quiz definition (showIf functions stripped)
- *   POST /api/match      → { answers } → { matches } from the configured
- *                          retailer's own stock (fast path). Display-only car
- *                          fields (no tags/specs the engine uses internally,
- *                          so the dataset can't be rebuilt).
- *   POST /api/preview    → { answers } → { matches }: the top few from the
- *                          configured retailer's stock for the quiz's live
- *                          "best guess" drawer. Same scoring + cache as
- *                          /api/match, just a wider slice — served hot from the
- *                          warmed cache so mid-quiz refreshes are cheap.
- *   POST /api/nearby     → { answers } → { nearby }: the best matches at
- *                          *other* retailers close by, each carrying a real
- *                          distance in miles. Split from /api/match so its
- *                          slow national search never blocks the hero matches;
- *                          degrades to [] on any failure (HTTP 200).
- *   GET  /health         → { ok: true }
- *
- * Portable: no framework, no build step. Deploy behind any host; set PORT.
+ * BMW Matcher API — zero-dependency Node HTTP server. Runs the matching engine
+ * server-side (weights never reach the browser) over live used-car stock (stock.js).
  */
 
 import { createServer } from 'node:http';
@@ -44,37 +21,22 @@ import { normalizeBrand, brandTuning } from './brands.js';
 const PORT = Number(process.env.PORT) || 8787;
 const MAX_BODY_BYTES = 16 * 1024; // quiz answers are tiny; reject anything bigger
 
-// A shared secret that gates the /api/* surface, set only in the host's env
-// (e.g. Render dashboard) so it's never committed. When it's unset or empty,
-// auth is OFF — local dev and the whole test suite run open, unchanged. When
-// it's set, every /api/* call must carry a matching X-Access-Key header (see
-// isAuthorized). /health stays open either way for the platform health check.
-// Rotate by changing this one env var; the frontend needs no redeploy because
-// the password is entered at runtime, not baked in. Read per-request (not
-// cached at load) so a rotation takes effect on the next call, and so tests can
-// toggle it around a single server instance.
+// A shared secret gating /api/*, set only in the host env (never committed). Unset/empty
+// = auth OFF (local dev + tests run open); set = X-Access-Key must match. Read per-request.
 function accessKey() {
   return process.env.DEMO_ACCESS_KEY || '';
 }
 
-// How many matches the quiz's live "best guess" drawer shows. Wider than the
-// results page's TOP_MATCHES (3) — it's a browse-the-shortlist glance, not the
-// final recommendation. The retailer may hold fewer that survive the filters;
-// the block renders however many come back.
+// How many matches the quiz's live "best guess" drawer shows. Wider than the results
+// page's TOP_MATCHES (3) — a browse-the-shortlist glance, not the final recommendation.
 const PREVIEW_COUNT = 9;
 
-// The game modes (swipe deck, knockout bracket) ask /api/field for a *roster* of
-// real stock, not a shortlist — a bracket wants a full field. This is the ceiling
-// on that roster (a Round-of-16 bracket, or a deck): a brand with a big feed like
-// BMW fills it; a thinner feed like MINI returns fewer and the mode adapts down.
-// It does NOT change what the engine scores (still the whole feed via rankCars) —
-// only how many of the ranked cars enter the game. Kept separate from
-// PREVIEW_COUNT so the questions drawer's tuned top-9 is untouched.
+// Ceiling on the game modes' roster (swipe deck / knockout bracket) from /api/field — a
+// bracket wants a full field, not a shortlist. Doesn't change what the engine scores.
 const FIELD_MAX = 16;
 
-/** Clamp a client-supplied roster size into [2, FIELD_MAX]; default to the cap
- * when it's absent or not a positive number. Two is the smallest playable field
- * (a single final); above the cap we just return the cap rather than error. */
+/** Clamp a client roster size into [2, FIELD_MAX]; default to the cap when absent or not
+ * a positive number. Two is the smallest playable field; above the cap returns the cap. */
 function clampFieldSize(raw) {
   const n = Math.floor(Number(raw));
   if (!Number.isFinite(n) || n < 2) return FIELD_MAX;
@@ -82,11 +44,8 @@ function clampFieldSize(raw) {
 }
 
 const CORS_HEADERS = {
-  // Read-only tool. Origin stays '*' on purpose: the block is driven by a
-  // runtime ?api=<url> from arbitrary origins (and file:// locally), and the
-  // real gate is the X-Access-Key header check (origin-independent), not the
-  // origin. X-Access-Key must be advertised here or the browser preflight
-  // blocks the custom header before the request reaches the handler.
+  // Read-only tool. Origin stays '*' on purpose (the block runs from arbitrary origins);
+  // the real gate is the X-Access-Key header, which must be advertised here for preflight.
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, X-Access-Key',
@@ -104,14 +63,8 @@ function sendJson(res, status, payload) {
 }
 
 /**
- * Is this request allowed to reach the /api/* surface?
- *
- * When ACCESS_KEY is unset, auth is OFF and every request passes — this is what
- * keeps local dev and the test suite running open with no env var set. When it's
- * set, the request must carry an X-Access-Key header that matches. The compare is
- * constant-time (timingSafeEqual), which needs equal-length buffers and throws
- * otherwise, so we bail early on a missing header or a length mismatch (the
- * length of a shared demo password isn't a secret worth protecting).
+ * Is this request allowed to reach /api/*? Unset ACCESS_KEY = auth OFF; set = X-Access-Key
+ * must match. Constant-time compare needs equal-length buffers, so bail on missing/mismatched.
  */
 function isAuthorized(req) {
   const expected = accessKey();
@@ -124,10 +77,8 @@ function isAuthorized(req) {
 }
 
 /**
- * Quiz definition for the client, for a given brand. Options the brand doesn't
- * sell are filtered out (questionsForBrand); `showIf` predicates can't cross
- * JSON, so we drop them and mark conditional questions — the block applies the
- * matching predicate from quiz-meta.js by question id.
+ * Quiz definition for the client, for a brand. Options the brand doesn't sell are filtered
+ * out; `showIf` predicates can't cross JSON, so we drop them and mark conditional questions.
  */
 function publicQuestions(brand) {
   return questionsForBrand(brand)
@@ -135,26 +86,13 @@ function publicQuestions(brand) {
 }
 
 /**
- * Project a car down to only the fields the result cards render (see
- * matchCard() in vehicle-matcher.js). Internal scoring fields — tags, sizeClass,
- * id — are omitted so responses can't be used to reconstruct the dataset. The
- * real display fields (mileage, plate, photo, retailerName, link) come from the
- * live feed and are passed through where present.
- *
- * `seats` and `boot` used to be withheld with the rest of the scoring fields.
- * They are printed on the card now (Priya walks away from "a boot claim she
- * cannot picture", and we were not even giving her the number), and a field the
- * card prints is public by definition.
- *
- * `retailerId` is deliberately absent: it exists only so fetchNearbyStock can
- * drop the anchor retailer's own cars, and the block has no use for it.
+ * Project a car to only the fields result cards render (see matchCard). Internal scoring
+ * fields are omitted so responses can't rebuild the dataset; a field the card prints is public.
  */
 function publicCar(car) {
   return {
-    // The advert id — already public in `link` (/vehicle/{advert_id}), and the
-    // only stable identity the page has for a car. Refinement state needs it:
-    // without it every card compares equal to every other, so "not this one"
-    // would rule out the lot.
+    // The advert id — already public in `link`, and the only stable identity the page has.
+    // Refinement needs it: without it every card compares equal, so "not this one" rules out all.
     id: car.id,
     name: car.name,
     line: car.line,
@@ -165,53 +103,41 @@ function publicCar(car) {
     zeroTo62: car.zeroTo62,
     mpg: car.mpg,
     evRange: car.evRange,
-    // The two practicality facts the engine hard-filters on. Both come from
-    // MODEL_SPECS (mapping.js), so they describe the model rather than the
-    // individual listing, and the card says so ("seats up") rather than
-    // implying a measured figure for this exact car.
+    // The two practicality facts the engine hard-filters on. From MODEL_SPECS (mapping.js),
+    // so they describe the model not the listing — the card says "seats up", not a measured figure.
     seats: car.seats,
     boot: car.boot,
     blurb: car.blurb,
     // Live retailer detail (present when sourced from the live feed).
     mileage: car.mileage,
     plate: car.plate,
-    // Age source for the swipe card's dating frame ("3 years old" instead of a
-    // reg plate). The plate encodes the age code for plated brands, but bikes
-    // (Motorrad) carry no plate in the feed, so the registration year/date are
-    // surfaced here too. Both describe the listing, so a card that prints an age
-    // is fair game (see ageInYears in match-signal.js for the derivation order).
+    // Age source for the swipe card's dating frame ("3 years old"). The plate encodes age
+    // for plated brands, but bikes carry none, so reg year/date are surfaced too (see ageInYears).
     year: car.year,
     firstReg: car.firstReg,
     photo: car.photo,
-    // Granular facts the life-fit questions never ask about, for the
-    // refinement step: equipment concepts (mapping.js FEATURE_CONCEPTS),
-    // gearbox, and paint — the last fetched per shown car from the PDP, so
-    // it's present on match results and absent elsewhere.
+    // Granular facts the life-fit questions never ask, for the refinement step: equipment
+    // concepts (FEATURE_CONCEPTS), gearbox, and paint (fetched per shown car from the PDP).
     features: car.features,
     transmission: car.transmission,
     colour: car.colour,
-    // Per-listing detail recovered from the raw feeds, for the card layer.
-    // cc/power are real for Honda (bhp), Motorrad (kW) and Ferrari (bhp), and now
-    // BMW/MINI (cc, from the feed's engine block); topSpeed is real per-listing
-    // for Ferrari (mph); fullServiceHistory and previousOwners are real per-
-    // listing for Ford. Each describes the individual car (not the model), so a
-    // card may state them as the listing's own.
+    // Per-listing detail from the raw feeds, for the card layer: cc/power (Honda bhp,
+    // Motorrad kW, Ferrari/BMW), topSpeed (Ferrari mph), service history/owners (Ford).
     cc: car.cc,
     power: car.power,
     topSpeed: car.topSpeed,
     fullServiceHistory: car.fullServiceHistory,
     previousOwners: car.previousOwners,
-    // Set when repeat listings of the same car were grouped (see
-    // groupListings): how many the retailer has, the price spread and the
-    // colours they come in, so one card can speak for all of them.
+    // Set when repeat listings of one car were grouped (see groupListings): count, price
+    // spread and colours, so one card can speak for all of them.
     listingCount: car.listingCount,
     priceFrom: car.priceFrom,
     priceTo: car.priceTo,
     colours: car.colours,
     retailerName: car.retailerName,
     link: car.link,
-    // Miles from the configured retailer. Only set on `nearby` cars — the
-    // hero matches are the configured retailer's own stock.
+    // Miles from the configured retailer. Only set on `nearby` cars — the hero matches
+    // are the configured retailer's own stock.
     distance: car.distance,
   };
 }
@@ -225,23 +151,12 @@ function publicMatch({
     stretch,
     reasons,
     tradeOffs,
-    // The individual cars behind a grouped card. Sent for EVERY match, not
-    // just multi-listing ones, because the page's refine/reject layer filters
-    // listings and rebuilds the card from the survivors — a one-listing group
-    // is just the degenerate case of that, and special-casing it in the client
-    // is how the two paths drift apart.
-    //
-    // The field list is "whatever a filter can test": colour and shade for the
-    // colour chips, price and mileage for the reject reasons, transmission and
-    // features for the gearbox and equipment chips. `shade` is the normalised
-    // name ("Blue") the chips group by; `colour` is the marketing one
-    // ("Portimao Blue") the buyer reads.
+    // The cars behind a grouped card, sent for EVERY match (a one-listing group is the
+    // degenerate case; special-casing it in the client is how the two paths drift apart).
     listings: (listings?.length ? listings : [car]).map((c) => ({
       id: c.id,
-      // Each listing is a real car with its own photographs, so the card can
-      // show the one the buyer picked rather than the one that ranked first.
-      // Colour is the reason this choice exists; a picture of a different
-      // colour undoes it.
+      // Each listing is a real car with its own photos, so the card shows the one the buyer
+      // picked, not the one that ranked first — colour is the reason, a wrong photo undoes it.
       photo: c.photo,
       colour: c.colour?.manufacturerColour || c.colour?.colour,
       shade: c.colour?.colour,
@@ -261,11 +176,8 @@ function readJsonBody(req) {
     req.on('data', (chunk) => {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
-        // Stop reading, but DON'T destroy the socket: a reset reaches the
-        // client as a generic "connection closed", indistinguishable from a
-        // network drop. Pausing lets the handler's 413 response flush first, so
-        // the block can actually see it's the payload that was refused. Ignore
-        // any further body — we've decided.
+        // Stop reading, but DON'T destroy the socket: a reset reaches the client as a generic
+        // "connection closed". Pausing lets the 413 flush first so the block sees the refusal.
         req.pause();
         reject(Object.assign(new Error('Payload too large'), { statusCode: 413 }));
         return;
@@ -285,12 +197,8 @@ function readJsonBody(req) {
 }
 
 /**
- * Parse + validate the { answers, retailer } POST body shared by /api/match,
- * /api/nearby and /api/field. Returns { answers, retailer, brand, size, enrich,
- * group } on success, or { error, status } for the caller to send. Kept in one
- * place so every endpoint validates identically. `size`/`enrich` are only
- * meaningful to /api/field (the game-mode roster) and `group` only to
- * /api/preview; the match/nearby handlers ignore them.
+ * Parse + validate the shared POST body. Returns {answers, retailer, brand, size, enrich,
+ * group} or {error, status}. `size`/`enrich` are for /api/field, `group` for /api/preview.
  */
 async function readMatchRequest(req) {
   let body;
@@ -303,9 +211,8 @@ async function readMatchRequest(req) {
   if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
     return { error: 'Missing "answers" object', status: 400 };
   }
-  // Budget is now a continuous number from the slider, but legacy b1–b5 band
-  // keys are still honoured (old shared links). budgetRange resolves both to a
-  // [min, max]; a null means neither a valid number nor a known band.
+  // Budget is a continuous number now, but legacy b1–b5 band keys are still honoured (old
+  // links). budgetRange resolves both to [min, max]; null means neither a number nor a band.
   if (!budgetRange(answers)) {
     return { error: 'Invalid or missing budget', status: 400 };
   }
@@ -313,16 +220,12 @@ async function readMatchRequest(req) {
   // Brand selects the feed (BMW vs MINI). normalizeBrand defaults unknown/absent
   // to BMW, so old clients that don't send a brand keep working.
   const brand = normalizeBrand(body.brand);
-  // Game-mode roster controls (see handleField). A client asking for a bigger
-  // field than FIELD_MAX is clamped, not rejected; absent/garbage falls back to
-  // the cap. `enrich` opts a caller into per-card paint (swipe wants it; the
-  // knockout doesn't pay for 16 PDP fetches on round-one losers).
+  // Game-mode roster controls (see handleField). Oversized fields are clamped not rejected;
+  // `enrich` opts into per-card paint (swipe wants it; knockout won't pay for 16 PDP fetches).
   const size = clampFieldSize(body.size);
   const enrich = body.enrich === true;
-  // `group` opts a caller into one-card-per-model results (see handlePreview).
-  // Opt-in rather than default, and strict `=== true` like `enrich`, because the
-  // questions drawer's top-9 is tuned around listings and must not shift under
-  // it: an absent or garbage flag has to leave that response untouched.
+  // `group` opts into one-card-per-model results (see handlePreview). Strict `=== true`:
+  // the drawer's top-9 is tuned around listings, so an absent/garbage flag must not shift it.
   const group = body.group === true;
   return {
     answers, retailer, brand, size, enrich, group,
@@ -330,10 +233,8 @@ async function readMatchRequest(req) {
 }
 
 /**
- * The retailer's own matches — the fast path. Scores against just the
- * retailer's live stock (one feed, ~3 pages), so the results page can render
- * the hero + "More at" tier without waiting on the slower national nearby
- * search, which the block now fetches separately via /api/nearby.
+ * The retailer's own matches — the fast path. Scores against just the retailer's live stock
+ * so the hero renders without waiting on the slower nearby search (now separate, /api/nearby).
  */
 async function handleMatch(req, res, deps) {
   const {
@@ -341,9 +242,8 @@ async function handleMatch(req, res, deps) {
   } = await readMatchRequest(req);
   if (error) return sendJson(res, status, { error });
 
-  // Live proxy: score against the retailer's real stock, not a static file.
-  // If the live feed can't be reached, return a friendly 5xx — the block's
-  // retry UI handles it. No static fallback (this tool is honestly live-only).
+  // Live proxy: score against real stock, not a static file. If the feed is down, return a
+  // friendly 5xx (the block's retry UI handles it) — no static fallback, this tool is live-only.
   let cars;
   try {
     cars = await deps.fetchRetailerStock(brand, retailer);
@@ -361,34 +261,16 @@ async function handleMatch(req, res, deps) {
     matches, alternatives, decisive, clusterSize, tasteLead, searched,
   } = matchCars(scored, cars, brandTuning(brand));
 
-  // Paint only exists on the vehicle detail page, so it's fetched for the
-  // handful of cars we're about to show rather than the whole pool (see
-  // enrichColours). Enriches the cached car objects in place, so a second
-  // session at the same retailer gets them for free.
-  // Enrich the grouped card AND the listings behind it: a card that says "4
-  // available in Portimao Blue, Brooklyn Grey or Alpine White" needs every
-  // listing's paint, not just the one that ranked first.
-  // Shown cards get their listings enriched too (the picker needs every
-  // colour); the held-back alternatives only need their own paint, since they
-  // aren't on screen yet.
-  // Order matters: paint is fetched one page at a time against a wall-clock
-  // budget, so whatever is queued last may not get done. Cards on screen come
-  // first, then the listings behind them (the picker names cars by colour),
-  // then the held-back alternatives, which nobody can see yet.
-  // Grouping copies the representative into a fresh `car` object and keeps the
-  // originals in `listings`, so enriching one does NOT enrich the other. Both
-  // have to be in this list, or a grouped card gets paint on its headline and
-  // none on the listings behind it.
+  // Paint only exists on the PDP, so enrich just the cars about to show (see enrichColours),
+  // on-screen first (budget cuts the tail); a grouped card's fresh `car` and `listings` differ — enrich both.
   await deps.enrichColours(brand, [
     ...matches.map((m) => m.car),
     ...matches.flatMap((m) => m.listings || []),
     ...alternatives.map((m) => m.car),
     ...alternatives.flatMap((m) => m.listings || []),
   ]);
-  // Paint is only known after that call, so the group's colour list is filled
-  // in here rather than at grouping time. Alternatives get the same treatment:
-  // a rejection promotes one into view, and it should arrive able to say what
-  // colours it comes in rather than repairing itself on the next request.
+  // Paint is only known after that call, so the group's colour list is filled here, not at
+  // grouping time. Alternatives too: a rejection promotes one into view already knowing its colours.
   for (const m of [...matches, ...alternatives]) {
     if (m.listings?.length > 1) {
       m.car.colours = [...new Set(m.listings
@@ -396,46 +278,29 @@ async function handleMatch(req, res, deps) {
         .filter(Boolean))];
     }
   }
-  // What this retailer couldn't offer, so the page can say so instead of
-  // quietly serving the closest thing (see unmetWants). Reported against the
-  // folded answers — those are the wants actually searched for. Half the
-  // picture: the block waits for /api/nearby to agree before telling the user
-  // a want is genuinely unavailable.
+  // What this retailer couldn't offer (see unmetWants), against the folded answers. Half the
+  // picture: the block waits for /api/nearby to agree before calling a want truly unavailable.
   return sendJson(res, 200, {
     matches: matches.map(publicMatch),
     // Held back for "not this one" to fall through to (see matchCars).
     alternatives: alternatives.map(publicMatch),
-    // Whether naming a single winner is honest, and how big the tie really is
-    // (it can exceed matches.length — see matchCars). The page decides between
-    // "your perfect BMW is…" and "any of these would suit you" on this.
+    // Whether naming a single winner is honest, and how big the tie is (can exceed
+    // matches.length — see matchCars). Drives "your perfect BMW is…" vs "any of these".
     decisive,
     clusterSize,
     // Fit couldn't separate the leaders but the buyer's stated preferences
     // could, so the page may name one honestly (see matchCars).
     tasteLead,
-    // How much stock was searched, how much survived the hard filters, and how
-    // far clear the winner is. The page uses it to show its working (see the
-    // working note in the block) rather than presenting a verdict with no
-    // evidence behind it.
+    // How much stock was searched, how much survived the filters, and how far clear the
+    // winner is — the page uses it to show its working rather than an evidence-free verdict.
     searched,
     unmet: unmetWants(scored, cars),
   });
 }
 
 /**
- * The quiz's live "best guess" — the same scoring as /api/match against the
- * same (cached) retailer stock, just a wider PREVIEW_COUNT slice for the
- * drawer that re-ranks as each question is answered. Shares fetchRetailerStock's
- * cache key with /api/match, so a quiz's stream of refreshes hits the warmed
- * cache and adds no upstream traffic. Requires a budget (readMatchRequest
- * enforces it) — the block only calls this once budget is set.
- *
- * Collapsing repeat listings into one card per model is opt-in (`group: true`),
- * following the same precedent as /api/field's `enrich`. The drawer is a
- * horizontal strip where the same model appearing twice in nine reads as stock
- * depth, so it takes the raw listings and is deliberately unchanged. A podium
- * cannot: three medals awarded to the same Countryman in three colours is not a
- * result, it's a rounding error, so that caller asks for grouping.
+ * The quiz's live "best guess": same scoring/cache as /api/match, a wider PREVIEW_COUNT
+ * slice. Grouping is opt-in (`group: true`) — the drawer keeps raw listings, a podium groups.
  */
 async function handlePreview(req, res, deps) {
   const {
@@ -453,41 +318,27 @@ async function handlePreview(req, res, deps) {
     return sendJson(res, 500, { error: 'Something went wrong finding matches' });
   }
 
-  // The preview scores partial answer sets (only budget is guaranteed), so
-  // guard the ranking too: a scorer that trips on an unanswered question must
-  // degrade to "no guess yet" (empty list, HTTP 200 — the drawer is a bonus),
-  // never take the process down with an uncaught throw.
+  // Preview scores partial answer sets, so guard the ranking: a scorer tripping on an
+  // unanswered question degrades to "no guess yet" (empty, 200), never an uncaught throw.
   let matches = [];
   try {
     const ranked = rankCars(applyBespokeAnswers(brand, answers), cars, brandTuning(brand));
-    // Group the WHOLE ranking before slicing. Slicing first would hand
-    // groupListings nine listings that might be three cars, and the caller
-    // would get three cards where it asked for nine — the shortfall growing
-    // with exactly the stock depth that made grouping worth asking for.
+    // Group the WHOLE ranking before slicing: slicing first could hand groupListings nine
+    // listings that are three cars, returning three cards where nine were asked for.
     matches = (group ? groupListings(ranked) : ranked).slice(0, PREVIEW_COUNT);
   } catch (err) {
     console.warn('[preview] ranking failed:', err?.message);
   }
 
-  // Paint the preview cards. The questions-mode drawer never needed colour, but
-  // the swipe mode (MINI Mingle) treats it as a first-class taste signal — a
-  // card's paint and the "Colour" bar both read car.colour, which only exists
-  // after a per-car PDP fetch (see enrichColours). Enrich the slice we're about
-  // to return, exactly as handleMatch does for its hero cars. Paint is cached
-  // permanently AND preview shares the stock cache with /api/match, so this is
-  // paid once per car ever and also warms the eventual match's colour — no
-  // wasted fetches. It's best-effort under a wall-clock budget: a card whose
-  // paint didn't land in time simply renders without colour (the client falls
-  // back to a neutral swatch), and enrichment never throws, so a slow PDP can't
-  // turn the "bonus" drawer into an error.
+  // Paint the returned slice (swipe mode reads car.colour as a taste signal; see
+  // enrichColours). Best-effort under a budget and never throws, so a slow PDP can't error the drawer.
   try {
     await deps.enrichColours(brand, [
       ...matches.map((m) => m.car),
       ...matches.flatMap((m) => m.listings || []),
     ]);
-    // Fill in each grouped card's colour list now that its listings are painted
-    // (mirror handleMatch): a card standing for several listings can name the
-    // colours they come in.
+    // Fill each grouped card's colour list now its listings are painted (mirror handleMatch):
+    // a card standing for several listings can name the colours they come in.
     for (const m of matches) {
       if (m.listings?.length > 1) {
         m.car.colours = [...new Set(m.listings
@@ -503,20 +354,8 @@ async function handlePreview(req, res, deps) {
 }
 
 /**
- * The game modes' roster — the field a swipe deck or a knockout bracket plays.
- * Same engine, same (cached) retailer stock as /api/match and /api/preview, but
- * a different *read* of it: a wider slice (up to `size`, capped at FIELD_MAX)
- * because a bracket wants a full field, not a top-few shortlist. This is the
- * server half of the client's "one engine, many interfaces" seam — a sibling to
- * /api/preview, not a replacement: /api/preview stays tuned to the questions
- * drawer's top-9-with-paint, this serves the games.
- *
- * Colour paint is opt-in (`enrich: true`). The swipe deck reads car.colour as a
- * taste signal so it asks for it (its deck is small — ~10 PDP fetches). The
- * knockout doesn't: painting all 16 entrants would fetch a PDP for cars that
- * lose in round one, so it takes the field unpainted and the face-off falls back
- * to a neutral swatch. Enrichment is best-effort and never throws, exactly as in
- * handlePreview.
+ * The game modes' roster: same engine/stock as /api/match, a wider slice (up to `size`,
+ * capped at FIELD_MAX). Paint is opt-in (`enrich`); best-effort, never throws.
  */
 async function handleField(req, res, deps) {
   const {
@@ -534,9 +373,8 @@ async function handleField(req, res, deps) {
     return sendJson(res, 500, { error: 'Something went wrong finding matches' });
   }
 
-  // Score the whole feed, then take the roster off the top. Guarded like the
-  // preview: a partial answer set must degrade to "no field yet" (empty, 200),
-  // never take the process down.
+  // Score the whole feed, then take the roster off the top. Guarded like preview: a partial
+  // answer set degrades to "no field yet" (empty, 200), never takes the process down.
   let matches = [];
   try {
     matches = rankCars(applyBespokeAnswers(brand, answers), cars, brandTuning(brand)).slice(0, size);
@@ -566,17 +404,8 @@ async function handleField(req, res, deps) {
 }
 
 /**
- * Cars at OTHER nearby retailers — the slow path (a national, distance-sorted
- * search over several extra pages). Split out from /api/match so its latency
- * never blocks the hero matches. This section is a bonus, so any failure
- * degrades to an empty list (HTTP 200) rather than an error the block must
- * surface — the block simply omits the "Worth the drive" section.
- *
- * `unmet` reports the wants this pool couldn't offer (see unmetWants), and is
- * deliberately `null` — not `{}` — when the lookup failed. The block only
- * tells a user a want is unavailable once both halves agree it is, so it has
- * to tell "nearby found nothing that fits" (a fact) apart from "we never
- * heard back from nearby" (an absence of facts, which claims nothing).
+ * Cars at OTHER nearby retailers — the slow path, split from /api/match so its latency never
+ * blocks the hero. A bonus (failure → [], 200); `unmet` is `null` not `{}` when the lookup failed.
  */
 async function handleNearby(req, res, deps) {
   const {
@@ -593,15 +422,8 @@ async function handleNearby(req, res, deps) {
     nearby = ranked.slice(0, TOP_MATCHES);
     unmet = unmetWants(scored, cars);
 
-    // Rescue slots. The top slice is ranked on the whole blend, which can
-    // squeeze out the very want this tier exists to honour: every MINI
-    // plug-in hybrid is a Countryman, so for a PHEV-hatchback ask the body
-    // penalty ranks all of them below the cut — and the response then claims
-    // the want is met (unmet says so, measured against the pool) while
-    // showing no car that meets it. "Never let the anchor retailer's
-    // inventory hide a preference the nearby tier could honour" has to hold
-    // for the SLICE, not just the pool: for each stated fuel/body value with
-    // no representative in the slice, append the best-ranked car that has it.
+    // Rescue slots. The blended top slice can drop the very want this tier honours, so for each
+    // stated fuel/body value missing from the slice, append the best-ranked car that has it.
     const stated = [
       ...(Array.isArray(scored.fuel) ? scored.fuel : [])
         .filter((v) => v !== 'open').map((v) => [(c) => c.fuel === v]),
@@ -622,12 +444,8 @@ async function handleNearby(req, res, deps) {
 }
 
 /**
- * Build the HTTP server. The stock source is injected (defaulting to the live
- * stock.js functions) so tests can drive the whole routing + validation + handler
- * surface against an in-memory fixture — no live feed, no port collisions (bind
- * port 0). Production (see the main-module block below) calls this with the real
- * deps. The handlers read `fetchRetailerStock`/`fetchNearbyStock`/`enrichColours`
- * off this `deps` object rather than the module imports, which is the seam.
+ * Build the HTTP server. The stock source is injected (defaults to the live stock.js fns)
+ * so tests drive routing/validation/handlers against a fixture; handlers read deps, the seam.
  */
 export function buildServer(deps = {}) {
   const resolved = {
@@ -649,18 +467,15 @@ export function buildServer(deps = {}) {
       return sendJson(res, 200, { ok: true });
     }
 
-    // Shared-password gate for everything below. /health above stays open (the
-    // platform health check has no key), OPTIONS is already handled. When
-    // DEMO_ACCESS_KEY is unset this is a no-op (see isAuthorized).
+    // Shared-password gate for everything below (/health and OPTIONS already handled above).
+    // When DEMO_ACCESS_KEY is unset this is a no-op (see isAuthorized).
     if (!isAuthorized(req)) {
       return sendJson(res, 401, { error: 'Unauthorized' });
     }
 
     if (req.method === 'GET' && pathname === '/api/questions') {
-      // Brand comes on the query string (?brand=mini) for this GET; the question
-      // set's option list is filtered to what that brand sells. Defaults to BMW.
-      // topMatches ships too so the intro can say how many results it'll return
-      // without hardcoding it — see TOP_MATCHES, the value /api/match slices to.
+      // Brand comes on the query string (?brand=mini, defaults BMW); options are filtered to
+      // what it sells. topMatches ships so the intro isn't hardcoded (see TOP_MATCHES).
       const brand = normalizeBrand(searchParams.get('brand'));
       return sendJson(res, 200, {
         questions: publicQuestions(brand),
@@ -692,29 +507,18 @@ export function buildServer(deps = {}) {
 // Constants worth asserting against in tests without hardcoding the numbers.
 export { PREVIEW_COUNT, FIELD_MAX, clampFieldSize };
 
-// Only bind a port + warm the cache when run as the entry point (`node index.js`
-// / `npm start`). Importing the module in a test gets buildServer with none of
-// these side effects — no socket, no live feed.
+// Only bind a port + warm the cache when run as the entry point; importing in a test gets
+// buildServer with none of these side effects — no socket, no live feed.
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const server = buildServer();
   server.listen(PORT, () => {
     console.log(`Matcher API listening on http://localhost:${PORT}`);
 
-    // Keep live stock hot off the request path so the slow cold fetch (chiefly
-    // the nearby distance search) isn't paid by a user. Prime each brand's
-    // default retailer now so even the first visitor hits a warm cache; the
-    // warmer then keeps every served brand+retailer fresh. Failures are
-    // non-fatal — the request path still fetches on demand.
+    // Keep live stock hot off the request path (the cold nearby search is slow). Prime each
+    // brand now so the first visitor hits a warm cache; the warmer keeps it fresh. Failures non-fatal.
     startStockWarmer();
-    // Prime every brand's main pool, and the nearby carousel for the two feed
-    // brands that have one (BMW/MINI). Priming a brand also enrols it in the
-    // background warmer (it tracks brands once served), so Motorrad's ~40s live
-    // paged fetch and Honda's live scrape are both paid at boot and kept fresh
-    // off the request path — the first visitor to any brand hits a warm cache.
-    // Ford is fixtures (instant); priming it is harmless and keeps it enrolled.
-    // Ferrari runs live too (its cold ~15-page walk is ~50s), so it's primed at
-    // boot for the same reason as Motorrad: the first Ferrari visitor must not
-    // pay that walk on the request path.
+    // Prime every brand's main pool (and the nearby carousel for BMW/MINI), which also enrols
+    // each in the warmer, so slow live walks (Motorrad, Ferrari, Honda) are paid at boot not on request.
     Promise.allSettled([
       fetchRetailerStock('bmw'), fetchNearbyStock('bmw'),
       fetchRetailerStock('mini'), fetchNearbyStock('mini'),

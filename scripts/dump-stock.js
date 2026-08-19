@@ -1,23 +1,6 @@
 /*
- * Dump full national used stock for a brand to fixtures/, for offline
- * validation and tuning of the matching engine.
- *
- * For each brand it writes two files under fixtures/:
- *   <brand>-raw.json    — the raw feed vehicles (every field the platform returns)
- *   <brand>-cars.json   — those vehicles run through mapVehicle(v, brand), i.e.
- *                         exactly what the engine scores (line/body/fuel/specs)
- *
- * These are point-in-time snapshots (used stock churns), refreshed by re-running
- * this script — NOT a live source. The app itself still fetches live; this is a
- * dev/validation aid so we can replay rankings against real cars without hitting
- * the network. Run:  node scripts/dump-stock.js [bmw|mini|all] [--remap]
- *
- * `--remap` skips the network entirely and re-projects the existing raw dump
- * through the current mapVehicle — what you want after mapping.js gains a
- * field, when you don't want the cars themselves to change underneath you.
- *
- * Zero-dep, node:https (same handshake as server/stock.js). Whole national feed,
- * so it paginates past the app's small PAGE_LIMIT.
+ * Dump full national used stock for a brand to fixtures/<brand>-raw.json (raw feed) and <brand>-cars.json (run through mapVehicle) — point-in-time snapshots for offline engine validation/tuning, NOT a live source. Zero-dep node:https, paginates the whole national feed past the app's PAGE_LIMIT. `--remap` skips the network and re-projects the existing raw dump through the current mapVehicle (use after mapping.js gains a field, when you don't want the cars to change).
+ * Run:  node scripts/dump-stock.js [bmw|mini|all] [--remap]
  */
 
 import { request } from 'node:https';
@@ -105,12 +88,8 @@ async function dumpBrand(brand) {
 }
 
 /*
- * Re-project the raw dump we already have through the CURRENT mapVehicle,
- * without touching the network — for when mapping.js gains a field (styleLine,
- * doors, features…) and the mapped fixture would otherwise be stale against a
- * mapper the tests and audits now assume. Same point-in-time cars, new
- * columns. Use `--remap` for that; re-run without it to fetch genuinely
- * current stock.
+ * Re-project the existing raw dump through the CURRENT mapVehicle with no network
+ * (--remap) — same point-in-time cars, new columns, for when mapping.js gains a field.
  */
 function remapBrand(brand) {
   const { label } = BRANDS[brand];

@@ -1,16 +1,6 @@
 /*
- * Knockout "tale of the tape" — the pure row-builders behind the head-to-head
- * stat panel (knockout.js buildStatPanel). Each builder is the honest-data
- * gatekeeper for one row: it returns null when its metric is absent on EITHER
- * car (so a half-empty row never paints), names the better side as the winner,
- * and stamps the tier ('listing' for a real per-car fact, 'model' for a shared
- * spec like 0-62). buildStatPanel then drops model-only panels and caps the set
- * at three — the rules pinned here, DOM-free.
- *
- * The builders live in the client (knockout.js) but are pure comparisons with no
- * DOM, exported as the `_stat` barrel purely for this test, the way age.test.js
- * imports ageInYears from match-signal.js. A wrong compare crowns the wrong car
- * in a real duel, so pin the winner, the tie, the null, and the tier on each.
+ * Pure row-builders behind knockout's head-to-head stat panel: each returns null
+ * unless a metric is on both cars, names the winner, and stamps a listing/model tier.
  */
 
 import { test } from 'node:test';
@@ -118,9 +108,8 @@ test('firstRows: keeps the first n non-null rows, skipping nulls', () => {
 });
 
 /*
- * The composed panel-level rules buildStatPanel enforces, exercised over the pure
- * rows the way the renderer does: model-only sets drop, and a set caps at three
- * with the real per-listing rows leading.
+ * The panel-level rules buildStatPanel enforces, over the pure rows: model-only
+ * sets drop, and a set caps at three with the real per-listing rows leading.
  */
 
 test('a Ferrari-shaped set leads on real per-listing rows, keeps 0-62 as support, caps at 3', () => {

@@ -1,33 +1,5 @@
 /*
- * Results-refinement audit — is the "YOUR PERFECT <brand> IS…" decree earned,
- * and is there material to refine with when it isn't?
- *
- * Companion to audit-questions.mjs, which asks whether each QUESTION earns its
- * screen. This one asks the same of the RESULTS: when the page names a single
- * winner, can the model actually tell it from the runners-up — and when it
- * can't, what could a refinement step ask about? Same machinery (real engine,
- * national fixture dumps, seeded PRNG, retailers sampled across the stock-size
- * distribution) so the two audits are directly comparable.
- *
- *   decree    For random answer sets: the #1-vs-#2 score gap, how often that
- *             gap is zero (winner decided by tie-break, not merit), how many
- *             cars sit within CLUSTER_PTS of #1 (the set the model treats as
- *             interchangeable), how often that cluster overflows the three the
- *             page shows — and whether granular attributes the quiz never asks
- *             about (gearbox, equipment) actually differ inside it.
- *   features  Per equipment concept: national coverage, and the split rate —
- *             the share of retailers where SOME but not all cars carry it.
- *             A concept everyone has can't refine anything; one nobody has is
- *             dead. Only the ones that split are requireable.
- *   vocab     The raw feed's option vocabulary: how big, what's most common,
- *             and — the maintenance signal — which frequent strings NO concept
- *             in mapping.js currently matches. Reads the big raw dumps, so
- *             it's slower than the other two passes.
- *
- * Findings + what they imply are written up in docs/refinement-audit.md; the
- * design they support is docs/refinement-plan.md. Re-run after a fixture
- * refresh to see whether they still hold.
- *
+ * Results-refinement audit — is the "YOUR PERFECT <brand> IS…" decree earned, and is there material to refine with when it isn't? Companion to audit-questions.mjs; modes decree/features/vocab. Findings in docs/refinement-audit.md, design in docs/refinement-plan.md.
  * Run:  node scripts/audit-refinement.mjs [decree|features|vocab|all]
  */
 
@@ -236,9 +208,8 @@ function auditVocab(brand) {
   [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15)
     .forEach(([s, n]) => console.log(`    ${pct(n, raw.length).padStart(4)}  ${s.slice(0, 62)}`));
 
-  // The maintenance signal: frequent strings no concept matches. Most are
-  // rightly ignored (every car has DAB radio), but a genuinely requireable
-  // want appearing here is a concept we can't yet parse.
+  // The maintenance signal: frequent strings no concept matches. Most are noise
+  // (every car has DAB radio), but a genuinely requireable want here is one we can't yet parse.
   console.log('\n  Frequent (>=10%) strings NO concept matches — candidates + noise:');
   const unmatched = [...freq.entries()]
     .filter(([s, n]) => n >= raw.length * 0.1 && !FEATURE_CONCEPTS.some(([, re]) => re.test(s)))

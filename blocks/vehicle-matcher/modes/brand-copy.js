@@ -1,34 +1,12 @@
 /*
- * Brand voice for the result surfaces, shared by every mode that shows a car.
- *
- * Lifted out of modes/questionnaire.js when a second mode (podium) needed the
- * same vocabulary. This is the *card and results* voice: the marque name, the
- * intro/result headlines, and the words each brand uses for a fuel or a shape.
- * It is deliberately NOT a mode's own campaign copy: a mode's wordmark, seed
- * screen and reveal lines live in that mode's own table (MINGLE_COPY,
- * KNOCKOUT_COPY, PODIUM_COPY), because those are the parts that differ per
- * interface. Anything a card renders lives here, so two modes cannot drift into
- * describing the same car two different ways.
- *
- * Voices follow docs/tone-style-guide.md.
+ * Brand voice for the card/result surfaces, shared by every mode that shows a car
+ * (marque, headlines, per-brand fuel/shape words). Voices: docs/tone-style-guide.md.
  */
 
 import { cardinal } from '../ui.js';
 
-/** Brand-specific display copy, keyed by brand. `name` is the marque, `title`
- * the intro headline, `cta` the intro button. `lede({ questions, retailer })`
- * builds the intro paragraph — a function because the two brands phrase it
- * differently, not just swap nouns.
- *
- * The question count is passed in rather than written into the copy (brands
- * have different totals, and a brand gaining a question needs no copy edit).
- * Deliberately no match count anywhere: results show one clear winner or the
- * whole tie, so any promised number would be wrong half the time.
- *
- * Voices follow docs/tone-style-guide.md: BMW is assured and understated (the
- * flat, unapologetic close borrowed from bmw.co.uk's register), MINI keeps the
- * warmth but smiles. Deliberately no "quiz" anywhere — this is a matcher, and
- * the word undersold it. */
+/** Brand-specific display copy, keyed by brand. `lede({ questions, retailer })` is a
+ * function because brands phrase it differently; no match count. Voices: docs/tone-style-guide.md. */
 export const BRAND_COPY = {
   bmw: {
     name: 'BMW',
@@ -39,55 +17,36 @@ export const BRAND_COPY = {
     lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
       + `your miles and your budget. We’ll match you with the approved-used `
       + `cars at ${retailer} that suit you best, and tell you why.`,
-    // Approved Used's no-surprises register: state the fact, name the
-    // retailer, don't dress it up (docs/tone-style-guide.md). No label —
-    // BMW's copy states things rather than announcing them.
+    // Approved Used's no-surprises register: state the fact, name the retailer,
+    // don't dress it up (docs/tone-style-guide.md). No label; BMW states, not announces.
     unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
       + 'These are the closest matches to everything else you asked for.',
-    // Shown instead of the "your perfect BMW is…" headline when the engine
-    // can't separate the top cars (see matchCars: decisive/clusterSize).
-    // Stated plainly, as a fact about the stock rather than an apology.
+    // Shown instead of the "your perfect BMW is…" headline when the engine can't
+    // separate the top cars (see matchCars: decisive/clusterSize). Stated plainly.
     tiedTitle: ({ count }) => `${cardinal(count)} of these fit you equally well.`,
     /*
-     * The scoped headlines, used ONLY when the scope is load-bearing: a car at
-     * another retailer genuinely outranks the best one here. Everywhere else
-     * the unqualified line stands, because a qualification that isn't doing
-     * work is just a smaller claim (docs/results-page-review.md).
-     *
-     * The block is authored onto ONE retailer's page, so "at Grassicks Garage"
-     * is not a hedge — it's a more accurate statement of what was searched. A
-     * higher score in the group below then contradicts nothing, because the
-     * headline never claimed to be about that group.
+     * Scoped headlines, used ONLY when scope is load-bearing: a car at another
+     * retailer genuinely outranks the best here (docs/results-page-review.md).
      */
     tiedTitleHere: ({ count, retailer }) => `At ${retailer}, ${cardinal(count)} of these `
       + 'fit you equally well.',
-    // Fit couldn't separate them, but what they told us matters could. Naming
-    // the pick is honest here, and it's what finally makes the preference
-    // questions capable of changing the recommendation.
+    // Fit couldn't separate them, but stated preference could. Naming the pick is
+    // honest, and it's what makes the preference questions able to change the pick.
     tasteTitle: ({ model }) => `Your best match is the ${model}.`,
     tasteTitleHere: ({ model, retailer }) => `Your best match at ${retailer} is the ${model}.`,
     tasteLede: () => 'Several of these suit you equally well on paper. This one lines up '
       + 'best with what you said matters.',
-    // The retailer is named on every card, so the lede doesn't repeat it —
-    // and a brand plural appended to a retailer label reads "Sytner Luton
-    // MINI MINIs", which is why neither brand's copy builds one.
+    // Retailer is named on every card, so the lede doesn't repeat it — and a brand
+    // plural after a retailer label reads "Sytner Luton MINI MINIs", so none builds one.
     tiedLede: () => 'On your answers we can’t split them: each suits you as well as the next. '
       + 'The difference now is which you prefer the look of.',
     /*
-     * The refine panel: BMW states the instruction, no exclamation, no
-     * cheerleading (docs/tone-style-guide.md).
-     *
-     * The label names the effect AND the set it acts on. "So, what do you
-     * fancy?" / "Narrow it down" were invitations that never said what a tap
-     * would change, and the owner's report of the chips was exactly that: it's
-     * "unclear what clicking them affects". That is a labelling problem as much
-     * as a positioning one, so both were fixed.
+     * The refine panel: BMW states the instruction, no cheerleading. The label names
+     * the effect AND the set it acts on, fixing the "unclear what clicking them affects" report.
      */
     refineLabel: ({ count }) => (count > 1 ? `Narrow these ${count} down` : 'Narrow this one down'),
-    // Feedback at the control itself, the moment a chip goes on. The running
-    // brief below the cars says the same thing at more length, but it is below
-    // the cars — by the time you reach it you have already stopped wondering
-    // whether the tap did anything.
+    // Feedback at the control itself, the moment a chip goes on. The running brief
+    // below the cars repeats it, but by then you've stopped wondering if the tap worked.
     refineStatus: ({ shown, wants }) => (shown === 1
       ? `One car still matches, with ${wants}.`
       : `${shown} cars still match, with ${wants}.`),
@@ -107,30 +66,22 @@ export const BRAND_COPY = {
     kitMore: ({ count }) => `, and ${count} more`,
     briefLabel: 'What I’ve picked up',
     hiddenChip: ({ count }) => `${count} ruled out`,
-    // The "closest here" frame (docs/results-page-states.md): the local cars
-    // miss something the buyer asked for, so no headline may crown one. First
-    // paint must be true whether or not the nearby tier later finds the real
-    // thing — this claims nothing beyond this retailer's stock.
+    // The "closest here" frame (docs/results-page-states.md): local cars miss
+    // something asked for, so no headline crowns one; claims nothing beyond this retailer.
     closestTitle: ({ retailer }) => `The closest matches at ${retailer}.`,
     closestLede: () => 'Nothing here ticks every box you gave us. Each card says what it '
       + 'gets right, and what it doesn’t.',
     closestSettled: ({ model }) => `Your closest match here is the ${model}.`,
     closestSettledHere: ({ model, retailer }) => `Your closest match at ${retailer} is the ${model}.`,
     /*
-     * One step below `closest`: not "here is the nearest we have" but "we have
-     * not got it" (see WEAK_SCORE). Approved Used's register does this well
-     * without help — state the fact, name the retailer, don't soften it and
-     * don't apologise for it. No `Here` variant: the sentence names the
-     * retailer already, exactly as the closest frame's does.
+     * One step below `closest`: not "here is the nearest" but "we haven't got it"
+     * (see WEAK_SCORE). No `Here` variant: the sentence already names the retailer.
      */
     weakTitle: ({ retailer }) => `Nothing at ${retailer} is close to what you asked for.`,
     weakLede: () => 'These are the nearest we hold, and each one misses something you '
       + 'said mattered. If none of them works, nothing here does.',
-    // The rescue note: the want is missing HERE but met nearby — by owner
-    // decision (2026-07-22) the local cards keep the lead and this note
-    // carries the fact, so the buyer weighs proximity against fit themselves.
-    // The rescue note points at the list, not at a section: nearby cars are
-    // IN the list now, wherever their score puts them.
+    // The rescue note: the want is missing HERE but met nearby. By owner decision
+    // (2026-07-22) local cards keep the lead; nearby cars are IN the list, not a section.
     rescueNote: ({ list, retailer, miles, where }) => `No ${list} at ${retailer} right now. `
       + `The nearest is ${miles} away at ${where}, and it’s in the list below.`,
     // Only `empty` survives: state 5, where the retailer had nothing and the
@@ -140,14 +91,8 @@ export const BRAND_COPY = {
         + 'closest matches at other retailers instead.',
     },
     /*
-     * The two group labels. They describe PLACE and nothing else.
-     *
-     * That is the whole rule the old banded page broke: "Close, but not level
-     * with the cars above" and "two of these fit you equally well" were both
-     * quality claims on the same scale, made by different sections, so one
-     * could contradict the other. "At Grassicks Garage" asserts nothing about
-     * fit, so it cannot contradict a higher score in the group below it. Same
-     * reason the old "NEXT BEST" heading had to go: it ranked.
+     * The two group labels. They describe PLACE and nothing else — the rule the old
+     * banded page broke, where two sections made quality claims that could contradict.
      */
     hereHeading: ({ retailer }) => `AT ${retailer.toUpperCase()}`,
     awayHeading: 'AT OTHER RETAILERS',
@@ -162,14 +107,12 @@ export const BRAND_COPY = {
     // The evidence for the weak headline, and the one number on the page a
     // reader can check against the badges on the cards.
     workingWeak: ({ top }) => ` The best of them reached ${top}%.`,
-    // What the badge means, said once. It has been unexplained since fit and
-    // taste were split, and several cards can carry the same number, which
-    // reads as a bug rather than as a claim about how alike they are.
+    // What the badge means, said once. Unexplained since fit and taste were split,
+    // and several cards sharing a number reads as a bug rather than a claim of likeness.
     workingScore: ' A match score is how well a car fits your answers, nothing else, '
       + 'so cars that suit you equally share one.',
-    // The other half of a scoped headline: which car beat the one here, and
-    // where it is. Shown exactly when the headline scopes, so the two read as
-    // one statement rather than repeating each other.
+    // The other half of a scoped headline: which car beat the one here, and where.
+    // Shown exactly when the headline scopes, so the two read as one statement.
     searchedWider: ({ model, miles, where }) => 'We looked further afield too. '
       + `The ${model} at ${where} scores higher, and it’s ${miles}.`,
   },
@@ -225,9 +168,8 @@ export const BRAND_COPY = {
     closestSettled: ({ model }) => `Closest to your brief: the ${model}.`,
     closestSettledHere: ({ model, retailer }) => `Closest to your brief at ${retailer}: `
       + `the ${model}.`,
-    // The same "we have not got it" as BMW's, in MINI's register: a shrug that
-    // still gives a straight answer, and a reason to come back rather than an
-    // apology. See WEAK_SCORE for when it fires.
+    // The same "we haven't got it" as BMW's, in MINI's register: a shrug that still
+    // gives a straight answer and a reason to come back. See WEAK_SCORE for when it fires.
     weakTitle: ({ retailer }) => `We haven’t got your MINI at ${retailer} right now.`,
     weakLede: () => 'Here’s the nearest we’ve got anyway, but none of them is it. '
       + 'Stock turns over quickly, so it’s worth another look soon.',
@@ -256,22 +198,16 @@ export const BRAND_COPY = {
 };
 
 /*
- * Honda's voice: plain, warm and practical, sentence-case throughout. It sits
- * between BMW's terse authority and MINI's uppercase play — it talks about
- * running costs, space and reliability rather than driving pleasure or kerb
- * appeal, and it never oversells (see docs/tone-style-guide.md). Built on the
- * BMW base (spread first) so every key is present — the resolver is all-or-
- * nothing, BRAND_COPY[brand] || BRAND_COPY.bmw — then only the lines that carry
- * Honda's marque or register are overridden. No em dashes in any of it.
+ * Honda's voice: plain, warm, practical, sentence-case (docs/tone-style-guide.md).
+ * Built on the BMW base (all-or-nothing resolver), overriding only marque/register lines.
  */
 BRAND_COPY.honda = {
   ...BRAND_COPY.bmw,
   name: 'Honda',
   title: 'Find the right Honda for you.',
   cta: 'Find my Honda',
-  // Honda's plain, practical register: no superlative ("best"), lead on the
-  // sensible fit (life, running, budget) and the reassurance of approved-used.
-  // See docs/tone-style-guide.md (Honda).
+  // Honda's plain, practical register: no superlative, lead on sensible fit
+  // (life, running, budget) and approved-used reassurance. See docs/tone-style-guide.md.
   lede: ({ questions, retailer }) => `${questions} quick questions about your days, `
     + 'your mileage and what you want to spend. We’ll find the approved-used '
     + `Hondas at ${retailer} that genuinely suit how you live, and show our working.`,
@@ -331,20 +267,16 @@ BRAND_COPY.honda = {
 };
 
 /*
- * Ford copy. Built the same all-or-nothing way as Honda's: spread the complete
- * BMW base so every key resolves, then override only the lines that carry Ford's
- * marque or its register. Ford's voice is confident, friendly and plainly
- * British — proud of being the sensible, well-priced choice, but with a real
- * spirited streak (ST, Mustang) it's allowed to enjoy. No em dashes anywhere.
+ * Ford copy. Same all-or-nothing build as Honda's: spread the BMW base, override
+ * only Ford's marque/register lines. Voice: confident, friendly, plainly British.
  */
 BRAND_COPY.ford = {
   ...BRAND_COPY.bmw,
   name: 'Ford',
   title: 'Find the right Ford for you.',
   cta: 'Find my Ford',
-  // Ford's confident, friendly, plainly-British register: upbeat and direct,
-  // proud of being the sensible, well-priced choice with room for the spirited
-  // side. See docs/tone-style-guide.md (Ford).
+  // Ford's confident, friendly, plainly-British register: upbeat and direct, proud
+  // of the sensible choice with room for the spirited side. See docs/tone-style-guide.md.
   lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
     + 'your miles and your budget. We’ll pull together the approved-used '
     + `Fords at ${retailer} that make real sense for you, and back it up with the reasons.`,
@@ -404,23 +336,16 @@ BRAND_COPY.ford = {
 };
 
 /*
- * Motorrad copy. Same all-or-nothing build as Honda/Ford: spread the BMW base so
- * every key resolves, then override the marque lines AND the ones that say "car"
- * or "drive" (a rider reads "bike" and "ride"). Motorrad's voice is rider-first
- * and technical, confident and a little adrenaline-forward. No em dashes.
- *
- * Note on "big enough for you" in `working`: for a bike that phrasing is wrong
- * (a bike isn't judged on space), so Motorrad re-voices it to "a match for your
- * licence and riding" - the real gate a rider cares about. No em dashes.
+ * Motorrad copy. Same all-or-nothing build; overrides marque lines AND "car"/"drive"
+ * (a rider reads "bike"/"ride"), and re-voices `working`'s "big enough" to licence/riding.
  */
 BRAND_COPY.motorrad = {
   ...BRAND_COPY.bmw,
   name: 'BMW Motorrad',
   title: 'Find your perfect BMW Motorrad.',
   cta: 'Find my bike',
-  // Motorrad's rider-first, technical, adrenaline-forward register ("Make Life
-  // a Ride"): lead on the riding, not "your life", and on the machine under you
-  // rather than a soft "suit you best". See docs/tone-style-guide.md (Motorrad).
+  // Motorrad's rider-first, technical register ("Make Life a Ride"): lead on riding
+  // and the machine, not "your life" or "suit you best". See docs/tone-style-guide.md.
   lede: ({ questions, retailer }) => `${questions} quick questions about your riding, `
     + 'your licence and your budget. We’ll match you to the approved-used '
     + `BMW Motorrad bikes at ${retailer} built for the road you ride, and tell you why.`,
@@ -439,26 +364,16 @@ BRAND_COPY.motorrad = {
 };
 
 /*
- * Ferrari copy. Same all-or-nothing build as Honda/Ford/Motorrad: spread the BMW
- * base so every key resolves, then re-voice the lines that carry the marque or
- * its register. Ferrari's voice is Italian, romantic and heritage-proud, and it
- * speaks to a Ferrarista joining a family, not a shopper making a purchase (per
- * ferrari.com / preowned.ferrari.com: "Join the world of Ferraristi", "La nuova
- * dolce vita", "Configure your dreams", the Prancing Horse, Maranello, Italian
- * excellence since 1947). It leads on emotion and the drive, never on value or
- * spec, and it stays warm and unhurried rather than clipped. Where the honesty
- * frames (unmet / closest / weak) must stay plain and true, they keep their
- * candour but in Ferrari's fuller cadence. No em dashes anywhere.
+ * Ferrari copy. Same all-or-nothing build; re-voices marque/register lines. Voice:
+ * Italian, romantic, heritage-proud — a Ferrarista joining a family, never a shopper.
  */
 BRAND_COPY.ferrari = {
   ...BRAND_COPY.bmw,
   name: 'Ferrari',
   title: 'Find the Ferrari that’s yours.',
   cta: 'Find my Ferrari',
-  // Romantic, insider, heritage-led: the car is a thoroughbred, the buyer is
-  // joining a bloodline. Lead on the drive and the feeling, name the official
-  // Ferrari Approved programme rather than "approved-used". See DECISIONS.md and
-  // docs/tone-style-guide.md (Ferrari).
+  // Romantic, insider, heritage-led: the car is a thoroughbred, the buyer joining a
+  // bloodline. Name the Ferrari Approved programme. See DECISIONS.md, docs/tone-style-guide.md.
   lede: ({ questions, retailer }) => `${questions} quick questions about how you drive, `
     + 'the roads you love and your budget. We’ll match you with the Ferrari Approved '
     + `cars at ${retailer} that were made for you, and tell you why.`,
@@ -484,12 +399,8 @@ BRAND_COPY.ferrari = {
 };
 
 /*
- * How an unmet want is named in the results note, per brand — plural noun
- * phrases that drop into "No ___ at <retailer>…". Per-brand because MINI
- * names its own shapes (a Countryman, not an SUV) and calls its EVs
- * all-electric, exactly as the quiz options do. Keyed by question id then
- * answer value; an unrecognised value (an old shared link) falls back to the
- * raw value rather than dropping the warning.
+ * How an unmet want is named in the results note, per brand — plurals dropped into
+ * "No ___ at <retailer>…". Per-brand vocab; unknown value falls back to the raw value.
  */
 export const UNMET_PHRASES = {
   bmw: {
@@ -511,9 +422,8 @@ export const UNMET_PHRASES = {
     },
   },
   honda: {
-    // Honda's self-charging hybrids score as petrol on the engine's fuel axis
-    // (see hondaFuel in mapping.js), so the fuel warnings only ever name petrol,
-    // diesel or fully electric — the values the quiz collects.
+    // Honda's self-charging hybrids score as petrol (see hondaFuel in mapping.js), so
+    // fuel warnings only name petrol, diesel or fully electric — the values the quiz collects.
     fuel: {
       petrol: 'petrol Hondas', diesel: 'diesel Hondas', ev: 'fully electric Hondas',
     },
@@ -522,9 +432,8 @@ export const UNMET_PHRASES = {
     },
   },
   ford: {
-    // Ford's used range spans the full fuel spread (petrol/mHEV, diesel, the
-    // Kuga PHEV, and the Mach-E / Explorer / Capri / Puma Gen-E EVs) and every
-    // body from a supermini to a pickup.
+    // Ford's used range spans the full fuel spread (petrol/mHEV, diesel, Kuga PHEV,
+    // Mach-E/Explorer/Capri/Puma Gen-E EVs) and every body from supermini to pickup.
     fuel: {
       petrol: 'petrol Fords', diesel: 'diesel Fords', phev: 'plug-in hybrid Fords',
       ev: 'fully electric Fords',
@@ -535,9 +444,8 @@ export const UNMET_PHRASES = {
     },
   },
   motorrad: {
-    // Motorrad is petrol plus one electric (the CE 04); no diesel/PHEV. The
-    // bodyStyles keys here are the bike categories the mapper emits as `body`
-    // (see MODEL_SPECS_MOTORRAD), not car shapes.
+    // Motorrad is petrol plus one electric (the CE 04); no diesel/PHEV. The bodyStyles
+    // keys are bike categories the mapper emits as `body` (see MODEL_SPECS_MOTORRAD).
     fuel: {
       petrol: 'petrol bikes', ev: 'electric bikes',
     },
@@ -548,9 +456,8 @@ export const UNMET_PHRASES = {
     },
   },
   ferrari: {
-    // Ferrari's used range is petrol plus the 296/SF90 plug-in hybrids; no
-    // diesel or fully electric. Its three bodies are named the way the quiz
-    // names them: the Spider for a convertible, the Purosangue for the SUV.
+    // Ferrari's used range is petrol plus 296/SF90 PHEVs; no diesel or EV. Bodies are
+    // named as the quiz names them: the Spider for a convertible, the Purosangue for SUV.
     fuel: {
       petrol: 'petrol Ferraris', phev: 'plug-in hybrid Ferraris',
     },
@@ -561,11 +468,8 @@ export const UNMET_PHRASES = {
 };
 
 /*
- * How the hero card owns a want it doesn't meet — "Petrol, where you asked
- * for all-electric." Singular phrases (UNMET_PHRASES above are plurals for
- * the pool-level note), same per-brand vocabulary rules: MINI names its own
- * shapes and calls its EVs all-electric. `label` is the section eyebrow that
- * mirrors "Why it suits you"; the CSS uppercases it, so it's authored plain.
+ * How the hero card owns a want it doesn't meet — "Petrol, where you asked for
+ * all-electric." Singular phrases; same per-brand vocab. `label` is the CSS-uppercased eyebrow.
  */
 export const TRADE_COPY = {
   bmw: {
@@ -585,10 +489,8 @@ export const TRADE_COPY = {
       hatchback: 'a hatchback', estate: 'a Clubman', suv: 'a Countryman',
       convertible: 'a convertible',
     },
-    // The `got` side describes the car itself, not a quiz option — and MINI's
-    // suv bucket holds the Aceman as well as the Countryman, so naming the
-    // Countryman there would mislabel an Aceman on its own card. The want
-    // side stays "a Countryman": that's the word the quiz option used.
+    // The `got` side describes the car, not a quiz option — MINI's suv bucket holds
+    // the Aceman too, so it says "a crossover"; the want side stays the quiz's "a Countryman".
     got: { bodyStyles: { suv: 'a crossover' } },
   },
   honda: {
@@ -631,21 +533,15 @@ export function orList(items) {
 }
 
 /** The same, for things that hold at once: "a and b", "a, b and c". Applied
- * refinements are ANDed, and "with a pano roof or grey" would describe a
- * different, looser search than the one actually run. */
+ * refinements are ANDed, so an "or" here would describe a looser search than was run. */
 export function andList(items) {
   if (items.length < 2) return items[0] || '';
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
 /*
- * The hero card's trade-off line(s): one short declarative per missed want,
- * in the engine's fuel-then-shape order — "Petrol, where you asked for fully
- * electric. A saloon, where you asked for an estate." Both brands share the
- * sentence shape (short, factual, full stop — the shared signature); the
- * vocabulary and the eyebrow above carry the brand difference. An
- * unrecognised value (an old shared link) falls back to the raw value rather
- * than dropping the admission.
+ * The hero card's trade-off line(s): one short declarative per missed want, in the
+ * engine's fuel-then-shape order. Unknown value falls back to the raw value.
  */
 export function tradeLines(brandKey, trades) {
   const vocab = TRADE_COPY[brandKey] || TRADE_COPY.bmw;

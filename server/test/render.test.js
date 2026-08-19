@@ -1,21 +1,6 @@
 /*
- * Headless render tests — every interface mode, every brand, actually mounted.
- *
- * The api/engine/brand suites prove the server. These prove the CLIENT: that
- * each mode's mount(root, ctx) paints real content in a real DOM, for each
- * brand, driving the true engine over a real (in-process) server. This is the
- * machine check that stands in for eyeballing `?brand=<key>&mode=<key>` in a
- * browser after onboarding a brand — a mode that throws on mount, or renders
- * nothing for a new brand, fails here.
- *
- * See dom-harness.js for how the DOM + server are stood up. Only the live feed
- * is faked; the mode, the engine client, the endpoints and the engine are all
- * production code.
- *
- * Coverage note (testing gap this closes): before this file, no test mounted a
- * client mode at all — client render regressions were caught only by manual
- * browser checks. New brands are added to BRANDS below so their client render
- * is guarded from the day they land, not just their server-side mapping.
+ * Headless render tests: mount every mode for every brand in a real DOM against
+ * an in-process server, proving the CLIENT paints (the check for onboarding a brand).
  */
 
 import { test, before, after, beforeEach } from 'node:test';
@@ -30,16 +15,8 @@ import {
   bmwPool, miniPool, hondaPool, fordPool, motorradPool, ferrariPool,
 } from './helpers.js';
 
-// Brands under render test, each with a stock pool and the marque name. The
-// wordmark is asserted only where a mode actually shows it: the questionnaire
-// intro names the brand for every marque ("Find your perfect BMW"), whereas the
-// two game modes lead with a neutral, brand-agnostic seed screen ("Car Match" /
-// "Head to Head" on BMW) and reveal the brand voice later, by design (see the
-// mode requirement docs). So the universal render check is "paints + correct
-// theme + no em dashes"; the wordmark check is scoped to questionnaire.
-// Motorrad is the first non-car brand: its pool is BIKES (motorrad-bikes.json),
-// but the mapped shape is identical, so the same render matrix applies. Its
-// wordmark on the questionnaire intro is "BMW Motorrad".
+// Brands under render test, each with a stock pool and marque name. The wordmark
+// is asserted only on the questionnaire intro; game modes lead with a neutral seed.
 const BRANDS = [
   { key: 'bmw', pool: () => bmwPool(20), name: /BMW/i },
   { key: 'mini', pool: () => miniPool(8), name: /MINI/i },
@@ -83,9 +60,8 @@ for (const mode of MODES) {
         text.replace(/\s/g, '').length > 20,
         `${mode}/${brand.key} rendered no meaningful text`,
       );
-      // Brand copy resolved on the questionnaire intro, which names the marque for
-      // every brand. The game modes lead with a neutral seed screen by design,
-      // so their wordmark is checked in their own reveal, not here.
+      // Brand copy resolves on the questionnaire intro, which names the marque.
+      // Game modes lead with a neutral seed, so their wordmark is checked elsewhere.
       if (mode === 'questionnaire') {
         assert.match(
           text, brand.name,
@@ -107,17 +83,8 @@ for (const mode of MODES) {
 }
 
 /*
- * Podium's two locked rules, neither of which the mount matrix above can see
- * (it only asserts the first paint).
- *
- * 1. The conditional questions are spliced IN PLACE. A rebuild of the pane is
- *    one line and it throws away scroll position and focus, so the check is
- *    that the removed block is gone AND that a neighbouring block is the same
- *    DOM node it was before the answer changed.
- * 2. "Not this one" only offers a reason whose follow-up can move the result
- *    FOR THIS BRAND. MINI drops the mileage question in brands.js, so MINI must
- *    not offer Mileage; a button that looks like it did something but cannot is
- *    worse than no button.
+ * Podium's two locked rules the mount matrix can't see: conditional questions splice
+ * in place (a neighbour stays the same node); a reason shows only if the brand can act.
  */
 test('podium splices a conditional question out in place', async () => {
   const stage = mountMode(modes.podium, { base: server.base, brand: 'bmw' });
@@ -163,17 +130,8 @@ test('podium only offers a dismissal reason the brand can act on', async () => {
 });
 
 /*
- * Podium's third locked rule, and the load-bearing one: a medal is a claim that
- * one car beat another, so the podium must never invent a ranking the engine
- * did not make. When the engine is not decisive the tied cars are joint first;
- * nothing is labelled 2nd or 3rd.
- *
- * Written as an invariant that holds in BOTH states rather than as a test that
- * forces a tie, because whether a given pool ties is a property of the engine's
- * scoring and would make this a brittle assertion about fixture data. Either
- * branch is meaningful: the tied branch catches a fabricated runner-up, the
- * decisive branch catches a podium that lost its single clear winner. Run over
- * every brand so a tie is genuinely exercised somewhere in the matrix.
+ * Podium's third, load-bearing rule: never invent a ranking the engine didn't make
+ * (tied cars are joint first). Written as an invariant holding in both branches.
  */
 test('podium never labels a runner-up unless the engine ranked one', async () => {
   for (const brand of BRANDS) {
@@ -215,9 +173,8 @@ test('podium never labels a runner-up unless the engine ranked one', async () =>
   }
 });
 
-// A re-mount (switching tabs re-calls mount) must start clean, not stack a
-// second interface on top of the first. Mount twice into the same stage-owning
-// body and assert the second run replaced rather than appended.
+// A re-mount (switching tabs re-calls mount) must start clean, not stack a second
+// interface. Mount twice and assert the second run replaced rather than appended.
 test('re-mounting a mode starts a clean run', async () => {
   const first = mountMode(modes.questionnaire, { base: server.base, brand: 'bmw' });
   await settle(first, (s) => s.textContent.replace(/\s/g, '').length > 20);
@@ -250,27 +207,14 @@ test('no em dashes in painted copy', async () => {
   }
 });
 
-// The painted-copy test above only sees the FIRST screen of each mode. The house
-// rule (no em dashes in user-facing copy) also has to hold on the later-flow
-// screens a render test can't cheaply reach without a full playthrough: deck
-// instructions, per-tie verdicts, weak/thin notes, empty-deck ledes, result CTAs.
-// Those all live in static copy tables in the mode source, so we guard them at
-// the source: scan each client file for an em dash inside a string literal. This
-// caught real violations in the BMW/MINI mingle + knockout copy that the painted
-// check never reached (they only appear on the result/verdict/empty screens), and
-// it stops any future edit from reintroducing one on any screen.
-//
-// Comments and dev-only console diagnostics are out of scope (the rule is about
-// on-screen copy), so pure-comment lines are skipped and CSS/JS content strings
-// are the target. This is a source scan, not a runtime paint, so it needs no
-// server or DOM — it stands alone.
+// The painted-copy test only sees the FIRST screen; later-flow copy (verdicts,
+// ledes, CTAs) lives in static tables, so scan each client file's string literals.
 test('no em dashes in any string literal across the client copy surface', () => {
   const CLIENT_FILES = [
     'modes/questionnaire.js', 'modes/mingle.js', 'modes/knockout.js',
     'modes/podium.js', 'modes/match-signal.js',
-    // The shared render modules lifted out of questionnaire.js. Their string
-    // literals are on-screen copy for every mode that renders a card or a
-    // question, so they belong in the same guard.
+    // Shared render modules lifted out of questionnaire.js. Their string literals
+    // are on-screen copy for every mode, so they belong in the same guard.
     'modes/result-card.js', 'modes/question-ui.js', 'modes/brand-copy.js',
     'modes/preview-feed.js',
     'vehicle-matcher.js', 'quiz-meta.js',
@@ -283,9 +227,8 @@ test('no em dashes in any string literal across the client copy surface', () => 
     const src = readFileSync(path, 'utf8');
     src.split(/\r?\n/).forEach((line, i) => {
       const t = line.trim();
-      // Skip pure-comment lines (JS // and /* */ bodies, CSS /* */). A code line
-      // with a trailing comment is still scanned — but only its string literals
-      // are inspected, so the trailing comment can't cause a false positive.
+      // Skip pure-comment lines (JS // and /* */ bodies, CSS /* */). Code lines with
+      // a trailing comment are still scanned, but only string literals are inspected.
       if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return;
       // Dev-only console diagnostics are author-facing, not on-screen copy.
       if (/\bconsole\.(warn|error|info|log|debug)\b/.test(line)) return;

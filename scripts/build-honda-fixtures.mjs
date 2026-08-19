@@ -1,17 +1,6 @@
 /*
- * Build fixtures/honda-cars.json from fixtures/honda-raw.json.
- *
- * Honda has no clean feed API to replay, so its stock is scraped from the
- * server-rendered listing pages (scripts/scrape-honda.mjs → honda-raw.json,
- * flat records) and then projected here through mapHondaRaw() into the engine's
- * already-mapped car schema — the SAME shape mapVehicle() produces for BMW/MINI
- * and the fixtures loader (server/stock.js) serves. This is the Honda analogue
- * of dump-stock.js's `--remap`: no network, just re-project the raw dump through
- * the current mapping so the fixtures stay in step when mapping.js changes.
- *
- * Run:  node scripts/build-honda-fixtures.mjs
- * In:   fixtures/honda-raw.json   (scrape output)
- * Out:  fixtures/honda-cars.json  (mapped cars the engine scores)
+ * Build fixtures/honda-cars.json by re-projecting fixtures/honda-raw.json (scraped by scrape-honda.mjs) through mapHondaRaw() into the engine's mapped-car schema — the Honda analogue of dump-stock.js --remap: no network, just re-map so fixtures track mapping.js changes.
+ * Run:  node scripts/build-honda-fixtures.mjs   (in: fixtures/honda-raw.json  out: fixtures/honda-cars.json)
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';

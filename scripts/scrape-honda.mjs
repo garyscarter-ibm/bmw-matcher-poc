@@ -1,24 +1,6 @@
 /*
- * Scrape real Honda UK approved-used stock into fixtures/honda-raw.json.
- *
- * Honda's used-car site (usedcars.honda.co.uk) has no clean stock API we can
- * replay, but its listing pages are fully server-rendered: every vehicle card
- * carries a rich <li> spec list (mileage, fuel, transmission, doors, power,
- * capacity, mpg, CO2, colour, first-registration date, reg plate), a cash
- * price, a title, a detail link and an image. That is more per-car data than
- * the BMW feed exposes, so a scrape here is honest real stock, not a stub.
- *
- * Pagination is a PATH segment (/page2/, /page3/, …), not a query param — the
- * query-param forms are silently ignored. We pull a representative sample of
- * pages (enough to fill a knockout field and show model variety across Jazz /
- * Civic / HR-V / CR-V / e / ZR-V etc.), throttled and polite, then hand the raw
- * records to mapping.js's honda mapper via dump-stock semantics.
- *
- * Usage:  node scripts/scrape-honda.mjs [pages]   (default 15 pages ≈ 360 cars)
- *
- * Output: fixtures/honda-raw.json — the parsed-but-unmapped records. Run
- *         scripts/dump-stock.js honda (or the mapping step) to produce the
- *         mapped fixtures/honda-cars.json the engine scores.
+ * Scrape real Honda UK approved-used stock into fixtures/honda-raw.json (parsed-but-unmapped records; run build-honda-fixtures.mjs to map them). No clean API, but the listing pages are server-rendered with a rich per-card spec list. Pagination is a PATH segment (/page2/, not a query param); we sample pages politely for model variety.
+ * Usage:  node scripts/scrape-honda.mjs [pages]   (default 15 pages ~ 360 cars)
  */
 
 import { writeFileSync } from 'node:fs';
@@ -50,10 +32,8 @@ function decode(s) {
 const stripTags = (s) => decode(String(s).replace(/<[^>]+>/g, ' '));
 
 /**
- * Split one listing page into per-vehicle HTML blocks. Each real card is
- * anchored by its detail link (…/approved-cars/honda/<model>/<slug>-<id>) and
- * bounded by the next card's anchor. We slice on the "vehicle-inner" wrapper,
- * which each card has exactly once.
+ * Split one listing page into per-vehicle HTML blocks by slicing on the
+ * "vehicle-inner" wrapper, which each real card has exactly once.
  */
 function splitCards(html) {
   const parts = html.split('class="vehicle-inner"');
@@ -89,9 +69,8 @@ function parseCard(block) {
   const title = pick(/title="(Honda[^"]+)"/, block);
   if (!link || !title) return null;
 
-  // Cash price: the non-monthly £ (monthly sits under "Monthly Payment").
-  // The card lists monthly first then the cash price under a plain h3; take the
-  // largest £ value on the card, which is always the cash price here.
+  // Cash price: take the largest £ value on the card, which is always the cash
+  // price (the smaller monthly figure sits under "Monthly Payment").
   const prices = [...block.matchAll(/&pound;([\d,]+)/g)].map((m) => num(m[1])).filter(Boolean);
   const price = prices.length ? Math.max(...prices) : null;
 
@@ -133,11 +112,8 @@ async function fetchPage(page) {
   return res.text();
 }
 
-/** Which pages to pull. The inventory (~58 pages) is sorted cheapest-first, so
- *  the first N pages are all the budget end — a dull, compressed price range. To
- *  get a representative spread (Jazz to Type R to e:Ny1, £8k to £51k) we sample
- *  across the whole inventory at a stride: 1, 4, 7, … up to `last`. Pass a plain
- *  count as arg to fall back to the first-N behaviour. */
+/** Which pages to pull. The inventory is sorted cheapest-first, so `stride` mode samples
+ *  across it (1, 4, 7, … up to `last`) for a representative price spread; a plain count gives first-N. */
 function pagePlan() {
   const arg = process.argv[2];
   if (arg && arg.startsWith('stride')) {

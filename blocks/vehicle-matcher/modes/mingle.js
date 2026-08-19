@@ -1,31 +1,6 @@
 /*
- * MINI Mingle — the matcher, played as a Valentine's swipe game.
- *
- * One of several interchangeable interface "modes" over the shared engine (see
- * ../modes/index.js and the shell in ../vehicle-matcher.js). Its premise, in one
- * line: swipes silently answer the same questionnaire the `questions` mode asks,
- * and the REAL engine does the matching. See docs/mini-mingle-requirements.md.
- *
- * The flow:
- *   1. A tiny "set your type" SEED step (budget + what's it for) — the two
- *      answers a swipe can't reliably read, and budget is the engine's one hard
- *      filter (so the deck is affordable from card one).
- *   2. A DECK of the retailer's real stock (POST /api/preview, scoped by the
- *      seed), shuffled, swiped one card at a time. Keeping/passing cards fills in
- *      the *taste* answer keys (body, fuel, style, priorities) — see
- *      swipesToAnswers().
- *   3. A RESULT: the assembled brief goes to the real /api/match (the identical
- *      call the questionnaire mode makes). The ENGINE'S pick wins; the swipe taste
- *      only re-ranks within the feasible set it returned. So the match is always
- *      a car the person could actually buy, with the engine's real reasons.
- *
- * This mode owns its own copy, cards and state — it deliberately does NOT reuse
- * the questionnaire mode's BRAND_COPY/matchCard (different voice, different card
- * shape). Only el/cardinal/gbp (ui.js) and the engine client are shared.
- *
- * The scoring engine and car dataset live behind an API (see server/ and
- * ../engine.js); this mode never sees the dataset — only the public display
- * fields the API returns.
+ * MINI Mingle — the matcher played as a Valentine's swipe game: swipes silently
+ * answer the same questionnaire, and the REAL engine does the matching.
  */
 
 import { apiGetQuestions, apiField, apiMatch } from '../engine.js';
@@ -42,31 +17,22 @@ import {
 const DECK_TARGET = 10;
 
 /* …but ask the field for a wider pool than we deal, so photosFirst has spares to
- * drop: a photo-less car (or a shared-placeholder one) only reaches the deck when
- * there aren't DECK_TARGET real-photo cars to fill it. Matches the knockout's
- * MAX_FIELD, and stays small enough to pay the per-card colour paint on. */
+ * drop a photo-less car. Matches the knockout's MAX_FIELD; small enough to paint. */
 const DECK_POOL = 16;
 
-/* A player can bail to the result once they've swiped at least this many —
- * enough signal to match honestly, so the "Reveal my match" affordance appears
- * (§6.1). Below it, finish the deck. */
+/* Swipes needed before the "Reveal my match" affordance appears (§6.1) — enough
+ * signal to match honestly. Below this, the player finishes the deck. */
 const REVEAL_AFTER = 3;
 
-/* The smallest feasible field that still makes "Swipe again" worthwhile. A brief
- * this narrow (e.g. a low budget band) can leave only one or two cars feasible,
- * and re-dealing the SAME seed then just replays those same one or two cards —
- * the reported "one more swipe and it shows your car again" dead end. Below this,
- * the result offers to widen the brief instead of re-dealing an identical deck. */
+/* The smallest feasible field that still makes "Swipe again" worthwhile. Below this,
+ * re-dealing replays the same one or two cards, so the result offers to widen instead. */
 const MIN_RESWIPE = 3;
 
 /* ------------------------------ copy ------------------------------ */
 
 /*
- * Valentine-flirty display copy, keyed by brand with a `bmw` fallback (every
- * read is `MINGLE_COPY[brand] || MINGLE_COPY.bmw`). MINI is the primary, fully
- * written voice — this is a MINI campaign (§9); the BMW register is a lighter
- * fallback so a future skin isn't blank. Functions take a single args object,
- * matching the questions-mode copy convention.
+ * Valentine-flirty display copy, keyed by brand with a `bmw` fallback. MINI is the
+ * primary voice (§9); functions take a single args object, per the copy convention.
  */
 const MINGLE_COPY = {
   mini: {
@@ -78,10 +44,8 @@ const MINGLE_COPY = {
     budgetLabel: 'How much are you looking to spend?',
     useLabel: 'And what’s it for?',
     seedCta: 'Start swiping',
-    // NB: the budget bands and the "what's it for" options are NOT copy — they
-    // come from the engine per brand (apiGetQuestions → the `budget` and
-    // `primaryUse` questions), so MINI's own labels and MINI-scale budget show
-    // without duplicating the source of truth. Only the seed's framing lives here.
+    // NB: the budget bands and the "what's it for" options are NOT copy — they come
+    // from the engine per brand (apiGetQuestions). Only the seed's framing lives here.
     // Deck
     deckInstruction: 'Drag right for yes, left for no, or tap. Keep the ones that catch your eye.',
     passLabel: 'Pass',
@@ -92,17 +56,15 @@ const MINGLE_COPY = {
     undoLabel: '↩ Bring that one back',
     revealLabel: 'Reveal my match',
     progress: ({ done, total }) => `${done} of ${total}`,
-    // Flirty card badges — flavour, never a scored verdict (§4.4). Warmer ones
-    // are nudged toward higher-scoring cards, but nothing here is negative.
+    // Flirty card badges — flavour, never a scored verdict (§4.4). Warmer ones are
+    // nudged toward higher-scoring cards, but nothing here is negative.
     badgesWarm: ['Hot right now', 'Strong chemistry', 'Head-turner'],
     badgesCool: ['Your type?', 'Plays hard to get', 'Bit of a charmer'],
-    // Age-aware flavour badge, MINI at its most playful, used only at the ends
-    // of the age range (very new / a bit older); null → fall back to the score
-    // pool above. Flavour only, never a verdict (§4.4).
+    // Age-aware flavour badge, used only at the ends of the age range; null → fall
+    // back to the score pool above. Flavour only, never a verdict (§4.4).
     ageBadge: (years) => (years <= 1 ? 'Barely driven' : years >= 6 ? 'Seen a few B-roads' : null),
     // Hero spec — the one brand-defining detail on the swipe card. MINI leads on
-    // character, not numbers (there are no honest per-car figures to show): a
-    // short, fixed brand tag. Returns null for nothing to add.
+    // character, not numbers: a short, fixed brand tag. Returns null for nothing to add.
     hero: () => 'Go-kart feel',
     // Taste profile
     tasteHeading: 'Your type, so far',
@@ -202,9 +164,8 @@ const MINGLE_COPY = {
     errLede: 'The matching service didn’t respond. Check your connection and try again.',
     retryLabel: 'Try again',
   },
-  // Honda's register: plain, warm and practical, no em dashes (house rule). The
-  // game framing stays light, but the words talk about fit and value rather than
-  // flirtation. Its own wordmark so the mode reads as Honda's, not a BMW skin.
+  // Honda's register: plain, warm and practical, no em dashes (house rule). Talks
+  // fit and value over flirtation; own wordmark so it reads as Honda's.
   honda: {
     wordmark: 'Honda Match',
     seedKicker: 'First, the essentials',
@@ -225,9 +186,8 @@ const MINGLE_COPY = {
     badgesCool: ['Your type?', 'One to consider', 'In the running'],
     // Age-aware badge, Honda's plain-warm register; null falls back to the pool.
     ageBadge: (years) => (years <= 1 ? 'Nearly new' : years >= 6 ? 'Been around' : null),
-    // Hero spec — Honda's power is a REAL per-listing figure (bhp), so the card
-    // can state it as this car's own. Labelled bhp (never a bare number, never
-    // the wrong unit); null when the listing didn't carry a power figure.
+    // Hero spec — Honda's power is a REAL per-listing figure (bhp), stated as this
+    // car's own. Labelled bhp; null when the listing carried no power figure.
     hero: (car) => (Number.isFinite(car?.power) ? `${car.power} bhp` : null),
     tasteHeading: 'Your taste, so far',
     tasteEmpty: 'Nothing yet, start swiping.',
@@ -261,8 +221,7 @@ const MINGLE_COPY = {
     retryLabel: 'Try again',
   },
   // Ford's register: friendly, confident and plainly British, with a little more
-  // spirit than Honda's (Ford has real driver's cars, so it's allowed to enjoy
-  // itself). No em dashes (house rule). Its own wordmark so the mode reads Ford.
+  // spirit than Honda's. No em dashes (house rule); own wordmark so it reads Ford.
   ford: {
     wordmark: 'Ford Match',
     seedKicker: 'First, the essentials',
@@ -283,11 +242,8 @@ const MINGLE_COPY = {
     badgesCool: ['Your type?', 'One to consider', 'In the running'],
     // Age-aware badge, Ford's friendly-plain register; null falls back to the pool.
     ageBadge: (years) => (years <= 1 ? 'Barely driven' : years >= 6 ? 'Plenty of miles in it' : null),
-    // Hero spec — Ford's halo cars (ST, Mustang, Mach-E GT) earn a performance
-    // tag. It's a MODEL trait, framed as one ("Performance"), NOT a per-car
-    // 0-62 (zeroTo62 is generic per-model, so it would be dishonest to state as
-    // measured for this listing). Non-halo Fords return null here and instead
-    // show the real full-service-history badge (see buildCard).
+    // Hero spec — Ford's halo cars (ST, Mustang, Mach-E GT) earn a "Performance"
+    // MODEL tag, not a per-car 0-62. Non-halo Fords return null (FSH badge instead).
     hero: (car) => (/\bST\b|\bST-Line\b|Mustang|Mach-E GT|\bGT\b/i.test(
       `${car?.name || ''} ${car?.line || ''}`,
     ) ? 'Performance' : null),
@@ -322,10 +278,8 @@ const MINGLE_COPY = {
     errLede: 'The matching service didn’t respond. Check your connection and try again.',
     retryLabel: 'Try again',
   },
-  // Motorrad's register: rider-first and technical, with real adrenaline (this is
-  // the sportiest sub-brand). Every car word becomes a bike word: a "deck" of
-  // bikes, you "ride away", you book a "test ride". No em dashes (house rule). Its
-  // own wordmark so the mode reads as Motorrad's, not a car skin.
+  // Motorrad's register: rider-first and technical, sportiest sub-brand. Every car
+  // word becomes a bike word. No em dashes (house rule); own wordmark.
   motorrad: {
     wordmark: 'Bike Match',
     seedKicker: 'First, the essentials',
@@ -346,10 +300,8 @@ const MINGLE_COPY = {
     badgesCool: ['Your kind of ride?', 'One to consider', 'In the running'],
     // Age-aware badge, Motorrad's rider register; null falls back to the pool.
     ageBadge: (years) => (years <= 1 ? 'Barely run in' : years >= 6 ? 'Well ridden' : null),
-    // Hero spec — engine size is the most Motorrad thing we can show, e.g.
-    // "1250cc". Displacement is a model constant (it reads as the bike's engine
-    // size, not a measured individual figure), so it's honest even where the
-    // server fell back to the model spec for cc. null when no cc is carried.
+    // Hero spec — engine size (e.g. "1250cc"). Displacement is a model constant that
+    // reads as the bike's engine size, so it's honest either way. null when no cc.
     hero: (car) => (Number.isFinite(car?.cc) ? `${car.cc}cc` : null),
     tasteHeading: 'Your taste, so far',
     tasteEmpty: 'Nothing yet, start swiping.',
@@ -385,11 +337,8 @@ const MINGLE_COPY = {
 };
 
 /*
- * The colour table (SHADE_HEX/NEUTRAL_SWATCH), the seed helpers, the deck/shade/
- * price/format helpers and the swipe→answers inference all live in
- * ./match-signal.js now — shared with the knockout mode so the two games read
- * taste and build the engine brief the same way. This file keeps only the
- * swipe-specific copy, state and rendering.
+ * The colour table, seed helpers, deck/shade/price/format helpers and the
+ * swipe→answers inference all live in ./match-signal.js now, shared with knockout.
  */
 
 /* ------------------------------ helpers ------------------------------ */
@@ -398,12 +347,8 @@ const MINGLE_COPY = {
 const copyFor = (brand) => MINGLE_COPY[brand] || MINGLE_COPY.bmw;
 
 /*
- * The car's advertised colour NAME for display, or null. `car.colour` arrives in
- * two shapes across brands: an object { colour, manufacturerColour } for BMW/MINI
- * (see server/stock.js) and a plain marketing string for Honda/Ford (mapping.js
- * passes the feed's colour through verbatim). Motorrad carries none yet. This
- * reads the readable marketing name out of either shape and returns null when
- * absent, so a card never fabricates a colour it wasn't given.
+ * The car's advertised colour NAME for display, or null. `car.colour` is an object
+ * (BMW/MINI) or a string (Honda/Ford); reads the name out of either, never fabricated.
  */
 const colourName = (car) => {
   const c = car?.colour;
@@ -414,11 +359,8 @@ const colourName = (car) => {
 };
 
 /*
- * Light presentational Title-Casing for a colour name, applied only to display.
- * Some feed colour strings arrive with odd casing verbatim ("Brilliant sporty
- * blu"); this only touches the FIRST letter of each word, so it tidies casing
- * without "correcting" (and so mangling) the feed's own spelling. Safe on
- * already-titled names ("Frozen White" stays "Frozen White").
+ * Light presentational Title-Casing for a colour name (display only). Touches only
+ * the FIRST letter of each word, so it tidies casing without mangling the spelling.
  */
 const titleCaseColour = (s) => s.replace(/\b\p{L}/gu, (ch) => ch.toUpperCase());
 
@@ -428,9 +370,7 @@ function mount(root, ctx) {
   const copy = copyFor(ctx.brand);
 
   // Per-run state — a fresh local object, NOT hung on the shared ctx, so a mode
-  // swap and re-mount (the switcher re-calls mount with the same ctx) starts
-  // clean. The mode owns its own state and its own hash key (it never touches
-  // ctx.answers or the questionnaire mode's #m= link).
+  // swap and re-mount starts clean. The mode owns its own state and hash key.
   const state = {
     questions: [], // the engine's per-brand questions (seeds the budget/use tiles)
     seed: null, // { budget, primaryUse }
@@ -444,9 +384,8 @@ function mount(root, ctx) {
   const reducedMotion = window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Live card elements in the visible stack, keyed by car id, reused across
-  // renders so the card behind animates up into focus rather than popping in
-  // (see renderDeckColumn). Cleared whenever a fresh deck is dealt.
+  // Live card elements in the visible stack, keyed by car id, reused across renders
+  // so the card behind animates up into focus. Cleared whenever a fresh deck is dealt.
   const cardEls = new Map();
 
   /* ---- error screen (local reimplementation of the renderStatus pattern) ---- */
@@ -466,9 +405,8 @@ function mount(root, ctx) {
   };
 
   /* --------------------------- seed skeleton --------------------------- */
-  // Painted synchronously by mount() while apiGetQuestions is in flight, so the
-  // stage is never blank and the shell never waits. Swapped for the real seed
-  // once the (per-brand) questions land.
+  // Painted synchronously by mount() while apiGetQuestions is in flight, so the stage
+  // is never blank. Swapped for the real seed once the (per-brand) questions land.
   const renderSeedSkeleton = () => {
     root.replaceChildren();
     const screen = el('div', 'vm-screen vm-mingle-seed');
@@ -485,11 +423,8 @@ function mount(root, ctx) {
   };
 
   /* ---------------------------- seed step ----------------------------
-   * The two answers a swipe can't read: budget (the engine's hard filter) and
-   * what the car's for. Both the budget bands and the "what's it for" tiles are
-   * built from the engine's own per-brand questions (state.questions) — NOT from
-   * local copy — so MINI shows MINI's labels and MINI-scale money, exactly like
-   * the questionnaire mode. Only the seed's framing (kicker/title/lede) is copy. */
+   * The two answers a swipe can't read: budget + what the car's for, built from the
+   * engine's per-brand questions (state.questions). Only the framing here is copy. */
   const renderSeed = (preset) => {
     root.replaceChildren();
     const screen = el('div', 'vm-screen vm-mingle-seed');
@@ -555,23 +490,17 @@ function mount(root, ctx) {
 
   /* --------------------------- deck loading --------------------------- */
   const loadDeck = async () => {
-    // Skeleton the deck panel while /api/field is in flight. Not the seed —
-    // this is the swipe stage arriving.
+    // Skeleton the deck panel while /api/field is in flight (the swipe stage arriving).
     renderDeckSkeleton();
-    // apiField resolves-empty (never throws), so no try/catch needed here. The
-    // swipe deck asks for a DECK_POOL of cars WITH colour paint (enrich: true) —
-    // card paint and the "Colour" bar read car.colour as a taste signal, and the
-    // pool is small enough to pay the per-card PDP fetch. (The knockout omits
-    // enrich; see knockout.js.)
+    // apiField resolves-empty (never throws), so no try/catch. Asks for a DECK_POOL WITH colour
+    // paint (enrich: true), since card paint and the "Colour" bar read car.colour (knockout omits it).
     const matches = await apiField(ctx.api, state.seed, ctx.retailer, ctx.brand, DECK_POOL, true);
     if (!matches.length) {
       renderEmptyPool();
       return;
     }
-    // Shuffle for variety, then float the real-photo cars to the front (a
-    // photo-less or placeholder-photo card is a weak swipe — §5.1) before dealing
-    // the top DECK_TARGET. With a full pool the no-photo cars simply don't make
-    // the deck; on a thin feed they fill the tail rather than starving it.
+    // Shuffle for variety, then float the real-photo cars to the front (§5.1) before
+    // dealing the top DECK_TARGET; on a thin feed no-photo cars fill the tail.
     state.deck = photosFirst(shuffle(matches), (m) => m.car?.photo).slice(0, DECK_TARGET);
     state.index = 0;
     state.kept = [];
@@ -606,13 +535,8 @@ function mount(root, ctx) {
   };
 
   /* ------------------------------ deck ------------------------------ */
-  // The stage element persists across swipes. Rebuilding it (root.replaceChildren)
-  // on every commit collapsed the section to zero height for an instant and
-  // re-fired the vm-in entry animation, so the whole panel visibly jumped on each
-  // Pass/Keep — the reported jump on click AND on swipe. Keeping one stage and
-  // swapping only its two columns in place holds the layout steady, and lets the
-  // card behind animate up into focus (its .vm-mingle-card transition carries the
-  // depth class change) instead of popping in from a fresh teardown.
+  // The stage element persists across swipes: rebuilding it on every commit made the
+  // panel jump, so we swap only its two columns in place to hold the layout steady.
   let stageEl = null;
   const renderDeck = () => {
     if (!stageEl || stageEl.parentNode !== root) {
@@ -691,15 +615,8 @@ function mount(root, ctx) {
 
     col.append(el('p', 'vm-mingle-instruction', copy.deckInstruction));
 
-    // The card stack — at most three deep (§11.1). Front card is live.
-    //
-    // Cards are REUSED across renders, keyed by car id: the card that was second
-    // in the stack keeps its DOM element and just has its depth class swapped
-    // (vm-mingle-card-1 → -0), so the CSS transform transition animates it up
-    // into focus as the leaver flies out — instead of a brand-new element popping
-    // in at the front. buildCard is only called for a card entering the visible
-    // three for the first time. Stale entries (already swiped) are dropped so the
-    // map can't grow past the deck.
+    // The card stack — at most three deep (§11.1), front card live. Cards are REUSED
+    // across renders (keyed by car id, depth class swapped) so the next animates up.
     const stack = el('div', 'vm-mingle-stack');
     const upcoming = state.deck.slice(done, done + 3);
     const freshKeys = new Set();
@@ -723,11 +640,8 @@ function mount(root, ctx) {
     cardEls.forEach((_, key) => { if (!freshKeys.has(key)) cardEls.delete(key); });
     col.append(stack);
 
-    // Make the front card draggable (pointer). The buttons/keys below stay the
-    // source of truth; drag is an enhancement that reuses the same doSwipe
-    // commit. No-op under reduced motion (drag would fight the instant commit).
-    // A reused front card may already carry the handler, so guard against a
-    // double-bind with a dataset flag.
+    // Make the front card draggable (pointer); buttons/keys stay the source of truth.
+    // No-op under reduced motion; a dataset flag guards a reused card from double-bind.
     if (!reducedMotion) {
       const front = stack.querySelector('.vm-mingle-card-0');
       if (front && !front.dataset.draggable) {
@@ -783,13 +697,8 @@ function mount(root, ctx) {
     const card = el('article', `vm-mingle-card vm-mingle-card-${depth}`);
     card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
 
-    // Drag stamps on every card, not just the current front one: cards are
-    // reused across renders (a depth-1 card is promoted to depth-0 in place, see
-    // renderDeckColumn), so the stamps must already be present when a card
-    // becomes the front, or a promoted card would drag with no KEEP/NOPE stamp.
-    // They sit hidden (opacity 0, pointer-events none) and CSS only reveals them
-    // on .vm-mingle-card-0.is-dragging-*, so carrying them on the back cards is
-    // inert. Purely decorative; the buttons remain the a11y truth.
+    // Drag stamps on every card, not just the front: a reused card promoted to front
+    // must already carry them. CSS reveals them only on the dragging front card.
     const keepStamp = el('span', 'vm-mingle-stamp vm-mingle-stamp-keep', copy.stampKeep);
     const passStamp = el('span', 'vm-mingle-stamp vm-mingle-stamp-pass', copy.stampPass);
     keepStamp.setAttribute('aria-hidden', 'true');
@@ -811,10 +720,8 @@ function mount(root, ctx) {
       media.classList.add('no-photo');
       media.append(el('span', 'vm-mingle-card-initial', (car.name || '?').charAt(0)));
     }
-    // Flirty badge — an age-aware line takes the badge at the extremes (barely
-    // used / been around), leaning the dating frame into the data we have;
-    // otherwise the warmer pool is nudged toward higher scores, but only as a
-    // nudge; nothing negative, no printed number.
+    // Flirty badge — an age-aware line takes the badge at the extremes; otherwise the
+    // warmer pool is nudged toward higher scores. Nothing negative, no printed number.
     const years = ageInYears(car);
     const ageBadge = (years != null && copy.ageBadge) ? copy.ageBadge(years) : null;
     const pool = (score >= 80 ? copy.badgesWarm : copy.badgesCool);
@@ -825,17 +732,12 @@ function mount(root, ctx) {
 
     const body = el('div', 'vm-mingle-card-body');
     body.append(el('h3', 'vm-mingle-card-name', car.name));
-    // Swipe leans into the dating frame (§9): the spec line reads the car as a
-    // date, not a listing — its AGE instead of a reg plate, and mileage as
-    // "miles under the belt". Age falls back to the plate when no listing date
-    // is surfaced (see ageInYears / registrationDate); if we can't work it out,
-    // the plate stands rather than printing a guessed age.
+    // Swipe leans into the dating frame (§9): the spec line reads the car's AGE (not
+    // a reg plate) and mileage as "miles under the belt", falling back to the plate.
     const age = ageLabel(car);
     const miles = car.mileage ? `${car.mileage.toLocaleString('en-GB')} miles under the belt` : null;
-    // Colour name closes the spec line ("3 years old · 24,000 miles under the
-    // belt · Frozen White"). Real per-listing, so it's the car's own fact; light
-    // Title-Casing tidies odd feed casing without correcting spelling. Absent →
-    // nothing appended (never a fabricated colour).
+    // Colour name closes the spec line — a real per-listing fact, lightly Title-Cased
+    // to tidy odd feed casing. Absent → nothing appended (never a fabricated colour).
     const colour = colourName(car);
     const spec = [age, miles, colour ? titleCaseColour(colour) : null].filter(Boolean).join(' · ');
     if (spec) body.append(el('p', 'vm-mingle-card-spec', spec));
@@ -845,13 +747,8 @@ function mount(root, ctx) {
     if (car.body) pills.append(el('span', 'vm-mingle-pill', cap(car.body)));
     body.append(pills);
 
-    // Per-brand hero spec + Ford's full-service-history badge — the small
-    // brand-defining beat below the pills. The hero is a copy-object hook so each
-    // brand controls its own line (engine size for Motorrad, real bhp for Honda,
-    // a performance/character tag for Ford/BMW/MINI); it renders only when the
-    // hook returns a non-null string, so a brand or a car without the datum shows
-    // nothing rather than an empty element. The FSH pill is real per-listing
-    // (Ford only) and a strong trust signal, so it sits alongside the hero.
+    // Per-brand hero spec + Ford's FSH badge — the brand-defining beat below the pills.
+    // The hero is a per-brand copy hook; renders only when it returns a non-null string.
     const heroText = copy.hero ? copy.hero(car) : null;
     const fsh = car.fullServiceHistory === 'Yes';
     if (heroText || fsh) {
@@ -864,11 +761,8 @@ function mount(root, ctx) {
     return card;
   };
 
-  // The card's age, in the dating-frame voice: "Brand new" under a year, then
-  // "1 year old" / "N years old". Returns null when we can't derive an age (no
-  // listing date and an unreadable/absent plate), so the caller can fall back
-  // rather than print a made-up number. ageInYears is brand-neutral (plate/
-  // firstReg/year), so this reads for every brand the swipe deck supports.
+  // The card's age in the dating-frame voice ("Brand new", "N years old"). Returns
+  // null when no age is derivable, so the caller falls back rather than guess.
   const ageLabel = (car) => {
     const years = ageInYears(car);
     if (years == null) return car.plate || null;
@@ -886,9 +780,8 @@ function mount(root, ctx) {
   };
 
   /* --------------------------- swiping --------------------------- */
-  // Commit a swipe. `viaDrag` means the card is ALREADY displaced by a finger
-  // drag past the threshold, so we let it finish flying under its own transform
-  // rather than re-triggering the class-based fly-out from centre.
+  // Commit a swipe. `viaDrag` means the card is ALREADY flying under its own drag
+  // transform, so we let it finish rather than re-trigger the fly-out from centre.
   const doSwipe = (keep, viaDrag = false) => {
     if (state.busy || state.index >= state.deck.length) return;
     const match = state.deck[state.index];
@@ -917,25 +810,16 @@ function mount(root, ctx) {
   };
 
   /*
-   * Pointer-drag on the front card: it follows the finger with a slight tilt, a
-   * KEEP/PASS stamp fades in with the pull, and releasing past a threshold (or a
-   * quick flick) commits that swipe via doSwipe; releasing short springs it back.
-   * This is the "feels like a swipe" layer over the button-driven model — the
-   * buttons and arrow keys still do exactly what they did, and this is skipped
-   * entirely under reduced motion (see the caller). Listeners live on THIS card;
-   * a re-render (renderDeck) throws the card away, so nothing leaks — and the
-   * document-level move/up listeners are removed the moment the gesture ends.
+   * Pointer-drag on the front card — a "feels like a swipe" layer over the button model:
+   * releasing past a threshold (or a quick flick) commits via doSwipe, else springs back.
    */
   const dragToSwipe = (card) => {
     let startX = 0;
     let startT = 0;
     let dx = 0;
     let dragging = false;
-    // Mark the card as an active swipe surface. The CSS `touch-action: none`
-    // that stops the page scrolling mid-swipe is scoped to THIS class, so it
-    // only applies when a drag handler is actually attached — under reduced
-    // motion dragToSwipe isn't called, the class is absent, and a touch that
-    // lands on the card scrolls the page normally instead of being trapped.
+    // Mark the card an active swipe surface: the CSS `touch-action: none` (stops the
+    // page scrolling mid-swipe) is scoped to this class, so absent it, touch scrolls.
     card.classList.add('is-draggable');
     // Commit past ~32% of the card width, or a fast flick in either direction.
     const threshold = () => Math.max(64, card.offsetWidth * 0.32);
@@ -991,12 +875,8 @@ function mount(root, ctx) {
       startT = e.timeStamp || 0;
       dx = 0;
       card.classList.remove('is-returning');
-      // Capture the pointer to THIS card so the gesture is ours start to finish:
-      // move/up keep firing even if the finger slides off the card, and — with
-      // touch-action: none on the card (CSS) — the browser won't reinterpret the
-      // touch as a page scroll partway through. Without this a touch swipe with
-      // any vertical drift scrolled the page (the reported jump). Guarded: some
-      // engines throw if the pointer is already released.
+      // Capture the pointer to THIS card so the gesture is ours start to finish (without
+      // it, vertical drift scrolled the page). Guarded: some engines throw if released.
       try { card.setPointerCapture(e.pointerId); } catch { /* no-op */ }
       document.addEventListener('pointermove', onMove);
       document.addEventListener('pointerup', onUp);
@@ -1082,9 +962,8 @@ function mount(root, ctx) {
     root.append(screen);
   };
 
-  // Re-rank the engine's feasible matches by swipe taste, then take the top.
-  // NEVER promotes a car the engine didn't return — it only reorders within
-  // `matches` (§5.3 step 3). With no kept signal, the engine's own order stands.
+  // Re-rank the engine's feasible matches by swipe taste and take the top — only
+  // reorders within `matches`, never promotes a car the engine didn't return (§5.3).
   const pickHero = (matches) => {
     if (state.kept.length === 0) return matches[0];
     const wantBody = modal(state.kept.map((c) => c.body))?.value;
@@ -1161,11 +1040,8 @@ function mount(root, ctx) {
     share.addEventListener('click', () => doShare(hero, share));
     wrap.append(share);
 
-    // "Swipe again" re-deals the same seed, which is a fresh, reshuffled session
-    // when the field is healthy — but a dead-end loop when the brief only fits a
-    // card or two (re-dealing replays the same one or two cards). So when the
-    // deck they just swiped was that thin, offer the real remedy instead: back to
-    // the seed screen (their choices preselected) to widen the brief.
+    // "Swipe again" re-deals the same seed — fresh when the field is healthy, but a
+    // dead-end replay on a thin deck, so below MIN_RESWIPE offer "widen" to the seed.
     if (state.deck.length >= MIN_RESWIPE) {
       const again = el('button', 'vm-mingle-link vm-mingle-again', copy.againCta);
       again.type = 'button';
@@ -1199,13 +1075,8 @@ function mount(root, ctx) {
    * (match-signal.js), so the swipe and knockout crescendos can't drift. */
 
   /* ------------------------------ boot ------------------------------
-   * The seed's budget bands and "what's it for" tiles are per-brand, and the
-   * brand's authored labels + budget ceiling live behind apiGetQuestions — so,
-   * like the questionnaire mode, we fetch that first. mount stays synchronous: it
-   * paints the seed skeleton now and does the fetch in this detached boot(), so
-   * the shell never awaits a cold backend. apiGetQuestions THROWS on failure
-   * (it's load-bearing here — no questions, no seed), so guard it and offer a
-   * retry that re-boots. */
+   * Fetch the per-brand questions (seed bands/tiles) in this detached async boot() so
+   * mount stays synchronous. apiGetQuestions THROWS — guard it and offer a re-boot retry. */
   const boot = async () => {
     try {
       const { questions } = await apiGetQuestions(ctx.api, ctx.retailer, ctx.brand);
@@ -1221,10 +1092,6 @@ function mount(root, ctx) {
   boot();
 }
 
-// The switcher tab is brand-agnostic shell UI, so its label is neutral —
-// "Swipe", not "MINI Mingle". The campaign name lives as the wordmark INSIDE
-// the stage (MINGLE_COPY[brand].wordmark), where it can vary by brand; the
-// mode's static `label` can't (spec §9). The key mirrors that label
-// ('swipe') so ?mode=swipe and the authored "Mode" value read the same as the
-// tab — the file is still mingle.js, but the mode a visitor addresses is "swipe".
+// The switcher tab is brand-agnostic shell UI, so its label stays neutral ("Swipe"); the
+// campaign name is the per-brand wordmark inside the stage (§9). Key mirrors the label.
 export default { key: 'swipe', label: 'Swipe', mount };

@@ -1,17 +1,6 @@
 /*
- * Quiz definition. Each question:
- *  id:       key used in the answers object
- *  title:    question shown to the user
- *  help:     optional sub-text
- *  multi:    true → multi-select (answer is an array of values)
- *  type:     'slider' → a range input (answer is a number); otherwise an option
- *            list. Slider questions carry min/max/step/format/plusAtMax and no
- *            `options`.
- *  showIf:   optional (answers) => boolean, for conditional questions
- *  options:  { value, label, sub? }
- *
- * The `answers` object produced by the quiz is the engine's only input,
- * so adding a question here means teaching engine.js about its id.
+ * Quiz definition. Each question: id, title, help?, multi?, type ('slider' → a number,
+ * else an option list), showIf?, options. Adding a question here means teaching engine.js about its id.
  */
 
 import { brandConfig } from './brands.js';
@@ -21,10 +10,8 @@ export const QUESTIONS = [
     id: 'budget',
     title: 'What’s your budget?',
     help: 'Rough on the road price. We’ll flag anything that’s a slight stretch.',
-    // A dual-thumb range: the user brackets a min and a max, so the answer is a
-    // [min, max] pair. The engine still understands a bare number (→ [0, n]) and
-    // the legacy b1–b5 band keys (see budgetRange in engine.js), so old shared
-    // links keep working.
+    // A dual-thumb range: the answer is a [min, max] pair. The engine still understands a bare
+    // number (→ [0, n]) and legacy b1–b5 band keys (budgetRange in engine.js), so old links keep working.
     type: 'slider',
     range: true,
     min: 0,
@@ -39,24 +26,20 @@ export const QUESTIONS = [
     title: 'Any body styles you’re drawn to?',
     help: 'Pick as many as you like or keep an open mind.',
     multi: true,
-    // `brands` limits an option to specific brands; absent means all CAR brands.
-    // MINI sells no saloons, coupés or 7-seat MPVs, so those are BMW-only. The
-    // car bodies are gated to the car brands so Motorrad (bikes) doesn't offer
-    // them; Motorrad supplies its own category options below. `any` shows for all.
+    // `brands` limits an option to specific brands; absent means all CAR brands (MINI sells no
+    // saloons/coupés/MPVs). Motorrad supplies its own category options below; `any` shows for all.
     options: [
       { value: 'hatchback', label: 'Hatchback', brands: ['bmw', 'mini', 'honda', 'ford'] },
       { value: 'saloon', label: 'Saloon', brands: ['bmw'] },
       { value: 'estate', label: 'Estate or Touring', brands: ['bmw', 'mini', 'honda', 'ford'] },
-      // Ferrari's stock is coupé / convertible / one SUV (the Purosangue), so it
-      // takes those three car bodies and none of the mainstream ones (no hatch,
-      // saloon, estate or MPV Ferrari exists).
+      // Ferrari's stock is coupé / convertible / one SUV (Purosangue), so it takes
+      // those three car bodies and none of the mainstream ones.
       { value: 'suv', label: 'SUV', brands: ['bmw', 'mini', 'honda', 'ford', 'ferrari'] },
       { value: 'coupe', label: 'Coupé', brands: ['bmw', 'ferrari'] },
       { value: 'convertible', label: 'Convertible', brands: ['bmw', 'mini', 'ford', 'ferrari'] },
       { value: 'mpv', label: 'Family carrier', brands: ['bmw'] },
       // Bike categories — Motorrad only. Each value matches a `body` the Motorrad
-      // mapper emits (see mapMotorradRaw / MODEL_SPECS_MOTORRAD), so the engine's
-      // body scorer works unchanged.
+      // mapper emits (mapMotorradRaw), so the engine's body scorer works unchanged.
       { value: 'adventure', label: 'Adventure / GS', sub: 'Go-anywhere, upright', brands: ['motorrad'] },
       { value: 'tourer', label: 'Tourer', sub: 'Distance and comfort', brands: ['motorrad'] },
       { value: 'sport', label: 'Sport', sub: 'Fast and focused', brands: ['motorrad'] },
@@ -72,10 +55,8 @@ export const QUESTIONS = [
     title: 'What fuel types suit you?',
     help: 'Pick as many as you like, or let us help you decide.',
     multi: true,
-    // `phev` is gated to the car brands: BMW Motorrad sells petrol bikes plus a
-    // few electric scooters (the CE models), no plug-in hybrid, so a rider never
-    // sees it. `petrol`, `ev` and `open` carry no `brands` marker, so they show
-    // for every brand.
+    // `phev` is gated to the car brands: Motorrad sells petrol bikes plus electric scooters,
+    // no plug-in hybrid. `petrol`, `ev` and `open` carry no `brands` marker, so they show for all.
     options: [
       { value: 'petrol', label: 'Petrol' },
       { value: 'diesel', label: 'Diesel', sub: 'Higher miles, more torque', brands: ['bmw'] },
@@ -88,9 +69,8 @@ export const QUESTIONS = [
     id: 'charging',
     title: 'Could you charge a car at home or work?',
     help: 'A driveway socket or workplace charger changes the electric maths.',
-    // fuel is now multi-select (an array), so test membership. Show the charging
-    // question if the picks include electric-adjacent fuels or "help me decide",
-    // or if fuel is still unanswered. Mirror of SHOW_IF.charging in quiz-meta.js.
+    // fuel is multi-select (array), so test membership: show charging if the picks include
+    // ev/phev/open, or if fuel is unanswered. Mirror of SHOW_IF.charging in quiz-meta.js.
     showIf: (a) => {
       const f = a.fuel;
       const picks = Array.isArray(f) ? f : (f != null ? [f] : []);
@@ -124,22 +104,15 @@ export const QUESTIONS = [
     ],
   },
   /*
-   * There is no boot-space question. It was cut after the stock audit
-   * (docs/question-stock-audit.md) measured it changing the top 3 in only 13%
-   * of BMW cases and ~25% of MINI's — a whole screen asking for something
-   * `people` and `primaryUse` already imply. The signal wasn't dropped with
-   * it: the engine derives the same small/medium/big need from those two
-   * answers (see bootNeedKey in engine.js), so the per-brand bootNeed tuning
-   * tables still calibrate practicality exactly as before.
+   * There is no boot-space question — cut after the stock audit found it rarely changed the top 3.
+   * The engine still derives small/medium/big need from `people`+`primaryUse` (bootNeedKey in engine.js).
    */
   {
     id: 'mileage',
     title: 'How many miles a year?',
     help: 'Roughly, it helps us weigh fuel type and running costs.',
-    // Annual mileage as a number. Feeds the economy dimension + its weight for
-    // every fuel via a 0..1 ramp (see mileageFraction in engine.js): the more
-    // you drive, the more running costs matter. Starts at 1,000 — nobody drives
-    // zero — and tops out at "25,000+".
+    // Annual mileage as a number. Feeds the economy dimension + its weight via a 0..1 ramp
+    // (mileageFraction in engine.js): the more you drive, the more running costs matter.
     type: 'slider',
     min: 1000,
     max: 25000,
@@ -186,21 +159,13 @@ export const BUDGET_BANDS = {
 };
 
 /*
- * Per-brand copy overrides. The base QUESTIONS text above is BMW/Grassick's
- * measured voice; MINI speaks in a playful, "go-kart", UPPERCASE-with-a-full-
- * stop register (see docs/tone-style-guide.md). Only the *words* change —
- * question ids and option `value`s are untouched, so the scoring engine is
- * unaffected. Keyed by brand → question id → { title?, help?, options?:{ value
- * → { label?, sub? } } }. A brand with no entry (BMW) keeps the base copy.
+ * Per-brand copy overrides. Only the *words* change — question ids and option `value`s are
+ * untouched, so the scoring engine is unaffected. Keyed by brand → id → { title?, help?, options? }.
  */
 const BRAND_COPY = {
   motorrad: {
-    // Bike-native voice. Motorrad drops charging/people/style (see
-    // BRANDS.motorrad.questions.drop) and adds ridingStyle + licence, whose copy
-    // lives with them in brands.js. Here we re-voice the questions it keeps so a
-    // rider never reads a car word: "car" becomes "bike", "on board" becomes the
-    // pillion, "drive" becomes "ride". Ids and option values are untouched, so
-    // the engine scores a bike exactly as it scores a car.
+    // Bike-native voice. Motorrad drops charging/people/style and adds ridingStyle + licence
+    // (copy in brands.js). Re-voices the kept questions so a rider never reads a car word; ids/values untouched.
     budget: {
       title: 'What’s your budget?',
       help: 'Rough ride-away price. We’ll flag anything that’s a slight stretch.',
@@ -244,14 +209,8 @@ const BRAND_COPY = {
     },
   },
   ferrari: {
-    // Ferrari voice: Italian, romantic, heritage-proud, addressed to a
-    // Ferrarista (per ferrari.com / preowned.ferrari.com: "Join the world of
-    // Ferraristi", "La nuova dolce vita", "Configure your dreams", the Prancing
-    // Horse, Maranello, Italian excellence since 1947). It leads on emotion and
-    // driving joy, never on value or spec, and it treats the buyer as joining a
-    // family, not making a purchase. Charging is dropped (see
-    // BRANDS.ferrari.questions.drop); ids and option values are untouched so the
-    // engine scores exactly as for any car.
+    // Ferrari voice: Italian, romantic, heritage-proud, addressed to a Ferrarista. Leads on
+    // emotion and driving joy, not value or spec. Charging is dropped; ids and option values are untouched.
     budget: {
       title: 'Where shall we set the budget?',
       help: 'A rough figure to aim at. We’ll gently flag anything that’s a reach.',
@@ -402,18 +361,8 @@ const BRAND_COPY = {
 };
 
 /**
- * The quiz for a given brand: the shared question set with per-brand tweaks
- * applied —
- *   - each option's `brands` restriction (an option with no `brands` shows for
- *     every brand; `brands: ['bmw']` is dropped for MINI). The `brands` marker
- *     is stripped so it never reaches the client.
- *   - the budget slider's `max`/`default` from the brand registry, since MINI
- *     stock tops out ~£40k where BMW reaches £100k+.
- *   - per-brand copy (BRAND_COPY): title/help/option labels+subs in the brand's
- *     voice. Only display text changes — ids and option `value`s are untouched.
- * The scoring engine is unaffected: a brand never receives an answer value it
- * can't sell (no Saloon/Diesel for MINI), a narrower budget slider still emits
- * the same [min, max] shape, and reworded labels map to the same values.
+ * The quiz for a given brand: the shared set with per-brand tweaks — option `brands`
+ * restrictions (marker stripped), budget bounds from the registry, and BRAND_COPY text. The engine is unaffected.
  */
 export function questionsForBrand(brand = 'bmw') {
   const { budget, questions: brandQuestions } = brandConfig(brand);
@@ -443,9 +392,8 @@ export function questionsForBrand(brand = 'bmw') {
       return out;
     });
 
-  // Splice in any bespoke per-brand questions at their requested position.
-  // `scoresAs` is engine-internal (see applyBespokeAnswers) and is stripped so
-  // it never crosses to the client — the block renders the question generically.
+  // Splice in any bespoke per-brand questions at their requested position. `scoresAs` is
+  // engine-internal (see applyBespokeAnswers) and is stripped so it never crosses to the client.
   for (const add of brandQuestions?.add || []) {
     const clean = {
       ...add,
@@ -462,16 +410,8 @@ export function questionsForBrand(brand = 'bmw') {
 }
 
 /**
- * Fold a brand's bespoke-question answers into the standard answer fields the
- * engine already scores, then return the merged answers. A bespoke question
- * never reaches the engine as its own id — instead each chosen option's
- * `scoresAs` contributes the same signals a normal answer would (a style value,
- * extra priorities, a fuel lean). This is what keeps the engine brand-agnostic:
- * new brands add questions + mappings, the scorers never change.
- *
- * Contributions merge conservatively: array fields (priorities, fuel,
- * bodyStyles) are unioned; scalar fields (style) only fill a gap the user left
- * blank, so an explicit answer always wins over a bespoke nudge.
+ * Fold a brand's bespoke-question answers into the standard answer fields the engine scores, via
+ * each option's `scoresAs`. Arrays are unioned; scalars only fill a gap the user left blank (explicit wins).
  */
 export function applyBespokeAnswers(brand, answers) {
   const adds = brandConfig(brand).questions?.add || [];

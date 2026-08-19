@@ -1,25 +1,6 @@
 /*
- * Headless DOM harness for the client modes (render.test.js).
- *
- * The server-side tests (api/engine/brand) prove the engine and the HTTP
- * contract. This harness closes the last gap: it actually MOUNTS each interface
- * mode (questionnaire / swipe / knockout) in a real DOM and asserts it paints, per
- * brand — so a client render regression (a mode that throws on mount, or paints
- * nothing for a new brand) is caught by CI, not by eyeballing the browser.
- *
- * How it stays honest:
- *  - The modes talk to the engine over HTTP. We stand up a real buildServer()
- *    on an ephemeral port with an injected stock source (the same seam api.test
- *    uses), so a mode exercises the true endpoints and the true engine. Only the
- *    live feed is faked; everything downstream is production code.
- *  - The DOM is jsdom. We import the mode's ES module directly and call its
- *    mount(root, ctx) exactly as the shell does. `fetch` stays Node's real
- *    global (the modes call it against our server); jsdom supplies document /
- *    window / the handful of browser APIs the modes touch (matchMedia, share,
- *    clipboard), shimmed below so a mount can't crash on a missing global.
- *
- * A mode's mount() is fire-and-forget: it paints a skeleton now and swaps in
- * real content after an async boot(). settle() waits for that boot to land.
+ * Headless DOM harness for the client modes (render.test.js): mounts each mode in
+ * jsdom against a real buildServer(), shimming the browser globals modes touch.
  */
 
 import { once } from 'node:events';
@@ -30,10 +11,8 @@ import { buildServer } from '../index.js';
 const BLOCK_DIR = new URL('../../blocks/vehicle-matcher/', import.meta.url);
 
 /**
- * Stand up jsdom and install the browser globals the modes reach for. Idempotent
- * per process is not required — each test gets a fresh document via reset() —
- * but the window/global wiring is done once so module-level `document` captures
- * in the modes resolve. Returns the JSDOM instance.
+ * Stand up jsdom and install the browser globals the modes reach for, so
+ * module-level `document` captures in the modes resolve. Returns the JSDOM instance.
  */
 export function installDom() {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {
@@ -42,9 +21,8 @@ export function installDom() {
   });
   const { window } = dom;
 
-  // The modes gate motion on prefers-reduced-motion via matchMedia; jsdom has
-  // no media engine, so shim a matcher that reports "no match" (motion allowed)
-  // and supports the add/removeEventListener the modes may attach.
+  // The modes gate motion on prefers-reduced-motion via matchMedia; jsdom has no
+  // media engine, so shim a matcher reporting "no match" with add/removeEventListener.
   if (typeof window.matchMedia !== 'function') {
     window.matchMedia = (query) => ({
       matches: false,
@@ -58,9 +36,8 @@ export function installDom() {
     });
   }
 
-  // Web Share + clipboard are used by the result CTAs. Neither should fire in a
-  // render test, but their presence must not throw when a mode feature-detects
-  // them. Provide inert stubs.
+  // Web Share + clipboard are used by the result CTAs. They must not throw when a
+  // mode feature-detects them, so provide inert stubs.
   if (!window.navigator.share) {
     window.navigator.share = async () => {};
   }
@@ -71,10 +48,8 @@ export function installDom() {
     });
   }
 
-  // Expose the DOM globals the modes read as bare identifiers. Some (navigator)
-  // are read-only getters on the Node global in newer runtimes, so define rather
-  // than assign; a plain assignment throws. The modes mostly reach these through
-  // `window.` anyway, so the bare-global copies are belt-and-braces.
+  // Expose the DOM globals the modes read as bare identifiers. Some (navigator) are
+  // read-only getters in newer runtimes, so define rather than assign (assign throws).
   const define = (name, value) => {
     try {
       Object.defineProperty(global, name, { value, configurable: true, writable: true });
@@ -102,10 +77,8 @@ export function resetDom() {
 }
 
 /**
- * Spin up a server whose stock is a caller-supplied per-brand pool (mapped car
- * objects — i.e. exactly what fetchRetailerStock returns). Returns { base, close }.
- * Nearby + colour are inert (empty / pass-through) so a mode's optional sections
- * simply don't appear, which is the honest fixtures-brand behaviour.
+ * Spin up a server whose stock is a caller-supplied per-brand pool. Returns
+ * { base, close }. Nearby + colour are inert so optional sections simply don't appear.
  */
 export async function startModeServer(poolsByBrand) {
   const fetchRetailerStock = async (brand) => poolsByBrand[brand] || poolsByBrand.bmw || [];
@@ -132,8 +105,7 @@ export async function loadMode(key) {
 
 /**
  * Mount a mode into a fresh stage against `base`, for `brand`. Returns the stage
- * element (already appended to the body) so the caller can assert on it after
- * settle().
+ * element (already appended to the body) so the caller can assert after settle().
  */
 export function mountMode(mode, { base, brand, retailer } = {}) {
   const stage = document.createElement('div');
@@ -152,9 +124,7 @@ export function mountMode(mode, { base, brand, retailer } = {}) {
 
 /**
  * Wait for a mode's async boot to paint real content. Polls `predicate(stage)`
- * every 15ms up to `timeout`, letting microtasks + timers (fetch, rAF) flush
- * between checks. Resolves true once satisfied; rejects on timeout with the
- * stage's current text so a failure is diagnosable.
+ * every 15ms up to `timeout`; rejects on timeout with the stage text for diagnosis.
  */
 export async function settle(stage, predicate, { timeout = 4000 } = {}) {
   const deadline = Date.now() + timeout;

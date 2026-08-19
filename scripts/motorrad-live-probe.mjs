@@ -1,13 +1,6 @@
 /*
- * Proof: fetch the Motorrad deck fully cold — no human-captured cURL, no browser.
- *
- * The feed's GMB-SID session is not minted by JS; the server embeds a fresh one
- * in the results landing page as a hidden field <input id="hfSID" value="…">
- * (UTF-16LE base64 of "<caller-ip>;<fresh-guid>"). So the entire live chain is:
- *   1. GET the landing page, scrape #hfSID
- *   2. send it as the GMB-SID header, loop POST ShowResults by selectedPage
- * This script does step 1 and one page of step 2, to prove a server can
- * self-issue the session. It is a probe, not the adapter.
+ * Proof that the Motorrad deck can be fetched fully cold: the GMB-SID session isn't minted by JS but embedded in the landing page's hidden #hfSID field, so a server can self-issue it (GET landing, scrape #hfSID, POST ShowResults with it as a header).
+ * This does one page of that chain to prove it works cold — a probe, not the adapter.
  */
 
 const BASE = 'https://approvedused.bmw-motorrad.co.uk';

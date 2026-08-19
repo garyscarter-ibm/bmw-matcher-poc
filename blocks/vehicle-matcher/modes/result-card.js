@@ -1,18 +1,6 @@
 /*
- * The car card, shared by every mode that shows a result.
- *
- * Lifted out of modes/questionnaire.js when a second mode (podium) needed to
- * render the same cards. One builder, three densities: `big` adds the engine's
- * "why it suits you" reasons, `compact` is the carousel tile, and previewTile is
- * the lighter strip tile. Everything a card is allowed to claim about a car is
- * decided here, so two modes cannot describe the same car two different ways.
- *
- * The display tables at the top are the client half of the wire format: the
- * server sends closed-set keys (`suv`, `phev`, `auto`, a normalised colour name,
- * an equipment concept id) and these turn them into words. An unknown key
- * renders nothing rather than a guess.
- *
- * Brand voice comes from ./brand-copy.js; the card holds no copy of its own.
+ * The car card, shared by every mode that shows a result. One builder, three densities
+ * (big/compact/previewTile); it decides all a card may claim. Brand voice from ./brand-copy.js.
  */
 
 import { el, gbp } from '../ui.js';
@@ -24,22 +12,14 @@ export const SPEC_LABELS = {
 };
 export const FUEL_SPEC = { petrol: 'Petrol', diesel: 'Diesel', phev: 'Plug-in hybrid', ev: 'Electric' };
 /*
- * Gearbox, stated rather than implied. It was already on the wire and already
- * a reject reason and a refine chip, and it was never printed anywhere — so a
- * buyer whose dealbreaker it is (Meg's clause is explicit that implied is not
- * good enough) had to infer it from a control that only appears when the stock
- * happens to be mixed. Same closed set as transmissionFor in server/mapping.js;
- * a car the feed gave no gearbox for simply says nothing.
+ * Gearbox, stated rather than implied. It was on the wire and a reject reason/refine chip
+ * but never printed. Same closed set as transmissionFor; a car with no gearbox says nothing.
  */
 export const GEARBOX_SPEC = { auto: 'Automatic', manual: 'Manual' };
 
 /*
- * Representative hex per basic colour, for the little swatch beside the paint
- * name. Keyed by the feed's normalised `colour.colour` — a closed set of basic
- * names, which is what makes a hand-authored table viable. Deliberately NOT
- * the actual paint (the feed gives "Ocean Wave Green", not a hex): the swatch
- * says "this one's the green one" at a glance, the name and photo carry the
- * truth. An unknown name renders no swatch rather than a wrong one.
+ * Representative hex per basic colour, for the swatch beside the paint name. Keyed by
+ * the feed's normalised `colour.colour`; not the actual paint. Unknown name → no swatch.
  */
 export const SWATCH_HEX = {
   black: '#1d1d1f',
@@ -59,12 +39,8 @@ export const SWATCH_HEX = {
 };
 
 /*
- * Human names for the equipment concepts the server parses out of the feed's
- * factory options list (mapping.js FEATURE_CONCEPTS). Display-only, so they
- * live here rather than on the wire — and only concepts a buyer would
- * recognise by name are listed: an unlabelled key is silently skipped, which
- * is how a concept can be parsed and measured long before it's offered as a
- * refinement.
+ * Human names for the equipment concepts the server parses from the feed's options list
+ * (mapping.js FEATURE_CONCEPTS). Display-only; an unlabelled key is silently skipped.
  */
 export const CONCEPT_LABELS = {
   panoRoof: 'Panoramic roof',
@@ -72,10 +48,8 @@ export const CONCEPT_LABELS = {
   sunroof: 'Sunroof',
   heatedSeats: 'Heated seats',
   heatedWheel: 'Heated steering wheel',
-  // "Points", not "rear ISOFIX": the concept folds BMW's rear ISOFIX system
-  // and both brands' front i-Size attachment, which are different fitments
-  // (see FEATURE_CONCEPTS in server/mapping.js). Claiming the rear one would
-  // be claiming more than the feed says.
+  // "Points", not "rear ISOFIX": the concept folds BMW's rear ISOFIX and both
+  // brands' front i-Size (see FEATURE_CONCEPTS); claiming the rear one overclaims.
   isofix: 'ISOFIX child seat points',
   sportsSeats: 'Sports seats',
   electricSeats: 'Electric seats',
@@ -96,19 +70,14 @@ export const CONCEPT_LABELS = {
 };
 
 /*
- * How many of those a card names before it starts counting. The order above is
- * the order they print in, which puts the distinctive kit (roof, seats, child
- * seats) ahead of the near-ubiquitous (cruise control, climate), so the six
- * that show are the six worth reading. The remainder is counted rather than
- * dropped, because a card that quietly truncates is a card making a claim
- * about what a car does not have.
+ * How many of those a card names before it counts the rest. Print order puts distinctive
+ * kit first; the remainder is counted, not dropped, since silent truncation implies absence.
  */
 export const KIT_SHOWN = 6;
 
 /**
- * The individual cars behind a card. The API sends this for every match, one
- * entry for an ungrouped car and N for a grouped one, so nothing downstream
- * has to care which it is holding.
+ * The individual cars behind a card: one entry for an ungrouped car, N for a grouped
+ * one, so nothing downstream cares which it holds.
  */
 export const listingsOf = (m) => m.listings || [];
 
@@ -120,18 +89,8 @@ export function distanceLabel(distance) {
 }
 
 /**
- * The photo band every card surface shares: the retailer's picture when the
- * feed supplied one, the "Images coming soon" placeholder when it didn't, and
- * the line label pinned in the corner. Mirrors usedcars.bmw.co.uk's own PDP
- * for a photo-less listing — a white bold caption centred on the dark field.
- *
- * Returns the element and a `showPhoto` to change it later. The swap exists
- * because a hero card's listing picker can change which car the card is
- * describing, and colour is usually the entire reason that choice exists: a
- * card that renames the paint over a picture of the old one has argued against
- * itself. Tiles never call it a second time, but they get it from here anyway
- * — this was two near-identical copies, and the copy the picker didn't use was
- * the copy that quietly stopped matching.
+ * The photo band every card surface shares: retailer picture or the "Images coming soon"
+ * placeholder, plus the corner line label. Returns `showPhoto` so the listing picker can swap it.
  */
 export function mediaWell(car, extraClass = '') {
   const media = el('div', `vm-card-media${extraClass ? ` ${extraClass}` : ''}`);
@@ -163,9 +122,8 @@ export function mediaWell(car, extraClass = '') {
 }
 
 /**
- * One result card.
- * `big` adds the "why it suits you" reasons; `compact` is the carousel tile —
- * same anatomy, but trades the blurb and reasons for a distance line.
+ * One result card. `big` adds the "why it suits you" reasons; `compact` is the carousel
+ * tile — same anatomy, but trades the blurb and reasons for a distance line.
  */
 export function matchCard(match, {
   big = false, compact = false, brand: brandKey = 'bmw',
@@ -182,10 +140,8 @@ export function matchCard(match, {
   const head = el('div', 'vm-card-head');
   head.append(el('h3', 'vm-card-name', car.name));
   const badge = el('span', 'vm-score', `${score}%`);
-  // The number has been unexplained since fit and taste were split, and two
-  // cards sharing one reads as a bug unless you know it is a claim that they
-  // suit you equally. Said properly in the working note under the cards; this
-  // is the affordance for the reader who points at the badge itself.
+  // The number has been unexplained since fit and taste were split, and two cards
+  // sharing one reads as a bug. Said properly in the working note; this is the badge affordance.
   badge.title = 'Match score: how well this car fits the answers you gave. Cars that '
     + 'suit you equally get the same score.';
   head.append(badge);
@@ -199,30 +155,16 @@ export function matchCard(match, {
       ? gbp(car.priceMin)
       : `${gbp(car.priceMin)}–${gbp(car.priceMax)}`);
   const specs = el('p', 'vm-specs');
-  // Paint, by its marketing name ("Legend Grey"), when the detail lookup got
-  // one. It reads as a spec, but it's carrying more weight than that: when the
-  // engine can't separate the cars, colour is very often the actual difference
-  // between them — so it belongs on the card, not buried on the retailer's PDP.
+  // Paint, by its marketing name ("Legend Grey"), when the detail lookup got one. In a
+  // tie colour is often the actual difference, so it belongs on the card, not the PDP.
   const lead = [SPEC_LABELS[car.body], FUEL_SPEC[car.fuel]].filter(Boolean);
   /*
-   * The spec line, rebuilt rather than written once, because the listing
-   * picker below can change what this card is describing. It used to be built
-   * inline, so choosing a listing updated the mileage and the link but left
-   * the paint saying "Chili Red" next to the black car's mileage — a card
-   * describing two different cars at once, which is worse than not offering
-   * the choice at all.
+   * The spec line, rebuilt rather than written once, because the listing picker below can
+   * change what this card describes — else paint and mileage drift to different cars.
    */
   /*
-   * `gearbox` is passed in rather than read off `car` because it is a property
-   * of one listing: a card speaking for four cars can hold three autos and a
-   * manual, so the gearbox has to follow the picker exactly as the paint does.
-   * Seats and boot are per-model and constant across a group, so they are read
-   * straight off the car.
-   *
-   * Boot is qualified with "seats up". It comes from MODEL_SPECS, not from the
-   * feed, and an unqualified litre figure is precisely the kind of claim Priya
-   * says she cannot picture: the number people distrust is the one that might
-   * quietly be the seats-down figure.
+   * `gearbox` is passed in, not read off `car`, because it's a per-listing property that
+   * must follow the picker. Boot is qualified "seats up" so the litre figure isn't distrusted.
    */
   function renderSpecs(paint, shade, priceText, gearbox) {
     specs.replaceChildren();
@@ -240,9 +182,8 @@ export function matchCard(match, {
       specs.textContent = [...head, ...tail].join('  ·  ');
       return;
     }
-    // Paint gets a swatch as well as its name: in a tie the colour is very
-    // often the actual difference between the cars, and a dot you can see
-    // beats a name you have to read. No hex for the name → name alone.
+    // Paint gets a swatch as well as its name: in a tie the colour is often the
+    // actual difference, and a dot you can see beats a name you read. No hex → name alone.
     specs.append(`${head.join('  ·  ')}  ·  `);
     const hex = SWATCH_HEX[(shade || '').toLowerCase()];
     if (hex) {
@@ -260,18 +201,11 @@ export function matchCard(match, {
   );
   body.append(specs);
 
-  // The whole point of the carousel: how far away is it, and whose is it?
-  // Distance comes from the live feed, so omit the line rather than invent
-  // one if the feed didn't supply it.
+  // The whole point of the carousel: how far away is it, and whose is it? Distance
+  // comes from the live feed, so omit the line rather than invent one if it's missing.
   /*
-   * Where this car is, on every card rather than only the compact ones.
-   *
-   * This is what lets the page be one ranked list instead of three. When
-   * "at the retailer" and "23 miles away" were separate SECTIONS, each needed
-   * its own caption, and those captions contradicted each other as soon as a
-   * distant car outscored a local one. Make it a property of the card and the
-   * sections stop being necessary: the list is just sorted, and each row says
-   * where you'd go.
+   * Where this car is, on every card not only the compact ones. This lets the page be
+   * one ranked list instead of three sections whose captions could contradict each other.
    */
   const where = el('p', 'vm-distance');
   if (car.distance != null) {
@@ -283,9 +217,8 @@ export function matchCard(match, {
     body.append(where);
   }
 
-  // When repeat listings of the same car were grouped into this card, say so:
-  // how many, the price spread, and the colours they come in. Without this the
-  // page showed four identical iX2 cards and looked like it was stuttering.
+  // When repeat listings of the same car were grouped into this card, say so: how
+  // many, the price spread, the colours. Without it the page looked like it was stuttering.
   if (car.listingCount > 1) {
     const avail = el('p', 'vm-avail');
     const span = car.priceFrom === car.priceTo
@@ -307,22 +240,8 @@ export function matchCard(match, {
   if (!compact) body.append(el('p', 'vm-blurb', car.blurb));
 
   /*
-   * What is actually on this car, from the feed's factory options list.
-   *
-   * The equipment concepts have been parsed since the refinement work and had
-   * exactly one surface: a chip, offered only where the stock happens to split
-   * on them. That is the wrong surface for confirming a fact. Priya walks away
-   * from "ISOFIX she cannot confirm", and on her page every lead car has it,
-   * so the chip is correctly suppressed and she learns nothing. Meg's clause
-   * wants the comfort equipment "stated where she can see it", not inferred
-   * from which filters are on offer.
-   *
-   * It claims PRESENCE and never absence. The feed lists factory options, so a
-   * car can carry standard kit this never mentions — which is why the label is
-   * "what's fitted" rather than a spec sheet, and why nothing anywhere says a
-   * car lacks something. Capped, with the remainder counted rather than
-   * silently dropped, and rebuilt by the picker because equipment belongs to a
-   * listing rather than to the model.
+   * What is actually on this car, from the feed's factory options list. It claims PRESENCE,
+   * never absence (the feed lists only factory options), so the label is "what's fitted".
    */
   const kit = el('p', 'vm-kit');
   const kitLabel = el('p', 'vm-why-label vm-kit-label', copy.kitLabel);
@@ -345,18 +264,8 @@ export function matchCard(match, {
   }
 
   /*
-   * The reasons, on every card that leads the page rather than only on a hero.
-   *
-   * Same argument the trade-off line was widened on: a tie renders several
-   * lead cards and none of them is "big", so the page's entire case for the
-   * cars it is recommending vanished in exactly the state where the buyer has
-   * most to choose between. Sam & Jordan Reyes walk away when the practicality
-   * claims read like brochure copy, and their page is a five-card taste pick,
-   * so until now their clause could not even be tested.
-   *
-   * Trimmed to two on a multi-card page. Four bullets across five cards is a
-   * wall, and the reasons are sorted by how much they contributed, so the top
-   * two are the case and the rest are corroboration.
+   * The reasons, on every card that leads the page, not only a hero — a tie renders several
+   * lead cards. Trimmed to two on a multi-card page; reasons are sorted by contribution.
    */
   if (!compact && reasons.length) {
     const why = el('ul', 'vm-reasons');
@@ -364,16 +273,8 @@ export function matchCard(match, {
     body.append(el('p', 'vm-why-label', 'Why it suits you'), why);
   }
 
-  // Owning the trade-off: when a recommendation misses a stated want (it's
-  // petrol and they asked for electric), the card says so itself, right under
-  // the case for it — not only the page-level unmet note, which fires solely
-  // when the whole reachable pool is short, and in practice almost never does.
-  //
-  // Every card that leads the page, not just the hero: a tie renders medium
-  // cards, and that's precisely where the admission matters most — six coupés
-  // offered to someone who asked for a convertible should say so on each of
-  // them, not go quiet because none of them is a "hero". Only the compact
-  // carousel tiles skip it, and they already state the shape in their specs.
+  // Owning the trade-off: when a recommendation misses a stated want, the card says so
+  // itself, under the case for it. Every leading card, not just the hero; compact tiles skip it.
   if (!compact && match.tradeOffs?.length) {
     const { label } = TRADE_COPY[brandKey] || TRADE_COPY.bmw;
     body.append(
@@ -382,25 +283,19 @@ export function matchCard(match, {
     );
   }
 
-  // Set by the reject block below, called by the listing picker further down:
-  // the two are built in DOM order but have to stay in step, because a reason
-  // for turning a car down is only usable if it is about the car on screen.
+  // Set by the reject block below, called by the listing picker: the two are built in DOM
+  // order but must stay in step, since a reject reason is only usable if it's about the car shown.
   let onPick = null;
 
-  // "Not this one" — the other half of choosing. Rejecting a car is the
-  // highest-signal thing a buyer does, because it's a reaction to a real car
-  // rather than an answer about a hypothetical one; the menu is what turns it
-  // into something actionable (see rejectOptions). Only offered where a
-  // caller supplies the options, so it appears in a tie and nowhere else.
+  // "Not this one" — the other half of choosing. Rejecting is the highest-signal act, and
+  // the menu turns it into something actionable. Only offered where a caller supplies options.
   if (rejectOptions) {
     const rejectWrap = el('div', 'vm-reject');
     const open = el('button', 'vm-reject-open', rejectLabel || 'Not this one');
     open.type = 'button';
     open.setAttribute('aria-expanded', 'false');
-    // Says what the control DOES. It was a small underlined link that looked
-    // like a disclaimer, and nothing on the page suggested that turning a
-    // car down would bring another one in — so the most conversational thing
-    // the tool can do read as the least important.
+    // Says what the control DOES. It read as a small disclaimer-like link, and nothing
+    // suggested that turning a car down brings another in — the most useful act looked least.
     if (copy.rejectHint) open.append(el('span', 'vm-reject-hint', copy.rejectHint));
     const menu = el('div', 'vm-reject-menu');
     menu.hidden = true;
@@ -410,13 +305,8 @@ export function matchCard(match, {
     });
 
     /*
-     * Rebuilt whenever the card changes which car it is describing.
-     *
-     * The menu used to be built once, from the group's representative, and the
-     * listing picker only repainted the DOM — so switching a four-colour card
-     * from red to green left "Not the red" on offer, and taking it removed the
-     * green car the buyer was actually looking at. The reason has to be about
-     * the car in front of them, or it is worse than no reason at all.
+     * Rebuilt whenever the card changes which car it describes. Built once, the picker would
+     * leave "Not the red" on offer after switching to green — a reason worse than none at all.
      */
     function renderRejectMenu(chosen) {
       const options = rejectOptions(match, chosen);
@@ -437,23 +327,11 @@ export function matchCard(match, {
   }
 
   /*
-   * Which one, though?
-   *
-   * Grouping repeat listings fixed the page reading as a stutter, but it also
-   * ended the journey a step early: it narrowed to a model and trim, then
-   * quietly handed over whichever listing happened to rank first. That's the
-   * step Chloe and Meg actually care about — the same Cooper C in Ocean Wave
-   * Green or Melting Silver is the whole decision for them.
-   *
-   * So a card that speaks for several cars lets the buyer pick the actual one.
-   * Choosing swaps the photo, price, mileage and the link out, so the card
-   * always describes the car they'd be going to see. Hero cards only: the
-   * compact tiles are a glance, not a decision.
+   * Which one, though? Grouping repeat listings fixed the stutter but ended the journey a
+   * step early. So a card speaking for several cars lets the buyer pick the actual one; hero only.
    */
-  // Every card that speaks for several cars, not just the hero. The picker
-  // was `big`-only, so a tie — where grouped cards are commonest — showed
-  // "4 available … Portimao Blue, Brooklyn Grey or Alpine White" with no way
-  // to choose between them. Compact tiles stay out: they're a glance.
+  // Every card that speaks for several cars, not just the hero. The picker was `big`-only,
+  // so a tie showed "4 available … Blue, Grey or White" with no way to choose. Compact stays out.
   if (!compact && match.listings?.length > 1) {
     body.append(el('p', 'vm-why-label', copy.pickLabel));
     const picker = el('div', 'vm-pick');
@@ -472,10 +350,8 @@ export function matchCard(match, {
         dot.style.background = hex;
         opt.append(dot);
       }
-      // Paint is fetched per car and can be missing (an unreachable page, or
-      // the request's colour budget running out). Naming the row "Colour n/a"
-      // told the buyer nothing; mileage is the next thing that actually
-      // separates two otherwise identical cars.
+      // Paint is fetched per car and can be missing. Naming the row "Colour n/a" told the
+      // buyer nothing; mileage is the next thing that separates two otherwise identical cars.
       const label = listing.colour
         || (listing.mileage != null ? `${listing.mileage.toLocaleString('en-GB')} miles` : `Option ${i + 1}`);
       opt.append(el('span', 'vm-pick-colour', label));
@@ -491,9 +367,8 @@ export function matchCard(match, {
         });
         opt.classList.add('is-on');
         opt.setAttribute('aria-pressed', 'true');
-        // Re-describe the card as the chosen car: paint, swatch, price,
-        // gearbox, mileage and where the link goes. Anything left showing the
-        // previous listing's values is a card describing two cars at once.
+        // Re-describe the card as the chosen car: paint, swatch, price, gearbox, mileage,
+        // link. Anything left showing the previous listing is a card describing two cars at once.
         showPhoto(listing.photo);
         renderSpecs(
           listing.colour, listing.shade, gbp(listing.priceMin),
@@ -532,10 +407,8 @@ export function matchCard(match, {
 }
 
 /**
- * A small "mini" tile for the live preview strip — deliberately lighter than the
- * results-page compact card (matchCard): a small photo (or the "Images coming
- * soon" placeholder), the model name + match score, and one spec line. The whole
- * tile is a link to the live listing when the feed gave us one.
+ * A small "mini" tile for the live preview strip — lighter than the compact card: a small
+ * photo (or placeholder), name + score, one spec line. The whole tile links to the listing.
  */
 export function previewTile(match) {
   const { car, score } = match;

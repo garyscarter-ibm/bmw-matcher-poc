@@ -1,35 +1,6 @@
 /*
- * MINI Knockout — the matcher, played as a championship "This or That".
- *
- * One of several interchangeable interface "modes" over the shared engine (see
- * ../modes/index.js and the shell in ../vehicle-matcher.js). Its premise is the
- * same as the swipe game's, in one line: the head-to-head picks silently answer
- * the same questionnaire the `questions` mode asks, and the REAL engine does the
- * matching. See docs/mini-knockout-requirements.md.
- *
- * The flow:
- *   1. A tiny "set your bracket" SEED step (budget + what's it for) — identical to
- *      the swipe game's seed: the two answers a game can't read, and budget is the
- *      engine's one hard filter, so the field is affordable from the first round.
- *   2. A FIELD of the retailer's real stock (POST /api/preview, scoped by the
- *      seed), shuffled and snapped to the largest power of two it can fill (16 → 8
- *      → 4). The field plays a knockout bracket: lean two-card head-to-heads
- *      whittle it to a single champion. Each pick nudges the *taste* answer keys,
- *      weighted by how far a car advances (bracketToAnswers()).
- *   3. A RESULT: the assembled brief goes to the real /api/match (the identical
- *      call the questionnaire mode makes). The player's CHAMPION is the hero of the
- *      reveal — always honoured — and the engine supplies its real "why" and the
- *      honest note when the numbers don't back the crown ("champion, engine
- *      validates"). So the celebration is the player's; the truth is the engine's.
- *
- * This mode owns its own copy, cards and state. It shares only the signal helpers
- * (./match-signal.js) with the swipe game and el/gbp (../ui.js) — the two games
- * read taste and build the engine brief the same way, but look and read
- * differently (a versus, not a swipe stack).
- *
- * The scoring engine and car dataset live behind an API (see server/ and
- * ../engine.js); this mode never sees the dataset — only the public display
- * fields the API returns.
+ * MINI Knockout — the matcher played as a championship "This or That": head-to-head
+ * picks silently answer the same questionnaire, and the REAL engine does the matching.
  */
 
 import { apiGetQuestions, apiField, apiMatch } from '../engine.js';
@@ -41,26 +12,19 @@ import {
   bracketToAnswers, idOf, celebrate, ageInYears,
 } from './match-signal.js';
 
-/* The most cars we'll ever field, even when stock is deep — four rounds
- * (16 → 8 → 4 → 2 → 1) is already a long-ish sitting for a promo. The field is
- * snapped DOWN to the largest power of two ≤ min(pool, this). */
+/* The most cars we'll ever field. Snapped DOWN to the largest power of two ≤
+ * min(pool, this), so four rounds (16→8→4→2→1) is the longest sitting. */
 const MAX_FIELD = 16;
 
-/* Below this many feasible cars there isn't a game — treat as an empty pool and
- * send the player back to the seed to widen the budget. Exactly two still makes a
- * one-match "final", which is a legitimate (if short) tournament. */
+/* Below this many feasible cars there isn't a game — send the player back to widen
+ * the budget. Exactly two still makes a legitimate (if short) one-match "final". */
 const MIN_FIELD = 2;
 
 /* ------------------------------ copy ------------------------------ */
 
 /*
- * Display copy, keyed by brand with a `bmw` fallback (every read is
- * KNOCKOUT_COPY[brand] || KNOCKOUT_COPY.bmw). MINI is the primary, fully written
- * voice — this is a MINI campaign; the BMW register is a lighter fallback so a
- * future skin isn't blank. Functions take a single args object, matching the
- * questions- and swipe-mode copy convention. Round names are computed from the
- * live field size (roundName), not written here, so an adaptive bracket labels
- * itself correctly whether it starts at 16, 8 or 4.
+ * Display copy, keyed by brand with a `bmw` fallback. MINI is the primary voice;
+ * round names are computed live from the field size (roundName), not written here.
  */
 const KNOCKOUT_COPY = {
   mini: {
@@ -83,16 +47,12 @@ const KNOCKOUT_COPY = {
     finalTitle: 'The Final.',
     finalLede: 'Two left on the pitch. One trophy. Back your winner.',
     finalCta: 'Bring it on',
-    // The per-tie verdict from the engine's own score of the two cars — did the
-    // player back the form pick, or send an underdog through? One concrete beat
-    // per tie (replaced the abstract "form" meter, which didn't move within a round).
+    // The per-tie verdict from the engine's own score of the two cars: did the
+    // player back the form pick, or send an underdog through?
     verdictForm: ({ model }) => `The ${model} was the form pick. Good shout.`,
     verdictUpset: ({ model }) => `The ${model} goes through. The underdog’s upset the odds!`,
-    // Tale of the tape — MINI has no honest per-car performance figure, so the
-    // listing rows are mileage + age (both real per-listing; the fresher, newer
-    // car wins), with 0-62 as a labelled model supporting row and engine cc
-    // where the feed carried it. Each row nulls out when its metric is missing,
-    // so a thin listing simply shows fewer rows.
+    // Tale of the tape — MINI has no honest per-car performance figure, so rows are
+    // mileage + age (real per-listing), plus 0-62 (model) and cc where present.
     taleTitle: 'Tale of the tape',
     statRows: (a, b) => [
       lowerBetterRow('Mileage', a, b, mileageOf, milesText),
@@ -147,9 +107,8 @@ const KNOCKOUT_COPY = {
     finalCta: 'Continue',
     verdictForm: ({ model }) => `The ${model} was the higher-rated of the two.`,
     verdictUpset: ({ model }) => `The ${model} goes through. The lower-rated pick.`,
-    // Tale of the tape — mileage + age lead (real per-listing; fresher and newer
-    // win), engine cc where the feed carried it, and 0-62 as a labelled model
-    // supporting row. Each nulls out when absent, so a thin listing shows fewer.
+    // Tale of the tape — mileage + age lead (real per-listing), engine cc where
+    // present, and 0-62 as a labelled model row. Each nulls out when absent.
     taleTitle: 'Tale of the tape',
     statRows: (a, b) => [
       lowerBetterRow('Mileage', a, b, mileageOf, milesText),
@@ -180,9 +139,8 @@ const KNOCKOUT_COPY = {
     errLede: 'The matching service didn’t respond. Check your connection and try again.',
     retryLabel: 'Try again',
   },
-  // Honda's register: plain and straightforward, no em dashes (house rule). The
-  // bracket framing is kept, but the words stay unshowy. Its own wordmark so the
-  // mode reads as Honda's rather than a BMW skin.
+  // Honda's register: plain and straightforward, no em dashes (house rule). Own
+  // wordmark so the mode reads as Honda's rather than a BMW skin.
   honda: {
     wordmark: 'Head to Head',
     seedTitle: 'Set up your bracket.',
@@ -202,8 +160,7 @@ const KNOCKOUT_COPY = {
     verdictForm: ({ model }) => `The ${model} was the higher-rated of the two.`,
     verdictUpset: ({ model }) => `The ${model} goes through, the lower-rated pick.`,
     // Tale of the tape - mileage + power (bhp) + age, all real per-listing (Honda
-    // carries a genuine per-car bhp and reg year). Each nulls out when its metric
-    // is missing, so a thin listing shows fewer rows.
+    // carries a genuine per-car bhp and reg year). Each nulls out when missing.
     taleTitle: 'Tale of the tape',
     statRows: (a, b) => [
       lowerBetterRow('Mileage', a, b, mileageOf, milesText),
@@ -233,9 +190,8 @@ const KNOCKOUT_COPY = {
     errLede: 'The matching service didn’t respond. Check your connection and try again.',
     retryLabel: 'Try again',
   },
-  // Ford's register: friendly and confident, with a touch of competitive spirit
-  // (Ford's ST/Mustang heritage earns the light bracket framing). No em dashes
-  // (house rule). Its own wordmark so the mode reads as Ford's.
+  // Ford's register: friendly and confident, with competitive spirit (ST/Mustang
+  // heritage). No em dashes (house rule); own wordmark so it reads as Ford's.
   ford: {
     wordmark: 'Head to Head',
     seedTitle: 'Set up your bracket.',
@@ -254,11 +210,8 @@ const KNOCKOUT_COPY = {
     finalCta: 'Continue',
     verdictForm: ({ model }) => `The ${model} was the higher-rated of the two.`,
     verdictUpset: ({ model }) => `The ${model} goes through, the lower-rated pick.`,
-    // Tale of the tape - the full-service-history trust duel leads (real per-
-    // listing, Ford only: a documented history beats a partial/absent one, and
-    // it nulls when the two are level so it never crowds a non-verdict), then
-    // mileage + age. Ford carries no per-listing power/cc, so those rows aren't
-    // offered. Each nulls out when absent.
+    // Tale of the tape - full-service-history trust duel leads (real per-listing,
+    // Ford only; nulls when level), then mileage + age. No per-listing power/cc.
     taleTitle: 'Tale of the tape',
     statRows: (a, b) => [
       fshRow(a, b),
@@ -288,10 +241,8 @@ const KNOCKOUT_COPY = {
     errLede: 'The matching service didn’t respond. Check your connection and try again.',
     retryLabel: 'Try again',
   },
-  // Motorrad's register: rider-first and competitive (the sportiest sub-brand, so
-  // the bracket framing has real bite). Every car word becomes a bike word: two
-  // bikes go head to head, it beats every bike, you book a test ride. No em dashes
-  // (house rule). Its own wordmark so the mode reads as Motorrad's.
+  // Motorrad's register: rider-first and competitive (sportiest sub-brand). Every
+  // car word becomes a bike word. No em dashes (house rule); own wordmark.
   motorrad: {
     wordmark: 'Head to Head',
     seedTitle: 'Set up your bracket.',
@@ -310,10 +261,8 @@ const KNOCKOUT_COPY = {
     finalCta: 'Continue',
     verdictForm: ({ model }) => `The ${model} was the higher-rated of the two.`,
     verdictUpset: ({ model }) => `The ${model} goes through, the lower-rated pick.`,
-    // Tale of the tape - power in kW + engine size in cc + age, all real per-
-    // listing (Motorrad carries a genuine per-bike kW, cc and reg year). Power is
-    // labelled kW (never a bare number). Each row nulls out when its metric is
-    // missing, so a thin listing shows fewer rows.
+    // Tale of the tape - power (kW) + engine (cc) + age, all real per-listing.
+    // Power is labelled kW (never a bare number); each row nulls out when missing.
     taleTitle: 'Tale of the tape',
     statRows: (a, b) => [
       higherBetterRow('Power', a, b, powerOf, (n) => `${n} kW`),
@@ -343,12 +292,8 @@ const KNOCKOUT_COPY = {
     errLede: 'The matching service didn’t respond. Check your connection and try again.',
     retryLabel: 'Try again',
   },
-  // Ferrari's register: a thoroughbred face-off, spare and reverent, never
-  // shouty. The bracket becomes a grid: cars line up, the quicker and more
-  // storied goes through. This is the brand with the richest per-listing data
-  // (real bhp, cc, and, on a fresh capture, top speed), so its tale of the tape
-  // leads on the numbers that actually separate two Ferraris. No em dashes
-  // (house rule). Its own wordmark so the mode reads as Ferrari's.
+  // Ferrari's register: a thoroughbred face-off, spare and reverent. Richest
+  // per-listing data (bhp, cc, top speed). No em dashes (house rule); own wordmark.
   ferrari: {
     wordmark: 'Head to Head',
     seedTitle: 'Set your grid.',
@@ -367,10 +312,8 @@ const KNOCKOUT_COPY = {
     finalCta: 'Bring it on',
     verdictForm: ({ model }) => `The ${model} was the form car. Well judged.`,
     verdictUpset: ({ model }) => `The ${model} goes through, the outside bet.`,
-    // Tale of the tape - power (bhp), engine size (cc) and top speed (mph) are
-    // real per-listing here, so they lead; 0-62 rounds it out as a labelled model
-    // row. Top speed only paints once a fresh capture carries it (the mapper
-    // surfaces it, the row nulls out until then). Every row real, every row honest.
+    // Tale of the tape - power (bhp), engine (cc) and top speed (mph) are real
+    // per-listing, so they lead; 0-62 rounds it out as a labelled model row.
     taleTitle: 'Tale of the tape',
     statRows: (a, b) => [
       higherBetterRow('Power', a, b, powerOf, (n) => `${n} bhp`),
@@ -416,9 +359,8 @@ function largestPowerOfTwo(n) {
   return n >= 1 ? p : 0;
 }
 
-/** Human name for a round given how many cars ENTER it: 2 → Final, 4 → Semi-
- * final, 8 → Quarter-final, else "Round of N". Adaptive: a bracket that starts
- * at 4 opens on "Semi-final", one that starts at 16 opens on "Round of 16". */
+/** Human name for a round given how many cars ENTER it: 2 → Final, 4 → Semi-final,
+ * 8 → Quarter-final, else "Round of N". Adaptive to the starting field size. */
 function roundName(entrants) {
   if (entrants <= 2) return 'The Final';
   if (entrants <= 4) return 'Semi-final';
@@ -426,9 +368,8 @@ function roundName(entrants) {
   return `Round of ${entrants}`;
 }
 
-/** Pair a flat list into [[a,b],[c,d],...]. Assumes an even length (the field is
- * snapped to a power of two before this); a stray odd tail car is dropped by the
- * caller, never faked into a bye. */
+/** Pair a flat list into [[a,b],[c,d],...]. Assumes an even length; a stray odd
+ * tail car is dropped by the caller, never faked into a bye. */
 function pairUp(list) {
   const pairs = [];
   for (let i = 0; i + 1 < list.length; i += 2) pairs.push([list[i], list[i + 1]]);
@@ -438,27 +379,8 @@ function pairUp(list) {
 /* ------------------------- stat-row helpers ------------------------- */
 
 /*
- * The head-to-head "tale of the tape": up to THREE brand-appropriate REAL
- * metrics compared across the two contenders, the better value highlighted, so
- * the duel shows WHY one car might edge it rather than being a pure look-and-
- * price pick. Still a duel, not a spreadsheet — buildStatPanel caps it at three.
- *
- * Each brand's statRows(a, b) hook returns an ARRAY of row objects, in priority
- * order; buildStatPanel drops the nulls and keeps the first three that survive.
- * A row is:
- *   { label, aText, bText, winner: 'a' | 'b' | null, tier: 'listing' | 'model' }
- * winner names the side to highlight; null means "no winner / tie" (both plain).
- * A row builder returns null whenever its metric is missing on EITHER car, so a
- * broken or half-empty row never paints.
- *
- * tier records whether the figure describes the individual LISTING (mileage,
- * power, cc, age — the honest default) or the MODEL (0-62, shared by every
- * listing of a line). Model rows are allowed only as SUPPORTING rows: they carry
- * an unambiguous label ("0 to 62") and buildStatPanel drops them if no listing
- * row survives, so a matchup is never described purely by a model figure.
- *
- * These small builders keep each brand's hook terse and guarantee the same
- * honest discipline (return null when a value is absent on either car).
+ * "Tale of the tape" helpers: each returns a row { label, aText, bText, winner, tier }
+ * or null when its metric is absent on either car, so no row paints half-empty.
  */
 
 /** A "lower is better" numeric duel (mileage). null if either value is missing.
@@ -486,21 +408,16 @@ function higherBetterRow(label, a, b, valueOf, fmt, opts = {}) {
 }
 
 /*
- * The one permitted MODEL-level row: 0-62, lower (quicker) wins. Always labelled
- * so it reads as the model's figure, and always tier:'model' so buildStatPanel
- * treats it as supporting-only (dropped when no listing row survives). Wraps
- * lowerBetterRow so the compare/format logic stays in one place.
+ * The one permitted MODEL-level row: 0-62, lower (quicker) wins. Always tier:'model'
+ * so buildStatPanel treats it as supporting-only. Wraps lowerBetterRow.
  */
 function zeroTo62Row(a, b) {
   return lowerBetterRow('0 to 62', a, b, zeroTo62Of, secsText, { tier: 'model' });
 }
 
 /*
- * A per-listing AGE duel: the younger car wins. Reads whatever registration
- * signal the listing carries (year / firstReg / plate) via the shared
- * ageInYears helper, so it is real per-listing across every brand. null when
- * either car's age can't be decoded, so it never guesses. `now` is injectable
- * for testing.
+ * A per-listing AGE duel: the younger car wins, via the shared ageInYears helper.
+ * null when either car's age can't be decoded. `now` is injectable for testing.
  */
 function ageRow(a, b, now = new Date()) {
   const av = ageInYears(a, now);
@@ -530,12 +447,8 @@ const topSpeedOf = (car) => (Number.isFinite(car?.topSpeed) ? car.topSpeed : NaN
 const zeroTo62Of = (car) => (Number.isFinite(car?.zeroTo62) ? car.zeroTo62 : NaN);
 
 /*
- * Ford's full-service-history duel (real per-listing, Ford only). "Full service
- * history" beats "Partial or none". Returns null when neither car carries a
- * fullServiceHistory flag (nothing to compare) AND when the two are level (both
- * documented, or both not) so the caller can fall back to a more separating
- * metric like mileage. A real contrast (one has it, the other doesn't) is the
- * standout trust duel and is always shown, with the documented side highlighted.
+ * Ford's full-service-history duel (real per-listing, Ford only). Returns null when
+ * neither car carries the flag or the two are level, so the caller can fall back.
  */
 function fshRow(a, b) {
   const has = (car) => typeof car?.fullServiceHistory === 'string' && car.fullServiceHistory !== '';
@@ -566,8 +479,7 @@ function mount(root, ctx) {
   const copy = copyFor(ctx.brand);
 
   // Per-run state — a fresh local object, NOT hung on the shared ctx, so a mode
-  // swap and re-mount (the switcher re-calls mount with the same ctx) starts
-  // clean. The mode owns its own state and its own hash key.
+  // swap and re-mount starts clean. The mode owns its own state and hash key.
   const state = {
     questions: [], // the engine's per-brand questions (seeds the budget/use tiles)
     seed: null, // { budget, primaryUse }
@@ -579,12 +491,8 @@ function mount(root, ctx) {
     rounds: [], // bracket log: { roundIndex, winner, loser } per head-to-head
     fieldSize: 0, // the starting field size (for round naming + weighting)
     roundIndex: 0, // 0 = first round
-    // The engine's own per-card score (0–100) from /api/field, keyed by idOf.
-    // The GAME plays with display cars (score is never a visible verdict), but
-    // we use it for a per-tie beat: after each pick we compare the winner's score
-    // to the loser's and tell the player whether they backed the engine's form
-    // pick or sent an underdog through. This surfaces the engine signal the mode
-    // used to discard — as a concrete moment, not an abstract meter.
+    // The engine's own per-card score (0–100) from /api/field, keyed by idOf. Used
+    // for the per-tie verdict (winner's score vs loser's), never as a visible verdict.
     scoreById: new Map(),
     lastVerdict: null, // { kind: 'form'|'upset', winner } — shown on the next paint, once
     busy: false, // pick lock while a matchup transitions out
@@ -610,9 +518,8 @@ function mount(root, ctx) {
   };
 
   /* --------------------------- seed skeleton --------------------------- */
-  // Painted synchronously by mount() while apiGetQuestions is in flight (reuses
-  // the swipe seed's skeleton/tile classes — the seed step is deliberately
-  // identical between the two games).
+  // Painted synchronously by mount() while apiGetQuestions is in flight (reuses the
+  // swipe seed's skeleton/tile classes — the seed step is identical between games).
   const renderSeedSkeleton = () => {
     root.replaceChildren();
     const screen = el('div', 'vm-screen vm-mingle-seed');
@@ -629,10 +536,8 @@ function mount(root, ctx) {
   };
 
   /* ---------------------------- seed step ----------------------------
-   * Identical in shape to the swipe game's seed: budget (the engine's hard
-   * filter) + what the car's for, both built from the engine's own per-brand
-   * questions (state.questions), never local copy. Reuses the .vm-mingle-seed /
-   * .vm-mingle-tile classes so the two games' seed steps look the same. */
+   * Identical in shape to the swipe game's seed: budget + what the car's for, built
+   * from the engine's per-brand questions (state.questions), never local copy. */
   const renderSeed = (preset) => {
     root.replaceChildren();
     const screen = el('div', 'vm-screen vm-mingle-seed vm-knockout-seed');
@@ -699,29 +604,19 @@ function mount(root, ctx) {
   /* --------------------------- field loading --------------------------- */
   const loadField = async () => {
     renderFieldSkeleton();
-    // apiField resolves-empty (never throws), so no try/catch needed here. We
-    // ask for a full MAX_FIELD roster (up to 16) rather than the questions
-    // drawer's top-9 shortlist — a big-range brand like BMW fills a Round of 16,
-    // a thinner one like MINI returns fewer and largestPowerOfTwo snaps down. No
-    // enrich: painting all 16 would fetch a PDP per round-one loser, so the
-    // face-off card falls back to a neutral swatch (swatchFor handles absent colour).
+    // apiField resolves-empty (never throws), so no try/catch needed. We ask for a
+    // full MAX_FIELD roster (no enrich — 16 PDP fetches is too many; swatch falls back).
     const matches = await apiField(ctx.api, state.seed, ctx.retailer, ctx.brand, MAX_FIELD);
-    // Field returns match objects { car, score, ... }; the game plays with the
-    // display cars, exactly as the swipe game does with match.car — but we no
-    // longer THROW AWAY the engine's per-car score. Stash it (keyed by stable
-    // identity) so each tie can say whether the winner was the engine's form pick
-    // or an underdog. This is the engine signal the mode used to discard.
+    // Field returns match objects { car, score, ... }; stash the per-car score
+    // (keyed by stable identity) so each tie can name the form pick vs the underdog.
     state.scoreById = new Map();
     for (const m of matches) {
       if (m?.car && typeof m.score === 'number') {
         state.scoreById.set(idOf(m.car), m.score);
       }
     }
-    // Shuffle for a fresh draw, then float the real-photo cars to the front (a
-    // photo-less or shared-placeholder contender doesn't read as a head-to-head —
-    // §3.5) before snapping to a power of two. We over-fetch MAX_FIELD and usually
-    // play 8, so the weak-image cars fall into the discarded tail; only a thin or
-    // photo-poor feed lets them onto the pitch as filler.
+    // Shuffle for a fresh draw, then float the real-photo cars to the front (§3.5)
+    // before snapping to a power of two; weak-image cars fall into the discarded tail.
     const cars = photosFirst(shuffle(matches.map((m) => m.car).filter(Boolean)), (c) => c?.photo);
     const size = largestPowerOfTwo(Math.min(cars.length, MAX_FIELD));
     if (size < MIN_FIELD) {
@@ -779,12 +674,8 @@ function mount(root, ctx) {
   };
 
   /*
-   * The per-tie verdict, from the engine's own scores: did the winner the player
-   * just picked out-rate the loser ('form' pick), or did an underdog go through
-   * ('upset')? Returns null when either car is unscored or they're level — no
-   * scored comparison to make, so we stay quiet rather than invent a verdict.
-   * This is the engine signal the mode used to discard, surfaced as one concrete
-   * beat per pick instead of an abstract meter.
+   * The per-tie verdict from the engine's own scores: 'form' if the winner out-rated
+   * the loser, else 'upset'. null when either is unscored or they're level.
    */
   const verdictFor = (winner, loser) => {
     const w = state.scoreById.get(idOf(winner));
@@ -793,9 +684,8 @@ function mount(root, ctx) {
     return { kind: w > l ? 'form' : 'upset', winner };
   };
 
-  // Render the verdict from the LAST pick as a small tag at the top of the next
-  // matchup (state.lastVerdict is set in pick(), cleared once shown). Null → the
-  // matchup just paints without one (first tie, or an unscored/level pair).
+  // Render the verdict from the LAST pick as a small tag atop the next matchup
+  // (set in pick(), cleared once shown). Null → the matchup paints without one.
   const renderVerdict = () => {
     const v = state.lastVerdict;
     state.lastVerdict = null;
@@ -834,12 +724,8 @@ function mount(root, ctx) {
     faceoff.append(buildContender(b, 'b'));
     screen.append(faceoff);
 
-    // The "tale of the tape" panel — up to three REAL, brand-appropriate metrics
-    // compared side by side, the better value highlighted, so the duel shows a
-    // reason rather than being pure looks-and-price. Driven by the per-brand
-    // statRows(a, b) hook; when nothing honest survives (metrics missing on
-    // either car) it returns null and nothing paints, so a broken or empty panel
-    // can never appear.
+    // The "tale of the tape" panel — up to three real metrics compared side by side,
+    // via the per-brand statRows hook; null (nothing paints) when nothing survives.
     const tale = buildStatPanel(a, b);
     if (tale) screen.append(tale);
 
@@ -861,9 +747,8 @@ function mount(root, ctx) {
     card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
     card.append(el('div', 'vm-mingle-card-colour'));
 
-    // Corner side badge (A / B) — the light-touch "opposing corners" framing that
-    // helps the pair read as a versus, not a two-item list. Bold on MINI, quiet on
-    // BMW (both via CSS); aria-hidden, the button label already carries the model.
+    // Corner side badge (A / B) — the "opposing corners" framing so the pair reads
+    // as a versus. aria-hidden; the button label already carries the model.
     const badge = el('span', 'vm-knockout-corner', side === 'a' ? 'A' : 'B');
     badge.setAttribute('aria-hidden', 'true');
     card.append(badge);
@@ -897,20 +782,8 @@ function mount(root, ctx) {
     return card;
   };
 
-  // The "tale of the tape" panel for the current pair, from the per-brand
-  // statRows(a, b) hook. Returns a framed DOM panel or null (nothing to show).
-  // The hook returns an array of row objects, in priority order:
-  //   { label, aText, bText, winner: 'a' | 'b' | null, tier: 'listing' | 'model' }
-  // buildStatPanel is the honest-data gatekeeper for the whole panel:
-  //   1. call the hook under a throw guard (a bad hook shows nothing, never crashes);
-  //   2. keep only well-formed rows (label + both texts present);
-  //   3. enforce the model-tier rule: a tier:'model' row (0-62, shared by every
-  //      listing of a line) may only SUPPORT a real per-listing row, so if no
-  //      listing row survives the model rows are dropped and the panel with them;
-  //   4. cap at the first three survivors (a duel, not a spec sheet);
-  //   5. tally how many rows each side wins, for the "A wins N of M" chip.
-  // Each row's winning side gets the is-winner class the CSS highlights; a tie
-  // (winner null) leaves both plain, so no side is ever falsely crowned.
+  // The "tale of the tape" panel for the current pair, from the per-brand statRows
+  // hook. Honest-data gatekeeper: throw-guarded, model rows support-only, capped at 3.
   const buildStatPanel = (a, b) => {
     if (typeof copy.statRows !== 'function') return null;
     let rows;
@@ -972,9 +845,8 @@ function mount(root, ctx) {
     return panel;
   };
 
-  // Record a pick: winner advances, loser is logged (for the advancement-weighted
-  // inference), the losing card flies out (gated on reduced-motion), and we move
-  // to the next matchup or round. `busy` blocks a double-pick mid-transition.
+  // Record a pick: winner advances, loser is logged, the losing card flies out
+  // (gated on reduced-motion). `busy` blocks a double-pick mid-transition.
   const pick = (winner, loser, side) => {
     if (state.busy) return;
     state.busy = true;
@@ -990,9 +862,8 @@ function mount(root, ctx) {
         state.matchIndex += 1;
         renderMatchup();
       } else {
-        // Round complete — the winners become the next round's entrants. Make a
-        // ceremony of it: a sweep banner naming the round we're entering, or the
-        // big Final interstitial when it's down to the last two.
+        // Round complete — the winners become the next round's entrants, with a
+        // sweep banner or the big Final interstitial when it's down to the last two.
         state.round = state.winners;
         state.roundIndex += 1;
         advanceRound();
@@ -1012,11 +883,8 @@ function mount(root, ctx) {
   };
 
   /* --------------------------- round ceremony --------------------------- */
-  // Between rounds we make "moving on" a moment. One survivor → the champion
-  // reveal. Two survivors → the Final gets a dedicated interstitial (one tap, the
-  // climax earns it). Otherwise a quick banner sweep names the round you're
-  // entering, then the next matchup paints. Under reduced motion the sweep is
-  // skipped (it would just flash) and we go straight to the round.
+  // Between rounds we make "moving on" a moment: champion reveal for one survivor,
+  // a Final interstitial for two, else a banner sweep (skipped under reduced motion).
   const advanceRound = () => {
     const survivors = state.round.length;
     if (survivors <= 1) { startRound(); return; }
@@ -1025,9 +893,8 @@ function mount(root, ctx) {
     renderRoundSweep(survivors);
   };
 
-  // A full-width banner that sweeps across the stage naming the round the player
-  // is entering, then hands off to the round. Self-timed (~800ms) so it's a beat,
-  // not a wait.
+  // A full-width banner naming the round being entered, then hands off to the round.
+  // Self-timed (~800ms) so it's a beat, not a wait.
   const renderRoundSweep = (survivors) => {
     root.replaceChildren();
     const screen = el('div', 'vm-screen vm-knockout-stage vm-knockout-sweep-stage');
@@ -1040,10 +907,8 @@ function mount(root, ctx) {
     window.setTimeout(startRound, 800);
   };
 
-  // The Final gets its own screen: the two finalists as crests, the "The Final"
-  // headline, and a single tap to begin. This is the one deliberate extra tap in
-  // the flow, and only ever once. Reduced motion keeps the screen (it's content,
-  // not motion) — the JS just doesn't animate the crest entrance.
+  // The Final gets its own screen: the two finalists as crests and a tap to begin.
+  // The one deliberate extra tap in the flow, and only ever once.
   const renderRoundInterstitial = () => {
     root.replaceChildren();
     const [a, b] = state.round;
@@ -1089,10 +954,8 @@ function mount(root, ctx) {
   };
 
   /* --------------------------- result --------------------------- */
-  // The champion is the lone survivor of the bracket. We STILL call the real
-  // engine (the same call the questionnaire mode makes) — not to pick the hero (the
-  // champion is always the hero, decision "champion, engine validates") but to
-  // attach its real "why" reasons and to know when to add the honest note.
+  // The champion is the lone survivor. We STILL call the real engine — not to pick
+  // the hero (always the champion) but to attach its real "why" and the honest note.
   const showResult = async (champion) => {
     renderResultSkeleton();
     const answers = bracketToAnswers(state.rounds, state.seed);
@@ -1122,9 +985,8 @@ function mount(root, ctx) {
     root.replaceChildren();
     const matches = result.matches || [];
 
-    // Find the champion in the engine's feasible set (by stable identity) to
-    // borrow its real reasons/score. If it isn't there, the engine didn't rank it
-    // feasible for the assembled brief — that's precisely the honest-note case.
+    // Find the champion in the engine's feasible set (by stable identity) to borrow
+    // its reasons/score. Absent → not ranked feasible: the honest-note case.
     const engineMatch = matches.find((m) => idOf(m.car) === idOf(champion));
     const reasons = engineMatch?.reasons || [];
     const weak = !engineMatch
@@ -1154,9 +1016,8 @@ function mount(root, ctx) {
       screen.append(why);
     }
 
-    // The one honest beat — when the engine can't fully back the crown (§6.2
-    // pattern). Celebrate anyway; add a soft note, and (if there's a different
-    // engine favourite) name it as a supportive aside, without swapping the hero.
+    // The one honest beat — when the engine can't fully back the crown (§6.2).
+    // Celebrate anyway; add a soft note, naming the engine favourite as an aside.
     if (weak) {
       screen.append(el('p', 'vm-mingle-weak-note', copy.weakNote.replace(/\*(.+?)\*/g, '$1')));
       const top = matches[0];
@@ -1259,11 +1120,8 @@ function mount(root, ctx) {
    * (match-signal.js) — the same crescendo the swipe game uses. */
 
   /* ------------------------------ boot ------------------------------
-   * Same shape as the swipe game: the seed's tiles are per-brand and live behind
-   * apiGetQuestions, so fetch that first. mount stays synchronous — it paints the
-   * seed skeleton now and does the fetch in this detached boot(), so the shell
-   * never awaits a cold backend. apiGetQuestions THROWS on failure, so guard it
-   * and offer a retry that re-boots. */
+   * The seed's per-brand tiles live behind apiGetQuestions, so fetch that first in
+   * this detached boot(). apiGetQuestions THROWS on failure, so guard it with a retry. */
   const boot = async () => {
     try {
       const { questions } = await apiGetQuestions(ctx.api, ctx.retailer, ctx.brand);
@@ -1279,10 +1137,8 @@ function mount(root, ctx) {
   boot();
 }
 
-// A test barrel of the pure stat-row builders, so the honest-data discipline
-// (return null when a value is absent on either car; younger/quicker/documented
-// wins; model rows carry tier:'model') can be unit-tested DOM-free, the way
-// age.test.js exercises the helpers in match-signal.js. Not used at runtime.
+// A test barrel of the pure stat-row builders, so the honest-data discipline can be
+// unit-tested DOM-free (like age.test.js). Not used at runtime.
 export const _stat = {
   lowerBetterRow,
   higherBetterRow,
@@ -1301,11 +1157,6 @@ export const _stat = {
   ageText,
 };
 
-// The switcher tab is brand-agnostic shell UI, so its label is neutral —
-// "Head to head", not "MINI Knockout". The campaign name lives as the wordmark
-// INSIDE the stage (KNOCKOUT_COPY[brand].wordmark), where it can vary by brand;
-// the mode's static `label` can't. The key mirrors that label, slugified
-// ('head-to-head'), so ?mode=head-to-head and the authored "Mode" value read the
-// same as the tab — the file is still knockout.js, but the mode a visitor
-// addresses is "head-to-head".
+// The switcher tab label is neutral shell UI ("Head to head"); the campaign name is
+// the per-brand wordmark inside the stage. The key mirrors the label ('head-to-head').
 export default { key: 'head-to-head', label: 'Head to head', mount };

@@ -142,9 +142,8 @@ test('stretch cars are flagged and carry a stretch reason', () => {
 });
 
 test('rankCars ranks a mixed-retailer pool on merit alone', () => {
-  // The "worth the drive" carousel ranks cars from several retailers through
-  // the same scoring as the hero grid. Retailer/distance must not leak into
-  // the score: two identical cars differing only in where they sit must tie.
+  // The "worth the drive" carousel ranks cars from several retailers through the
+  // same scoring: retailer/distance must not leak in, so identical cars must tie.
   const [near, far] = [2.2, 31.1].map((distance) => ({
     ...CARS[0], id: `${CARS[0].id}-${distance}`, distance, retailerId: distance < 10 ? 96 : 101,
   }));
@@ -227,8 +226,7 @@ test('a tie wider than MAX_SHOWN is capped for display but counted in full', () 
 
 test('an empty pool is decisive by vacuum, not by claim', () => {
   // `searched` reports the funnel the page shows its working with. On an empty
-  // pool it must still be present and still be honest: nothing searched,
-  // nothing eligible, and no margin to claim over a car that isn't there.
+  // pool it must still be present and honest: nothing searched, nothing eligible.
   assert.deepEqual(matchCars(base, []), {
     matches: [],
     decisive: true,
@@ -250,10 +248,8 @@ test('every dataset entry has the fields the engine needs', () => {
 });
 
 test('boot need is derived from people + primaryUse, not from a boot question', () => {
-  // Two identical cars but for luggage space. A solo weekend driver asks
-  // nothing of a boot, so they tie; a small family on family duties (1 + 1 →
-  // "big") separates them. This is the signal the cut boot question used to
-  // carry, now folded into the answers that already implied it.
+  // Two identical cars but for luggage space. A solo driver asks nothing of a
+  // boot so they tie; a family on family duties needs it (the folded-in boot need).
   const small = {
     ...CARS[0], id: 'sm', seats: 5, boot: 300, priceMin: 40000, priceMax: 40000,
   };
@@ -306,9 +302,8 @@ test('a [min,max] budget scores in-bracket cars full and cheaper cars lower', ()
 });
 
 test('a car far below a high budget floor is heavily penalised, not gently', () => {
-  // Regression: with a £92k–128k range, a £39k car used to score 0.7 on budget
-  // and — since budget is only ~1/5 of the blend — out-ranked pricier cars that
-  // actually fit the bracket. A car well under the floor must now score low.
+  // Regression: with a £92k–128k range, a £39k car used to score 0.7 on budget and,
+  // since budget is only ~1/5 of the blend, out-ranked cars that fit the bracket.
   const near = { ...CARS[0], id: 'near', priceMin: 90000, priceMax: 95000 };
   const wayUnder = { ...CARS[0], id: 'under', priceMin: 38000, priceMax: 42000 };
   const answers = { ...base, budget: [92000, 128000], fuel: ['open'] };
@@ -366,9 +361,8 @@ test('charging "either" gives EV access like home charging', () => {
 
 /* ---- unmet wants: what the pool couldn't offer (results-page honesty) ---- */
 
-// A deliberately narrow pool: petrol saloons only. Anything else a user asks
-// for is genuinely absent, which is exactly the case the results note exists
-// to admit to.
+// A deliberately narrow pool: petrol saloons only. Anything else a user asks for
+// is genuinely absent — exactly the case the results note exists to admit to.
 const petrolOnly = CARS.filter((c) => c.fuel === 'petrol' && c.body === 'saloon');
 
 test('an unmet fuel want is reported against the pool that was searched', () => {

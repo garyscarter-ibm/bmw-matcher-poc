@@ -1,42 +1,19 @@
 /*
- * Shared "signal" helpers for the game modes (Swipe / MINI Mingle and the
- * Head-to-head / MINI Knockout championship). Both modes do the same core job:
- * they let a player express taste over a deck of real stock, then turn that taste
- * into the SAME answer keys the questionnaire mode produces and hand them to the real
- * engine. The engine — not the game — picks the match (see the mode docs).
- *
- * These helpers are the mode-agnostic, brand-safe pieces of that job:
- *   - display: SHADE_HEX / swatchFor / priceLabel / gbpShort / cap
- *   - deck:    shuffle
- *   - reading: modal / rankByFrequency
- *   - seed:    budgetBandsFromQuestion / useTilesFromQuestion
- *   - infer:   swipesToAnswers (swipe) / bracketToAnswers (knockout)
- *   - reveal:  celebrate (the shared confetti crescendo)
- *
- * They were originally private to mingle.js; extracted here so the two game modes
- * share ONE tuning surface for how taste becomes answers, rather than a drifting
- * copy. Nothing here is brand-specific: the inference only ever emits values it
- * actually observed on real cards, so it can never emit a value the brand's engine
- * would reject (MINI has no saloon/coupe/mpv/diesel — those are brands:['bmw']).
+ * Shared brand-safe helpers for the game modes (Swipe and Knockout): display, deck, seed,
+ * taste→answers inference, and reveal. Inference only emits observed values, never a rejected one.
  */
 
 import { el, gbp } from '../ui.js';
 
 /*
- * Below this the engine stops calling its leader a match at all — the client's
- * "we don't really have this" threshold. Mirror of WEAK_SCORE in
- * ../vehicle-matcher.js and scripts/persona-check.mjs; kept client-side because
- * it's a presentation decision, not a server value. When a result's leader
- * crosses it, the celebration still fires but adds one honest note.
+ * The client's "we don't really have this" threshold — below it a leader gets an
+ * honest note. Mirror of WEAK_SCORE in ../vehicle-matcher.js and persona-check.mjs.
  */
 export const WEAK_SCORE = 68;
 
 /*
- * Colour shade → swatch hex, for the card colour bar/tint and the "Colour" taste
- * bar (§11.4). Brand-neutral and keyed by the NORMALISED shade the feed returns
- * (car.colour.colour), not marketing names — so it survives "Chili Red" vs
- * "Rooftop Grey" naming. Unknown shades fall back to a neutral swatch. This is a
- * small display table, deliberately not the prototype's five hard-coded hexes.
+ * Colour shade → swatch hex for the card colour bar/tint and "Colour" taste bar (§11.4).
+ * Keyed by the NORMALISED shade (not marketing names); unknown shades → neutral swatch.
  */
 export const SHADE_HEX = {
   red: '#c0392b', orange: '#d35400', yellow: '#e2b100', green: '#1e8449',
@@ -47,16 +24,8 @@ export const SHADE_HEX = {
 export const NEUTRAL_SWATCH = '#c8ccce';
 
 /**
- * Budget tiles for the seed step, derived from the engine's `budget` question
- * so the range is per-brand (MINI caps ~£50k where BMW reaches £150k+). The
- * quiz uses a dual-thumb slider; the games want a few tap targets, so we
- * quantise the engine's `max` into round "up to £Xk" bands plus an open-top
- * "£Xk plus". Each band is the [min, max] pair the engine expects (see
- * budgetRange in server/engine.js), so no answer shape changes — only the
- * control does. Falls back to a sane MINI-ish ladder if the question is missing.
- *
- * Returns [{ label, range: [min, max] }]. The last band is open-topped at the
- * slider max, so a MINI player never sees a £70k tile and a BMW player does.
+ * Budget tiles for the seed step, quantising the engine's per-brand `budget` max into
+ * round bands plus an open top. Each band is the [min, max] pair the engine expects.
  */
 export function budgetBandsFromQuestion(budgetQ) {
   const max = Number(budgetQ?.max) || 50000;
@@ -79,11 +48,8 @@ export function budgetBandsFromQuestion(budgetQ) {
 export const gbpShort = (n) => (n % 1000 === 0 ? `£${n / 1000}k` : gbp(n));
 
 /**
- * The `primaryUse` options as the seed's "what's it for" tiles, taken straight
- * from the engine so the labels/subs are the brand's own (MINI's "Nipping round
- * town", BMW's "City driving") and any brand-excluded option is already gone.
- * Returns [{ value, label, sub }]. Falls back to an empty list if the question
- * is missing — the caller guards on that.
+ * The engine's `primaryUse` options as the seed's "what's it for" tiles, so labels/subs
+ * are the brand's own. Returns [{ value, label, sub }], empty if the question is missing.
  */
 export function useTilesFromQuestion(useQ) {
   return (useQ?.options || []).map((o) => ({ value: o.value, label: o.label, sub: o.sub }));
@@ -101,32 +67,8 @@ export function shuffle(list) {
 }
 
 /*
- * Sink the cars that don't show a real photo. Both games look better — and read
- * more like the dating / head-to-head games they're pretending to be — when every
- * card shows a genuine picture; a picture-less (or placeholder-picture) contender
- * next to a photographed one is a weak matchup (user feedback: "I'm not matching
- * with anyone who can't be arsed to upload their photo"). So order the field into
- * three tiers, best first, each tier keeping its incoming (already-shuffled)
- * order:
- *
- *   2  real photo   — car.photo is set AND unique to this car in the field
- *   1  placeholder  — car.photo is set but SHARED by several cars in the field
- *                     (a generic "image coming soon" graphic the feed hands out
- *                     in place of a real shot reads as a photo to the renderer,
- *                     but it isn't one — the user flagged exactly this)
- *   0  no photo     — car.photo absent
- *
- * This is a STABLE re-order, not a filter: when the deck/bracket then slices to
- * its target size, the weak-image cars fall off the end if there's enough supply,
- * but still act as filler for a thin/photo-poor feed rather than starving the
- * game. The placeholder tier is a within-field frequency signal (no server flag
- * exists for "this URL is a placeholder"): a URL shared across cars can't be a
- * per-car photo, and when every URL is unique — the common case — the middle tier
- * is simply empty and this degrades to a plain photo/no-photo split.
- *
- * `photoOf` reads the photo URL off whatever the list holds — the swipe deck
- * carries match objects ({ car }), the knockout field carries bare cars — so the
- * caller passes the right accessor.
+ * Stable re-order (not a filter) into three tiers, best first: unique photo (2),
+ * shared-URL placeholder (1), no photo (0). `photoOf` is the caller's URL accessor.
  */
 export function photosFirst(list, photoOf) {
   // Count each non-empty photo URL across the whole field, so a URL used by more
@@ -174,18 +116,8 @@ export function priceLabel(car) {
 export const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 /*
- * The approximate registration date of a car, as a Date, from whatever the feed
- * gives us — brand-neutral because the `plate` field arrives in three shapes and
- * some brands surface a date instead:
- *   1. `firstReg` "dd/mm/yyyy" (Honda/Motorrad listings) — the exact date.
- *   2. `year` (a plain number, same brands) — 1 March of that year, a fair midpoint.
- *   3. `plate` — the DVLA age identifier, embedded differently per brand:
- *        BMW/MINI  bare code            "23", "72"
- *        Ford      code + dealer tag    "23 FRD"      (first token)
- *        Honda     full VRM             "AU19MVG"     (chars 3-4)
- *      Code 1-50  = March of 2000+code (23 → Mar 2023).
- *      Code 51-99 = September of 2000+(code-50) (72 → Sep 2022).
- * Returns null when nothing usable is present (never guess an age).
+ * Approximate registration Date from whatever the feed gives: exact `firstReg`, then
+ * `year` (1 March midpoint), then the DVLA age code from `plate`. Null if none (no guess).
  */
 export function registrationDate(car) {
   if (!car) return null;
@@ -206,10 +138,8 @@ export function registrationDate(car) {
 }
 
 /*
- * Age of a car in whole years from its registration date to `now` (defaults to
- * today). Floored, so a car registered 3y 10m ago is "3", matching how a person
- * states an age. Returns null when the date is unknown. `now` is injectable so
- * the pure function is testable without the clock.
+ * Age in whole (floored) years from registration date to `now`, like a person states
+ * their age. Null when the date is unknown. `now` is injectable so the function is testable.
  */
 export function ageInYears(car, now = new Date()) {
   const reg = registrationDate(car);
@@ -223,11 +153,8 @@ export function ageInYears(car, now = new Date()) {
 }
 
 /*
- * Pull the two-digit DVLA age identifier out of a plate, whatever the brand's
- * plate shape (see registrationDate). Current-style plates are "AB12 CDE": two
- * letters, the age code, then three letters. We take the first run of letters,
- * then the two digits that follow. A bare "23" or "23 FRD" has no leading
- * letters, so the digits are just the front of the string. Returns 1-99 or null.
+ * Pull the two-digit DVLA age code from a plate of any brand shape (bare "23",
+ * "23 FRD", or full VRM "AB12 CDE"): first run of letters, then two digits. 1-99 or null.
  */
 function plateAgeCode(plate) {
   if (typeof plate !== 'string') return null;
@@ -240,8 +167,8 @@ function plateAgeCode(plate) {
 }
 
 /*
- * The modal value in a list, with its share of the total. Used for the taste
- * bars: {value, count, share} where share is 0–1. Ties break to first seen.
+ * The modal value in a list with its share of the total: {value, count, share}, share
+ * 0–1. Ties break to first seen. Used for the taste bars.
  */
 export function modal(values) {
   const counts = new Map();
@@ -270,31 +197,15 @@ export function rankByFrequency(values) {
 }
 
 /*
- * Turn a WEIGHTED bag of liked cars (plus the seed answers) into the engine's
- * answer object — the whole point of the game modes. The result is the SAME shape
- * the questionnaire mode builds; it goes straight to /api/match.
- *
- * `liked` is a flat list of cars where a car appears once per unit of preference:
- * the swipe game passes each kept car once; the knockout passes each car `weight`
- * times (how far it advanced), so a crowned car speaks louder than a first-round
- * exit. Either way the reading below is just frequency over that bag.
- *
- * Principle: infer only the *taste* keys, and err toward OMITTING a key over
- * guessing it — an omitted key lets the engine use its own default, which is
- * safer than a wrong inference. budget + primaryUse come from the seed and are
- * never touched here.
- *
- * Brand safety: MINI has no saloon/coupe/mpv body or diesel fuel (those options
- * are brands:['bmw'] in server/questions.js). We only ever emit values we
- * actually observed on real cards, so we can't emit a value the engine rejects.
+ * Turn a WEIGHTED bag of liked cars (once per unit of preference) plus the seed into the
+ * engine's answer object. Infer only taste keys, err toward OMITTING, emit only observed values.
  */
 export function likesToAnswers(liked, seed) {
   const answers = { ...seed };
   if (liked.length === 0) return answers;
 
-  // Body / fuel: the distinct values seen among liked cars, most-liked first. Only
-  // keep a preference once at least two "votes" agree, so a single stray like
-  // isn't read as a want (thin data → omit).
+  // Body / fuel: distinct values among liked cars, kept only once at least two "votes"
+  // agree, so a single stray like isn't read as a want (thin data → omit).
   const bodyByFreq = rankByFrequency(liked.map((c) => c.body));
   const fuelByFreq = rankByFrequency(liked.map((c) => c.fuel));
   if (liked.length >= 2) {
@@ -304,9 +215,8 @@ export function likesToAnswers(liked, seed) {
     if (fuels.length) answers.fuel = fuels;
   }
 
-  // Style (1–5, sent as a STRING per server/questions.js). Sporty skew → 4/5 if
-  // liked cars lean to sporty bodies or hot trims; else leave the engine's
-  // default rather than asserting "balanced".
+  // Style (1–5, sent as a STRING per server/questions.js): sporty skew → 4/5 on sporty
+  // bodies or hot trims; else leave the engine's default rather than assert "balanced".
   const sportyBodies = liked.filter((c) => /coupe|convertible|roadster/i.test(c.body || '')).length;
   const sportyTrims = liked.filter((c) => /\b(jcw|cooper s|m\d|competition|gts?)\b/i.test(
     `${c.name || ''} ${c.line || ''}`,
@@ -315,10 +225,8 @@ export function likesToAnswers(liked, seed) {
   if (sportyShare >= 0.5) answers.style = '5';
   else if (sportyShare >= 0.25) answers.style = '4';
 
-  // Priorities (max 2). Derive from the pattern, not from a form:
-  //  - consistent colour/body → they're buying with their eyes → image
-  //  - economical fuel liked → economy
-  //  - sporty skew → performance
+  // Priorities (max 2), derived from the pattern: consistent colour/body → image,
+  // economical fuel → economy, sporty skew → performance.
   const priorities = [];
   const colourModal = modal(liked.map((c) => shadeOf(c)).filter(Boolean));
   const bodyModal = bodyByFreq[0];
@@ -353,20 +261,8 @@ export function swipesToAnswers(kept, seed) {
 }
 
 /*
- * Knockout championship's inference: advancement-weighted taste → engine answers.
- *
- * Same discipline as the swipe game (err toward OMITTING; only emit observed,
- * brand-safe values), but a car's voice scales with how far it advanced. We
- * express that by REPEATING each car `weight` times into the liked bag, where
- * weight = the number of rounds the car survived (a first-round loser = 1, a
- * semi-finalist = 2, the champion = the round count). Feeding that weighted bag
- * through the SAME likesToAnswers machinery means there is one inference idiom,
- * not two — the knockout just votes with heavier ballots for cars the player kept
- * choosing.
- *
- * `rounds` is the bracket log: an array (indexed by round, 0 = first round) of
- * matchups { winner, loser } — the mode records one per head-to-head. The
- * champion is the winner of the last round.
+ * Knockout inference: a car's voice scales with how far it advanced — repeat it `weight`
+ * times (rounds survived) into the bag, then feed the SAME likesToAnswers machinery.
  */
 export function bracketToAnswers(rounds, seed) {
   const totalRounds = rounds.length ? Math.max(...rounds.map((r) => r.roundIndex)) + 1 : 0;
@@ -400,21 +296,8 @@ export function idOf(car) {
 /* ------------------------------ reveal ------------------------------ */
 
 /*
- * Per-brand celebration character. The JS owns one dial only — particle COUNT,
- * i.e. how exuberant the burst is; colour and easing are the stylesheet's job
- * via each brand's .vm-<brand> scope (--vm-ease / --vm-accent-spot). This map is
- * the single place a brand's exuberance lives, so onboarding a brand is one
- * entry here (plus its CSS token block), never an edit to celebrate() itself.
- *
- *   - restrained (BMW, Ford): measured, fewer plainer bits.
- *   - lively (MINI, Honda): warm and playful, denser burst.
- *   - punchy (Motorrad): a denser burst too, but the energy is sporting, not
- *     cutesy — the sharpness comes from the theme (motorsport-red spot + crisp,
- *     unbouncy --vm-ease), so the count just turns the exuberance up. Finding
- *     your bike is a high-adrenaline moment; the burst should match it.
- *
- * A brand not listed falls back to the restrained default, so a new brand is
- * never broken here — it just starts understated until it opts into warmth.
+ * Per-brand celebration character. The JS owns one dial only — particle COUNT; colour
+ * and easing are the stylesheet's job. Unlisted brands fall back to the restrained default.
  */
 const BRAND_CELEBRATION = {
   bmw: { count: 26 },
@@ -422,35 +305,22 @@ const BRAND_CELEBRATION = {
   mini: { count: 40 },
   honda: { count: 36 },
   motorrad: { count: 36 },
-  // Ferrari: a measured, slightly-raised burst. Finding one is a genuine event,
-  // so a touch above BMW's restraint, but the brand is understated luxury, not
-  // confetti-cannon exuberance — the sparkle comes from the red spot and the
-  // composed --vm-ease, so the count stays dignified.
+  // Ferrari: a measured, slightly-raised burst — a touch above BMW's restraint, but
+  // dignified; the sparkle comes from the red spot and composed --vm-ease, not the count.
   ferrari: { count: 30 },
 };
 const DEFAULT_CELEBRATION = { count: 26 };
 
 /*
- * The shared celebration burst on a result reveal — one implementation for both
- * games (the swipe match and the knockout champion), so the crescendo can't
- * drift between them. Was a 24-bit copy in each mode; extracted and enriched
- * here into a denser, staggered burst with per-brand character (BRAND_CELEBRATION).
- *
- * The bits are plain confetti — no glyphs (the earlier hearts were pulled with
- * the rest of the Valentine's iconography). Character is carried by a
- * `.vm-<brand>`-scoped CSS + the token (--vm-ease / --vm-accent-spot), so the JS
- * just varies the particle COUNT; colour and easing are the stylesheet's job. The
- * caller gates this on prefers-reduced-motion (the CSS also hides it as a belt-
- * and-braces second guard). `host` should be position:relative so the absolutely
- * positioned layer fills it.
+ * The shared celebration burst on a result reveal, one implementation for both games. JS
+ * varies only particle COUNT; the caller gates on prefers-reduced-motion. `host` position:relative.
  */
 export function celebrate(host, { brand } = {}) {
   const { count } = BRAND_CELEBRATION[brand] || DEFAULT_CELEBRATION;
   const layer = el('div', 'vm-mingle-confetti');
   layer.setAttribute('aria-hidden', 'true');
   for (let i = 0; i < count; i += 1) {
-    // Plain confetti bits — no glyphs (the hearts went with the rest of the
-    // Valentine's iconography). Character is the count + the stylesheet's colour.
+    // Plain confetti bits, no glyphs — character is the count + the stylesheet's colour.
     const bit = el('span', 'vm-mingle-confetti-bit');
     bit.style.left = `${(i / count) * 100}%`;
     // Stagger across a wider window than the old 6-step cycle, so the burst

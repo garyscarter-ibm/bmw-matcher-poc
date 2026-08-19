@@ -1,14 +1,6 @@
 /*
- * Age helper — the swipe card's "dating app" frame shows a vehicle's AGE instead
- * of its reg plate (mingle.js buildCard -> ageLabel -> ageInYears). The age has
- * to be derived from whatever the card actually carries, and that differs by
- * brand: BMW/MINI send a bare age code ("73"), Ford an age code plus a dealer
- * suffix ("73 FRD"), Honda a full VRM ("AU19MVG"), and Motorrad no plate at all
- * but a firstReg date / year (surfaced through publicCar + mapMotorradRaw).
- *
- * ageInYears/registrationDate live in the client (match-signal.js) but are pure
- * date math with no DOM, so they're imported straight in here. A wrong decode
- * prints a made-up age on a real car, so pin every format and the fallbacks.
+ * Age helper — mingle's swipe card shows a vehicle's AGE not its reg plate, decoded
+ * from whatever the card carries per brand (plate code, VRM, date). Pin every format.
  */
 
 import { test } from 'node:test';

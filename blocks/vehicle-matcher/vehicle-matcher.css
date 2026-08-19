@@ -1,42 +1,10 @@
 /*
- * Vehicle Matcher block styles. Scoped under .vm so the block drops into
- * an existing EDS site without leaking styles. Mobile-first.
- *
- * The base (.vm) is brand-neutral; per-brand theming lives under a modifier
- * class (.vm-bmw, .vm-mini) further down.
- *
- * Reskinned to the BMW / Grassick's design system — see docs/design-tokens.md.
- * Light, sharp, editorial: BMW Blue accent, flat no-radius cards, the
- * BMW Type Next family.
- *
- * -------------------------------------------------------------------------
- * Packaged brand fonts (@font-face below).
- *
- * BMW and MINI use proprietary typefaces (BMW Type Next, MINI Serif, MINI
- * Sans). Earlier revisions of this block were *host-first only*: the tokens
- * named the host page's font variables and fell through to Helvetica in the
- * standalone harness (block.html / GitHub Pages), where there is no host to
- * inherit from. That is why the fonts didn't render outside an EDS site.
- *
- * We now SHIP the fonts with the block (see ./fonts/), so it renders in the
- * brand typeface everywhere it's embedded — host page or not. Each typeface is
- * declared ONCE as a single family with real weights (Thin/Light/Regular/Bold
- * for BMW; Regular/Bold for the MINI faces); weight is carried by font-weight,
- * never by a per-weight family name. That is the fix for the older bug where
- * the CSS named families like 'BMWTypeNextLatin-Light' that no host declared,
- * so every rule silently fell back to Helvetica.
- *
- * The files are the exact woff/woff2 the live BMW and MINI retailer sites load.
- * font-display: swap so text paints immediately in the fallback and swaps to
- * the brand face when it arrives.
- * ------------------------------------------------------------------------- */
+ * Vehicle Matcher block styles, scoped under .vm (base .vm is BMW; per-brand modifiers below).
+ * Fonts are PACKAGED (@font-face below): one family each, weight via font-weight, never a per-weight family name.
+ */
 
-/* Design tokens (every --vm-* custom property) live in a sibling file so they
-   can be shared with the demo chrome and the neutral brand picker. Imported
-   here, at the very top, because a real EDS page auto-loads ONLY this file —
-   nothing pulls in a sibling — so the @import is what keeps the block
-   self-contained. @import must precede all other rules (the @font-face run
-   below included), so it stays first. See tokens.css for the :root vs .vm split. */
+/* Design tokens live in a sibling file, @imported here first (EDS auto-loads
+   only this file, and @import must precede all rules). See tokens.css. */
 @import url('./tokens.css');
 
 /* BMW Type Next — shared by BMW cars and BMW Motorrad. woff2 only. */
@@ -69,10 +37,8 @@
   font-display: swap;
 }
 
-/* MINI Serif — display/headline face. woff only (no woff2 published).
-   Note the "bold" file is MINI's Black cut (internal usWeightClass 900); we map
-   it to the 700 the CSS requests so `font-weight: 700` titles resolve to it
-   exactly rather than the browser synthesising bold from the 400 regular. */
+/* MINI Serif — display/headline face, woff only. The "bold" file is MINI's Black
+   cut (usWeightClass 900), mapped to 700 so titles resolve to it, not synthesised bold. */
 @font-face {
   font-family: 'MINI Serif';
   src: url('./fonts/mini_serif-regular-web.woff') format('woff');
@@ -88,9 +54,8 @@
   font-display: swap;
 }
 
-/* MINI Sans — body/UI face. woff only. The "regular" file is MINI's Medium cut
-   (usWeightClass 500) and the "bold" is a Black (900); both are mapped to the
-   400/700 the CSS asks for so matching is exact. */
+/* MINI Sans — body/UI face, woff only. "regular" is Medium (500), "bold" is
+   Black (900); both mapped to 400/700 for exact matching. */
 @font-face {
   font-family: 'MINI Sans';
   src: url('./fonts/mini_sans_serif-regular-web.woff') format('woff');
@@ -106,17 +71,8 @@
   font-display: swap;
 }
 
-/* Honda — Proxima Nova, the face honda.co.uk actually serves (NOT a "Honda
-   Sans"; that was a placeholder guess). Honda uses Proxima Nova Extra Condensed
-   for display/headings and regular-width Proxima Nova for body. The woff files
-   are lifted from honda.co.uk, where their internal name tables are deliberately
-   scrambled to deter reuse — that doesn't affect us, because @font-face matches
-   on the family name we declare here, not the file's internal name.
-   Licence caveat: Proxima Nova is a commercial Mark Simonson retail face Honda
-   licenses; unlike BMW Type Next it isn't a brand-owned asset. Self-hosting is
-   an owner decision recorded in DECISIONS.md, on weaker footing than BMW/MINI.
-   The Extra Condensed weights map by their internal usWeightClass: Light 300,
-   Regular 400, Semibold 600. */
+/* Honda — Proxima Nova (honda.co.uk's face): Extra Condensed headings, regular body.
+   Licence caveat: commercial licensed face, self-hosted by owner decision (see DECISIONS.md). */
 @font-face {
   font-family: 'Proxima Nova ExCn';
   src: url('./fonts/ProximaNovaExCn-Light.woff') format('woff');
@@ -146,12 +102,8 @@
   font-display: swap;
 }
 
-/* Ford — FordF1, Ford's current brand typeface (2023 on), self-hosted as woff2
-   (CFF outlines). Regular 400, Medium 500, Bold 700 by internal usWeightClass.
-   Ford Antenna (the previous brand face) follows as a woff fallback for the
-   same family stack, so older weights still resolve to a Ford face rather than
-   Helvetica. Both are Ford-owned brand faces, so this is the BMW-style footing,
-   not the Honda one. */
+/* Ford — FordF1 (current brand typeface, 2023 on), woff2; Ford Antenna follows
+   as a same-stack woff fallback. Both Ford-owned, so BMW-style footing not Honda's. */
 @font-face {
   font-family: 'FordF1';
   src: url('./fonts/FordF1-Regular.woff2') format('woff2');
@@ -188,19 +140,8 @@
   font-display: swap;
 }
 
-/* Ferrari — Ferrari Sans, the face preowned.ferrari.com actually serves (its
-   CSS aliases it as "Title-Font"/"Body-Font" but the woff files are
-   Ferrari-SansRegular / Ferrari-SansMedium, lifted from that site). It is a
-   brand-owned corporate face (like BMW/Ford, unlike Honda's licensed Proxima),
-   so self-hosting sits on the BMW footing; recorded in DECISIONS.md.
-   The family ships only Regular (usWeightClass 400) and Medium (also stamped
-   400 internally, a heavier design at the same nominal weight) — there is NO
-   bold cut, and Ferrari's own site uses Medium as its title/emphasis weight.
-   So we declare Regular at 400 and map the Medium woff to BOTH 500 and 700:
-   an emphasis or heading request resolves to the real Medium face rather than
-   letting the browser synthesise a fake bold or fall through to Helvetica.
-   NotoSans (the fallback family the site pairs it with) is left to the system
-   stack in the token below. */
+/* Ferrari — Ferrari Sans (preowned.ferrari.com's face), brand-owned so BMW footing.
+   No bold cut ships: Regular at 400, Medium mapped to BOTH 500 and 700 so emphasis/headings hit the real Medium, not a synthesised bold. */
 @font-face {
   font-family: 'Ferrari Sans';
   src: url('./fonts/Ferrari-SansRegular.woff') format('woff');
@@ -217,38 +158,19 @@
 }
 
 .vm {
-  /* Design tokens (fonts, colour, spacing, geometry, type scale, motion) live
-     in tokens.css, @imported at the top of this file; the base .vm block there
-     is the BMW default and each .vm.vm-<brand> block overrides it. They cascade
-     in here — what remains on .vm below is the block's own LAYOUT. */
+  /* Design tokens live in tokens.css; what remains on .vm below is the block's
+     own LAYOUT. */
 
-  /* Transparent, not white: the host section owns the background. Painting
-     our own white is invisible on a white page but becomes a white slab the
-     moment an author drops the block into a light-grey section. Card surfaces
-     still paint --vm-surface explicitly. */
+  /* Transparent, not white: the host section owns the background (our own white
+     would become a slab on a light-grey section). Cards still paint --vm-surface. */
   background: transparent;
   color: var(--vm-ink);
   font-family: var(--vm-font-body);
   font-size: var(--vm-text-body);
   border-radius: var(--vm-radius);
   padding: var(--vm-space-6) var(--vm-space-5) var(--vm-space-8);
-  /* Cap the width on large screens, but fill (never exceed) a narrow viewport:
-     box-sizing keeps the side padding inside the 100%, so the block can't push
-     past the screen edge on mobile. Without width:100% a centred flex/grid
-     parent sizes the block to its max-content and it overflows.
-     ---------------------------------------------------------------------
-     The cap is a 1280px COLUMN, not a reading measure. It used to be 880px,
-     which was set when every mode was a single centred column of copy — but
-     podium puts a brief and a live podium side by side, and at 880 that meant a
-     320px pane holding a card the size of the fold, so one car at a time was
-     all you could see. 1280 is the number the host pages already use: MINI's
-     own sections sit in a 1280px column (see the wrapper rule below) and the
-     BMW retailer sections in a 1200px one, and with the 48px gutter added at
-     900px up the content lands at 1184 — within a couple of pixels of the demo
-     shell's own 1180px hero and footer inners, so the tool lines up with the
-     furniture around it instead of reading as an inset panel.
-     Single-column modes keep their own measures (`.vm-lede` is capped in ch,
-     the swipe deck in px), so widening the column does not widen prose. */
+  /* Cap width on large screens, fill (via width:100% + box-sizing) a narrow one.
+     The 1280px cap is a COLUMN matching the host pages (MINI 1280, BMW 1200), not a reading measure — single-column modes keep their own ch/px measures. */
   box-sizing: border-box;
   width: 100%;
   max-width: 1280px;
@@ -258,11 +180,8 @@
 
 .vm * { box-sizing: border-box; }
 
-/* The standalone gutter, matching the one the wrapper rule below gives the
-   block on a host page: 48px is what the host's own sections use, so the
-   content column is the same width in the harness, on the Pages demo and in
-   EDS. Kept off small screens, where the 20px base padding is the right edge
-   distance and 48px would eat a fifth of a phone. */
+/* Standalone gutter matching the host sections' 48px, so the content column is
+   the same width everywhere. Off small screens, where 48px would eat a phone. */
 @media (min-width: 900px) {
   .vm {
     padding-left: var(--vm-space-12);
@@ -271,13 +190,8 @@
 }
 
 /*
- * Inside an EDS page the section already provides the content column, so the
- * block fills it and lines up with its neighbours instead of nesting a second
- * width limit inside the first. Measured on the live dealer site before this:
- * the block's content started at 304px while every host section started at
- * 160–270px, because an 880px centred box sat inside EDS's 1200px column — it
- * read as inset and bolted-on. Standalone (the local harness / Pages demo)
- * there's no wrapper, so the block keeps its own 1280px column.
+ * In EDS the section supplies the content column, so the block just fills it.
+ * Standalone (harness / Pages demo) has no wrapper, so it keeps its own 1280px column.
  */
 .vehicle-matcher-wrapper .vm {
   max-width: none;
@@ -285,19 +199,15 @@
 }
 
 @media (min-width: 900px) {
-  /* Matches the gutter the host's own sections use, so the left edges align.
-     On the BMW site the section is already a 1200px column, so 48px here puts
-     the content at 168px — exactly where the host's own sections sit. */
+  /* Matches the host sections' gutter so left edges align (48px puts BMW's
+     content at 168px, where its own sections sit). */
   .vehicle-matcher-wrapper .vm {
     padding-left: 48px;
     padding-right: 48px;
   }
 
-  /* MINI pages put this block in a FULL-BLEED section, so without a cap it ran
-     the whole 1440 and dwarfed its neighbours. The host's own sections there
-     ("FIND YOUR MINI.", "MINI OFFERS.") sit in a 1280px column — measured at
-     left 80 / right 1360 — so the block takes the same column and drops the
-     gutter, putting its content on exactly the same line. */
+  /* MINI pages are FULL-BLEED, so without a cap the block dwarfs its neighbours.
+     Take the host's 1280px column and drop the gutter so content lines up. */
   .vehicle-matcher-wrapper .vm.vm-mini {
     max-width: 1280px;
     margin-inline: auto;
@@ -307,30 +217,16 @@
 }
 
 /*
- * Host pages style their own p / h2 / a / button, and a rule that matches an
- * element directly beats a font inherited from an ancestor — so host
- * typography can leak into the block. Re-assert inheritance for the elements
- * the block renders. :where() keeps this at zero specificity, so every
- * block rule below still wins.
+ * Host element rules (p/h2/a/button) beat inherited fonts, so host typography
+ * leaks in. Re-assert inheritance via :where() (zero specificity, so block rules still win).
  */
 .vm :where(p, h1, h2, h3, h4, li, a, button, input, select, label, span) {
   font-family: inherit;
 }
 
 /* ------------------------------ MINI theme ---------------------------- *
- * Applied when the block is configured Brand: MINI (the .vm-mini class,
- * added in decorate). MINI's real identity (per sytnerlutonmini.co.uk): a
- * BLACK-on-white base — black is the primary button, white-with-a-2px-black-
- * pill-border is the secondary. British Racing Green + teal are rare SPOT
- * accents (score badge, progress bar, slider fill, focus ring), never the
- * button colour. Serif UPPERCASE headlines with tight leading. Everything is a
- * token override + a few MINI-scoped rules — no structural change to the base.
- *
- * Fonts are PACKAGED with the block: 'MINI Serif' and 'MINI Sans' are declared
- * via @font-face at the top of this file and shipped from ./fonts (the exact
- * .woff files the live MINI retailer site loads). The block therefore renders
- * in MINI's own faces everywhere it's embedded, host page or standalone
- * harness alike — it no longer depends on the host declaring them.
+ * Brand: MINI (.vm-mini). Black-on-white base (black primary button, 2px-black-
+ * pill secondary); green + teal are rare SPOT accents. Serif uppercase headlines. *
  * -------------------------------------------------------------------- */
 
 /* MINI theme tokens (fonts, colour, geometry, buttons, motion) live in the
@@ -344,19 +240,16 @@
 .vm.vm-mini .vm-nearby-heading {
   text-transform: uppercase;
   font-family: var(--vm-font-heading);
-  /* The serif is now a multi-weight family, so the weight has to be asked for.
-     BMW's titles are 300 (light); MINI's are heavy, matching the host's own
-     headings, which set 700 on the same face. */
+  /* The serif is a multi-weight family, so weight must be asked for: MINI's
+     titles are heavy (700), matching the host's own headings. */
   font-weight: 700;
   line-height: 1.02;
   letter-spacing: 0.01em;
 }
 
 /*
- * MINI's lede is body copy, not a headline. The base rule sets the lede in the
- * HEADING font, which is right for BMW (a light grotesque reads well large)
- * and wrong for MINI, whose heading face is a heavy display serif — it made
- * every intro paragraph on the live site render in MINI Serif Black.
+ * MINI's lede is body copy, not a headline: the base's heading font is a heavy
+ * display serif here, which rendered every intro paragraph in MINI Serif Black.
  */
 .vm.vm-mini .vm-lede {
   font-family: var(--vm-font-body);
@@ -399,29 +292,14 @@
 }
 
 /* ------------------------------ Honda theme --------------------------- *
- * Applied when the block is configured Brand: Honda (the .vm-honda class,
- * added in decorate). Honda UK's identity (per honda.co.uk): a clean, modern
- * SANS look on white, with Honda Red as the one signature accent. Unlike BMW
- * (light grotesque, uppercase, sharp corners) and MINI (heavy display serif,
- * uppercase, pill controls), Honda is sentence-case, medium-weight sans with
- * softly rounded corners and calm, honest motion — no bounce. It reads as
- * plain, practical and trustworthy, which is the brand and the voice.
- *
- * Fonts are PACKAGED from ./fonts (see the @font-face block up top), like BMW
- * and MINI. Honda's real web face is Proxima Nova, not a "Honda Sans" (that was
- * a placeholder guess); honda.co.uk uses Proxima Nova Extra Condensed for
- * display/headings and regular-width Proxima Nova for body. Packaged family
- * first so the standalone harness renders, then the host bridge
- * (var(--*-font-family)) in case a host page overrides, then a system fallback.
- * Licence note: Proxima Nova is a commercial licensed face, self-hosted by
- * owner decision (weaker footing than BMW/MINI) — see DECISIONS.md.
+ * Brand: Honda (.vm-honda). Clean sans on white, Honda Red the one accent;
+ * sentence-case, medium-weight, softly rounded, calm motion (no bounce). *
  * -------------------------------------------------------------------- */
 /* Honda theme tokens (fonts, colour, geometry, buttons, motion) live in the
    .vm.vm-honda block in tokens.css. The Honda-scoped COMPONENT rules stay here. */
 
-/* Honda headlines: sans, sentence-case (NOT uppercased like BMW/MINI), medium
-   weight. Overriding text-transform is the key move — the base .vm-title
-   uppercases, which is wrong for Honda's register. */
+/* Honda headlines: sans, sentence-case, medium weight. Overriding text-transform
+   is the key move (the base .vm-title uppercases, wrong for Honda). */
 .vm.vm-honda .vm-title,
 .vm.vm-honda .vm-question,
 .vm.vm-honda .vm-subhead,
@@ -442,9 +320,8 @@
   text-transform: none;
 }
 
-/* Honda buttons: red primary fill. The base .vm-btn-primary already uses the
-   accent, so the token override does most of the work; nudge the hover to a
-   deeper red rather than the base's filter so it stays on-brand. */
+/* Honda buttons: red primary fill (token override does most of it); nudge the
+   hover to a deeper red rather than the base's filter. */
 .vm.vm-honda .vm-btn-primary:not(:disabled):hover {
   filter: none;
   background: #a30000;
@@ -452,8 +329,7 @@
 }
 
 /* Honda spot-red touches: progress bar, score badge, slider fill, focus ring
-   all carry the accent (it's the same red, so these just make it appear on the
-   small chrome the base leaves neutral). */
+   carry the accent on the small chrome the base leaves neutral. */
 .vm.vm-honda .vm-progress-bar { background: var(--vm-accent-spot); }
 .vm.vm-honda .vm-score {
   background: var(--vm-accent-spot);
@@ -473,32 +349,14 @@
 }
 
 /* --------------------------------------------------------------------
- * FORD THEME
- * Applied when the block is configured Brand: Ford (the .vm-ford class,
- * added in decorate). Ford UK's identity (per ford.co.uk): a confident,
- * modern SANS look on white, with Ford Blue as the one signature accent
- * (the oval blue, used far more assertively than BMW's blue). Like Honda
- * it's sentence-case, medium-weight sans, but a touch crisper (smaller
- * radius) and a fraction more energetic in motion, matching a brand that
- * sells both a sensible Puma and a Mustang. It reads friendly, capable and
- * plainly British.
- *
- * Fonts are PACKAGED from ./fonts (see the @font-face block up top), like BMW
- * and MINI. FordF1 is Ford's current (2023-on) brand typeface; Ford Antenna is
- * the previous one, kept as a same-stack fallback. Both are Ford-owned brand
- * faces, so self-hosting sits on the BMW footing, not Honda's licensed-Proxima
- * one. Packaged FordF1 first, then Antenna, then the host bridge, then a system
- * sans for the standalone harness.
+ * FORD THEME — Brand: Ford (.vm-ford). Confident sans on white, Ford Blue the
+ * one accent; like Honda but crisper (smaller radius) and a touch more energetic.
  * -------------------------------------------------------------------- */
 /* Ford theme tokens (fonts, colour, geometry, buttons, motion) live in the
    .vm.vm-ford block in tokens.css. The Ford-scoped COMPONENT rules stay here. */
 
-/* Ford headlines: sans, sentence-case (NOT uppercased like BMW/MINI), in the
-   navy strong-ink. As with Honda, overriding text-transform is the key move —
-   the base .vm-title uppercases, which is wrong for Ford's register.
-   Weight 500: FordF1's Medium cut, the weight ford.co.uk sets headings at. The
-   packaged FordF1 ships 400/500/700, so 500 resolves to a real face rather than
-   the browser synthesising a 600 from the 500. */
+/* Ford headlines: sans, sentence-case, navy strong-ink; text-transform override
+   is the key move. Weight 500 is FordF1's real Medium cut (ford.co.uk's heading weight). */
 .vm.vm-ford .vm-title,
 .vm.vm-ford .vm-question,
 .vm.vm-ford .vm-subhead,
@@ -519,9 +377,8 @@
   text-transform: none;
 }
 
-/* Ford buttons: blue primary fill. The base .vm-btn-primary already uses the
-   accent, so the token override does most of the work; nudge the hover to a
-   deeper navy rather than the base's filter so it stays on-brand. */
+/* Ford buttons: blue primary fill (token override does most of it); nudge the
+   hover to a deeper navy rather than the base's filter. */
 .vm.vm-ford .vm-btn-primary:not(:disabled):hover {
   filter: none;
   background: #00214d;
@@ -529,8 +386,7 @@
 }
 
 /* Ford spot-blue touches: progress bar, score badge, slider fill, focus ring
-   all carry the accent (the same blue, appearing on the small chrome the base
-   leaves neutral). */
+   carry the accent on the small chrome the base leaves neutral. */
 .vm.vm-ford .vm-progress-bar { background: var(--vm-accent-spot); }
 .vm.vm-ford .vm-score {
   background: var(--vm-accent-spot);
@@ -550,23 +406,13 @@
 }
 
 /* -------------------------------- Motorrad ---------------------------------
- * BMW Motorrad is the same parent marque as BMW cars but a distinct sub-brand
- * with its own tougher, more technical register: motorsport red/blue on a near-
- * black anthracite, sharp geometry (a bike is mechanical, precise), and crisp,
- * confident motion. Shares BMW's uppercase headline treatment (it inherits the
- * base .vm-title, unlike Ford/Honda which un-uppercase) because Motorrad's own
- * marketing sets model names and headlines in caps. Accent is Motorrad blue;
- * the motorsport red is the secondary spot that appears on small highlights. */
+ * BMW sub-brand, tougher register: motorsport red/blue, sharp geometry, crisp motion.
+ * Keeps BMW's uppercase headlines; accent is Motorrad blue, red the secondary spot. */
 /* Motorrad theme tokens (fonts, colour, geometry, buttons, motion) live in the
    .vm.vm-motorrad block in tokens.css. The Motorrad-scoped COMPONENT rules stay here. */
 
-/* Motorrad buttons: BLACK primary fill with UPPERCASE labels — the marque's
-   signature CTA treatment (bmw-motorrad.com). Blue is a LINK/accent colour here,
-   not the button fill, and red stays the spot colour (progress/score/slider), so
-   neither doubles as the primary button. The base .vm-btn-primary fills with
-   --vm-accent (blue for Motorrad), so we override it to black explicitly.
-   The uppercasing lives on .vm-btn below, not the base, so only Motorrad's
-   buttons shout while BMW/MINI/Honda/Ford keep their own casing. */
+/* Motorrad buttons: BLACK primary fill, UPPERCASE labels (blue is a link colour, not the fill).
+   Uppercasing lives on .vm-btn below so only Motorrad shouts, not the other brands. */
 .vm.vm-motorrad .vm-btn {
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -588,9 +434,8 @@
   color: var(--vm-ink-strong);
 }
 
-/* Motorsport-red spot touches: progress bar, score badge, slider fill and focus
-   ring carry the red, the sub-brand's signature energy on the small chrome the
-   base leaves neutral. (--vm-accent-spot is red for Motorrad, blue elsewhere.) */
+/* Motorsport-red spot touches: progress bar, score, slider fill, focus ring
+   carry the red (--vm-accent-spot is red for Motorrad, blue elsewhere). */
 .vm.vm-motorrad .vm-progress-bar { background: var(--vm-accent-spot); }
 .vm.vm-motorrad .vm-score {
   background: var(--vm-accent-spot);
@@ -611,14 +456,8 @@
   box-shadow: inset 0 0 0 2px var(--vm-accent), inset 4px 0 0 var(--vm-accent-spot);
 }
 
-/* Motorrad headlines: BOLD, tight, uppercase — NOT the base .vm-title's light
-   300. That weight is BMW *cars'* airy editorial register; Motorrad's is the
-   opposite ("tougher, more technical", per the theme note above): its marketing
-   sets model names and headlines heavy and condensed-feeling. Motorrad shares
-   BMW's UPPERCASE treatment but not its lightness, so we keep text-transform
-   (inherited) and override the weight to 700 with tighter tracking. Without this
-   the block rendered Motorrad headlines in thin Light Type Next, reading like a
-   7 Series ad rather than a GS one. Mirror the MINI title override's shape. */
+/* Motorrad headlines: BOLD, tight, uppercase — not the base .vm-title's light 300
+   (that airy register reads like a 7 Series ad, not a GS). Keeps inherited uppercase, overrides weight to 700. */
 .vm.vm-motorrad .vm-title,
 .vm.vm-motorrad .vm-question,
 .vm.vm-motorrad .vm-subhead,
@@ -632,31 +471,14 @@
 }
 
 /* --------------------------------------------------------------------
- * FERRARI THEME
- * Applied when the block is configured Brand: Ferrari (the .vm-ferrari class,
- * added in decorate). Ferrari's identity (per ferrari.com and
- * preowned.ferrari.com): a restrained, luxurious near-black-on-white base
- * with Ferrari red as the single, sparing signature. The register is the
- * opposite of a supermarket forecourt: quiet, editorial, confident that the
- * cars sell themselves. So NOT BMW/MINI/Motorrad's shouted uppercase; Ferrari
- * sets headings in generous SENTENCE CASE with a lot of air, in its own
- * Ferrari Sans. Red is the CTA and the one accent; the shield yellow is a rare
- * secondary that never becomes a button. Crisp, small-radius geometry (the
- * cars are precise machines) and calm, unhurried motion (no MINI bounce).
- *
- * Colours are the site's own tokens: red #da291c (1186 uses in its CSS),
- * ink #181818, muted #8f8f8f, band #f6f7f8, hairline #d0dddd. Fonts are
- * PACKAGED from ./fonts (Ferrari Sans, see the @font-face block up top) — a
- * brand-owned face, self-hosted on the BMW footing. See DECISIONS.md.
+ * FERRARI THEME — Brand: Ferrari (.vm-ferrari). Restrained near-black-on-white,
+ * Ferrari red the single sparing accent; sentence-case headings, crisp geometry, calm motion.
  * -------------------------------------------------------------------- */
 /* Ferrari theme tokens (fonts, colour, geometry, buttons, motion) live in the
    .vm.vm-ferrari block in tokens.css. The Ferrari-scoped COMPONENT rules stay here. */
 
-/* Ferrari headlines: sans, SENTENCE CASE (not uppercased like BMW/MINI/
-   Motorrad), in the strong ink. Overriding text-transform is the key move; the
-   base .vm-title uppercases, which is wrong for Ferrari's restrained editorial
-   register. Weight 500 pulls the Ferrari Sans Medium cut (the site's own title
-   weight), a touch heavier than body without shouting. */
+/* Ferrari headlines: sans, SENTENCE CASE, strong ink; text-transform override is
+   the key move. Weight 500 pulls the Ferrari Sans Medium cut (the site's title weight). */
 .vm.vm-ferrari .vm-title,
 .vm.vm-ferrari .vm-question,
 .vm.vm-ferrari .vm-subhead,
@@ -677,11 +499,8 @@
   text-transform: none;
 }
 
-/* Ferrari buttons: the real fill is a vertical red gradient (a00c01 -> da291c),
-   taken from Ferrari's own button component (--f-color-gradient-red), not a flat
-   red. The uppercase label + tracking come from the --vm-btn-* tokens in the
-   scope above. Border matches the gradient's lower stop so the 1px edge doesn't
-   read as a lighter halo. */
+/* Ferrari buttons: fill is a vertical red gradient (a00c01 -> da291c) from
+   Ferrari's own button component. Border matches the lower stop so the edge isn't a lighter halo. */
 .vm.vm-ferrari .vm-btn-primary {
   background: linear-gradient(180deg, #a00c01, #da291c 64%);
   border-color: #a00c01;
@@ -694,9 +513,8 @@
   border-color: #7d0a01;
 }
 
-/* Ferrari red spot touches: progress bar, score badge, slider fill and focus
-   ring all carry the accent (the one red, appearing on the small chrome the
-   base leaves neutral). */
+/* Ferrari red spot touches: progress bar, score, slider fill, focus ring carry
+   the accent on the small chrome the base leaves neutral. */
 .vm.vm-ferrari .vm-progress-bar { background: var(--vm-accent-spot); }
 .vm.vm-ferrari .vm-score {
   background: var(--vm-accent-spot);
@@ -838,8 +656,7 @@
 }
 
 /* --- answered-question pills (running summary above the question) ---
-   One tap-to-edit chip per already-answered question; wraps onto multiple
-   lines as they accumulate. Sits between the step line and the question. */
+   One tap-to-edit chip per answered question, wrapping as they accumulate. --- */
 .vm-pills {
   display: flex;
   flex-wrap: wrap;
@@ -901,12 +718,8 @@
   .vm-options { grid-template-columns: 1fr 1fr; }
 }
 
-/* Three up once the block has its full 1184px content column, because two would
-   make a 580px-wide box for the word "SUV". Three keeps the option a
-   button-sized target (~380px), and it shortens the form: eight body styles are
-   three rows instead of four. The podium's left pane overrides this back to one
-   column (it is a 360px column, not the full width) and the slider variant is
-   never a grid — see `.vm-options.vm-slider` below. */
+/* Three up at the full 1184px column: two would make a 580px box for "SUV".
+   Podium's narrow pane overrides back to one column; the slider variant is never a grid. */
 @media (min-width: 1024px) {
   .vm-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
@@ -941,9 +754,8 @@
   outline-offset: 2px;
 }
 
-/* Selected: ONE clean accent edge plus a soft wash of the same colour.
-   Previously this painted an accent border AND an inset accent ring, which
-   doubled into a thick saturated outline — the harsh blue box on BMW. */
+/* Selected: ONE clean accent edge plus a soft wash. A border AND an inset ring
+   doubled into a thick saturated outline (the harsh blue box on BMW). */
 .vm-option.is-selected {
   border-color: var(--vm-accent);
   background: var(--vm-accent-soft);
@@ -959,11 +771,8 @@
   padding: var(--vm-space-2) var(--vm-space-1) 0;
 }
 
-/* A slider is a TRAVEL, not a field: dragged across the block's full 1184px
-   column, a budget thumb has to cross most of the desk to add £5k, and the £0 /
-   £150,000+ end labels end up a screen apart. Capped where the drag still feels
-   proportionate. Scoped to a direct child of a screen so the podium's own panes
-   (a 360px column and a 272px popover) are untouched. */
+/* A slider is a TRAVEL, not a field: across the full 1184px column the end labels
+   end a screen apart, so cap it. Scoped to a direct child of a screen so podium's panes are untouched. */
 .vm-screen > .vm-options.vm-slider { max-width: 760px; }
 
 /* Big live value readout above the track. */
@@ -988,9 +797,8 @@
   cursor: pointer;
 }
 
-/* Track — sharp corners, hairline fill, accent to the left of the thumb is
-   approximated by the fill colour (native range has no cheap "elapsed" fill,
-   so we keep a single neutral track with an accent thumb). */
+/* Track — sharp corners, hairline fill. Native range has no cheap "elapsed"
+   fill, so we keep a single neutral track with an accent thumb. */
 .vm-slider-input::-webkit-slider-runnable-track {
   height: 4px;
   background: var(--vm-line);
@@ -1044,9 +852,8 @@
   color: var(--vm-ink-muted);
 }
 
-/* Dual-thumb range (budget): two range inputs overlaid on one track. The track
-   is drawn once here; each input's own track is made transparent so only this
-   shared one shows, with an accent fill spanning the selected bracket. */
+/* Dual-thumb range (budget): two range inputs overlaid on one track drawn here;
+   each input's own track is transparent, with an accent fill spanning the bracket. */
 .vm-range {
   position: relative;
   height: 24px;
@@ -1068,9 +875,8 @@
   transform: translateY(-50%);
   background: var(--vm-accent);
 }
-/* Both inputs fill the container and stack; the container's ::before is the
-   visible track, so hide each input's native track. Only the thumbs take
-   pointer events, so whichever thumb you grab wins even where they overlap. */
+/* Both inputs fill and stack; the container's ::before is the visible track.
+   Only the thumbs take pointer events, so whichever you grab wins on overlap. */
 .vm-range .vm-slider-input {
   position: absolute;
   left: 0;
@@ -1090,13 +896,8 @@
 
 /* --- results --- */
 
-/* Unmet-want note: "no fully electric cars here or nearby right now". Sits
-   between the results headline and the hero, because it changes how the hero
-   should be read — these are the closest fit, not the thing that was asked
-   for. Styled as a quiet grey field with a spot-colour edge (blue for BMW,
-   racing green for MINI, via --vm-accent-spot) rather than an alert: it's
-   an honest aside, not an error. Geometry comes from --vm-radius, so it's
-   sharp on BMW and softly rounded on MINI like every other surface. */
+/* Unmet-want note ("no electric cars nearby"): sits before the hero to reframe
+   it as the closest fit. Quiet grey field with a spot-colour edge, an honest aside not an alert. */
 .vm-unmet {
   display: block;
   background: var(--vm-surface-alt);
@@ -1128,17 +929,14 @@
 
 .vm-grid { display: grid; gap: var(--vm-space-4); margin: var(--vm-space-6) 0 var(--vm-space-2); }
 
-/* A tie: no hero, no runners-up tier — every car at the same weight, because
-   the engine rates them the same. Two up from 560px; one column below that,
-   which the base .vm-grid already gives. */
+/* A tie: no hero, no runners-up tier — every car at the same weight. Two up
+   from 560px; one column below (from the base .vm-grid). */
 @media (min-width: 560px) {
   .vm-grid-tied { grid-template-columns: 1fr 1fr; }
 }
 
 /* --- refine panel: breaking a tie on the things the questions didn't ask ---
-   Deliberately light — a row of chips, not a filter sidebar. This tool is for
-   the buyer who can't yet state a spec; the moment it looks like advanced
-   search it's competing with the real site's filters and losing. */
+   Deliberately light (a row of chips, not a filter sidebar): looking like advanced search means competing with the real site's filters and losing. --- */
 .vm-refine { margin-top: var(--vm-space-5); }
 
 .vm-refine-label {
@@ -1153,9 +951,8 @@
 
 .vm-chips { display: flex; flex-wrap: wrap; gap: var(--vm-space-2); }
 
-/* Pill on both brands (MINI's --vm-radius-control is already a pill; BMW's
-   is square, so this is one of the few places the two geometries diverge on
-   purpose — a tappable filter reads as a chip, not a button). */
+/* Pill on both brands (one of the few places BMW's square and MINI's pill
+   geometry diverge on purpose — a tappable filter reads as a chip, not a button). */
 .vm-chip {
   display: inline-flex;
   align-items: center;
@@ -1199,16 +996,11 @@
 }
 
 /* --- "Not this one": rejection, and the why that makes it usable ---
-   Deliberately quiet — a small text button at the foot of the card, not a
-   red X. Rejecting is normal browsing behaviour, not an error state. */
+   A small quiet text button, not a red X: rejecting is normal browsing, not an error. --- */
 .vm-reject { margin-top: var(--vm-space-4); }
 
-/* Promoted from a small underlined link to a real control. It was styled like
-   a disclaimer while being the second most important thing on the page: it is
-   what makes this a conversation rather than a search result. Still quiet
-   (bordered, not filled — turning a car down is normal browsing, not an
-   error), but now clearly a button, and carrying a hint that says what it
-   does, because nothing previously suggested another car would come up. */
+/* Promoted from an underlined link to a real control: it's what makes this a
+   conversation, not a search result. Still quiet (bordered, not filled), with a hint that another car will come up. */
 .vm-reject-open {
   display: flex;
   flex-direction: column;
@@ -1278,9 +1070,7 @@
 }
 
 /* --- the running brief: what the tool has picked up so far ---
-   Grows as the buyer taps a chip or turns a car down, so the page visibly
-   holds a model of them instead of silently re-filtering. Deliberately quiet:
-   it's the tool listening, not the tool talking. */
+   Grows as the buyer refines, so the page visibly holds a model of them. Quiet: the tool listening, not talking. --- */
 .vm-brief {
   margin-top: var(--vm-space-4);
   padding: var(--vm-space-4) var(--vm-space-5);
@@ -1304,12 +1094,8 @@
   font-size: var(--vm-text-label);
   color: var(--vm-ink-muted);
 }
-/* Everything learned since the quiz, one statement at a time, each with its
-   own undo. These are deliberately NOT chips: "+ Blue / − Not the red" reads
-   as a model of a person, a row of pills reads as a filter bar, and the model
-   is what this tool has that a stock search does not. The chip row below
-   carries only what could be added next, so each constraint is stated exactly
-   once, in the register that suits it, next to the control that clears it. */
+/* Everything learned since the quiz, one statement + undo at a time. NOT chips:
+   "+ Blue / − Not the red" reads as a model of a person; a pill row reads as a filter bar. */
 .vm-brief-item {
   display: flex;
   gap: var(--vm-space-2);
@@ -1327,9 +1113,8 @@
   color: var(--vm-accent-spot);
 }
 .vm-brief-item.is-rule .vm-brief-mark { color: var(--vm-ink-muted); }
-/* Not flex-grow: the panel is full width, and stretching the text pinned the
-   undo to the far right where it read as unrelated to the statement it
-   clears. It sits immediately after the words instead. */
+/* Not flex-grow: stretching the text pinned the undo to the far right, reading
+   as unrelated. It sits immediately after the words instead. */
 .vm-brief-text { flex: 0 1 auto; min-width: 0; }
 /* Quiet until wanted: the statement is the point, the undo is the escape. */
 .vm-brief-undo {
@@ -1377,9 +1162,7 @@
 }
 
 /* --- results skeleton (shown while /api/match is in flight) ---
-   Reuses the real .vm-card / .vm-grid / .vm-tail-grid structure so the
-   placeholder occupies the same footprint the results will, avoiding a layout
-   jump. Each grey block shimmers via a sweeping gradient. */
+   Reuses the real card/grid structure so the placeholder matches the results' footprint (no layout jump); grey blocks shimmer via a sweeping gradient. --- */
 .vm-skel {
   background: var(--vm-surface-alt);
   border-radius: var(--vm-radius);
@@ -1430,9 +1213,8 @@
   overflow: hidden;
 }
 
-/* Full-width 16:9 photo band at the top of the card (matching the live-stock
-   API's sixteennine aspect ratio). Flat dark field standing in for the photo
-   until real imagery is wired in. */
+/* Full-width 16:9 photo band at the top of the card (matching the API's
+   sixteennine ratio); flat dark field until real imagery loads. */
 .vm-card-media {
   position: relative;
   background: var(--vm-surface-dark);
@@ -1443,12 +1225,8 @@
   overflow: hidden;
 }
 
-/* A 16:9 band is a photo at 880px and a wall at 1184: held to its aspect ratio
-   the results hero's media alone was 665px tall, more than a laptop fold, and
-   the card it heads came to 1194px. Capped, so the hero crops to a cinematic
-   band (the photo is object-fit: cover, so it crops rather than squashes) and
-   the specs under it stay on screen with it. Only the full-width hero needs
-   this: every other card sits in a column narrow enough that 16:9 is a photo. */
+/* At 1184px a 16:9 band is a wall (665px tall media alone), so cap the hero to
+   a cinematic band (object-fit: cover crops). Only the full-width hero needs this. */
 @media (min-width: 1024px) {
   .vm-results .vm-card-big > .vm-card-media { max-height: 480px; }
 }
@@ -1479,10 +1257,8 @@
   background: rgba(0, 0, 0, 0.6);
 }
 
-/* "Images coming soon" — the placeholder for a photo-less listing, matching
-   usedcars.bmw.co.uk's own PDP: white bold caption centred on the dark media
-   field. Absolutely positioned so it centres independently of the bottom-left
-   line label. Hidden once a real photo loads (has-photo). */
+/* "Images coming soon" — placeholder for a photo-less listing (matching BMW's
+   own PDP). Absolutely positioned to centre independently of the line label; hidden once a photo loads. */
 .vm-card-soon {
   position: absolute;
   inset: 0;
@@ -1499,11 +1275,8 @@
 
 .vm-card-media.has-photo .vm-card-soon { display: none; }
 
-/* Column so the CTA can pin to the bottom (margin-top: auto below). Cards in
-   a tie now sit side by side at full size, where they used to be a single
-   full-width hero, so their heights vary with the picker and the reasons —
-   without this the link floated wherever the content stopped and the row read
-   as broken rather than as equal-weight options. */
+/* Column so the CTA can pin to the bottom (margin-top: auto below). Tied cards
+   sit side by side at varying heights, so without this the link floated and the row read as broken. */
 .vm-card-body {
   display: flex;
   flex-direction: column;
@@ -1523,10 +1296,8 @@
   font-size: var(--vm-text-h3);
   line-height: 1.33;
   margin: 0;
-  /* Take the space the badge doesn't, and wrap between words rather than
-     orphaning the trim level onto its own line ("MINI Hatch Electric Level"
-     / "3"), which is what a shared baseline row produced once the cards
-     halved in width. */
+  /* Take the space the badge doesn't, wrapping between words rather than
+     orphaning the trim level ("...Level" / "3") once the cards halved in width. */
   flex: 1 1 auto;
   min-width: 0;
   text-wrap: balance;
@@ -1582,10 +1353,8 @@
 .vm-reasons { margin: 0; padding: 0 0 0 var(--vm-space-5); font-size: var(--vm-text-body); }
 .vm-reasons li { margin-bottom: var(--vm-space-1); }
 
-/* What's fitted, from the feed's factory options. A flat comma list rather
-   than a bulleted one: these are facts to scan for a word ("ISOFIX"), not an
-   argument to read, and bullets would give them the weight of the reasons
-   below. Muted like the spec line, which is the register they belong to. */
+/* What's fitted, from the feed's factory options. A flat comma list, not bullets:
+   facts to scan ("ISOFIX"), not an argument; muted like the spec line. */
 .vm-kit {
   margin: 0;
   font-size: var(--vm-text-label);
@@ -1593,11 +1362,8 @@
   color: var(--vm-ink-muted);
 }
 
-/* The hero card owning a want it doesn't meet ("Petrol, where you asked for
-   all-electric.") — the per-car sibling of the .vm-unmet note, so its
-   eyebrow takes the same spot colour as that note's edge: one colour for
-   honesty, everywhere it appears. Plain text under the eyebrow, no field or
-   border — it's a statement in the card's own voice, not a warning. */
+/* The hero card owning a want it doesn't meet — the per-car sibling of .vm-unmet,
+   so its eyebrow takes the same spot colour (one colour for honesty everywhere). Plain text, not a warning field. */
 .vm-trade-label { color: var(--vm-accent-spot); }
 .vm-trade-text {
   margin: 0;
@@ -1615,22 +1381,13 @@
 }
 
 /* --- "worth the drive": nearby-retailer carousel ---
-   Styled as a full-width grey content band (BMW's own "why choose BMW
-   servicing"-style module: grey field, uppercase heading, even 3-up
-   spacing) rather than sitting directly on the white results page. */
+   A full-width grey content band (BMW's "why choose servicing" module style) rather than sitting on the white results page. --- */
 
 /* --- the rest of the list ---
-   The "More at <retailer>" band that used to live here is gone: it was a
-   second ranked list with its own caption, and its caption ended up
-   contradicting the headline whenever it outscored the lead. */
+   The old "More at <retailer>" band is gone: a second ranked list whose caption contradicted the headline when it outscored the lead. --- */
 
-/* The rest of a group's list, smaller. Three up so it reads as a continuation
-   of the same list rather than as a second, competing one — the old two-up
-   "More at <retailer>" band looked like a fresh section with its own claim,
-   which is exactly what it turned out to be doing. No heading of its own any
-   more: it sits under its group's place label, and the weight step from cards
-   to tiles is the only thing marking it, which is right because the step is a
-   fact about rank inside one sorted list, not a claim about a different one. */
+/* The rest of a group's list, smaller. Three up so it reads as a continuation of
+   the same list, not a competing one. No heading: the cards-to-tiles weight step marks rank within one sorted list. */
 .vm-tail-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1658,16 +1415,12 @@
   color: var(--vm-ink-muted);
 }
 
-/* The "we looked further afield" line. Accent-edged like the unmet/rescue notes
-   it sits alongside, because it is the same kind of statement: the tool telling
-   you something about its own search rather than about a car. */
+/* The "we looked further afield" line. Accent-edged like the unmet/rescue notes:
+   the tool telling you about its own search, not about a car. */
 /* The working: what was searched, what survived, how far clear the winner is.
-   Last on the page and quiet with it, because it is evidence for the verdict
-   above rather than a claim of its own. Ruled off so it reads as a footnote to
-   the whole list rather than a note attached to the last card. */
+   Last and quiet, evidence for the verdict above; ruled off so it reads as a footnote to the whole list. */
 /* "Still checking other retailers" while the national search is outstanding.
-   Holds the group's space so its cars do not appear out of nothing several
-   seconds after the page settled. Quiet: it is a status, not a result. */
+   Holds the group's space so cars don't appear from nothing later. A status, not a result. */
 .vm-pending {
   display: flex;
   align-items: center;
@@ -1733,43 +1486,28 @@
   color: var(--vm-ink);
 }
 
-/* The chips sit ABOVE the cards again: they're a control, and a control has to
-   be visible next to the thing it controls. Below the fold they read, in the
-   owner's words, as "unclear what clicking them affects". Kept to one light
-   strip so it's a control and not a second question between the headline and
-   the car. Deliberately not sticky — that fights the EDS host page's header. */
+/* Chips sit ABOVE the cards: a control has to be visible next to what it controls
+   (below the fold it read as "unclear what clicking affects"). One light strip, not sticky (that fights the host header). */
 .vm-refine-tools { margin: var(--vm-space-6) 0 var(--vm-space-5); }
 
 .vm-refine-tools:empty { display: none; }
 
-/* The brief sits ABOVE the cards, immediately over the chips, so the two read
-   as one statement: here is what I understand about you, and here is how to
-   change it. Below the cards it was unreachable — nobody scrolls past fourteen
-   cars to read what they typed themselves — which made the one signal that
-   says the tool holds a model of you the one thing never seen. No rule above
-   it: it opens the block rather than starting a new movement inside it. */
+/* The brief sits ABOVE the cards, over the chips, so the two read as one statement.
+   Below the cards it was unreachable (nobody scrolls past fourteen cars to reach it). No rule above it. */
 .vm-brief-block { margin-bottom: var(--vm-space-4); }
 
 .vm-brief-block:empty { display: none; }
 
 /* --- the two groups: the retailer's cars, then everyone else's ---
-   The heading names a PLACE and nothing else. It is not allowed to rank, which
-   is why "NEXT BEST" and "Close, but not level with the cars above" are gone:
-   two sections making claims on one scale is how the old page ended up
-   contradicting itself. A place label can't contradict a score. */
+   The heading names a PLACE, never a rank ("NEXT BEST" is gone): two sections making claims on one scale is how the old page contradicted itself. --- */
 .vm-group + .vm-group { margin-top: var(--vm-space-8); }
 
-/* Full ink, not the muted grey the old "NEXT BEST" heading used. That one was
-   marking a demotion so it whispered; this one is the signpost that makes a
-   99% below a 96% read as a fact about geography rather than an error, and it
-   has to be seen for the page to be honest. The gap between groups comes from
-   the rule above, so the label itself sits tight to its cards. */
+/* Full ink, not the old "NEXT BEST" muted grey: this is the signpost that makes
+   a 99% below a 96% read as geography, not an error, so it has to be seen. */
 .vm-group-label { margin-top: 0; }
 
-/* The group's own grids butt up under its label, so the lead grid drops the top
-   margin .vm-grid carries for the standalone case. Either grid can come back
-   empty — a group with no car outranking the retailer's best has tiles only,
-   and one with fewer than TAIL_SHOWN spare cars has lead cards only. */
+/* The group's grids butt up under its label, so the lead grid drops .vm-grid's
+   top margin. Either grid can come back empty (tiles-only or lead-only groups). */
 .vm-group > .vm-grid { margin-top: 0; }
 
 .vm-group > .vm-tail-grid { margin-top: var(--vm-space-4); }
@@ -1785,20 +1523,16 @@
   padding: var(--vm-space-8) var(--vm-space-5);
 }
 
-/* Matches BMW's own "WHY CHOOSE BMW SERVICING?" module heading: the Light
-   face (inherited from .vm-subhead) at 28px, left-aligned, normal tracking.
-   BMW bakes the caps into the copy rather than using text-transform, so the
-   heading text is authored in caps and no transform is applied here. */
+/* Matches BMW's "WHY CHOOSE BMW SERVICING?" module heading: Light face at 28px,
+   left-aligned. BMW bakes caps into the copy, so no text-transform here. */
 .vm-nearby-heading {
   margin-top: 0;
   font-size: 28px;
   line-height: 1.2;
 }
 
-/* The lede sits under the subhead, so drop the subhead's bottom margin.
-   Also release .vm-lede's 52ch reading measure: that's tuned for the intro's
-   narrow column, but here the lede captions a full-width band and the 52ch cap
-   made it wrap mid-band on desktop. One sentence across the band is fine. */
+/* The lede sits under the subhead, so drop that margin, and release .vm-lede's
+   52ch measure (tuned for the intro) so it doesn't wrap mid-band here. */
 .vm-nearby-lede { margin: 0 0 var(--vm-space-6); max-width: none; }
 
 /* Horizontal scroll-snap track. Three tiles fit on desktop; on mobile the
@@ -1825,11 +1559,8 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
-/* Tighter than a hero card: this is a glance, not a pitch. The body fills the
-   tile's height (tiles stretch to the tallest via the track's default
-   align-items: stretch) so the "View at…" anchor can be pinned to the bottom
-   edge — the card names run 1–2 lines and the distance/used-meta lines are
-   conditional, which would otherwise leave the CTAs at ragged heights. */
+/* Tighter than a hero card: a glance, not a pitch. The body fills the tile's
+   height so the "View at…" anchor pins to the bottom, keeping CTAs level despite ragged name/meta lines. */
 .vm-card-compact .vm-card-body {
   flex: 1;
   display: flex;
@@ -1837,20 +1568,15 @@
   padding: var(--vm-space-4);
 }
 
-/* Pin the anchor to the bottom of the tile, taking up the slack above it.
-   margin-top: auto eats the fixed gap, so restore the breathing room as
-   padding for the tallest tile (where there's no slack to absorb). */
+/* Pin the anchor to the bottom, taking up the slack. margin-top: auto eats the
+   fixed gap, so restore breathing room as padding for the tallest tile. */
 .vm-card-compact .vm-card-link {
   margin-top: auto;
   padding-top: var(--vm-space-4);
 }
 
-/* Most feed names are short (~24 chars), but a minority are raw Auto Trader
-   dumps up to 80 ("BMW 1.5 118i Sport Hatchback 5dr Petrol Auto Euro 6 (s/s)").
-   At the hero card's 24px those take four lines in a 300px tile, so step the
-   size down and cap at two. No title tooltip: the feed itself already sends
-   ~6% of these names pre-truncated with an ellipsis, so it would promise a
-   full name we don't have. The card links out for the full detail. */
+/* A minority of feed names are raw Auto Trader dumps up to 80 chars, so step the
+   size down and cap at two lines. No title tooltip: ~6% arrive pre-truncated, so it would promise a full name we lack. */
 .vm-card-compact .vm-card-name {
   font-size: var(--vm-text-body);
   line-height: 1.3;
@@ -1882,11 +1608,7 @@
 .vm-disclaimer { color: var(--vm-ink-muted); font-size: var(--vm-text-label); margin-top: var(--vm-space-5); }
 
 /* --- live "best guess" strip (quiz screen) ---
-   Always-open (no toggle): a heading + a horizontal track of compact result
-   tiles — the same card the results carousel uses. Only mounted once there are
-   matches (see showPreview), so there's never an empty state on screen. Sits
-   BELOW the quiz nav as a full-bleed grey band, reusing the .vm-nearby-band
-   treatment so it reads as a distinct section rather than an inset panel. */
+   A heading + horizontal track of compact tiles, mounted only once there are matches. Full-bleed grey band reusing .vm-nearby-band. --- */
 .vm-preview {
   background: var(--vm-surface-alt);
   margin: var(--vm-space-8) calc(var(--vm-space-5) * -1) calc(var(--vm-space-8) * -1);
@@ -1897,10 +1619,8 @@
    (inherits size/tracking from .vm-nearby-heading). */
 .vm-preview-heading { margin: 0 0 var(--vm-space-4); }
 
-/* The track reuses .vm-nearby's horizontal scroll-snap layout, so the tiles
-   scroll with the next one peeking — same affordance as the results carousel —
-   and the .vm-card-compact tile styling comes for free. The opacity
-   transition drives the soft cross-fade on re-rank (see paintPreview). */
+/* Reuses .vm-nearby's scroll-snap layout (next tile peeking) and .vm-card-compact
+   styling. The opacity transition drives the cross-fade on re-rank (see paintPreview). */
 .vm-preview-track {
   transition: opacity 0.15s ease;
   align-items: stretch;
@@ -1908,9 +1628,7 @@
 .vm-preview-track.is-fading { opacity: 0; }
 
 /* --- small "mini" preview tiles ---
-   A flat white card, lighter than the results-page compact card: small photo,
-   model name + match score, one spec line. The whole tile is the tap target
-   (an <a> to the live listing). Sharp corners + hairline to match the system. */
+   A flat white card, lighter than the compact card: photo, name + score, one spec line. Whole tile is an <a> to the live listing. --- */
 .vm-ptile {
   flex: 0 0 clamp(150px, 46vw, 176px);
   scroll-snap-align: start;
@@ -1946,9 +1664,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   font-weight: 700;
   font-size: var(--vm-text-label);
   line-height: 1.25;
-  /* Wrap to two lines, then ellipsis — most names fit, the long Auto Trader
-     dumps truncate. Tiles stretch to the tallest (track align-items: stretch),
-     so a two-line name doesn't leave the others ragged. */
+  /* Wrap to two lines then ellipsis (long Auto Trader dumps truncate). Tiles
+     stretch to the tallest, so a two-line name doesn't leave others ragged. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1959,33 +1676,26 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-ptile-specs { font-size: var(--vm-text-eyebrow); color: var(--vm-ink-muted); }
 
 /* Skeleton preview tile: same footprint as a real mini tile so the strip holds
-   its size, then real tiles swap in without a layout jump. The media band is a
-   plain shimmer block (no padding/line label), and the two text lines shimmer
-   in the body. Not interactive. */
+   its size and real tiles swap in without a layout jump. Not interactive. */
 .vm-skel-ptile { pointer-events: none; }
 .vm-skel-ptile .vm-ptile-media { padding: 0; }
 .vm-skel-ptile .vm-skel-name { width: 70%; margin-bottom: var(--vm-space-2); }
 .vm-skel-ptile .vm-skel-specs { width: 45%; margin-bottom: 0; }
 
-/* Skeleton tiles drop the hairline everywhere — a borderless shimmer reads
-   cleaner. Only the border-COLOR goes (not the border itself) so the real
-   bordered card swaps in without a 1px layout shift. Lives down here so it
-   outranks the earlier same-specificity .vm-tail-grid .vm-card-compact and
-   .vm-ptile border rules. */
+/* Skeleton tiles drop the hairline (only the border-COLOR, so no 1px shift on
+   swap). Lives down here to outrank the earlier same-specificity border rules. */
 .vm-card.vm-skel-card,
 .vm-tail-grid .vm-skel-card,
 .vm-skel-ptile { border-color: transparent; }
 
-/* Mobile: hero steps 40px → 32px (the one confirmed breakpoint data point);
-   other headings scale down ~proportionally. Desktop values are the defaults
-   above, so only the stepped-down overrides live here. */
+/* Mobile: hero steps 40px → 32px (the one confirmed data point), others
+   ~proportionally. Desktop defaults are above; only stepped-down overrides live here. */
 @media (max-width: 767px) {
   .vm-title { font-size: 32px; }
   .vm-question { font-size: 22px; }
   .vm-card-name, .vm-subhead { font-size: 20px; }
-  /* BMW's own module steps its heading 28px → 18px at this same 768px
-     breakpoint; the .vm-subhead override above doesn't reach the more
-     specific nearby-heading rule, so step it down explicitly to match. */
+  /* BMW's own module steps its heading 28px → 18px at this 768px breakpoint;
+     the .vm-subhead override doesn't reach nearby-heading, so step it explicitly. */
   .vm-nearby-heading { font-size: 18px; }
   .vm-lede { font-size: var(--vm-text-body); }
 }
@@ -2017,10 +1727,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 }
 
 /* --- "Choose yours": the last step, picking the actual car ---
-   A grouped card speaks for several listings of one model. These are those
-   listings: colour, price, mileage. Selecting one re-describes the card, so
-   the buyer leaves with a specific car rather than whichever advert ranked
-   first. Laid out as a column, because it's a decision, not a filter row. */
+   Lists a grouped card's real listings (colour, price, mileage); selecting one
+   re-describes the card. A column, because it's a decision not a filter row. */
 .vm-pick { display: flex; flex-direction: column; gap: var(--vm-space-2); }
 
 .vm-pick-opt {
@@ -2056,13 +1764,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-pick-meta { margin-left: auto; color: var(--vm-ink-muted); }
 
 /* --- mode switcher ------------------------------------------------------
-   Only present when the block is UNLOCKED and more than one interface mode is
-   registered (the showcase). A production page authors a "Mode" row, which
-   hides the switcher entirely — so these rules never apply there and the block
-   looks exactly as it did before modes existed. A quiet segmented control: it
-   picks the interface, so it must not compete with the interface's own CTA.
-   Themed off the shared tokens, so it follows brand (BMW blue / MINI green)
-   without a per-brand rule. */
+   Only present when UNLOCKED with >1 mode registered (a production "Mode" row
+   hides it). A quiet segmented control, themed off tokens so it follows brand. */
 .vm-switcher {
   display: flex;
   flex-wrap: wrap;
@@ -2076,10 +1779,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   border: 1px solid var(--vm-line);
   background: transparent;
   color: var(--vm-ink-muted);
-  /* The brand's bold face, not plain body — the wordmark-adjacent chrome should
-     carry the typeface the brand shouts in (BMW Type Next bold, MINI Sans,
-     FordF1, Proxima Nova), so the control reads as the brand's at rest, before
-     any tab is active. */
+  /* The brand's bold face, not plain body — the wordmark-adjacent chrome carries
+     the brand's typeface, so the control reads as the brand's even at rest. */
   font-family: var(--vm-font-bold);
   font-weight: 700;
   font-size: 13px;
@@ -2102,11 +1803,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   cursor: default;
 }
 
-/* Motorrad's switcher wears the marque's CTA signature, same as its buttons
-   (see .vm.vm-motorrad .vm-btn above): UPPERCASE labels, and the active tab is
-   the near-black fill rather than blue — blue is a link/accent colour for
-   Motorrad, not a fill. Without this the tabs read as the generic grey control
-   and Motorrad's strong identity stops at the stage edge. */
+/* Motorrad's switcher wears the marque's CTA signature (like its buttons):
+   UPPERCASE labels and a near-black active fill (blue is a link colour, not a fill). */
 .vm.vm-motorrad .vm-switcher-tab {
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -2117,23 +1815,13 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   color: #fff;
 }
 
-/* The active mode mounts here. Transparent and layout-neutral: with no
-   switcher above it, the stage is indistinguishable from the block itself, so
-   a locked page is unchanged. */
+/* The active mode mounts here. Transparent and layout-neutral, so with no
+   switcher above it the stage is indistinguishable from the block itself. */
 .vm-stage { display: block; }
 
 /* ========================================================================
- * MINI Mingle — the swipe mode (modes/mingle.js)
- *
- * A Valentine's swipe game over the shared engine: a seed step, a swipeable
- * deck of real stock, and a match reveal. All scoped under .vm and built on the
- * same tokens as the questionnaire mode; MINI tweaks live under .vm.vm-mini so a
- * BMW skin inherits the base. Every animation is disabled under the
- * reduced-motion block at the end of this section.
- *
- * A --vm-mingle-swatch custom property carries each card's paint colour (set in
- * JS from the enriched car.colour) so the colour bar + media tint read one
- * value. It falls back to a neutral so an un-enriched card still renders.
+ * MINI Mingle — swipe mode (modes/mingle.js) over the shared engine, same tokens.
+ * --vm-mingle-swatch carries each card's paint colour (set in JS).
  * ==================================================================== */
 
 .vm-mingle-wordmark { color: var(--vm-accent-spot); }
@@ -2293,18 +1981,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   max-width: 40ch;
 }
 
-/* The card stack: front card in flow, the two behind it peek out and scale
-   down. A fixed-ratio well keeps the deck height stable as cards swap.
-
-   The well's box is the FRONT card (the cards are position:absolute; inset:0,
-   so they resolve against this box — don't add padding here or inset:0 stretches
-   them). The two cards behind sit at translateY(10px)/(20px), a transform, so
-   they paint up to 20px BELOW the well without enlarging it. The bottom margin
-   therefore has to clear that peek AND still leave a gap to the Pass/Keep
-   buttons, or the deepest card crowds them (and the gap looks like it shrinks as
-   the deck empties and the peek disappears). --vm-space-8 (32px) = the 20px peek
-   plus a clean ~12px gap, constant whether the stack is full or on its last
-   card. */
+/* Card stack: front card in flow, the two behind peek out + scale down. Cards are
+   position:absolute inset:0, so DON'T pad this well; margin clears the 20px peek. */
 .vm-mingle-stack {
   position: relative;
   aspect-ratio: 3 / 4;
@@ -2340,29 +2018,19 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    so kill the transition — it should track the finger 1:1, not lag behind it. */
 .vm-mingle-card-0.is-dragging-keep,
 .vm-mingle-card-0.is-dragging-pass { transition: none; cursor: grabbing; }
-/* touch-action: none — the front card owns the whole gesture. pan-y (reserve
-   vertical scroll for the browser) let the vertical component of a real finger
-   swipe scroll the page: the UI jumped down then sprang back on every swipe. The
-   drag handler is horizontal-only and takes a pointer capture (mingle.js), so
-   the page must not also try to scroll from a touch that starts on the card. The
-   card is small (max 360px) and the rest of the page still scrolls normally.
-   Scoped to .is-draggable (added by dragToSwipe) so under reduced motion — where
-   no drag handler is attached — the card keeps normal touch-action and doesn't
-   trap the user's scroll. */
+/* touch-action: none so the front card owns the whole gesture (pan-y let a swipe's
+   vertical component scroll the page). Scoped to .is-draggable so reduced motion keeps scroll. */
 .vm-mingle-card-0 { cursor: grab; }
 .vm-mingle-card-0.is-draggable { touch-action: none; }
 
-/* Spring back to centre when a drag is released short of the threshold. The
-   inline transform is cleared by JS; this transition carries it home (with the
-   brand's bounce on MINI). */
+/* Spring back to centre when a drag is released short of the threshold. JS clears
+   the inline transform; this transition carries it home (with MINI's bounce). */
 .vm-mingle-card-0.is-returning {
   transition: transform var(--vm-pop) var(--vm-ease);
 }
 
-/* Drag stamps: the big KEEP/PASS word that lands on the card as you pull it.
-   Hidden until a drag; opacity is driven by --vm-drag-stamp (0→1, set in JS from
-   how far past the threshold the pull is), and only the stamp matching the drag
-   direction is revealed via the is-dragging-* class. Decorative, aria-hidden. */
+/* Drag stamps: the big KEEP/PASS word that lands on the card as you pull. Opacity
+   driven by --vm-drag-stamp (set in JS); only the drag-direction stamp is shown. */
 .vm-mingle-stamp {
   position: absolute;
   top: var(--vm-space-5);
@@ -2475,10 +2143,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   color: var(--vm-ink-muted);
 }
 
-/* Hero flags row: the per-brand hero spec (engine size / bhp / character tag)
-   and Ford's full-service-history badge, sitting just under the fuel/body pills.
-   Only rendered by the JS when there's something to say (a null hero and a
-   non-FSH car paint nothing), so this never leaves an empty band. */
+/* Hero flags row: per-brand hero spec (engine/bhp/tag) + Ford's FSH badge, under
+   the fuel/body pills. Only rendered when there's something to say (never empty). */
 .vm-mingle-hero-flags {
   display: flex;
   flex-wrap: wrap;
@@ -2595,9 +2261,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 }
 .vm-mingle-hero .vm-mingle-card-media { aspect-ratio: 16 / 9; flex: none; }
 
-/* Hero entrance — the match/champion card settles in as a crescendo. The scale
-   overshoot reads as a precise "lock-in" on BMW and a springy pop on MINI,
-   because both use the brand's --vm-ease token on the same keyframes. */
+/* Hero entrance — the match/champion card settles in as a crescendo. Scale
+   overshoot reads as "lock-in" on BMW, springy pop on MINI (same --vm-ease). */
 .vm-mingle-hero.is-revealing { animation: vm-hero-in var(--vm-pop) var(--vm-ease) both; }
 @keyframes vm-hero-in {
   from { transform: scale(0.86) translateY(14px); opacity: 0; }
@@ -2703,20 +2368,14 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 }
 
 /* ======================================================================
-   MINI Knockout (the `knockout` / "Head to head" mode)
-   ----------------------------------------------------------------------
-   The championship "This or That". It shares the swipe game's card, hero, why,
-   CTA, confetti and seed vocabulary (the .vm-mingle-* classes above) so the two
-   games look of a piece; the classes below are ONLY the structure that's new to
-   a knockout — the two-up face-off, the bracket progress rail, and the pick
-   fly-out. All tokens, no hex; MINI tweaks fold in under .vm.vm-mini at the end.
+   MINI Knockout (`knockout` / "Head to head"): championship "This or That",
+   reusing .vm-mingle-* card/hero/why/CTA/confetti; new below = two-up face-off.
    ====================================================================== */
 
 .vm-knockout-stage { padding: var(--vm-space-6) var(--vm-space-1) var(--vm-space-8); }
 
-/* Progress rail — round name on the left, "Match n of m" on the right. Doubles
-   as the "where am I in the tournament" cue that a full bracket tree would give,
-   without drawing one (out of scope v1). */
+/* Progress rail — round name left, "Match n of m" right. The "where am I in the
+   tournament" cue a full bracket tree would give, without drawing one (v1). */
 .vm-knockout-rail {
   display: flex;
   align-items: baseline;
@@ -2735,11 +2394,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-knockout-count { font-size: var(--vm-text-label); color: var(--vm-ink-muted); }
 .vm-knockout-hint { margin: 0 0 var(--vm-space-5); }
 
-/* Per-tie verdict from the engine's own score — did the player back the form
-   pick, or send an underdog through? A small tag under the rail, shown on the
-   matchup that follows the pick. It's the signal the mode used to discard,
-   surfaced as one concrete beat per tie (the old "form" meter didn't move within
-   a round). Omitted by the JS when the pair was unscored or level. */
+/* Per-tie verdict from the engine's score — did the player back the form pick or
+   send an underdog through? A tag under the rail; JS omits it if unscored/level. */
 .vm-knockout-verdict {
   display: flex;
   align-items: center;
@@ -2762,14 +2418,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* The "tale of the tape": a framed panel of up to THREE real, brand-appropriate
-   metrics compared across the two contenders, sitting under the face-off (not
-   between the cards — the VS badge owns that seam and the cards stay edge-to-
-   edge). A titled surface card with an optional "A wins N of M" tally chip, then
-   one row per metric; each row lines its two values up under the two cards.
-   Content, not motion, so it needs no reduced-motion handling. Only painted when
-   the per-brand statRows hook yields at least one honest, comparable row, so it
-   never appears empty or half-filled. */
+/* "Tale of the tape": a framed panel of up to THREE metrics compared across the
+   two contenders, under the face-off. Only painted when statRows yields a row. */
 .vm-knockout-tale {
   margin-top: var(--vm-space-4);
   padding: var(--vm-space-4) var(--vm-space-4) var(--vm-space-3);
@@ -2804,9 +2454,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   color: var(--vm-ink-muted);
   white-space: nowrap;
 }
-/* One metric row: three cells that line up with the two cards (value, centred
-   label, value). Reuses the 1fr auto 1fr grid so every row's values sit under
-   the same contender. Rows stack with a hairline between them. */
+/* One metric row: three cells lining up with the two cards (value, centred label,
+   value). Reuses the 1fr auto 1fr grid; rows stack with a hairline between. */
 .vm-knockout-stat-row {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -2840,9 +2489,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   color: var(--vm-ink-muted);
   white-space: nowrap;
 }
-/* Winner highlight: the better side goes bold and inks up in the brand accent,
-   with a small tick, so the edge is obvious without a second glance. A tie
-   highlights neither. */
+/* Winner highlight: the better side goes bold and inks up in the brand accent
+   with a small tick, so the edge is obvious. A tie highlights neither. */
 .vm-knockout-stat-side.is-winner {
   color: var(--vm-accent-spot);
   font-family: var(--vm-font-bold);
@@ -2857,12 +2505,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 /* On the B side the tick trails the value (mirrors the right alignment). */
 .vm-knockout-stat-b .vm-knockout-stat-tick { order: 2; }
 
-/* The face-off: two contenders that sit SHOULDER TO SHOULDER — a fight, not a
-   list. Kept side-by-side even on the narrowest screens (a vertical stack read
-   as a two-item menu, which is exactly what threw the first playtest); the "VS"
-   badge is centred as an overlay chip on the seam between them, so the cards
-   stay edge-to-edge and don't lose a row to it. From 560px the columns simply
-   breathe wider. `position: relative` anchors the overlay badge. */
+/* The face-off: two contenders SHOULDER TO SHOULDER, kept side-by-side even when
+   narrowest (a vertical stack read as a menu). position:relative anchors the VS. */
 .vm-knockout-faceoff {
   position: relative;
   display: grid;
@@ -2874,11 +2518,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   .vm-knockout-faceoff { gap: var(--vm-space-5); }
 }
 
-/* "VS" — a bold, accent-ringed disc, so the pairing reads as a versus at a
-   glance. Was a whisper-quiet lowercase "or"; now it's the loudest thing in the
-   matchup. The base rule is the badge LOOK (used both here and in the Final
-   interstitial's crest row); the faceoff below positions it as an overlay on the
-   seam between the two cards. */
+/* "VS" — a bold, accent-ringed disc so the pairing reads as a versus. This base
+   rule is the badge LOOK (reused in the Final crest row); faceoff below places it. */
 .vm-knockout-vs {
   display: grid;
   place-items: center;
@@ -2906,8 +2547,7 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 }
 
 /* A contender is a <button> wrapping the shared .vm-mingle-card-* interior, so
-   the whole card is one big tap target. Reset the button, then frame it like a
-   deck card. */
+   the whole card is one big tap target. Reset the button, frame like a deck card. */
 .vm-knockout-card {
   display: flex;
   flex-direction: column;
@@ -2931,10 +2571,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-knockout-card .vm-mingle-card-media { aspect-ratio: 4 / 3; }
 .vm-knockout-card:disabled { cursor: default; }
 
-/* Corner badge (A / B) — the "opposing corners" framing that helps the pair
-   read as two sides of a fight. Restrained by default (a quiet outlined chip in
-   the top corner); MINI turns it up below. Positioned over the card, so the card
-   needs to be a containing block — it's a flex column, position it relative. */
+/* Corner badge (A / B) — "opposing corners" framing so the pair reads as a fight.
+   A quiet outlined chip (MINI turns it up below); card is relative to anchor it. */
 .vm-knockout-card { position: relative; }
 .vm-knockout-corner {
   position: absolute;
@@ -2957,9 +2595,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-knockout-card-a .vm-knockout-corner { left: var(--vm-space-2); }
 .vm-knockout-card-b .vm-knockout-corner { right: var(--vm-space-2); }
 
-/* Pick fly-out: the loser leaves in its side's direction, the winner lifts and
-   fades as the round advances. ~0.3s, matched to the 300ms JS timer. Gated on
-   reduced-motion below. */
+/* Pick fly-out: the loser leaves in its side's direction, the winner lifts + fades
+   as the round advances. ~0.3s, matched to the 300ms JS timer. Reduced-motion below. */
 .vm-knockout-card.is-out-left { transform: translateX(-60%) rotate(-8deg); opacity: 0; }
 .vm-knockout-card.is-out-right { transform: translateX(60%) rotate(8deg); opacity: 0; }
 .vm-knockout-card.is-crowned {
@@ -2968,10 +2605,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 }
 
 /* --- round ceremony ---------------------------------------------------------
-   Between rounds we make "moving on" a moment. The default is a banner that
-   sweeps across the stage naming the round you're entering; the Final swaps that
-   for a dedicated interstitial (the crescendo before the last pick). Both use
-   the brand's --vm-ease so MINI's ceremony has a spring BMW's doesn't. */
+   Between rounds, "moving on" is a moment: default is a sweep banner naming the
+   round; the Final swaps to an interstitial. Both use --vm-ease (MINI springs). */
 
 /* The sweep: a full-bleed band that flies in from the left, holds, and the
    JS paints the next matchup ~800ms later. */
@@ -3072,30 +2707,25 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    contender card just needs the softer MINI corner the deck cards get. --- */
 .vm.vm-mini .vm-knockout-card { border-radius: var(--vm-radius); }
 /* MINI turns the corner badge up: filled in the brand accent, so the two sides
-   pop as team colours rather than a quiet reference chip. BMW keeps the
-   restrained outlined version above. */
+   pop as team colours rather than a quiet reference chip (BMW keeps outlined). */
 .vm.vm-mini .vm-knockout-corner {
   background: var(--vm-accent-spot);
   border-color: var(--vm-accent-spot);
   color: #fff;
 }
 /* MINI's tale panel matches the deck's softer corner and turns the title up to
-   the brand accent (British Racing Green spot), so the face-off reads as MINI's
-   playful register rather than the restrained BMW default. */
+   the accent (British Racing Green spot) for its playful register. */
 .vm.vm-mini .vm-knockout-tale { border-radius: var(--vm-radius); }
 
-/* --- Ferrari's tale panel: the spare, reverent register the rest of the brand
-   keeps. The title sits in the brand's serif display face and stays understated
-   (no shout), the surface is the flat band, and the winner tick/accent carries
-   the only colour. The richest-data brand, so it usually fills all three rows. */
+/* --- Ferrari's tale panel: spare and reverent. Title in the serif display face,
+   understated; the winner tick/accent carries the only colour. --- */
 .vm.vm-ferrari .vm-knockout-tale-title {
   font-family: var(--vm-font-heading);
   letter-spacing: 1.5px;
 }
 
-/* --- reduced motion: no fly-out, no crown lift — the JS commits instantly.
-   The Final interstitial still SHOWS (it's content — the round change must stay
-   legible) but doesn't animate in; the sweep is skipped in JS entirely. --- */
+/* --- reduced motion: no fly-out or crown lift, JS commits instantly. The Final
+   interstitial still SHOWS (content) but doesn't animate; sweep skipped in JS. --- */
 @media (prefers-reduced-motion: reduce) {
   .vm-knockout-card { transition: none; }
   .vm-knockout-card.is-out-left,
@@ -3108,45 +2738,20 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 }
 
 /* ======================================================================
-   Podium (the `podium` mode, modes/podium.js)
-   ----------------------------------------------------------------------
-   The everything-on-screen surface: the brief on the left, a live ranked
-   podium on the right that re-orders as answers land. Unlike the two games
-   this mode renders the SHARED card vocabulary (.vm-card / .vm-card-compact
-   from result-card.js) and the SHARED question controls (.vm-options /
-   .vm-slider from question-ui.js), so almost everything below is either
-   layout, rank weight, or a size adjustment for the narrower column. Where a
-   rule touches a shared class it is scoped under .vm-podium so the
-   questionnaire is untouched.
-
-   Rank is expressed as WEIGHT, never as medal colour: gold, silver and bronze
-   hex would fight BMW blue, MINI green, Honda red, Ford blue, Motorrad red and
-   Ferrari red in turn. The ladder is four honest signals instead, all from
-   tokens: the length of the rule before the rank label, how far the step is
-   inset from the column edge, the card border (accent versus hairline) and the
-   depth of its shadow. A tie flattens all of them, because a joint first must
-   not have a visible winner.
-
-   Every animation is disabled in the reduced-motion block at the end.
+   Podium (`podium` mode, modes/podium.js): brief left, a live ranked podium right.
+   Rank shown as WEIGHT not medal colour (rule length, inset, border, shadow).
    ====================================================================== */
 
-/* The two-pane grid. One column below 720px (the brief first, then the
-   podium, which is DOM order, so no reordering is needed), two above: the left
-   column takes a fixed reading measure and the podium takes the rest.
-   min-width: 0 on both panes because a grid item defaults to min-content width,
-   and a long unbroken model name in a card would otherwise push the whole track
-   wider than the block. */
+/* The two-pane grid: one column below 720px (brief then podium, DOM order), two
+   above. min-width:0 on both panes so a long model name can't widen the track. */
 .vm-podium {
   display: grid;
   grid-template-columns: 1fr;
   align-items: start;
   gap: var(--vm-space-8);
   animation: vm-in 0.25s ease;
-  /* The stage is also the confetti host: celebrate() drops an absolutely
-     positioned layer into it, so it needs to be the containing block or the
-     burst escapes to the nearest positioned ancestor and fires somewhere up
-     the page. The stage rather than the results pane on purpose, since that
-     pane scrolls internally above 720px and would clip the burst. */
+  /* The stage is also the confetti host: celebrate() drops an absolute layer in,
+     so it must be the containing block (the results pane would clip the burst). */
   position: relative;
 }
 .vm-podium-ask,
@@ -3163,11 +2768,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
     border-right: var(--vm-border-width) solid var(--vm-line);
     padding-right: var(--vm-space-6);
   }
-  /* The podium is the mode: it has to stay in view while the brief is filled
-     in. Clamped and internally scrollable rather than a bare sticky, because a
-     sticky pane taller than the viewport pins its top and strands its own
-     lower half. The small inline padding keeps the gold card shadow off the
-     scroll container edge. */
+  /* Clamped + internally scrollable, not a bare sticky: a sticky pane taller
+     than the viewport pins its top and strands its lower half. Inline padding keeps the gold card shadow off the scroll edge. */
   .vm-podium-results {
     position: sticky;
     top: var(--vm-space-4);
@@ -3177,32 +2779,16 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
     padding-inline: var(--vm-space-1);
   }
 
-  /* "Choose yours" prints one row per grouped listing, and the count comes from
-     the feed: a retailer with 24 of the same model gives a 1192px list, one with
-     47 gives 2342px. On the questionnaire's results PAGE that is fine — the page
-     scrolls. Here the pane is a fixed-height viewport (above), so an unbounded
-     list is the one thing that can push the next option off the bottom however
-     the steps are laid out: measured, a 24-row picker took the winner to 1712px
-     in an 868px pane and put the runner-up 896px below the fold.
-
-     So the list gets a height and scrolls inside the card. 212px is four rows
-     and a sliver of the fifth — the clipped row is the affordance, the same way
-     the nearby track lets the next tile peek rather than printing a scrollbar
-     hint. Nothing is hidden: every listing is still reachable, and the picker
-     chains its scroll to the pane at both ends (no overscroll-behavior here, on
-     purpose). Podium only; the questionnaire's hero keeps the full list. */
+  /* The listing count is feed-driven and unbounded, so in this fixed-height pane
+     it gets its own scroll. 212px ≈ 4.5 rows; the clipped row is the peek affordance. */
   .vm-podium-step .vm-pick {
     max-height: 212px;
     overflow-y: auto;
   }
 }
 
-/* Wide: the brief gets a slightly longer measure and a wider seam, and the
-   podium gets everything that buys. Every extra pixel the block gained goes to
-   the RESULTS pane on purpose — the brief is eight short questions in a single
-   column and reads worse the wider it gets, while the podium is the mode. At a
-   1184px content column this leaves the pane ~784px, which is what makes the
-   two-per-row step layout below possible. */
+/* Wide: extra width goes to the RESULTS pane, not the brief (a single narrow
+   column reads worse wider). ~784px pane is what enables the two-per-row steps below. */
 @media (min-width: 1080px) {
   .vm-podium {
     grid-template-columns: minmax(320px, 360px) 1fr;
@@ -3224,9 +2810,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   margin: 0 0 var(--vm-space-2);
 }
 
-/* Sized off .vm-title but two steps down: this headline lives in a 320px
-   column beside a live result, so the questionnaire's 40px would take four
-   lines and push the first question below the fold. */
+/* Sized off .vm-title but two steps down: in a 320px column beside a live result,
+   the questionnaire's 40px would take four lines and push the first question below the fold. */
 .vm-podium-title {
   font-family: var(--vm-font-heading);
   font-size: var(--vm-text-h2);
@@ -3237,10 +2822,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   margin: 0 0 var(--vm-space-3);
 }
 
-/* The lede sets in the BODY font at every brand, not the heading font that
-   .vm-lede uses. Four of the six brands already override .vm-lede back to body
-   copy, and the two that do not (BMW, Motorrad) set it in a light grotesque
-   that reads thin at this size in a narrow column. One rule beats six. */
+/* The lede sets in the BODY font at every brand (not .vm-lede's heading font),
+   which reads thin at this size in a narrow column for BMW/Motorrad. One rule beats six. */
 .vm-podium-lede {
   font-family: var(--vm-font-body);
   font-weight: 400;
@@ -3265,9 +2848,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   transition: width 0.3s ease;
 }
 
-/* A live region, so it gains and loses text as the brief fills in. The
-   reserved min-height stops that from nudging the first question up and down
-   under the reader. */
+/* A live region, so it gains and loses text as the brief fills in. Reserved
+   min-height stops that from nudging the first question under the reader. */
 .vm-podium-banner {
   margin: 0 0 var(--vm-space-6);
   min-height: 1.4em;
@@ -3283,10 +2865,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   color: var(--vm-accent-spot);
 }
 
-/* One block per visible question. Conditional questions are spliced in and out
-   here, so the separation is a hairline between siblings rather than a border
-   on the block itself: adding or removing a block never leaves a stray rule at
-   the top or bottom of the list. */
+/* One block per visible question. Separation is a hairline between siblings (not a
+   border on the block), so splicing conditionals never leaves a stray rule. */
 .vm-podium-questions {
   display: flex;
   flex-direction: column;
@@ -3304,10 +2884,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   margin: 0 0 var(--vm-space-1);
 }
 
-/* Quieter than the questionnaire's 26px .vm-question, deliberately: that mode
-   asks one question at a time and the question IS the screen. Here eight of
-   them share a column with a live result, so they read as a form, not as eight
-   consecutive headlines. */
+/* Quieter than the questionnaire's 26px .vm-question, deliberately: here eight
+   questions share a column with a live result, so they read as a form. */
 .vm-podium-q-title {
   font-family: var(--vm-font-heading);
   font-weight: 300;
@@ -3341,9 +2919,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   max-width: 100%;
   margin-top: var(--vm-space-6);
 }
-/* Committed and disabled is a DONE state, not a broken one, so it drops out of
-   the accent rather than sitting there at the base 0.35 opacity looking like a
-   button that failed. Editing an answer re-arms it and this stops applying. */
+/* Committed + disabled is a DONE state, not broken, so it drops out of the accent
+   rather than the base 0.35 opacity. Editing an answer re-arms it. */
 .vm-podium.is-committed .vm-podium-commit:disabled {
   opacity: 1;
   background: var(--vm-surface-alt);
@@ -3353,10 +2930,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 
 /* ---------------------------- right pane: the podium ----------------- */
 
-/* The re-rank announcement. Visible, not screen-reader-only: seeing "the
-   podium changed" is the whole feedback loop, and hiding it would leave a
-   sighted reader guessing whether their answer did anything. Height is
-   reserved so an announcement arriving does not shove the podium down. */
+/* The re-rank announcement. Visible, not screen-reader-only: seeing "the podium
+   changed" is the feedback loop. Height reserved so it doesn't shove the podium down. */
 .vm-podium-live {
   margin: 0 0 var(--vm-space-3);
   min-height: 1.2em;
@@ -3377,17 +2952,14 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    on an opacity dip reads as a flicker rather than a settle. */
 .vm-podium-steps.is-updating { opacity: 0.45; }
 
-/* A step is a frame around a shared card, not a card itself, so it paints no
-   background or border of its own (that would double every card edge). It is
-   the positioning context for the reject trigger, and it carries the dismissal
-   transition for the whole tile. */
+/* A step frames a shared card, not a card itself, so it paints no background or
+   border (that would double every edge). It carries the dismissal transition. */
 .vm-podium-step {
   position: relative;
   transition: opacity 0.35s var(--vm-ease), transform 0.35s var(--vm-ease);
 }
 /* Wraps the card + reject chip below the rank eyebrow. It, not the step, is the
-   chip's positioning context, so the absolutely-positioned chip hugs the card's
-   top-right corner instead of floating in the eyebrow band (tallest on gold). */
+   chip's positioning context, so the chip hugs the card's corner not the eyebrow. */
 .vm-podium-card {
   position: relative;
 }
@@ -3396,11 +2968,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 }
 
 /* --- the rank ladder: weight, not medal colour ---
-   First takes the accent edge, a ring that reads as a doubled border, and the
-   deepest lift. Second keeps the hairline and a shallower shadow. Third sits
-   flat on the quiet band. The inset narrows as the rank drops, which is the
-   shape of an actual podium read top to bottom. The insets are small enough
-   that the third step still has ~248px of card at a 320px viewport. */
+   First: accent edge + deepest lift. Second: hairline + shallow shadow. Third:
+   flat on the quiet band. Inset narrows as rank drops (the shape of a podium). */
 .vm-podium-step.is-gold .vm-card {
   border-color: var(--vm-accent);
   box-shadow: 0 0 0 1px var(--vm-accent), 0 10px 28px rgba(0, 0, 0, 0.12);
@@ -3418,72 +2987,39 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   background: var(--vm-surface-alt);
 }
 
-/* Committing firms the winner up: the ring thickens and the lift deepens, so
-   pressing the CTA visibly resolves the podium instead of only swapping copy
-   inside the hero. */
+/* Committing firms the winner up: the ring thickens and the lift deepens, so the
+   CTA visibly resolves the podium instead of only swapping copy in the hero. */
 .vm-podium.is-committed .vm-podium-step.is-gold .vm-card {
   box-shadow: 0 0 0 2px var(--vm-accent), 0 14px 34px rgba(0, 0, 0, 0.14);
 }
 
-/* Joint first: every tied step carries .is-gold, so they already share the
-   accent edge. Flatten the lift as well, because an elevation difference
-   between two cards the engine rates level is exactly the fabricated
-   distinction the tie state exists to avoid. */
+/* Joint first: tied steps all carry .is-gold, so they share the accent edge.
+   Flatten the lift too, so cards the engine rates level don't differ by elevation. */
 .vm-podium-steps.is-tied .vm-podium-step.is-gold .vm-card {
   box-shadow: 0 0 0 1px var(--vm-accent);
 }
 
 /* --- wide: the steps become ROWS, and the fold has to keep a peek ---
-   Stacked one per row in a ~780px pane, the winner IS the fold: it measured
-   771px in an 868px scroll pane, so nothing below it was even hinted at and the
-   mode's whole claim — a ranked shortlist you can watch re-order — needed a
-   scroll to see. Two per row fixes that. First still spans the row, because it
-   is the answer; second and third sit side by side beneath it and are ~230px on
-   screen with it, which is the peek.
-
-   In a TIE nothing spans: joint firsts share the row at identical widths, since
-   a wider card in a row of equals is a winner the engine did not name. Three
-   tied cars wrap 2 + 1 rather than squeezing into three ~240px columns — the
-   third lands under the first at the same width with the same treatment, and
-   the wrap is what puts it above the fold. */
+   Two per row: first spans (it's the answer), second + third sit beneath as the
+   peek. In a TIE nothing spans — joint firsts share the row at identical widths. */
 @media (min-width: 1080px) {
   .vm-podium-steps {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    /* Each card takes its natural height rather than the row's.
-       Matching the bottoms was the first instinct — two cards in a row that end
-       on the same line look composed — but card length here is CONTENT, and the
-       content varies enormously: "Choose yours" prints one row per grouped
-       listing, so a national feed returned 47 rows for one joint first against
-       24 for the other. Stretched, the shorter card measured 1875px of content
-       inside a 3026px card: 1151px of blank white with a hairline border round
-       it, which reads as a broken card, not a tidy row. Ragged bottoms are the
-       honest version — one of those cars genuinely has twice as much to choose
-       between — and nothing in the rank ladder is carried by height. */
+    /* Each card takes its natural height, not the row's: card length here is
+       CONTENT (grouped listings vary hugely), so stretching leaves broken blank cards. */
     align-items: start;
   }
 
-  /* The insets are the rank ladder's third signal, and they were measured for a
-     stack, where a narrower card reads as a step down. Side by side they read
-     as two mismatched cards and they knock the row out of alignment. Rank still
-     carries on the other three signals: the rule before the label, the card
-     border, and the shadow depth. */
+  /* Insets (the ladder's third signal) were measured for a stack; side by side
+     they'd look like mismatched cards, so drop them. Rank still shows on the other three. */
   .vm-podium-step.is-silver,
   .vm-podium-step.is-bronze { margin-inline: 0; }
 
   .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold { grid-column: 1 / -1; }
 
-  /* The spanning winner, re-proportioned for a 776px row rather than scaled up
-     into one. Held to 16:9 its photo alone would be 436px tall and the card
-     721px, which is the stacked problem again with a bigger picture on it, so
-     the photo becomes a cinematic band and the copy runs in two columns beside
-     itself. Together they bring the hero to ~595px — 2nd and 3rd clear the fold
-     — and the split falls where the card's own content changes register: what
-     this car IS on the left (name, score, specs, retailer, blurb), the argument
-     FOR it on the right (what's fitted, why it suits you, the link).
-
-     Only the spanning winner. A tied gold card is one column wide, so it is a
-     portrait card and keeps the stacked anatomy. */
+  /* The spanning winner, re-proportioned for a 776px row: photo becomes a
+     cinematic band, copy runs in two columns, so 2nd and 3rd clear the fold. */
   .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-media {
     flex: none;
     max-height: 280px;
@@ -3493,33 +3029,27 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
     columns: 2;
     column-gap: var(--vm-space-8);
   }
-  /* Multi-column will break a paragraph across the gap by default, which turns
-     a two-line spec list into one line at the bottom of one column and one at
-     the top of the other. Every block in this body is a unit. */
+  /* Multi-column breaks a paragraph across the gap by default, splitting a spec
+     list across columns. Every block in this body is a unit, so avoid it. */
   .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body > * {
     break-inside: avoid;
   }
-  /* Put the seam where the register changes instead of wherever the balancer
-     lands: the blurb is the last thing the card says about the car itself, and
-     it is present on every non-compact card, so it is the reliable hinge.
-     Skipped when the blurb is the last child — a payload with no kit, reasons or
-     link would otherwise force an empty second column. */
+  /* Put the seam where the register changes: the blurb is the reliable hinge (last
+     thing said about the car). Skipped when it's last child, else an empty 2nd column. */
   .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body
     > .vm-blurb:not(:last-child) {
     break-after: column;
   }
-  /* Belt and braces for the browsers that ignore a forced column break: a
-     balanced split put "What's fitted" at the foot of one column and the kit it
-     labels at the head of the next. A label is part of the thing it labels. */
+  /* Belt and braces for browsers that ignore a forced column break: keep a label
+     with the kit it labels, so "What's fitted" doesn't strand from its list. */
   .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body
     > .vm-why-label {
     break-after: avoid;
   }
 }
 
-/* The rank eyebrow. The rule before the label is the quietest of the four rank
-   signals and the one that survives any brand palette, because it inherits the
-   label colour rather than picking one. */
+/* The rank eyebrow. The rule before the label is the quietest rank signal and
+   survives any brand palette, since it inherits the label colour. */
 .vm-podium-rank {
   --vm-podium-rule: var(--vm-space-2);
   display: flex;
@@ -3564,9 +3094,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
   gap: var(--vm-space-3);
 }
-/* Tail tiles are shared compact cards, which are built for the horizontal
-   nearby rail: reset the flex sizing that a grid track ignores anyway, give
-   each one a positioning context for its reject trigger, and let it shrink. */
+/* Tail tiles are shared compact cards built for the horizontal rail: reset the
+   flex sizing, give each a positioning context for its reject trigger, let it shrink. */
 .vm-podium-tail-grid > * {
   position: relative;
   min-width: 0;
@@ -3574,9 +3103,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   transition: opacity 0.35s var(--vm-ease), transform 0.35s var(--vm-ease);
 }
 
-/* The honest note, only painted when it applies. Same quiet grey field with a
-   spot edge as .vm-unmet and the swipe mode weak note, because it is the same
-   register: an aside, never an apology. */
+/* The honest note, only painted when it applies. Same quiet grey field + spot
+   edge as .vm-unmet and the swipe weak note: an aside, never an apology. */
 .vm-podium-note {
   margin: var(--vm-space-6) 0 0;
   padding: var(--vm-space-3) var(--vm-space-4);
@@ -3601,9 +3129,7 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 /* ---------------------------- "not this one" ------------------------- */
 
 /* Deliberately a small corner chip, not a red X: turning a car down is normal
-   browsing, the same judgement the questionnaire reject control makes. It
-   paints a solid surface rather than a translucent one so it stays legible
-   over any photo the feed happens to return. */
+   browsing. Solid surface (not translucent) so it stays legible over any photo. */
 .vm-podium-reject {
   position: absolute;
   top: var(--vm-space-2);
@@ -3640,10 +3166,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-podium-reject-icon { line-height: 1; }
 .vm-podium-reject-label { letter-spacing: 0.2px; }
 
-/* The popover. Fixed and 272px per the PRD, positioned in JS from the trigger
-   rect; the max-width is the 8px viewport margin the contract asks for, so a
-   chip near the screen edge still gets a full dialog. z-index clears the
-   in-card chrome (the deck stamps and knockout badges top out at 4). */
+/* The popover. Fixed, 272px, positioned in JS from the trigger rect; max-width
+   keeps an 8px viewport margin. z-index clears in-card chrome (stamps/badges top out at 4). */
 .vm-podium-pop {
   position: fixed;
   z-index: 50;
@@ -3668,9 +3192,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   color: var(--vm-ink);
 }
 
-/* One reason per row, matching .vm-reject-option: they are read, not scanned,
-   and a wrapped row of pills invites a fast mis-tap on something that teaches
-   the engine a dealbreaker. */
+/* One reason per row (matching .vm-reject-option): a wrapped row of pills invites
+   a fast mis-tap on something that teaches the engine a dealbreaker. */
 .vm-podium-pop-reasons {
   display: flex;
   flex-direction: column;
@@ -3723,9 +3246,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   outline-offset: 2px;
 }
 
-/* Step 2 reuses the shared question controls so the follow-up looks like the
-   left pane rather than a second, unrelated widget. They arrive sized for a
-   full-width screen, so everything here is a fit for 240px of usable width. */
+/* Step 2 reuses the shared question controls so the follow-up matches the left
+   pane. They arrive full-width sized, so everything here refits 240px of width. */
 .vm-podium-pop-body .vm-options {
   grid-template-columns: 1fr;
   margin: 0;
@@ -3748,11 +3270,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 
 /* ---------------------------- first paint ---------------------------- */
 
-/* The skeleton reuses .vm-skel / .vm-skel-line wholesale. A bare .vm-skel has
-   no intrinsic height (its callers give it one via an aspect ratio or a text
-   line), so any placeholder here that is not a text line gets a card-sized
-   floor, otherwise the first paint collapses to nothing and the podium drops
-   in from zero height. */
+/* The skeleton reuses .vm-skel / .vm-skel-line. A bare .vm-skel has no intrinsic
+   height, so non-text placeholders get a card-sized floor or first paint collapses. */
 .vm-podium-skeleton {
   display: grid;
   gap: var(--vm-space-4);
@@ -3762,18 +3281,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 
 /* ---------------------------- brand fit ------------------------------ */
 
-/* Each brand keys its headline treatment to the questionnaire class list
-   (.vm-title, .vm-question, .vm-subhead and friends), so podium headings have
-   to opt in by name or MINI loses its serif caps, Motorrad loses its weight,
-   and Honda, Ford and Ferrari inherit an uppercase register that is not
-   theirs. .vm-podium-tail-head is absent from these rules on purpose: it also
-   carries .vm-subhead, so it is already covered.
-
-   Button casing needs nothing here: .vm-btn reads --vm-btn-transform, so
-   Ferrari's uppercase CTA and Motorrad's uppercase labels reach the commit
-   button and the popover Done button on their own. Geometry likewise, so the
-   reject chip is a MINI pill, a Ford 4px chip and a square Ferrari one from
-   --vm-radius-control without a rule per brand. */
+/* Each brand keys its headline treatment to the questionnaire classes, so podium
+   headings must opt in by name (button casing + geometry inherit via tokens). */
 .vm.vm-mini .vm-podium-title,
 .vm.vm-mini .vm-podium-q-title {
   font-family: var(--vm-font-heading);
@@ -3822,10 +3331,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   letter-spacing: 1.5px;
 }
 
-/* MINI reserves solid black for buttons and selected states, so the podium
-   winner takes the green spot edge rather than a near-black one that would
-   read as a heavy box around the top card and lose the rank signal entirely
-   (--vm-accent is near-black for MINI, unlike every other brand). */
+/* MINI reserves solid black for buttons/selected, so the podium winner takes the
+   green spot edge (near-black --vm-accent would read as a heavy box, losing rank). */
 .vm.vm-mini .vm-podium-step.is-gold .vm-card {
   border-color: var(--vm-accent-spot);
   box-shadow: 0 0 0 1px var(--vm-accent-spot), 0 10px 28px rgba(0, 0, 0, 0.12);
@@ -3838,9 +3345,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 }
 .vm.vm-mini .vm-podium-reject[aria-expanded='true'] { border-color: var(--vm-accent-spot); }
 
-/* --- reduced motion: no entrance, no cross-fade, no dismissal travel. Every
-   state stays reachable and legible, and the JS commits instantly, so the only
-   thing removed here is the transition between two states, never a state. --- */
+/* --- reduced motion: no entrance, cross-fade, or dismissal travel. Only the
+   transition between states is removed, never a state (all stay legible). --- */
 @media (prefers-reduced-motion: reduce) {
   .vm-podium { animation: none; }
   .vm-podium-steps,

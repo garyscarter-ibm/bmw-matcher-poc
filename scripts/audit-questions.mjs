@@ -1,33 +1,5 @@
 /*
- * Question-vs-stock audit — does each quiz question earn its screen?
- *
- * Replays the real engine (rankCars + brand tuning) against the national
- * fixture dumps (fixtures/<brand>-cars.json — refresh with
- * `node scripts/dump-stock.js all`) and measures, per brand and per retailer:
- *
- *   dead   Dead options: answer values with zero cars behind them at a
- *          retailer (e.g. fuel:phev at 60% of MINI retailers), plus how much
- *          of the budget slider's range real prices actually span.
- *   sens   Sensitivity: for random answer sets, flip ONE question at a time —
- *          how often does the top-3 change? 0% = the question is theatre.
- *          Also outcome diversity (distinct top-3s across N answer sets) and
- *          body-style honesty (you named a shape — is it in your top 3?).
- *   size   The `sens` measure split by retailer stock size (small/medium/
- *          large), which is the test for stock-*level*-dependent questions.
- *   fuel   Does a named fuel bind? Tests engine.js's own claim that a
- *          wrong-fuel car shouldn't top a matching-fuel one.
- *   stick  Does the winner ever change? Perturbs REAL persona answers one at
- *          a time — the "it always recommends the same car" test.
- *   taste  Inside a fit tie, how far ahead is #1 on taste? The distribution
- *          TASTE_PTS is a threshold on, and what each candidate value does.
- *   conf   Where does "nothing here is close" start? The top-score distribution
- *          of the pages the low-confidence state divides, which is what
- *          WEAK_SCORE (the block) is a threshold on.
- *
- * Findings + the adapt-to-which-pool decision framework are written up in
- * docs/question-stock-audit.md — re-run this after a fixture refresh to see
- * whether they still hold. Zero-dep; seeded PRNG so runs are reproducible.
- *
+ * Question-vs-stock audit: replays the real engine over national fixture dumps to check each quiz question earns its screen. Modes dead/sens/size/fuel/stick/taste/conf; findings in docs/question-stock-audit.md.
  * Run:  node scripts/audit-questions.mjs [dead|sens|size|fuel|stick|taste|conf|all]
  */
 
@@ -85,9 +57,8 @@ function loadBrand(brand) {
 }
 
 /*
- * Does this car satisfy this answer option? Mirrors the engine's hard filters
- * and the thresholds at which the scorers treat an option as "met" — kept
- * deliberately simple (an option is alive if ANY car satisfies it).
+ * Does this car satisfy this answer option? Mirrors the engine's hard filters,
+ * kept deliberately simple (an option is alive if ANY car satisfies it).
  */
 function satisfies(qid, value, car, t) {
   switch (qid) {
@@ -303,23 +274,8 @@ function auditBySize(brand) {
 // ---------------------------------------------------------------- fuel ----
 
 /*
- * Does a named fuel actually bind?
- *
- * engine.js says of fuelStrictBoost: "a car of the wrong fuel (however strong
- * elsewhere) shouldn't top a matching-fuel car." This measures whether that
- * holds. Two numbers, and the second is the one that tests the claim:
- *
- *   honesty    named a fuel, and a car of that fuel is in the top 3 — the
- *              direct analogue of the body-honesty measure above.
- *   violations named a fuel, a matching car SURVIVED the hard filters (so it
- *              could have won), and a wrong-fuel car topped it anyway.
- *
- * Cases where no matching car survives are excluded from both: that's an
- * unmet want, which the results page handles with its own copy, not a
- * ranking failure. Also reports the margin, because it says how much
- * retuning would be needed, and the wanted→got pairs, because the fix may
- * be narrower than the whole table (FUEL_TABLE is generous between petrol
- * and diesel, harsh toward EV).
+ * Does a named fuel actually bind? Tests engine.js's fuelStrictBoost claim that a wrong-fuel car shouldn't top a matching one, reporting honesty, violations, margin and wanted→got pairs.
+ * Cases where no matching car survives are excluded: that's an unmet want (its own results copy), not a ranking failure.
  */
 function auditFuel(brand) {
   const { byRetailer, tuning: t, budgetCfg, questions: qs } = loadBrand(brand);
@@ -347,9 +303,7 @@ function auditFuel(brand) {
       testable += 1;
       if (!picks.includes(ranked[0].car.fuel)) {
         // Wanting an EV/PHEV with nowhere to charge is penalised ON PURPOSE
-        // (scoreOneFuel's evAccess), so steering to petrol there is advice,
-        // not a ranking failure. Counted separately so the headline number
-        // is only the cases the engine can't justify.
+        // (scoreOneFuel's evAccess), so count it separately from real violations.
         const canCharge = ['home', 'work', 'either'].includes(a.charging);
         const plugWanted = picks.every((v) => v === 'ev' || v === 'phev');
         if (plugWanted && !canCharge) {
@@ -381,24 +335,8 @@ function auditFuel(brand) {
 // --------------------------------------------------------------- stick ----
 
 /*
- * "It always recommends the same car."
- *
- * The other passes sample answer sets UNIFORMLY AT RANDOM, which is the wrong
- * model of a human: a real person answers as themselves, then tweaks one thing
- * and looks again. Uniform sampling pairs extreme combinations nobody actually
- * picks, and it flatters the question set — `style` measures 63% sensitive
- * under random answers and 0% under realistic ones.
- *
- * So this pass starts from the personas (fixtures/personas.json — real-shaped
- * answer sets), changes exactly ONE answer at a time to every other value it
- * could take, and asks: did the WINNER change? Two numbers come out:
- *
- *   stickiness   how often the same car wins anyway. High = the tool looks
- *                deaf to the user's input, which is what the stakeholder
- *                complaint actually describes.
- *   per question how often changing THAT question moves the winner. A question
- *                at 0% cannot change the recommendation for these buyers, no
- *                matter what they pick.
+ * "It always recommends the same car." Starts from real personas (not uniform-random, which flatters the questions), flips ONE answer at a time, and asks: did the WINNER change?
+ * Reports overall stickiness (looks deaf to input) and per-question move rate (0% = that question can't change the pick for these buyers).
  */
 function auditStickiness(brand) {
   const { byRetailer, tuning, questions: qs } = loadBrand(brand);
@@ -456,18 +394,8 @@ function auditStickiness(brand) {
 
 
 /*
- * Taste pass — is TASTE_PTS set anywhere useful?
- *
- * TASTE_PTS is consulted in exactly one situation: a fit tie, deciding whether
- * #1 is far enough ahead on TASTE to be named ("We'd go for the Countryman C")
- * rather than handing the choice to the refine chips. So the only measurement
- * that means anything is the distribution of that gap across real ties, which
- * is what this prints, plus what each candidate threshold would do to it.
- *
- * It exists because the post-grouping review predicted the gaps would collapse
- * to 1–2 points and suppress the state. They don't — the prediction came from
- * one unrepresentative pair. Re-run this after a fixture refresh rather than
- * reasoning about it from a sample of one.
+ * Taste pass — is TASTE_PTS set anywhere useful? TASTE_PTS is consulted only in a fit tie (naming #1 vs handing off to refine chips), so this prints the #1-vs-#2 taste-gap distribution across real ties and what each threshold would do.
+ * The gaps don't collapse to 1–2 pts as an early review predicted (that came from one unrepresentative pair) — re-run after a fixture refresh rather than reasoning from a sample of one.
  */
 function auditTaste(brand) {
   const { byRetailer, tuning: t, budgetCfg, questions: qs } = loadBrand(brand);
@@ -505,26 +433,8 @@ function auditTaste(brand) {
 }
 
 /*
- * Confidence pass — where does "nothing here is close" begin?
- *
- * The results page has a state below `closest` that stops presenting the
- * leader as an answer at all (see WEAK_SCORE in blocks/vehicle-matcher). It fires
- * on the top score, and only over a leader that already carries a trade-off,
- * because "nothing here matches your brief" is plainly false about a car that
- * meets every stated want.
- *
- * So the only population that matters is the CLOSEST pages, and the only
- * measurement that means anything is their top-score distribution — which is
- * what this prints, both ways the harness knows how to sample:
- *
- *   uniform   random answer sets over sampled retailers. Broad, and (per the
- *             `stick` pass's argument) not how anyone actually answers.
- *   personas  each persona's real answers with ONE question changed at a time.
- *             Realistic in shape, and the sample the threshold was set on.
- *
- * Findings, 2026-07-29: the distribution has no cliff, so the threshold is a
- * policy choice and the defensible place for it is the middle of the
- * population it divides. Three samples put that median at 67, 68 and 69.
+ * Confidence pass — where does "nothing here is close" begin? Prints the top-score distribution of CLOSEST pages (what WEAK_SCORE thresholds; only fires over a leader with a trade-off), sampled both uniformly and from personas.
+ * Findings 2026-07-29: no cliff, so the threshold is a policy choice — the defensible spot is the population's median, which three samples put at 67–69.
  */
 const WEAK_SCORE = 68; // mirrors blocks/vehicle-matcher/vehicle-matcher.js
 

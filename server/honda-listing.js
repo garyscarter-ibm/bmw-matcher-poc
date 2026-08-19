@@ -1,18 +1,6 @@
 /*
- * Honda used-car listing parser — shared by the live adapter (stock.js) and the
- * offline scraper (scripts/scrape-honda.mjs).
- *
- * usedcars.honda.co.uk has no clean stock API, but its listing pages are fully
- * server-rendered: every vehicle card carries a rich <li> spec list (mileage,
- * fuel, transmission, doors, power, capacity, mpg, CO2, colour, first-reg date,
- * reg plate), a cash price, a title, a detail link and an image. Parsing that
- * HTML yields the exact flat-raw shape mapHondaRaw consumes, so the same records
- * feed the engine whether they came from a live fetch or a committed snapshot.
- *
- * The regexes here were proven against real listing HTML over the whole
- * inventory during the scrape that built fixtures/honda-cars.json; lifting them
- * into one module means the live path and the snapshot path can never drift.
- * This file is pure (no network): callers fetch the HTML and hand it in.
+ * Honda used-car listing parser (live adapter + offline scraper). No stock API,
+ * but listing pages are fully server-rendered, so this parses card HTML. Pure.
  */
 
 /** The listing base + the approved-used programme the site filters on. Pages
@@ -38,9 +26,8 @@ export function decode(s) {
 const stripTags = (s) => decode(String(s).replace(/<[^>]+>/g, ' '));
 
 /**
- * Split one listing page into per-vehicle HTML blocks. Each real card is
- * anchored by its detail link and bounded by the next card's anchor. We slice on
- * the "vehicle-inner" wrapper, which each card has exactly once.
+ * Split one listing page into per-vehicle HTML blocks, sliced on the
+ * "vehicle-inner" wrapper each card has exactly once.
  */
 export function splitCards(html) {
   const parts = String(html).split('class="vehicle-inner"');
@@ -76,9 +63,8 @@ export function parseCard(block) {
   const title = pick(/title="(Honda[^"]+)"/, block);
   if (!link || !title) return null;
 
-  // Cash price: the non-monthly £ (monthly sits under "Monthly Payment"). The
-  // card lists monthly first then the cash price; take the largest £ value on
-  // the card, which is always the cash price here.
+  // Cash price: the non-monthly £ (monthly sits under "Monthly Payment"). Take
+  // the largest £ on the card, which is always the cash price here.
   const prices = [...block.matchAll(/&pound;([\d,]+)/g)].map((m) => num(m[1])).filter(Boolean);
   const price = prices.length ? Math.max(...prices) : null;
 
@@ -118,10 +104,7 @@ export function parseListingHtml(html) {
 }
 
 /** The listing URL for a page, with an optional location filter. Page 1 is the
- *  base; later pages are a /pageN path segment. A postcode + radius narrows to
- *  stock near that location (the site's own "search near me" facet: zip + radius
- *  in miles), which is how Honda expresses "a dealer near you" — it has no
- *  dealer-id filter in the listing. */
+ *  base; later pages are a /pageN segment. A postcode + radius narrows to nearby stock. */
 export function listingUrl(page = 1, { zip, radius } = {}) {
   const params = new URLSearchParams(HONDA_WARRANTY_QUERY);
   if (zip) params.set('zip', zip);

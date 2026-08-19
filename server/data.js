@@ -1,8 +1,6 @@
 /*
- * Curated dataset of the current UK BMW range.
- * Last reviewed: 2026-07 — figures are indicative UK OTR prices and
- * approximate WLTP-ish specs. Relative positioning between cars matters
- * more than exact numbers; update prices here as the range changes.
+ * Curated dataset of the current UK BMW range (last reviewed 2026-07; indicative
+ * OTR prices, approximate specs — relative positioning matters more than exact numbers).
  *
  * Fields:
  *  body:      hatchback | saloon | estate | suv | coupe | convertible | mpv

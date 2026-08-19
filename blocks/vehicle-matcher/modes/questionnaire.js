@@ -1,20 +1,6 @@
 /*
- * Questionnaire mode — the original, question-by-question matcher interface.
- *
- * One of several interchangeable interface "modes" over the shared engine (see
- * ../modes/index.js and the shell in ../vehicle-matcher.js). This is the whole
- * quiz UI: intro, the question flow, the live "best guess" preview, the results
- * page and refinement. The shell reads brand/retailer/config and hands this
- * mode a `ctx` and a stage element to render into via `mount(root, ctx)`.
- *
- * The scoring engine and car dataset live behind an API (see server/ and
- * ../engine.js); this mode fetches the quiz definition and match results over
- * HTTP and never sees the dataset.
- *
- * Share links encode the quiz answers in the URL hash (#m=<base64url>); the
- * link is decoded/validated client-side (quiz-meta.js), then the results are
- * re-fetched from the API. Deep-linking is owned here rather than by the shell
- * because the encoded state is this mode's answer shape.
+ * Questionnaire mode: the question-by-question matcher interface (intro, flow, live
+ * preview, results, refinement). Fetches over HTTP; owns #m=<base64url> deep-linking.
  */
 
 import { BUDGET_BANDS, pillFor } from '../quiz-meta.js';
@@ -36,10 +22,8 @@ const HASH_KEY = 'm';
 /* ------------------------------ helpers ------------------------------ */
 
 /**
- * Is the budget answer usable? Budget drives the engine's one hard requirement.
- * It's a dual-thumb range ([min, max]) from the slider, but we also accept a bare
- * number (the earlier single-slider shape) and a legacy b1–b5 band key from an
- * old shared link. Mirror of budgetRange's guard in server/engine.js.
+ * Is the budget answer usable? Budget is the engine's one hard requirement; accepts a
+ * [min,max] range, bare number, or legacy b1–b5 band. Mirror of budgetRange guard in engine.js.
  */
 function validBudget(value) {
   if (Array.isArray(value)) {
@@ -50,13 +34,8 @@ function validBudget(value) {
 }
 
 /**
- * The wants BOTH halves of the reachable pool agree they can't meet.
- *
- * The retailer's stock and the nearby tier are fetched independently, and a
- * car one street over still counts as reachable — so a want is only truly
- * unavailable when the retailer AND nearby both came back without it. A
- * `nearbyUnmet` of null means nearby never answered (failed or still cold):
- * that's an absence of facts, so we claim nothing at all.
+ * The wants BOTH halves of the reachable pool agree they can't meet (retailer AND nearby
+ * both lack it). `nearbyUnmet` null means nearby never answered, so we claim nothing.
  */
 function agreedUnmet(retailerUnmet, nearbyUnmet) {
   if (!nearbyUnmet) return {};
@@ -69,9 +48,8 @@ function agreedUnmet(retailerUnmet, nearbyUnmet) {
 }
 
 /**
- * The buyer's original brief, in short phrases, taken from the questions they
- * actually answered. Only the defining three — fuel, shape, budget — because
- * this is a reminder of what they said, not a transcript of it.
+ * The buyer's original brief, in short phrases. Only the defining three — fuel,
+ * shape, budget — because this is a reminder of what they said, not a transcript.
  */
 function briefFromAnswers(ctx) {
   const labelsFor = (id, values) => {
@@ -95,9 +73,8 @@ function briefFromAnswers(ctx) {
 }
 
 /*
- * How far apart two scores may be and still count as a tie. Mirrors the
- * engine's CLUSTER_PTS: the page re-derives which result state it is in after
- * every narrowing, so it needs the same threshold the server used.
+ * How far apart two scores may be and still count as a tie. Mirrors the engine's
+ * CLUSTER_PTS, since the page re-derives its result state after every narrowing.
  */
 const CLUSTER_PTS = 3;
 
@@ -106,34 +83,14 @@ const CLUSTER_PTS = 3;
 const TAIL_SHOWN = 6;
 
 /*
- * How far behind the best car on the page a car may be and still be worth
- * showing at all.
- *
- * The tail used to be a flat six per group, blind to score. Priya's page ran
- * 96, 95 and then 78, 75, 74, 73, 73, 72: two genuine matches followed by six
- * cars answering a different question, under a headline about how well the
- * first two fit. A car eighteen points back is not an alternative, it is a
- * change of subject.
- *
- * Ten, measured against the eight personas' live distributions. It lands on
- * the natural cliff in six of the eight (Priya's 17pt drop, Meg's 30, Reyes'
- * 19, Tyler's 29, Daniel's 9, Chloe's 7) and gives a sensible answer in the
- * other two. It has to be relative: an absolute floor of 70 would show Priya
- * all nine of hers and Rob Jennings none at all, his best being 67.
+ * How far behind the best car a car may be and still be worth showing. Relative not
+ * absolute (a floor over-shows strong pages, empties weak); ten hits the natural score cliff.
  */
 const RELEVANT_PTS = 10;
 
 /*
- * How long the first paint will wait for the national search before going
- * ahead without it.
- *
- * The two searches now leave together (see renderResults), and measured warm
- * against the live API they are the same speed: 0.33s local, 0.26s national.
- * So in the common case the second one is already back and the page paints
- * once, complete. This budget only covers the gap between them.
- *
- * It is deliberately shorter than the local call usually takes, so it cannot
- * make a fast page slow. It only ever waits on a race that is nearly won.
+ * How long the first paint waits for the national search before going without it. Only
+ * covers the gap between the two parallel searches; shorter than the local call.
  */
 const GRACE_MS = 1500;
 
@@ -141,110 +98,23 @@ const GRACE_MS = 1500;
 const MAX_SHOWN = 6;
 
 /*
- * Below this, and missing something they asked for, the page stops presenting
- * the leader as an answer at all.
- *
- * The page could already say *the closest here misses your brief* and had no
- * words for *nothing here is close*, so a 67% leader was announced in exactly
- * the same voice as an 85% one. Rob Jennings is in the persona set to test
- * that: he walks away when "the tool recommends rather than filters", and
- * winning him looks like the tool saying "we do not have the right car for you
- * this week" when that is true.
- *
- * TWO CONDITIONS, and the first is what makes the sentence true. The state only
- * fires over a leader that already carries a trade-off, i.e. it is `closest`
- * escalated rather than a new population. A car that meets every stated want
- * and scores 63 is a car we DO have in the shape and fuel asked for; telling
- * that buyer "nothing here matches your brief" would be false on its face, and
- * the low score is coming from budget position or practicality, which the
- * cards already show.
- *
- * SIXTY-EIGHT, measured. Replayed matchCars over fixtures/*-cars.json two ways
- * — 40 retailers × 25 uniform answer sets per brand, and every persona's answers
- * perturbed one question at a time (the `stick` model, because uniform sampling
- * pairs combinations nobody picks) — and took the score distribution of the
- * population this splits, the `closest` pages:
- *
- *   BMW uniform     513 closest pages   median 69   p25 60  p75 78
- *   BMW personas     91 closest pages   median 67   p25 66  p75 71
- *   MINI uniform    590 closest pages   median 68   p25 59  p75 78
- *   MINI personas     8 closest pages   (too few to read)
- *
- * There is NO cliff in that distribution — it is unimodal and wide — so the
- * threshold is a policy choice about how often the tool is willing to say no,
- * and the only defensible place to put it is the middle of the population it
- * divides. Three independent samples put that at 67, 68 and 69. The state
- * therefore covers roughly the worse half of `closest` pages, which is ~24% of
- * realistic pages on BMW and ~2% on MINI (Sytner Luton's stock simply fits the
- * MINI personas well).
- *
- * Rob lands at 67 and fires; Martin at 71 does not, and that is a consequence
- * of the median rather than the target — worth saying plainly, because Rob's
- * page turns out to be an ordinary `closest` page rather than an outlier.
- * Martin belongs in `closest`: his page already tells him straight (the rescue
- * note names the convertible and where it is), his ask IS met 18 miles away,
- * and his clause is about being handled, not about being told no.
- *
- * Re-measure with `npm run audit confidence` after a fixture refresh.
+ * Below this, over a leader already carrying a trade-off, the page says "nothing here is close".
+ * 68 = median of the `closest` population it splits (policy); re-measure via `npm run audit confidence`.
  */
 const WEAK_SCORE = 68;
 
 /**
- * A car with no `distance` came from the configured retailer's own feed; the
- * national search sets one on everything it returns. That single fact is what
- * splits the list into its two groups.
+ * A car with no `distance` came from the retailer's own feed; the national search
+ * sets one on everything it returns. That fact splits the list into its two groups.
  */
 const isHere = (m) => m.car.distance == null;
 
 /**
- * The results list, plus every means of arguing with it.
- *
- * ONE ranked list, GROUPED BY PLACE. Both halves of that matter.
- *
- * One list, because the page used to be three — the retailer's matches, a
- * quieter "More at <retailer>" band, and a "Worth the drive" carousel — each
- * ranked internally and captioned honestly on its own terms. Stacked
- * vertically they read as one list that isn't sorted: Priya's page ran 96, 95
- * → 78 → 99, 97, so it claimed two cars fit best and then showed a 99% one
- * scroll down. Nobody reads three lists. See docs/results-page-review.md.
- *
- * Grouped by place, because this block is authored onto ONE retailer's site. A
- * tool on Sytner's page whose answer is "go to Group 1 Bedford" is answering a
- * different question than the page implies. So the groups are the retailer's
- * cars and then everyone else's, sorted by score inside each, and the headline
- * is derived from the retailer's cars because that is what it is scoped to.
- *
- * The governing rule, and the reason this isn't a rebuild of the bands it
- * replaced: GROUPS MAY DESCRIBE PLACE. THEY MAY NEVER CLAIM QUALITY. The old
- * page broke because "Close, but not level with the cars above" and "two of
- * these fit you equally well" were both quality claims on the same scale made
- * by different sections, so one could contradict the other. "At Grassicks
- * Garage" and "At other retailers" assert nothing about fit, so a 99% in the
- * second group contradicts nothing in the first.
- *
- * Every card still says where it is (see matchCard's provenance line). The
- * group heading is a signpost, not the only place that fact lives.
- *
- * Nearby stock arrives late (a slow national search) and joins the same pool
- * through `addToPool`, which is why the pool is mutable and the headline is
- * derived rather than fixed.
- *
- * The headline is re-derived on every redraw from the scores actually on
- * screen, never from the card count. That fixes a class of lie rather than one
- * instance: "TWO OF THESE FIT YOU EQUALLY WELL" was rendered over a 96% and a
- * 73% because narrowing back-filled the set to keep its size and nothing
- * re-tested the claim. Back-filling is right; not re-checking was not.
- *
- * Two rules the plan insists on, both still here: an applied refinement is
- * always shown and always revocable (a chip you can't see is a filter you
- * can't argue with), and narrowing to nothing is a legitimate outcome that
- * must be explained rather than rendered as an empty grid.
- *
+ * The results list plus every means of arguing with it: ONE ranked list GROUPED BY PLACE.
+ * Headline re-derived each redraw from on-screen scores; nearby stock joins late via `addToPool`.
  * @param {HTMLElement} title the results headline, rewritten on every redraw
  * @param {HTMLElement} lede the framing line, dropped once one car remains
- * @param {Object} frames how each situation may be described (docs/
- *   results-page-states.md), keyed by state. Chosen per redraw, because
- *   narrowing can move the page from one state to another.
+ * @param {Object} frames per-state copy (docs/results-page-states.md), chosen per redraw
  * @returns {{ host: HTMLElement, addToPool: (matches) => void }}
  */
 function renderRefine(
@@ -255,55 +125,37 @@ function renderRefine(
   // Mutable: nearby stock joins after first paint. Always kept in score order
   // so "the list" and "ranked by fit" mean the same thing.
   /*
-   * Score first, then the configured retailer ahead of a distant one.
-   *
-   * The tie-break matters more than it looks. Merging nearby stock into the
-   * list means local and distant cars can land on identical scores, and
-   * without a rule the order is whatever the arrays happened to be in. Owner
-   * decision (2026-07-22) stands: proximity is the buyer's trade to make, so
-   * when two cars fit equally well the one they can walk to leads. A nearby
-   * car that genuinely scores HIGHER still leads — that is the whole point of
-   * merging the list — it just has to earn it rather than win a coin toss.
+   * Score first, then local ahead of distant on a tie (owner decision 2026-07-22:
+   * proximity is the buyer's trade). A nearby car that scores HIGHER still leads.
    */
   const rank = (a, b) => b.score - a.score
     || (a.car.distance == null ? 0 : 1) - (b.car.distance == null ? 0 : 1)
     || (a.car.distance ?? 0) - (b.car.distance ?? 0);
   let pool = [...initialPool].sort(rank);
   /*
-   * The taste lead is a server judgement about one specific car: "of the cars
-   * that fit you equally well, this is the one your priorities point at". It
-   * therefore only stands while that car is still the one leading. Narrow it
-   * away, reject it, or let a nearby car outrank it, and the claim is about a
-   * car that is no longer being recommended.
+   * The taste lead is a server judgement about one specific car, so it only stands
+   * while that car still leads — narrow, reject or outrank it and the claim is stale.
    */
   const tasteLeader = tasteLead ? pool[0]?.car.id : null;
   const tasteLed = (alive) => Boolean(tasteLeader) && alive[0]?.car.id === tasteLeader;
   const active = new Map(); // axis id -> axis
 
-  // Everything narrowing the set, positive or negative, in one place: a
-  // required feature and a rejected colour differ only in what they keep. Both
-  // render as removable chips, because a filter the user can't see is one they
-  // can't argue with — and at this stock depth two constraints can empty a
-  // tie, which must be explainable rather than mysterious.
+  // Everything narrowing the set, positive or negative, in one place, each a
+  // removable chip: a filter the user can't see is one they can't argue with.
   const constraints = new Map(); // id -> { label, test(listing) }
   const hidden = new Set(); // cars waved away with no reason given
 
   const host = el('div', 'vm-refine');
   const chipRow = el('div', 'vm-chips');
   /*
-   * The running brief: what the buyer said at the start, plus everything
-   * they've told us since by tapping a chip or turning a car down. It grows as
-   * they go, so the tool visibly holds a model of them rather than silently
-   * re-filtering. This replaced a flat "2 of 6 left, with X and Y" line —
-   * accurate, but it read as a filter count rather than as listening.
+   * The running brief: what the buyer said, plus everything since. It grows as they
+   * go, so the tool visibly holds a model of them rather than silently re-filtering.
    */
   const status = el('div', 'vm-brief');
 
   /*
-   * The two groups: the retailer's own cars, then everyone else's. Each is one
-   * section with one PLACE heading, its lead cars at full size and the rest as
-   * tiles, in score order throughout. A group that ends up with no cars is
-   * never mounted, so an empty heading can't appear.
+   * The two groups (retailer's cars, then everyone else's): one section each, PLACE
+   * heading, lead cards full-size and the rest as tiles. An empty group is never mounted.
    */
   const grid = el('div', 'vm-grid vm-grid-tied');
   const hereGroup = el('section', 'vm-group');
@@ -311,14 +163,8 @@ function renderRefine(
   const hereRestGrid = el('div', 'vm-tail-grid');
   const awayGroup = el('section', 'vm-group');
   /*
-   * "Still looking" placeholder for the other-retailers group.
-   *
-   * Only shown when the national search lost the grace race, which is now the
-   * exception. It exists because the alternative is worse: a whole group of
-   * cars appearing out of nothing several seconds after the page settled,
-   * re-sorting the list and sometimes changing which car leads, while the
-   * buyer is reading. Reserving the space and saying what is happening turns
-   * an ambush into an expectation.
+   * "Still looking" placeholder for the other-retailers group when the national search lost
+   * the grace race. Reserving space beats cars ambushing and re-sorting the list mid-read.
    */
   // Flipped by searchDone() when the national search finally lands or fails.
   let stillSearching = searching;
@@ -330,30 +176,14 @@ function renderRefine(
   const awayRestGrid = el('div', 'vm-tail-grid');
 
   /*
-   * Two things were moved below the cards together in the rebuild, and only
-   * one of them belonged there.
-   *
-   * The chips are a CONTROL, so they sit directly above what they control. Put
-   * below the fold they became, in the owner's words, "a bit confusing to use
-   * and it's unclear what clicking them affects" — you cannot see the thing
-   * being narrowed while you narrow it. The brief is a SUMMARY, and summaries
-   * belong after. So the chips came back up and the brief stayed down.
-   *
-   * Deliberately NOT sticky: that was considered and rejected, because it
-   * fights the EDS host page's own header.
+   * Chips are a CONTROL, so they sit above what they control; the brief is a SUMMARY,
+   * so it stays below. NOT sticky: that fights the EDS host page's own header.
    */
   const refineBlock = el('div', 'vm-refine-tools');
   const briefBlock = el('div', 'vm-brief-block');
   /*
-   * The other half of a scoped headline: the car elsewhere that beat the best
-   * one here, named, with where it is.
-   *
-   * It used to fire once, only if late-arriving nearby stock changed the
-   * leader. Now it is derived on every redraw from the same comparison that
-   * decides whether the headline scopes, so the two always agree: scope the
-   * headline and this says what forced it; leave the headline unqualified and
-   * this is silent. Anything else would leave "at Grassicks Garage" hanging
-   * with no explanation of what it was protecting the page from.
+   * The other half of a scoped headline: the named car elsewhere that beat the best here.
+   * Derived each redraw from the same comparison that scopes the headline, so they agree.
    */
   const notice = el('p', 'vm-notice');
   notice.hidden = true;
@@ -363,16 +193,8 @@ function renderRefine(
   hereGroup.append(hereLabel, grid, hereRestGrid);
   awayGroup.append(awayLabel, awayPending, awayGrid, awayRestGrid);
   /*
-   * The working, under the cars.
-   *
-   * A page holding one card is correct when nothing else is close, and it
-   * still reads as thin stock rather than as a clear winner, because the
-   * reader cannot tell whether we searched three cars or three hundred.
-   * Adding weaker cars back would not fix that: a page of seven is equally
-   * silent about how many were rejected, and a card is an invitation, so
-   * offering a car thirty points off the pace to prove it is not worth having
-   * undermines the claim it was meant to defend. What was missing is evidence
-   * of the search, so this says it.
+   * The working, under the cars: evidence of the search. A one-card page reads as
+   * thin stock unless we say how much was searched; padding with weak cars can't fix that.
    */
   const working = el('aside', 'vm-working');
   working.hidden = true;
@@ -380,19 +202,8 @@ function renderRefine(
   host.append(notice, briefBlock, refineBlock, hereGroup, awayGroup, working);
 
   /*
-   * Survivors of everything the buyer has said, drawn from the WHOLE pool so a
-   * rejection promotes the next-best car instead of leaving a hole.
-   *
-   * Every filter is applied to LISTINGS, not to cards. That distinction is the
-   * whole of this function and it matters: grouping made a card "a model the
-   * retailer has four of", so judging it by whichever listing happened to rank
-   * first is judging three cars by a fourth. "Not the Chili Red" on a card
-   * that's also available in Midnight Black used to delete both — the colour
-   * she'd have taken went with the one she turned down.
-   *
-   * So: narrow each card's listings, drop the card only when nothing is left,
-   * and rebuild what the card claims (count, price range, colours) from what
-   * actually survived.
+   * Survivors of everything the buyer has said, from the WHOLE pool so a rejection
+   * promotes the next-best. Filters apply to LISTINGS not cards (so "Not the Chili Red" keeps the same model in another colour); the card is rebuilt from survivors.
    */
   function narrow(m) {
     if (hidden.has(m.car.id)) return null;
@@ -407,8 +218,7 @@ function renderRefine(
 
   /**
    * The lead of a sorted list: its top car plus anything tied with it. Nothing
-   * outside this may ever be described as fitting equally well, whatever the
-   * card count happens to be.
+   * outside this may be described as fitting equally well, whatever the card count.
    */
   const leadOf = (list) => {
     const top = list[0].score;
@@ -416,29 +226,8 @@ function renderRefine(
   };
 
   /*
-   * Which result state the page is in, RIGHT NOW, from the scores on screen.
-   *
-   * Previously this was decided once by the server and then never revisited,
-   * while the card count was allowed to drift under narrowing. That is how a
-   * 96% and a 73% ended up under "two of these fit you equally well", and how
-   * a diesel carrying "Diesel, where you asked for fully electric" got
-   * promoted into a set defined as fitting equally well.
-   *
-   * Deriving it each time means every state transition the buyer can cause is
-   * handled by construction: narrow a tie to one car and it becomes a decree;
-   * reject the leader and whatever it promotes is re-judged on its own merits;
-   * a nearby car joining the pool can win outright and the page says so.
-   *
-   * It is derived from the RETAILER'S cars, because the headline is scoped to
-   * the retailer. That is also what brought the decree back: merging nearby
-   * stock into one cluster meant an equally-good car 17 miles away joined every
-   * lead, and every persona landed on a tie (docs/results-page-review.md, "the
-   * cost"). Cars elsewhere no longer dilute a verdict about here.
-   *
-   * `scoped` is the one thing a car elsewhere still decides: when one genuinely
-   * outranks the best here, the headline says "at <retailer>" and the notice
-   * names what beat it. Strictly outranks, not ties — ties already break
-   * local-first, so an equal car has not earned the qualification.
+   * Which result state the page is in RIGHT NOW, derived each redraw from the RETAILER'S
+   * on-screen scores. `scoped` is the one thing a car elsewhere decides: it must strictly outrank the best here, since ties already break local-first.
    */
   /** Score below which a car is a change of subject rather than an option. */
   function relevanceFloor() {
@@ -453,55 +242,35 @@ function renderRefine(
     }
     const here = alive.filter(isHere);
     const away = alive.filter((m) => !isHere(m));
-    // Ruling out every one of the retailer's cars leaves nothing to be scoped
-    // to, so the cars within reach become the answer and the page says so
-    // without a qualification it can no longer support.
+    // Ruling out every retailer car leaves nothing to scope to, so the cars within
+    // reach become the answer and the page drops a qualification it can't support.
     const from = here.length ? here : away;
     const cluster = leadOf(from);
     const scoped = here.length > 0 && away.length > 0 && away[0].score > here[0].score;
     const common = { alive, here, away, scoped };
-    // The leader misses something asked for: the page must not say "perfect"
-    // in any state, so this outranks the rest. Below WEAK_SCORE it stops being
-    // "the closest here" and becomes "nothing here is close", which is a
-    // different sentence rather than a softer one.
+    // The leader misses something asked for, so never "perfect". Below WEAK_SCORE it
+    // stops being "the closest here" and becomes "nothing here is close".
     if ((from[0].tradeOffs || []).length) {
       const state = cluster[0].score < WEAK_SCORE ? 'weak' : 'closest';
       return { ...common, lead: cluster, state };
     }
     if (cluster.length === 1) return { ...common, lead: cluster, state: 'decree' };
-    // Fit-tied. Their priorities may still pick one (the taste lead is a
-    // server judgement about the original cluster, so it only stands while
-    // that cluster's leader is still the leader).
+    // Fit-tied. Their priorities may still pick one (the taste lead is a server
+    // judgement, so it only stands while that cluster's leader is still leading).
     return { ...common, lead: cluster, state: tasteLed(from) ? 'taste' : 'tie' };
   }
 
   /*
-   * What this car could be rejected FOR, given what's still on screen.
-   *
-   * Attribution is the whole point of asking. A rejection on its own says
-   * nothing usable — reject a white 3-door with 40k miles and we don't know
-   * which of those three things you objected to, and guessing is how you learn
-   * a dealbreaker that isn't real and empty someone's shortlist. So each
-   * reason names one property and rules out exactly that.
-   *
-   * A reason is only offered when it would change something: "too expensive"
-   * needs a cheaper car to fall back to, "not the colour" needs another colour
-   * in the set. Anything else is a dead end dressed as a choice. "Just not
-   * this one" is always last and always available — a shrug is a legitimate
-   * answer, and forcing a reason produces invented ones, which are worse than
-   * no signal at all.
+   * What this car could be rejected FOR, given what's on screen. Each reason names one
+   * property and is offered only when it changes something; "just not this one" is always last.
    */
   function rejectOptions(match, chosen) {
     const { car } = match;
-    // What the card is showing right now. Colour and gearbox are properties of
-    // ONE car, so a reason about them has to come from the listing on screen,
-    // not from whichever one happened to represent the group. Price and
-    // mileage stay group-based below, deliberately.
+    // What the card is showing right now. Colour and gearbox are properties of ONE
+    // car, so a reason about them must come from the listing on screen.
     const shown = chosen || listingsOf(match)[0] || {};
-    // Judge "would this reason change anything?" against every listing still
-    // reachable — not just the cards on screen, and not just other cards.
-    // Siblings count: on a two-colour card, turning down the red is answered
-    // by the black one standing behind it, and the card stays.
+    // Judge "would this reason change anything?" against every reachable listing,
+    // siblings included: turning down the red is answered by the black behind it.
     const alive = surviving().flatMap(listingsOf);
     const survives = (test) => alive.some(test);
     const opts = [];
@@ -511,22 +280,8 @@ function renderRefine(
     });
 
     /*
-     * EVERY reason is about the listing on screen, price and mileage included.
-     *
-     * They used to be judged against the group's cheapest and lowest-mileage
-     * copy, on the theory that a reason should make the whole card disappear
-     * rather than let it survive on a copy the buyer had just ruled out. That
-     * was wrong twice over. A card surviving with a CHEAPER listing is exactly
-     * what was asked for, which is what the colour reason already does. And
-     * the arithmetic was worse than the theory: on a card holding 1,000,
-     * 2,000 and 3,000-mile copies the only option ever offered was "Fewer than
-     * 1,000 miles", which excluded all three including the one being looked
-     * at. So a card could offer "Not the green", correctly leaving the blue,
-     * beside a mileage reason that could only ever leave nothing.
-     *
-     * Direction needs no thought here: nobody turns a car down for being too
-     * cheap or having too few miles, so "than the one I'm looking at" is the
-     * only sensible reading of both.
+     * EVERY reason is about the listing on screen, price and mileage included (a cheaper
+     * survivor is what was asked for). Direction is fixed: both mean "than this one".
      */
 
     // A listing with no known paint is never "the red one" — we can't claim it
@@ -566,29 +321,14 @@ function renderRefine(
     const frame = frames[state] || frames.tie;
     const strip = (m) => m.car.name.replace(new RegExp(`^${copy.name} `), '');
 
-    // Chips: every axis that still splits what's on screen, plus the ones
-    // already applied (which by definition no longer split anything). Offering
-    // an axis that can't change the result is noise, so they're recomputed
-    // against the current set rather than the original one.
+    // Chips: every axis that still splits what's on screen, recomputed against the
+    // current set — offering an axis that can't change the result is noise.
     refineBlock.replaceChildren();
     chipRow.replaceChildren();
 
     /*
-     * Everything the buyer has told us since the quiz, as statements rather
-     * than as controls. It renders in the brief below; the chip row carries
-     * only what they could ADD next.
-     *
-     * The two were briefly both: applied filters showed as "+ Blue" here and
-     * as a removable [Blue ✕] chip an inch away, which is one constraint in
-     * two places with only one of them undoable. Collapsing them into the
-     * chip row was the obvious fix and the wrong one, because a chip and a
-     * sentence are not the same register. "+ Blue, − Not the red" reads as a
-     * model of a person; a row of pills reads as a filter bar, and the model
-     * is the thing this tool has that a stock search does not. The +/- mark
-     * carries meaning the pills flatten, too: a want and a rule are different
-     * kinds of statement.
-     *
-     * So the statements keep the state, and they keep the undo with it.
+     * Everything the buyer has told us since the quiz, as statements in the brief below
+     * (not controls); the chip row carries only what they could ADD next. +/- reads as a model of a person, a flat filter bar of pills doesn't.
      */
     const learned = [
       ...[...active.entries()].map(([id, a]) => ({
@@ -605,20 +345,8 @@ function renderRefine(
     }
 
     /*
-     * Computed against what is ON SCREEN, on every redraw.
-     *
-     * It used to be an intersection: a fixed set taken once from the pool's top
-     * six, filtered each redraw by what still split the lead. Both halves were
-     * capped at MAX_AXES, so the two sixes could be six different axes and the
-     * intersection could be empty — which is how Meg's page, narrowed to one
-     * card, lost her chips entirely while that card's two listings still
-     * differed on colour and equipment. Offering a fixed menu was the mistake:
-     * an axis exists only where it splits the cars actually being shown, and
-     * that set changes every time she taps something.
-     *
-     * MAX_AXES still applies, inside refinementAxes, and now applies to the set
-     * that is offered rather than to a snapshot taken before it (see the note
-     * there for why the cap exists at all).
+     * Computed against what is ON SCREEN every redraw: an axis exists only where it splits
+     * the cars being shown, and that set changes with every tap. MAX_AXES applies in refinementAxes.
      */
     for (const axis of refinementAxes(shown.map(listingsOf))) {
       if (active.has(axis.id)) continue;
@@ -629,9 +357,8 @@ function renderRefine(
       chipRow.append(chip);
     }
 
-    // Mounted only when there is something to offer. A cluster of
-    // identical-spec cars in identical paint has no axes, and the page simply
-    // shows the cars and stops.
+    // Mounted only when there is something to offer: a cluster of identical-spec
+    // cars in identical paint has no axes, so the page just shows the cars and stops.
     if (chipRow.children.length) {
       refineBlock.append(
         el('p', 'vm-refine-label', copy.refineLabel({ count: shown.length })),
@@ -639,13 +366,8 @@ function renderRefine(
       );
     }
 
-    // The headline says whatever is true of the cars now on screen. `state`
-    // already accounts for narrowing, rejection and late-arriving nearby
-    // stock, so there is nothing to special-case here beyond the empty set.
-    //
-    // `scoped` picks the "at <retailer>" wording where a frame has one. A frame
-    // without one is already scoped in its own copy (the closest frame names
-    // the retailer outright), so it needs no variant.
+    // The headline says whatever is true of the cars now on screen; `state` already
+    // covers narrowing/rejection/late stock. `scoped` picks the "at <retailer>" variant.
     const wants = [...active.values(), ...constraints.values()].map((a) => a.label.toLowerCase());
     const say = (kind) => (scoped && frame[`${kind}Here`]) || frame[kind];
     if (!shown.length) {
@@ -659,12 +381,8 @@ function renderRefine(
       title.textContent = say(shown.length === 1 ? 'settled' : 'tied')(args);
     }
 
-    // Names what forced the scope. Suppressed only when a rescue note above the
-    // cards is already pointing at THAT car: Martin's page would otherwise say
-    // "no convertibles here, the nearest is 18.1 miles away at John Clark
-    // Tayside" and then, two lines down, "the 420i Convertible at John Clark
-    // Tayside scores higher". Two notes about different cars are two facts, and
-    // both keep their line.
+    // Names what forced the scope. Suppressed only when a rescue note above the cards
+    // already points at THAT car, to avoid saying the same fact twice about one car.
     notice.hidden = !scoped || away[0].car.id === notedCarId;
     if (!notice.hidden) {
       notice.textContent = copy.searchedWider({
@@ -680,20 +398,8 @@ function renderRefine(
     // A car waved away with no reason narrows the count but adds no words —
     // there's nothing to report about "just not that one".
     /*
-     * The running brief, ABOVE the cars.
-     *
-     * It was moved below on the argument that a summary belongs after the
-     * thing it summarises. True of a summary; false of this. Nobody scrolls
-     * past fourteen cards to read what they themselves typed, so the one
-     * signal that says the tool holds a model of you was the one thing
-     * guaranteed not to be seen.
-     *
-     * What it does NOT carry any more is the list of applied filters. Those
-     * were being said twice: once here as "+ Blue", and once as a removable
-     * [Blue ✕] chip a couple of inches above. The chip is the better of the
-     * two because you can undo it, so the duplicate is gone and the brief is
-     * back to the thing only it says, which is what the buyer originally
-     * asked for.
+     * The running brief, ABOVE the cards: nobody scrolls past fourteen cards to read what
+     * they typed. Applied filters live as undoable chips above; this carries only the brief.
      */
     briefBlock.replaceChildren();
     status.replaceChildren();
@@ -703,10 +409,8 @@ function renderRefine(
       status.append(el('p', 'vm-brief-label', copy.briefLabel));
       if (said.length) status.append(el('p', 'vm-brief-said', said.join('  ·  ')));
 
-      // Then everything since, each with the means to take it back. The undo
-      // lives here because this is now the only place the constraint is
-      // stated, and a filter you can see but not clear is worse than one you
-      // cannot see at all.
+      // Then everything since, each with the means to take it back — this is now the
+      // only place the constraint is stated, and a filter you can't clear is worse.
       learned.forEach((item) => {
         const row = el('p', `vm-brief-item is-${item.kind}`);
         row.append(el('span', 'vm-brief-mark', item.kind === 'want' ? '+' : '−'));
@@ -720,38 +424,14 @@ function renderRefine(
       });
 
       /*
-       * One count, and it lives here rather than under the chips.
-       *
-       * There were briefly two, two lines apart: "3 of 13 still match" (the
-       * whole pool) over "1 of 2, with blue." (the lead). Both accurate,
-       * measuring different things, leaving the reader to work that out. This
-       * one wins because it belongs to the same panel as the statements that
-       * caused it: `total` is the lead measured with nothing applied, so
-       * "1 of 2" is a real before-and-after rather than a number floating free
-       * of a baseline. Only the positive wants are named, because "with not
-       * the red" is not a sentence and a rejection has already shown its work
-       * by removing a card.
+       * One count, in the same panel as the statements that caused it (two counts confused).
+       * Only positive wants are named; a rejection has already shown its work by removing a card.
        */
       if (learned.length) {
         const picked = [...active.values()].map((a) => a.label.toLowerCase());
         /*
-         * No denominator. It has been wrong three ways and the third is what
-         * killed the idea:
-         *
-         *   "1 of 2"   counted the local lead, while the same chip was also
-         *              cutting cars at other retailers shown directly below.
-         *   "9 of 13"  counted the whole pool, which fixed the scope but put
-         *              an invisible number in the denominator: nobody can see
-         *              thirteen cars to check it against.
-         *   and now the relevance bar means the pool holds cars the page has
-         *              deliberately decided are not worth showing, so counting
-         *              them is measuring against a set that does not exist for
-         *              the buyer.
-         *
-         * What they actually want to know is whether the last tap did
-         * anything and whether there is still a choice. A bare count answers
-         * both, is checkable against the cards, and cannot be mis-scoped
-         * because it claims nothing about a total.
+         * No denominator: every version was wrong (mis-scoped, invisible total, or counting
+         * cars the relevance bar hides). A bare count is checkable against the cards and claims nothing about a total.
          */
         const args = { shown: alive.filter((m) => m.score >= relevanceFloor()).length };
         const line = el('p', 'vm-brief-count', picked.length
@@ -769,13 +449,8 @@ function renderRefine(
     hereGroup.hidden = false;
     awayGroup.hidden = true;
     if (!shown.length) {
-      // A guard, not a path the chips can currently reach: an axis is only
-      // offered while it still splits what's on screen, so applying one always
-      // leaves at least one car, and a combination that would empty the set is
-      // never presented. That's deliberate — the axes describe THIS cluster,
-      // so "nothing has both" would read as a claim about the retailer's whole
-      // stock, which we haven't checked. Rejection (the next step) can empty a
-      // set for real, and this is what it will land on.
+      // A guard, not a path the chips can reach: an offered axis always leaves at
+      // least one car. Rejection can empty a set for real, and this is what it lands on.
       const dead = el('div', 'vm-refine-empty');
       dead.append(el('p', 'vm-refine-empty-text', wants.length
         ? copy.refineEmpty({ wants: andList(wants) })
@@ -796,65 +471,33 @@ function renderRefine(
     }
 
     /*
-     * Who leads the page. Normally the retailer, which is the whole point of
-     * scoping the headline to it; only when every one of its cars has been
-     * ruled out does the answer come from the group beyond.
+     * Who leads the page: normally the retailer (the point of scoping to it); only
+     * when every one of its cars is ruled out does the answer come from the group beyond.
      */
     const leadIsHere = here.length > 0;
     /*
-     * Full cards in the second group are reserved for cars that OUTRANK the
-     * best one here, i.e. exactly the set that makes the headline scope. That
-     * keeps the promise the merge was built on: a car that genuinely suits the
-     * buyer better is a real card they can reject, refine and read the
-     * trade-off line on, not a tile they have to notice. Everything else in
-     * that group is a tile, because it is context rather than the answer.
-     *
-     * `leadOf` again, rather than a flat cap, so the cut lands on a real score
-     * gap. A flat three left Priya's group as 99, 97, 97 in cards and a fourth
-     * 97 as a tile below them, which is a difference in treatment where there
-     * is no difference in score.
-     *
-     * It is a treatment, not a caption. No heading anywhere says one group
-     * beats the other.
+     * Full cards in the second group are reserved for cars that OUTRANK the best here
+     * (so a genuinely better car is a real card to reject/refine); `leadOf`, not a flat cap, lands the cut on a real score gap.
      */
     const hereLead = leadIsHere ? shown : [];
     const beats = leadIsHere ? away.filter((m) => m.score > here[0].score) : away;
     /*
-     * Capped to the retailer's own lead, and this is the one place a treatment
-     * decision is also a commercial one.
-     *
-     * Uncapped, the rule above put a full card on every car that outranks the
-     * best one here, and on Priya's page that was four full cards under AT
-     * OTHER RETAILERS against two under AT GRASSICKS BMW. On a retailer's own
-     * website the competitors' section then outweighs the host, which is the
-     * exact problem grouping by place was built to solve.
-     *
-     * The cap is a count, never a caption: no heading anywhere says one group
-     * beats the other, and the cars that lose their card stay in the list as
-     * tiles rather than disappearing. At least one full card always survives,
-     * so the promise the merge was built on holds — a genuinely better car is
-     * something you can reject, refine and read the trade-off line on.
-     *
-     * It does not apply when every local car has been ruled out, because then
-     * the group beyond IS the answer rather than context beside one.
+     * Capped to the retailer's own lead so a competitors' section can't outweigh the host
+     * (at least one full card survives). Skipped when every local car is ruled out, since then the group beyond IS the answer.
      */
     const awayLead = beats.length
       ? leadOf(beats).slice(0, leadIsHere ? Math.max(1, hereLead.length) : undefined)
       : [];
     /*
-     * The tail: what else is worth a look, cut by relevance first and by
-     * length second. The floor is measured against the best car anywhere on
-     * the page rather than each group's own best, so both groups are judged by
-     * one standard: within ten points of the best we found.
+     * The tail: what else is worth a look, cut by relevance then length. The floor is
+     * measured against the best car anywhere on the page, so both groups share one standard.
      */
     const drop = (list, taken) => list
       .slice(taken.length, taken.length + TAIL_SHOWN)
       .filter((m) => m.score >= relevanceFloor());
 
-    // One car left is a recommendation again, so it gets the hero treatment
-    // (photo, reasons, its trade-off) rather than staying a tile in a grid.
-    // It keeps its reject menu: the answer still has to survive being looked
-    // at, and "actually, not that one either" is a real thing to want to say.
+    // One car left is a recommendation again, so it gets the hero treatment (photo,
+    // reasons, trade-off) and keeps its reject menu — the answer must survive scrutiny.
     const single = shown.length === 1;
     const full = (m, big = false) => matchCard(m, {
       big,
@@ -878,44 +521,29 @@ function renderRefine(
     awayLead.forEach((m) => awayGrid.append(full(m, leadIsHere ? false : single)));
     drop(away, awayLead).forEach((m) => awayRestGrid.append(tile(m)));
     /*
-     * While the national search is outstanding the group stays on screen with
-     * its heading and the pending line, holding the space its cars will take.
-     * Once it lands, normal rules: shown only if it has something in it.
+     * While the national search is outstanding the group stays on screen with its
+     * heading and pending line, holding the space; once it lands, shown only if non-empty.
      */
     awayPending.hidden = !stillSearching;
     awayLabel.hidden = !away.length && !stillSearching;
     awayGroup.hidden = !away.length && !stillSearching;
 
     /*
-     * The working, last. It is evidence for the verdict above it, so it reads
-     * as the tool signing off rather than as a preamble, and on the one-card
-     * page it lands directly under the single card where it is unmissable.
-     *
-     * The margin is measured off the cars on screen, not off the API's figure,
-     * so rejecting the leader re-states it about whoever leads now. It is only
-     * claimed when there IS a gap: below CLUSTER_PTS the cars are tied, and
-     * "nothing else came within 1 point" is not a boast.
+     * The working, last: evidence for the verdict above it. The margin is measured off
+     * the cars on screen (so rejecting the leader re-states it), only when there's a gap.
      */
     working.replaceChildren();
     working.hidden = !searched || !alive.length;
     if (searched && alive.length) {
       working.append(el('p', 'vm-working-label', copy.workingLabel));
       /*
-       * The margin is measured over the RETAILER's own cars, matching what the
-       * headline is scoped to. Measured over everything it never fired: nearby
-       * stock ties at the top on every persona (Meg's 97 against three nearby
-       * 97s), so the claim was true, unclaimable, and effectively dead code.
-       * Against this retailer it says the useful thing, which is that nothing
-       * else HERE is close, and Meg's one-card page gets its evidence.
+       * The margin is measured over the RETAILER's own cars, matching the headline's
+       * scope. Over everything it never fired (nearby stock ties at the top on every persona).
        */
       const margin = here.length > 1 ? Math.round(here[0].score - here[1].score) : null;
       /*
-       * In the weak state the margin says nothing worth saying. How far clear
-       * the leader is of the next car is the wrong question when the answer is
-       * that neither is close; the useful number is the one that put the page
-       * in this state. Stating it here rather than in the headline is what
-       * keeps the two from repeating each other: the headline is the verdict,
-       * this is the arithmetic behind it, checkable against the badges.
+       * In the weak state the margin says nothing: the useful number is the top score
+       * that put the page here. Stated here not in the headline so the two don't repeat.
        */
       const closing = state === 'weak'
         ? copy.workingWeak({ top: shown[0].score })
@@ -929,13 +557,8 @@ function renderRefine(
   return {
     host,
     /*
-     * Nearby stock, arriving after first paint from the slow national search.
-     * It joins the SAME pool and is re-sorted with everything else, so a car
-     * 23 miles away that genuinely suits the buyer better than anything local
-     * is presented as the better answer rather than as a footnote below a
-     * headline claiming otherwise. Each card carries where it is (see
-     * matchCard's provenance line), which is what makes that honest rather
-     * than merely tidy.
+     * Nearby stock, arriving after first paint, joins the SAME pool and is re-sorted, so
+     * a distant car that suits the buyer better leads rather than sitting as a footnote.
      */
     /*
      * The national search is done, whatever it found. Drops the pending line,
@@ -958,10 +581,8 @@ function renderRefine(
       redraw();
     },
     /*
-     * Told by renderResults which car the rescue note it just inserted points
-     * at (null for the unmet note, which names no car). The notice stands down
-     * for that car only: the note is the more specific version of the same
-     * fact, and saying it twice in different words reads as a bug.
+     * Told by renderResults which car the rescue note points at (null for the unmet
+     * note). The notice stands down for that car only, so the same fact isn't said twice.
      */
     noteShown(carId = null) {
       notedCarId = carId;
@@ -980,9 +601,8 @@ function unmetPhrases(brandKey, unmet) {
 }
 
 /**
- * A brand-voiced note admitting that something the user asked for isn't in
- * the stock we searched, and framing what's shown as the closest fit. Returns
- * null when there's nothing to admit to — which is the common case.
+ * A brand-voiced note admitting something asked for isn't in the stock we searched,
+ * framing what's shown as the closest fit. Null when there's nothing to admit to.
  */
 function unmetNote(ctx, unmet) {
   const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
@@ -999,16 +619,8 @@ function unmetNote(ctx, unmet) {
 }
 
 /**
- * The state-3 note (docs/results-page-states.md): the want is missing at THIS
- * retailer but met nearby. The sibling of unmetNote with the opposite message
- * — that one says "nobody reachable has it" (and almost never fires), this
- * one says "not here, but N miles away" (and fires constantly). Same visual
- * treatment: they are two polarities of one fact and can never both show.
- *
- * By owner decision the local cards keep the lead — someone may value
- * proximity over the full brief, and that trade is theirs to make. This note
- * is what puts the choice in front of them.
- *
+ * The state-3 note (docs/results-page-states.md): a want missing at THIS retailer but met
+ * nearby. Sibling of unmetNote, opposite polarity; local cards keep the lead (owner decision).
  * @param {Object} rescued unmet-shaped: the wants missing here but met nearby
  * @param {Object} nearest the closest nearby match that meets the whole brief
  */
@@ -1029,10 +641,8 @@ function rescueNote(ctx, rescued, nearest) {
   return note;
 }
 
-/* The engine client (apiGetQuestions, apiMatch, apiNearby, apiPreview) is
- * shared across modes and lives in ../engine.js — imported at the top, or via
- * ./preview-feed.js for the debounced preview. The question widgets themselves
- * (visibility, the sliders, the option list) are shared too: ./question-ui.js. */
+/* The engine client lives in ../engine.js (or ./preview-feed.js for the debounced
+ * preview); the shared question widgets live in ./question-ui.js. */
 
 function encodeAnswers(answers) {
   const json = JSON.stringify(answers);
@@ -1058,26 +668,8 @@ function answersFromHash(questions) {
 }
 
 /*
- * What actually separates a set of cars the engine scored the same.
- *
- * This is the digital version of the bit of a dealership visit the tool has
- * been missing: once the brief is satisfied several times over, a good
- * salesperson stops asking about your life and starts asking about the cars in
- * front of you — and only about the ways they differ. Nobody is asked "do you
- * want a sunroof?" when all six have one.
- *
- * So the axes are computed from the cluster itself, never authored. An axis
- * exists only where it splits the set (at least one car has it, at least one
- * doesn't), which means a refinement can never be dead and can never empty the
- * list on its own — the two failure modes that killed asking this sort of
- * thing upfront (docs/question-stock-audit.md, and the plan's rejected
- * approaches). It also needs no per-brand configuration: gearbox surfaces for
- * a MINI cluster because MINI stock is mixed, and stays quiet for BMW because
- * it isn't.
- *
- * Ranked by how evenly each axis splits the set, because a 3/3 split is worth
- * more than a 5/1 — it's the question that tells us most about you per tap.
- *
+ * What actually separates cars the engine scored the same. Axes are computed from the
+ * cluster (an axis exists only where it splits the set, so it can't be dead or empty the list); ranked by how evenly each splits, since a 3/3 tells us more per tap than a 5/1.
  * @returns {Array<{ id, label, test(car), have }>}
  */
 
@@ -1085,14 +677,8 @@ function answersFromHash(questions) {
 const shadeOf = (l) => l.shade || l.colour;
 
 /**
- * Rebuild a grouped card from the listings that survived filtering.
- *
- * Everything the card claims about stock depth — "4 available, £31,498 to
- * £36,890, in Portimao Blue, Brooklyn Grey or Alpine White" — is derived, so
- * once a filter removes two of those four the card must stop saying it has
- * them. The representative fields (paint, price, mileage, link) follow the
- * best-ranked survivor; `id` deliberately does not move, because it is what
- * "just not this one" remembers the card by.
+ * Rebuild a grouped card from surviving listings: stock-depth claims are derived, so a filter
+ * must update them. Fields follow the best survivor; `id` stays put, since "just not this one" uses it.
  */
 function regroup(car, kept) {
   const head = kept[0];
@@ -1114,18 +700,8 @@ function regroup(car, kept) {
 }
 
 /**
- * The ways this set of cards can still be split, as chips.
- *
- * Takes one listing array per card, and tests LISTINGS rather than cards, for
- * the same reason the reject menu does: a card is a model the retailer has
- * several of, and "Blue" should leave the blue ones rather than keep or kill
- * all four on the strength of whichever ranked first.
- *
- * An axis earns its place when applying it would change something — some
- * listing has the thing and some listing doesn't. That's a weaker bar than
- * "it splits the cards", deliberately: on a single four-colour card, "Blue"
- * changes nothing about which cards show but everything about what the buyer
- * is being offered.
+ * The ways this set of cards can still be split, as chips. Tests LISTINGS not cards (so
+ * "Blue" leaves the blue ones); an axis earns its place when some listing has the thing and some doesn't, so even a single multi-colour card offers colour.
  */
 // How many chips the page will offer at once. Six is about what reads as
 // "here are some ways to split these" rather than as a search form.
@@ -1148,10 +724,8 @@ function refinementAxes(groups) {
     offer(`g:${value}`, label, (l) => l.transmission === value);
   }
 
-  // Colour, by its normalised name ("Grey"), each shade its own axis. Only
-  // present on listings the detail lookup reached — one with no colour simply
-  // never matches a colour axis, which is the honest behaviour: we can't
-  // claim it's the blue one.
+  // Colour, by its normalised name ("Grey"), each shade its own axis. A listing with
+  // no colour never matches a colour axis, which is honest: we can't claim it's the blue one.
   for (const shade of new Set(all.map(shadeOf).filter(Boolean))) {
     offer(`c:${shade}`, shade, (l) => shadeOf(l) === shade);
   }
@@ -1160,11 +734,8 @@ function refinementAxes(groups) {
   // that shaves a single car off it.
   const balance = (a) => Math.abs(a.have / groups.length - 0.5);
   axes.sort((a, b) => balance(a) - balance(b) || a.label.localeCompare(b.label));
-  // Capped, because testing listings rather than cards removed the bound that
-  // used to be implicit. An axis only qualified while it split the CARDS, so a
-  // single card could never offer one; now that one card is several listings,
-  // an equipment-rich cluster will happily produce eleven chips, and a wall of
-  // chips is a filter panel, which is the thing this was built not to be.
+  // Capped, because testing listings rather than cards removed the implicit bound: an
+  // equipment-rich cluster can produce eleven chips, and a wall of chips is a filter panel.
   return axes.slice(0, MAX_AXES);
 }
 
@@ -1173,14 +744,12 @@ function refinementAxes(groups) {
 function renderIntro(root, ctx) {
   root.replaceChildren();
   const intro = el('div', 'vm-intro');
-  // Count the questions a typical run sees ("Help me decide" shows the
-  // conditional charging question, matching the longest common path). fuel is
-  // multi-select now, so pass it as an array.
+  // Count the questions a typical run sees ("Help me decide" shows the conditional
+  // charging question). fuel is multi-select now, so pass it as an array.
   const count = visibleQuestions(ctx.questions, { fuel: ['open'] }).length;
   const copy = BRAND_COPY[ctx.brand] || BRAND_COPY.bmw;
-  // Authored overrides win; a blank row suppresses the line entirely, which is
-  // how the block sits under a host page's own "FIND YOUR MINI." heading
-  // without repeating it (see copyRow).
+  // Authored overrides win; a blank row suppresses the line entirely, so the block can
+  // sit under a host page's own heading without repeating it (see copyRow).
   const { title: titleOverride, kicker: kickerOverride } = ctx.overrides;
   const kicker = kickerOverride === undefined ? 'The unofficial UK matchmaker' : kickerOverride;
   const title = titleOverride === undefined ? copy.title : titleOverride;
@@ -1197,11 +766,8 @@ function renderIntro(root, ctx) {
 
 /* -------------------------- live "best guess" preview ---------------------- */
 
-// The debounce and the latest-wins guard live in ./preview-feed.js, shared with
-// the other modes that show a running guess. Everything below is this mode's
-// own: the strip, where it mounts, and what it paints.
-// Cross-fade duration when the tile row re-ranks (kept in sync with the CSS
-// transition on .vm-preview-track). Disabled under prefers-reduced-motion.
+// Debounce and latest-wins guard live in ./preview-feed.js; below is this mode's own
+// strip. Cross-fade duration for a re-rank (in sync with the .vm-preview-track transition).
 const PREVIEW_FADE_MS = 150;
 
 /** Can the engine score these answers yet? It hard-requires a valid budget. */
@@ -1214,10 +780,8 @@ function canPreview(ctx) {
 const PREVIEW_SKELETON_COUNT = 5;
 
 /**
- * Build the live preview section: a heading + a horizontal strip of small
- * "mini" result tiles (see previewTile). Since budget is set from the first
- * render, the section mounts straight away — showing skeleton tiles until the
- * first guess lands (see paintPreview), so it never snaps open.
+ * Build the live preview section: a heading + a horizontal strip of mini result tiles.
+ * Mounts straight away (budget is set from the first render), skeleton until the first guess lands.
  */
 function renderPreviewSection(ctx) {
   const section = el('section', 'vm-preview');
@@ -1245,11 +809,8 @@ function previewSkeletonTile() {
 }
 
 /**
- * Refill the strip from ctx.preview.matches, with a soft cross-fade so a re-rank
- * reads as "this just updated" rather than a hard jump. Reduced-motion users get
- * an instant swap (the CSS transition is disabled). With no matches yet (budget
- * is set from the off, so this is the initial load), paint skeleton tiles so the
- * bar holds its footprint instead of popping in when the first guess arrives.
+ * Refill the strip from ctx.preview.matches, with a soft cross-fade so a re-rank reads
+ * as "just updated". With no matches yet, paint skeleton tiles so the bar holds its footprint.
  */
 function paintPreview(section, ctx) {
   const track = section.querySelector('.vm-preview-track');
@@ -1275,20 +836,16 @@ function paintPreview(section, ctx) {
 }
 
 /**
- * Mount or update the preview for the current answers. The section lives at the
- * end of ctx.preview's host (`.vm-screen`): it mounts as soon as a budget is
- * set (skeleton tiles until the first guess lands), repaints on later updates,
- * and is only removed if we genuinely can't preview yet (no valid budget).
+ * Mount or update the preview for the current answers. Mounts as soon as a budget is
+ * set (skeleton until the first guess), repaints on updates, removed only if we can't preview.
  */
 function showPreview(ctx) {
   const screen = document.querySelector('.vm-screen');
   if (!screen) return;
   let section = screen.querySelector('.vm-preview');
   const { matches, loaded } = ctx.preview;
-  // Hide the strip only when there's genuinely nothing to show: no budget to
-  // score yet, or a guess has landed and returned zero matches. While a budget
-  // is set but the first guess hasn't arrived (!loaded), we keep the strip up
-  // with skeleton tiles (paintPreview) rather than removing it.
+  // Hide the strip only when there's nothing to show: no budget yet, or a guess landed
+  // with zero matches. While a budget is set but the first guess hasn't arrived, keep skeletons.
   if ((!canPreview(ctx) && !matches.length) || (loaded && !matches.length)) {
     section?.remove();
     return;
@@ -1302,14 +859,8 @@ function showPreview(ctx) {
 }
 
 /**
- * Ask the feed for a fresh guess and paint it when it lands. A no-op until a
- * budget is chosen, since the engine hard-requires one.
- *
- * The feed drops a response a newer answer has already superseded; `ctx.preview.seq`
- * is the coarser guard on top of it, for the run itself. Starting over
- * (see the retake button) bumps it, so a request from the finished run cannot
- * repopulate the strip of the new one — a fresh run must start empty even if
- * the old one's answers are still in flight.
+ * Ask the feed for a fresh guess and paint it when it lands (a no-op until a budget is set).
+ * `ctx.preview.seq` is a per-run guard: starting over bumps it so a late response can't repopulate the new run.
  */
 function schedulePreviewRefresh(ctx) {
   if (!canPreview(ctx)) return;
@@ -1323,12 +874,8 @@ function schedulePreviewRefresh(ctx) {
 }
 
 /**
- * A wrapping row of tap-to-edit summary pills — one per question answered
- * *before* the current one (the current question is what you're answering now,
- * so it's excluded). Tapping a pill jumps back to edit that answer and sets a
- * return point so advancing lands back on the question you left. Returns the
- * row element, or null when nothing's been answered yet.
- *
+ * A wrapping row of tap-to-edit summary pills, one per question answered before the
+ * current one. Tapping a pill jumps back to edit and sets a return point; null if none yet.
  * @param {number} index current question's position in the visible list
  */
 function renderAnswerPills(ctx, questions, index) {
@@ -1365,9 +912,8 @@ function renderQuestion(root, ctx, index) {
   progress.append(bar);
   screen.append(progress, el('p', 'vm-step', `Question ${index + 1} of ${questions.length}`));
 
-  // Summary pills for every question already answered before this one. Each is
-  // a tap-to-edit button: it jumps back to that question, remembering the
-  // current index so advancing returns straight here (see advance / jumpToEdit).
+  // Summary pills for every question already answered before this one, each a
+  // tap-to-edit button that remembers the current index so advancing returns here.
   const answeredPills = renderAnswerPills(ctx, questions, index);
   if (answeredPills) screen.append(answeredPills);
 
@@ -1376,10 +922,8 @@ function renderQuestion(root, ctx, index) {
 
   const advance = () => {
     const total = visibleQuestions(ctx.questions, ctx.answers).length;
-    // Editing a pill sets a return point: once this (earlier) question is
-    // re-answered, jump straight back rather than walking forward again. Only
-    // honour it when returning would actually move forward, and clamp to the
-    // live visible range (editing fuel can add/remove the charging question).
+    // Editing a pill sets a return point: once re-answered, jump back rather than walk
+    // forward. Only honour it when it moves forward, and clamp to the live visible range.
     const returnTo = ctx.editReturnIndex;
     if (returnTo != null) {
       ctx.editReturnIndex = null;
@@ -1391,9 +935,8 @@ function renderQuestion(root, ctx, index) {
   };
 
   const isSlider = q.type === 'slider';
-  // A slider is a single labelled input (its own role), not a radio/checkbox
-  // group, so it gets a bare container; an option list builds its own and
-  // arrives with the group role already on it (see question-ui.js).
+  // A slider is a single labelled input, so it gets a bare container; an option list
+  // builds its own and arrives with the group role already on it (see question-ui.js).
   let list;
   // The option list's live selection, which is what the Next button below is
   // enabled by. A slider always has a value, so it has no such set.
@@ -1403,9 +946,8 @@ function renderQuestion(root, ctx, index) {
     list = el('div', 'vm-options vm-slider');
     renderRangeSlider(list, q, ctx.answers, { onChange: () => schedulePreviewRefresh(ctx) });
   } else if (isSlider) {
-    // A range input plus a live value readout. The whole thing writes a number
-    // to ctx.answers[q.id] and, unlike a single-select, never auto-advances —
-    // the Next button (below) is the commit point, since any drag would fire.
+    // A range input plus a live readout, writing a number to ctx.answers[q.id]. Unlike
+    // a single-select it never auto-advances; the Next button is the commit point.
     list = el('div', 'vm-options vm-slider');
     const stored = ctx.answers[q.id];
     const startValue = typeof stored === 'number'
@@ -1446,10 +988,8 @@ function renderQuestion(root, ctx, index) {
       onChange: () => {
         // Multi-select commits via Next, so the button tracks the selection.
         if (q.multi) next.disabled = selected.size === 0;
-        // Refresh before advancing: the debounced fetch belongs to the mode
-        // rather than to this screen, so the next question's freshly-built
-        // drawer picks up the result (via the feed's latest-wins guard) even
-        // though this screen is about to be replaced.
+        // Refresh before advancing: the debounced fetch belongs to the mode, so the next
+        // question's drawer picks up the result even though this screen is about to be replaced.
         schedulePreviewRefresh(ctx);
       },
       onPick: advance,
@@ -1479,16 +1019,12 @@ function renderQuestion(root, ctx, index) {
   screen.querySelector('.vm-question').setAttribute('tabindex', '-1');
   screen.querySelector('.vm-question').focus({ preventScroll: true });
 
-  // Live "best guess" strip. If we already have matches cached (navigating
-  // Back/Next), mount it straight away so it doesn't flash out and back in;
-  // otherwise it appears once the refresh below lands. showPreview no-ops
-  // (and removes the strip) when there are no matches, so it's only ever on
-  // screen with content.
+  // Live "best guess" strip. Mount immediately if matches are cached (Back/Next) so it
+  // doesn't flash; showPreview removes it when there are no matches, so it's never empty.
   showPreview(ctx);
 
-  // Refresh on entering the question too, so navigating Back/Next (budget
-  // already set) updates the guess even without changing an answer. Cheap: the
-  // stock is served from the warmed cache and the call is debounced.
+  // Refresh on entering the question too, so Back/Next updates the guess without an answer
+  // change. Cheap: stock is served from the warmed cache and the call is debounced.
   schedulePreviewRefresh(ctx);
 }
 
@@ -1509,11 +1045,8 @@ function renderStatus(root, { kicker, title, message, retryLabel, onRetry }) {
 }
 
 /**
- * Skeleton placeholder for the intro screen, shown while the question set
- * loads (GET /api/questions). Mirrors renderIntro — kicker, title, two lede
- * lines, a CTA button block — so the boot reads as "the intro, arriving"
- * rather than a "Loading" status message that then swaps out. Reuses
- * the .vm-skel shimmer; reduced-motion users get a static tint.
+ * Skeleton placeholder for the intro screen, shown while the question set loads. Mirrors
+ * renderIntro's layout so the boot reads as "the intro, arriving" not a "Loading" status.
  */
 function renderIntroSkeleton(root) {
   root.replaceChildren();
@@ -1533,11 +1066,8 @@ function renderIntroSkeleton(root) {
 }
 
 /**
- * Skeleton placeholder for the results page, shown while /api/match is in
- * flight. Mirrors the real layout — kicker, title, one big hero card, a 2-up
- * row of compact tiles — so the load reads as "this page, arriving" rather
- * than a centred spinner that then jumps to a dense grid. The shimmer is CSS
- * (see .vm-skel); reduced-motion users get a static tint instead.
+ * Skeleton placeholder for the results page, shown while /api/match is in flight. Mirrors
+ * the real layout (hero card + compact tiles) so the load reads as "this page, arriving".
  */
 function renderResultsSkeleton(root) {
   root.replaceChildren();
@@ -1586,10 +1116,8 @@ function renderResultsSkeleton(root) {
 }
 
 /**
- * The "Worth the drive" band with its heading + lede but a skeleton carousel in
- * place of real tiles, shown while /api/nearby is in flight. Returns the
- * <section> so the caller can fill it (fillNearbyBand) or remove it. Built to
- * match the real band exactly so filling it in causes no layout shift.
+ * The "Worth the drive" band with a skeleton carousel, shown while /api/nearby is in
+ * flight. Returns the <section> to fill (fillNearbyBand) or remove; matches the real band exactly.
  */
 function renderNearbySkeleton(ctx, lede) {
   const band = el('section', 'vm-nearby-band');
@@ -1616,9 +1144,8 @@ function renderNearbySkeleton(ctx, lede) {
 }
 
 /**
- * Swap a nearby skeleton band (from renderNearbySkeleton) for the real
- * carousel of nearby-retailer matches, in place. Replaces only the track so
- * the heading/lede stay put.
+ * Swap a nearby skeleton band for the real carousel of nearby-retailer matches, in
+ * place. Replaces only the track so the heading/lede stay put.
  */
 function fillNearbyBand(band, ctx, nearby) {
   band.removeAttribute('aria-busy');
@@ -1635,46 +1162,34 @@ function fillNearbyBand(band, ctx, nearby) {
 async function renderResults(root, ctx, answers) {
   renderResultsSkeleton(root);
 
-  // Two-phase load. The retailer's own matches (fast: one feed) render first;
-  // the nearby-retailer carousel (slow: a national distance search) is fetched
-  // separately below so it never holds up the hero. See apiNearby / the
-  // .vm-nearby placeholder wired up further down.
+  // Two-phase load: the retailer's own matches (fast) render first; the nearby carousel
+  // (slow national search) is fetched separately below so it never holds up the hero.
   let matches;
-  // Whether the engine could actually pick a winner, and how big the tie is if
-  // not (see matchCars). Defaults to the old behaviour — an API that doesn't
-  // send `decisive` keeps getting the single-hero page it always rendered.
+  // Whether the engine could pick a winner, and how big the tie is if not. Defaults to
+  // the old behaviour, so an API without `decisive` keeps its single-hero page.
   let decisive = true;
   let clusterSize = 1;
   // Fit tied, but their stated priorities picked a winner (see matchCars).
   let tasteLead = false;
   // Held back by the API so a rejection has a next-best car to promote.
   let alternatives = [];
-  // How much stock was searched and how much survived the hard filters, so the
-  // page can show its working. Absent from an older API, in which case the
-  // working note simply never renders.
+  // How much stock was searched and how much survived the hard filters, so the page can
+  // show its working. Absent from an older API, in which case the working note never renders.
   let searched = null;
   // The one ranked list, once it exists. Nearby stock is merged into it when
   // the national search resolves (see addToPool below).
   let refine = null;
-  // What the retailer's own stock couldn't offer. Half the picture: nothing is
-  // said to the user until /api/nearby agrees (see agreedUnmet). An older API
-  // that doesn't send the field leaves this empty, so it simply never fires.
+  // What the retailer's own stock couldn't offer. Half the picture: nothing is said
+  // until /api/nearby agrees (see agreedUnmet); an older API leaves this empty.
   let retailerUnmet = {};
 
   /*
-   * Both searches leave together.
-   *
-   * They used to be serialised: await the local match, paint, and only then
-   * start the national search. That was right when nearby was a bonus
-   * carousel at the foot of the page. It stopped being right when nearby
-   * stock joined the one ranked list, because a late arrival now changes the
-   * ANSWER rather than adding a section, and starting it second guaranteed
-   * the change would land after the buyer had begun reading.
+   * Both searches leave together. Now that nearby stock joins the one ranked list, a
+   * late arrival changes the ANSWER, so starting it second would land after reading began.
    */
   const nearbyPromise = apiNearby(ctx.api, answers, ctx.retailer, ctx.brand);
-  // Swallow rejections at the source: this promise is now created before
-  // anything awaits it, and an unhandled rejection here would surface as a
-  // console error on a page that recovers perfectly well without nearby.
+  // Swallow rejections at the source: created before anything awaits it, an unhandled
+  // rejection would surface as a console error on a page that recovers fine without nearby.
   nearbyPromise.catch(() => {});
 
   try {
@@ -1694,15 +1209,8 @@ async function renderResults(root, ctx, answers) {
   }
 
   /*
-   * Give the national search a moment to catch up before painting.
-   *
-   * If it is already back, or arrives within GRACE_MS, its cars go into the
-   * FIRST paint and nothing moves afterwards. That is the common case now the
-   * two run in parallel. If it is genuinely slow we paint without it and
-   * stream it in, which is the old behaviour, now the exception.
-   *
-   * Resolves to null on timeout or failure, and `early === null` is what the
-   * code below reads as "still searching, show the placeholder".
+   * Give the national search a moment (GRACE_MS) to catch up: if it arrives in time its
+   * cars go into the FIRST paint, else we paint without it and stream it in. Null = still searching.
    */
   const early = await Promise.race([
     nearbyPromise.catch(() => null),
@@ -1722,33 +1230,16 @@ async function renderResults(root, ctx, answers) {
       el('p', 'vm-lede', `Nothing in ${ctx.retailerLabel}'s current stock fits those answers. Try loosening the budget or seating needs.`),
     );
   } else {
-    // How many cars lead the page as EQUALS. One when the engine genuinely
-    // picked a winner; otherwise the tie itself — never more, because the
-    // headline counts these and "three fit you equally well" must not be said
-    // over a third car that's four points back. Anything beyond this leads a
-    // quieter "More at <retailer>" tier, so a near-miss is demoted rather than
-    // dropped.
+    // How many cars lead the page as EQUALS: one when the engine picked a winner, else
+    // the tie itself, never more — the headline counts these and must not overclaim a near-miss.
     /*
-     * The frames, one per situation (docs/results-page-states.md).
-     *
-     * These used to be chosen ONCE, from the server's verdict about the
-     * original result set, and then reused however far the buyer narrowed.
-     * That is how "TWO OF THESE FIT YOU EQUALLY WELL" survived being applied
-     * to a 96% and a 73%. Now renderRefine picks between them on every
-     * redraw, from the scores actually on screen, so all this has to supply
-     * is the words for each case.
+     * The frames, one per situation (docs/results-page-states.md). renderRefine picks
+     * between them each redraw from on-screen scores, so all this supplies is the words.
      */
     const perfect = ({ model }) => `Your perfect ${brandName} is the ${model}.`;
     /*
-     * The same claim, scoped to the retailer whose page this is. Used only when
-     * a car elsewhere genuinely outranks the best one here — renderRefine picks
-     * the `…Here` variant per redraw off that one comparison, so the scope
-     * appears exactly where it is load-bearing and nowhere else.
-     *
-     * "at Grassicks Garage" is deflating read alone, and it is the accurate
-     * statement of what was searched: this block is authored onto ONE
-     * retailer's site, and a tool on their page answering "go to Group 1
-     * Bedford" is answering a different question than the page implies.
+     * The same claim scoped to this retailer, used only when a car elsewhere outranks the
+     * best here. Accurate about what was searched: the block is authored onto ONE site.
      */
     const perfectHere = ({ model, retailer }) => `Your perfect ${brandName} at ${retailer} `
       + `is the ${model}.`;
@@ -1763,15 +1254,8 @@ async function renderResults(root, ctx, answers) {
         lede: copy.closestLede(),
       },
       /*
-       * The leader misses the brief AND is below WEAK_SCORE: the page stops
-       * offering an answer and says so. It keeps the cards, because "here is
-       * how far off the nearest one is" is the evidence for the claim and
-       * withholding it would just be a shorter page — but nothing above them
-       * describes any of them as a match.
-       *
-       * Both keys are the same sentence: narrowing to one card must not turn
-       * this into a settled verdict about that card. The lede survives
-       * narrowing for the same reason.
+       * The leader misses the brief AND is below WEAK_SCORE: the page stops offering an
+       * answer but keeps the cards as evidence. Both keys are the same sentence, so narrowing to one card can't turn it into a settled verdict.
        */
       weak: {
         tied: () => copy.weakTitle({ retailer: ctx.retailerLabel }),
@@ -1809,20 +1293,12 @@ async function renderResults(root, ctx, answers) {
     screen.append(title, lede);
 
     /*
-     * One pool, one list. Everything the API returned goes in: the matches,
-     * the held-back alternatives a rejection can promote, and — later, when
-     * the national search resolves — the nearby retailers' stock too.
-     *
-     * The old page split these across three sections with three captions and
-     * three internal rankings, which is what made it possible for it to claim
-     * two cars fit best above a card scoring higher. See
-     * docs/results-page-review.md.
+     * One pool, one list: matches, held-back alternatives, and later the nearby stock. The
+     * old page's three ranked sections could claim a local car fit best above a higher-scoring one.
      */
     /*
-     * `early` is the national search when it beat the grace period. Its cars
-     * go into the FIRST paint, so the page arrives complete and nothing
-     * reshuffles under the buyer. When it lost the race this is empty and the
-     * list carries a placeholder instead, filled by applyNearby later.
+     * `early` is the national search when it beat the grace period, so its cars make the
+     * FIRST paint; when it lost, this is empty and a placeholder is filled by applyNearby later.
      */
     refine = renderRefine(
       ctx,
@@ -1835,11 +1311,8 @@ async function renderResults(root, ctx, answers) {
   }
 
   /*
-   * Nearby stock used to get its own "Worth the drive" carousel below
-   * everything else. It doesn't any more: it joins the one ranked list (see
-   * addToPool). What remains here is the empty case — when the retailer had
-   * nothing at all, there is no list to join, so the nearby cars ARE the
-   * results and get rendered as such.
+   * Nearby stock now joins the one ranked list (see addToPool), not its own carousel.
+   * What remains here is the empty case: with no local list to join, the nearby cars ARE the results.
    */
   const emptyLocal = !matches.length;
   const nearbyBand = emptyLocal
@@ -1867,9 +1340,8 @@ async function renderResults(root, ctx, answers) {
   retake.type = 'button';
   retake.addEventListener('click', () => {
     ctx.answers = {};
-    // Clear the strip's carried-over guess so a fresh run starts empty, and
-    // drop any in-flight/debounced refresh from the finished run (bump seq so a
-    // late-landing response from the old run is ignored).
+    // Clear the strip's carried-over guess for a fresh run, and bump seq so any
+    // in-flight/debounced refresh from the finished run is ignored when it lands.
     ctx.previewFeed.cancel();
     ctx.preview = { matches: [], seq: ctx.preview.seq + 1, loaded: false };
     ctx.editReturnIndex = null;
@@ -1890,16 +1362,8 @@ async function renderResults(root, ctx, answers) {
   root.append(screen);
 
   /*
-   * What to do with the national search, whenever it lands.
-   *
-   * Extracted so it can run either way: immediately, when the grace period
-   * caught it and its cars are already in the first paint, or later from the
-   * promise when it was too slow. The body is identical, which is the point.
-   *
-   * This is also where we learn whether a want the retailer couldn't meet is
-   * genuinely unavailable, so the unmet note goes here rather than with the
-   * hero. Claiming "no electric cars near you" while still waiting to hear
-   * from the retailers that might have one is exactly the mistake.
+   * What to do with the national search whenever it lands; runs either way (grace-caught into
+   * first paint, or later from the promise). Here we learn if a want is truly unavailable, so the unmet note lands here not the hero.
    */
   function applyNearby({ nearby, unmet }) {
     {
@@ -1907,17 +1371,13 @@ async function renderResults(root, ctx, answers) {
       // only touch the page if it's still in the document.
       if (!screen.isConnected) return;
 
-      // One insertion slot, two polarities (docs/results-page-states.md).
-      // State 4: both halves lack the want → "not anywhere nearby" (rare).
-      // State 3: missing here, met nearby → "not here, but N miles away" (the
-      // common case). Either way this only ever ADDS to the page — first
-      // paint's headline was written to stay true, so nothing is retracted.
+      // One insertion slot, two polarities (docs/results-page-states.md): state 4 "not anywhere
+      // nearby", state 3 "not here, but N miles away". Only ever ADDS; first paint stays true.
       const agreed = agreedUnmet(retailerUnmet, unmet);
       let note = unmetNote(ctx, agreed);
       let ordered = nearby;
-      // Which car the note ends up pointing at, so the "we looked further
-      // afield" notice can stand down for that one car rather than for the
-      // whole page (see renderRefine's noteShown).
+      // Which car the note points at, so the "we looked further afield" notice can stand
+      // down for that one car rather than the whole page (see renderRefine's noteShown).
       let notedCar = null;
       if (!note && unmet) {
         // Nearby answered and disagreed: whatever the retailer lacks that
@@ -1927,12 +1387,8 @@ async function renderResults(root, ctx, answers) {
           const left = values.filter((v) => !(agreed[id] || []).includes(v));
           if (left.length) rescued[id] = left;
         }
-        // The cars the note is about: those that HAVE the rescued want itself
-        // — not "zero trade-offs overall", which claims more than the note
-        // says and can be empty when the note is still true. Nearly every
-        // MINI plug-in hybrid is a Countryman: for a PHEV-hatchback ask no
-        // nearby car meets the whole brief, but "the nearest plug-in hybrid
-        // is 12 miles away" remains exactly what the buyer asked to know.
+        // The cars the note is about: those that HAVE the rescued want itself, not "zero
+        // trade-offs overall" — that claims more than the note says and can be empty when it's true.
         const resolves = (car) => (rescued.fuel || []).includes(car.fuel)
           || (rescued.bodyStyles || []).includes(car.body);
         const fits = nearby.filter((m) => resolves(m.car));
@@ -1945,9 +1401,8 @@ async function renderResults(root, ctx, answers) {
         }
       }
       if (note) {
-        // Above the cards, whatever frame they're in. The grid lives inside
-        // the refine host — walk up to the screen-level ancestor, or
-        // insertBefore throws on a non-child reference node.
+        // Above the cards, whatever frame they're in. The grid lives inside the refine host,
+        // so walk up to the screen-level ancestor or insertBefore throws on a non-child node.
         let anchor = screen.querySelector('.vm-refine, .vm-grid');
         while (anchor && anchor.parentElement !== screen) anchor = anchor.parentElement;
         // No cards at all (state 5): the note still belongs with the results,
@@ -1958,14 +1413,8 @@ async function renderResults(root, ctx, answers) {
         refine?.noteShown(notedCar);
       }
       /*
-       * The merge. Nearby cars join the one ranked list rather than forming a
-       * band beneath it, so the page never claims a local car fits best above
-       * a more distant one that scores higher. Each card says where it is, so
-       * "23 miles away · Arnold Clark Kirkcaldy" is the buyer's call to make
-       * with the facts in front of them.
-       *
-       * When the retailer had nothing at all there is no list to join, and
-       * the nearby cars are the results — they keep the standalone band.
+       * The merge. Nearby cars join the one ranked list, not a band beneath it, so the page
+       * never claims a local car beats a higher-scoring distant one. With no retailer list, they keep the standalone band.
        */
       if (refine) refine.addToPool(ordered);
       else if (nearbyBand && ordered.length) fillNearbyBand(nearbyBand, ctx, ordered);
@@ -1974,8 +1423,7 @@ async function renderResults(root, ctx, answers) {
   }
 
   /*
-   * Either the grace period caught it, in which case its cars are already in
-   * the first paint and this only adds the note, or it did not, in which case
+   * Grace-caught: cars are already in first paint and this only adds the note. Otherwise
    * the placeholder is on screen and this replaces it.
    */
   if (early) applyNearby(early);
@@ -1987,42 +1435,30 @@ async function renderResults(root, ctx, answers) {
 /* ------------------------------ decorate ------------------------------ */
 
 /*
- * The questionnaire interface as a mountable mode.
- *
- * The shell (../vehicle-matcher.js) has already read authored config and put
- * `api`, `retailer`, `retailerLabel`, `brand` and `overrides` on `ctx`, applied
- * the brand theme class to the block, and handed us `root` — a stage element we
- * own outright (we may replaceChildren() it freely). `mount` augments `ctx`
- * with this mode's own per-run state and navigation, then boots.
- *
- * `mount` is deliberately synchronous-return: EDS awaits the block's decorate()
- * before it reveals the page, and the shell doesn't await us, so a slow first
- * request never holds the document (or scrolling) hostage. We paint a skeleton
- * immediately and swap in the real thing when the questions land.
+ * The questionnaire interface as a mountable mode: the shell has prepared `ctx` and handed us
+ * `root`, and `mount` augments ctx with per-run state and navigation, then boots.
+ */
+/*
+ * `mount` returns synchronously on purpose: the shell doesn't await us, so a slow first request
+ * never holds the document hostage. We paint a skeleton now and swap in the real thing later.
  */
 function mount(root, ctx) {
   // Per-run UI state this mode owns, hung on the shared ctx.
   ctx.answers = {};
   ctx.questions = [];
-  // Live "best guess" strip state, kept on ctx so it survives the per-question
-  // re-render (see renderPreviewSection / schedulePreviewRefresh). `seq` counts
-  // the RUN, so starting over can disown a response the finished run is still
-  // waiting on; ordering within a run is the feed's own guard. `loaded` flips
-  // true once the first /api/preview response lands, so the strip can tell
-  // "still loading" (show skeleton) from "loaded, no matches" (hide the strip).
+  // Live "best guess" strip state on ctx so it survives per-question re-render. `seq` counts
+  // the RUN so starting over disowns stale responses; `loaded` distinguishes loading from no-matches.
   ctx.preview = { matches: [], seq: 0, loaded: false };
   // No `group`: the questions drawer shows individual cars, so its requests are
   // exactly what they always were.
   ctx.previewFeed = createPreviewFeed({
     api: ctx.api, retailer: ctx.retailer, brand: ctx.brand,
   });
-  // Set when a summary pill is tapped to edit an earlier answer: the index to
-  // return to once that answer is re-submitted (see renderAnswerPills /
-  // advance). Null the rest of the time.
+  // Set when a summary pill is tapped to edit an earlier answer: the index to return to once
+  // that answer is re-submitted (see renderAnswerPills / advance). Null the rest of the time.
   ctx.editReturnIndex = null;
-  // Where the preview strip mounts within the quiz screen. This is the one spot
-  // that differs by layout: here it sits at the END of the screen, i.e. below
-  // the Back/Next nav.
+  // Where the preview strip mounts within the quiz screen; the one spot that differs by
+  // layout. Here it sits at the END of the screen, below the Back/Next nav.
   ctx.mountPreview = (screen, section) => screen.append(section);
 
   ctx.showIntro = () => renderIntro(root, ctx);
@@ -2036,9 +1472,8 @@ function mount(root, ctx) {
 
   // The question set lives behind the API, so load it before rendering.
   const boot = async () => {
-    // Skeleton the intro while the question set loads — reads as the page
-    // arriving rather than a "Loading…" status. (A deep-link run swaps to the
-    // results skeleton a moment later inside renderResults.)
+    // Skeleton the intro while the question set loads, so it reads as the page arriving not a
+    // "Loading…" status. (A deep-link run swaps to the results skeleton inside renderResults.)
     renderIntroSkeleton(root);
     try {
       const meta = await apiGetQuestions(ctx.api, ctx.retailer, ctx.brand);

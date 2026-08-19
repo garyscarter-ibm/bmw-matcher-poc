@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-// Minimal zero-dependency static file server for local preview.
-// Serves the repo root on http://localhost:3000 so the EDS block's
-// ES modules load over http:// (they won't load from file://).
+// Minimal zero-dependency static file server for local preview: serves the repo root
+// on http://localhost:3000 so the EDS block's ES modules load over http:// (not file://).
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';

@@ -15,19 +15,14 @@
       background: #0d0f12;
       font-family: 'Helvetica Neue', helvetica, arial, sans-serif;
     }
-/* The harness stands in for a host page, so IT owns the page surface.
-   The block itself is transparent (the host section decides its
-   background), which is why this white lives here and not there.
-   Matches the block's own 1280px column (vehicle-matcher.css `.vm`) so the
-   white surface ends where the block does — a narrower wrapper here would
-   clamp the block back down and hide the change. */
+/* This page owns the page surface; the transparent block gets a white one here.
+   Width matches the block's own 1280px column (vehicle-matcher.css `.vm`), else a narrower wrapper clamps the block down and hides the change. */
 main {
   width: 100%; max-width: 1280px; margin: 0 auto; box-sizing: border-box;
   background: #fff;
 }
-/* Shared-password gate: a full-screen overlay over the harness's dark
-   surface. Purely for capturing the demo password (see the module script);
-   the server is the real gate. */
+/* Shared-password gate: a full-screen overlay over the harness's dark surface,
+   purely for capturing the demo password (see the module script). The server is the real gate. */
     .vm-gate {
       position: fixed; inset: 0; z-index: 1000;
       display: flex; align-items: center; justify-content: center;
@@ -58,10 +53,8 @@ main {
   </style>
 </head>
 <body>
-  <!-- The whole page is built by the module below: either the neutral brand
-       picker (no ?brand=) or the themed shell wrapping the real block. Nothing
-       is authored statically here so one page serves all five brands and the
-       picker off the same content map. -->
+  <!-- The whole page is built by the module below: either the neutral brand picker
+       (no ?brand=) or the themed shell wrapping the real block. Nothing is authored statically, so one page serves every brand and the picker off the same content map. -->
   <div id="demo-root"></div>
 
   <script type="module">
@@ -72,18 +65,8 @@ main {
     const params = new URLSearchParams(window.location.search);
 
     // ------------------------------------------------------------------
-    // Per-brand chrome content. CHROME COPY ONLY — the block's own retailer
-    // names still come from BRAND_RETAILER_NAMES below (carried over from
-    // block.html). Origins verified in server/brands.js. Voice drawn from the
-    // brands' documented tone (questionnaire.js BRAND_COPY, docs/tone-style-guide.md).
-    // No em dashes in on-screen copy (house style).
-    //
-    // logo:   /assets/brand-logos/<brand>.svg if present, else the text wordmark
-    //         fallback renders automatically (img onerror).
-    // hero:   /assets/brand-hero/<brand>.jpg if present, else the hero falls back
-    //         to the token accent band (.is-plain). Both assets are brand-owned
-    //         marketing material, committed for THIS internal pitch demo only —
-    //         do not ship to production (see the plan's licensing note).
+    // Per-brand chrome content. CHROME COPY ONLY (retailer names come from BRAND_RETAILER_NAMES; origins from server/brands.js; voice from questionnaire.js BRAND_COPY + docs/tone-style-guide.md; no em dashes in on-screen copy).
+    // logo/hero use /assets/brand-logos/<brand>.svg and /assets/brand-hero/<brand>.jpg if present, else a text-wordmark / token-accent-band fallback. Brand-owned assets committed for THIS internal demo only — do not ship.
     // ------------------------------------------------------------------
     const BRANDS = {
       bmw: {
@@ -156,10 +139,8 @@ main {
           + 'is not an official BMW Motorrad site and is not affiliated with or '
           + 'endorsed by BMW Motorrad.',
       },
-      // Ferrari's voice is Italian, romantic and heritage-led: a Ferrarista
-      // joining a bloodline, not a shopper. It leads on the drive and the feeling,
-      // names the official "Ferrari Approved" programme, and stays warm and
-      // unhurried (see BRAND_COPY.ferrari in modes/questionnaire.js). No em dashes.
+      // Ferrari's voice is Italian, romantic and heritage-led (a Ferrarista joining a bloodline,
+      // not a shopper): leads on drive and feeling, names "Ferrari Approved" (see BRAND_COPY.ferrari in modes/questionnaire.js). No em dashes.
       ferrari: {
         label: 'Ferrari',
         origin: 'preowned.ferrari.com',
@@ -181,10 +162,8 @@ main {
     const PICKER_ORDER = ['bmw', 'mini', 'ford', 'honda', 'motorrad', 'ferrari'];
 
     // ---- carried over verbatim from block.html ------------------------------
-    // Each brand's default demo retailer name, so switching brand alone doesn't
-    // leave a mismatched "...at Grassicks BMW". Honda/Ford/Motorrad are national
-    // programmes, so they use the programme name. Precedence: ?retailerName=
-    // beats the ?retailer= ID map beats the ?brand= default.
+    // Each brand's default demo retailer name, so switching brand alone doesn't leave a mismatched
+    // "...at Grassicks BMW" (national programmes for Honda/Ford/Motorrad). Precedence: ?retailerName= > ?retailer= ID map > ?brand= default.
     const BRAND_RETAILER_NAMES = {
       bmw: 'Grassicks BMW', // Grassicks Garage, Perth (retailer 96)
       mini: 'Sytner Luton MINI', // retailer 92
@@ -208,13 +187,8 @@ main {
       .map((l) => `<a href="#" onclick="return false">${esc(l)}</a>`)
       .join('');
 
-    // A brand logo as a real DOM node: an <img> pointing at the committed SVG,
-    // that quietly replaces ITSELF with a styled text wordmark if the file is
-    // missing (so a brand with no committed mark still renders on-brand). Built
-    // as a node with a real error listener rather than an inline onerror string
-    // — a JSON label inside a double-quoted onerror attribute inside a template
-    // literal breaks the HTML parser (double-quote collision). This avoids all
-    // of that.
+    // A brand logo as a real DOM node: an <img> at the committed SVG that replaces itself with a
+    // text wordmark on error. Built with a real error listener, not an inline onerror string, to avoid a double-quote collision (JSON label in a "-quoted attribute in a template literal breaks the HTML parser).
     function logoNode(key, label, textClass) {
       const img = document.createElement('img');
       img.src = `assets/brand-logos/${key}.svg`;
@@ -228,17 +202,8 @@ main {
       return img;
     }
 
-    // Resolve a brand's picker-accent straight from the CSS design tokens, so the
-    // picker keeps no second copy of the palette (demo-chrome.css's guiding rule:
-    // one source of truth, zero duplicated colour). The tokens live on
-    // `.vm.vm-<brand>` in tokens.css; the neutral picker deliberately sits OUTSIDE
-    // that scope, so read them off a throwaway, unrendered probe that carries those
-    // classes. We use --vm-accent-spot, NOT --vm-accent: spot is the highlight-safe
-    // variant built to stay legible on a dark ground for every brand (the raw
-    // accent is near-black for MINI, invisible here). Base `.vm` defaults spot to
-    // var(--vm-accent), so every brand — including a future one that only sets
-    // --vm-accent — resolves a value. Falls back to the neutral blue if a brand
-    // somehow resolves nothing.
+    // Resolve a brand's picker-accent from the CSS tokens (no duplicated palette) via a throwaway
+    // `.vm.vm-<brand>` probe, since the neutral picker sits outside that scope. Use --vm-accent-spot NOT --vm-accent: spot stays legible on a dark ground (raw accent is near-black for MINI); falls back to neutral blue.
     function brandAccent(key) {
       const probe = document.createElement('span');
       probe.className = `vm vm-${key}`;
@@ -266,23 +231,16 @@ main {
         const b = BRANDS[key];
         const tile = document.createElement('a');
         tile.className = 'demo-picker-tile';
-        // Paint this tile's hover highlight in the brand's own spot colour,
-        // resolved from the CSS tokens (see brandAccent). The hover rule in
-        // demo-chrome.css reads it back as var(--tile-accent).
+        // Paint this tile's hover highlight in the brand's own spot colour (see brandAccent);
+        // the hover rule in demo-chrome.css reads it back as var(--tile-accent).
         tile.style.setProperty('--tile-accent', brandAccent(key));
-        // Carry the current query through the hop, overriding only the brand.
-        // These are plain links that reload the page, so a hand-built
-        // `?brand=x` silently dropped every other param: ?api= pointed the demo
-        // at a specific backend, then the first tile click sent it back to the
-        // default. ?retailer=, ?retailerName= and ?mode= were lost the same way.
-        // ?key= is already stripped from params below (it moves into
-        // sessionStorage), so the password cannot leak back into a URL here.
+        // Carry the current query through the hop, overriding only the brand: a hand-built `?brand=x`
+        // would drop every other param (?api=, ?retailer=, ?retailerName=, ?mode=). ?key= is already stripped into sessionStorage, so the password can't leak back into a URL here.
         const query = new URLSearchParams(params);
         query.set('brand', key);
         tile.href = `?${query}`;
-        // The mark sits on a white plate so it reads on the dark tile (see
-        // .demo-picker-logo). Its error-fallback wordmark lands on that same
-        // plate, so it carries the label class that the plate darkens.
+        // The mark sits on a white plate so it reads on the dark tile (see .demo-picker-logo);
+        // its error-fallback wordmark lands on that same plate, so it carries the label class the plate darkens.
         const plate = document.createElement('span');
         plate.className = 'demo-picker-logo';
         plate.append(logoNode(key, b.label, 'demo-picker-tile-label'));
@@ -296,10 +254,8 @@ main {
     }
 
     // ------------------------------------------------------------------
-    // Themed shell: nav + hero + tool section + footer, wrapping the real block.
-    // The wrapper carries `vm vm-<brand> demo-shell` so brand tokens cascade to
-    // the chrome (see demo-chrome.css for how the .vm layout is neutralised).
-    // Returns the .vehicle-matcher block element ready to decorate.
+    // Themed shell: nav + hero + tool + footer wrapping the real block. The wrapper carries
+    // `vm vm-<brand> demo-shell` so brand tokens cascade to the chrome (see demo-chrome.css). Returns the block element ready to decorate.
     // ------------------------------------------------------------------
     function renderShell(brandKey) {
       const b = BRANDS[brandKey];
@@ -386,35 +342,17 @@ main {
         || RETAILER_NAMES[retailerOverride]
         || (brandOverride && BRAND_RETAILER_NAMES[brandOverride.toLowerCase()]);
       if (nameOverride) setRow('retailer name', nameOverride);
-      // Title is already authored to "none" in the shell markup to suppress the
-      // block's own H1 (the hero owns the headline). ?mode= is read by the block
-      // itself, so it needs no row here.
+      // Title is authored "none" in the shell markup to suppress the block's own H1 (the hero
+      // owns the headline). ?mode= is read by the block itself, so it needs no row here.
     }
 
     // ------------------------------------------------------------------
-    // Password gate — carried over from block.html, but here it runs before
-    // ANY view renders, picker included: the whole demo sits behind the shared
-    // password, so a visitor sees the prompt rather than the brand tiles.
+    // Password gate — carried over from block.html, but here it runs before ANY view renders
+    // (picker included), so a visitor sees the prompt rather than the brand tiles.
     // ------------------------------------------------------------------
 
-    // The backend the block will talk to. Authored as the shell's data-api and
-    // resolved up front too, so the gate can tell local dev from a deployed API
-    // before there is a block to read it off.
-    //
-    // Derived from where the PAGE is served rather than hardcoded, because the
-    // Pages deploy rewrite cannot reach this value. That step seds a data-api
-    // attribute whose value is the localhost URL spelled out in full, which
-    // block.html has but this file does not: the shell authors it as the
-    // ${DEFAULT_API} placeholder, which the pattern never matches. So the
-    // published homepage kept calling localhost from an https origin, which the
-    // browser reports as a CORS failure, and the gate below read the same stale
-    // value and skipped the password prompt while the block called a keyed API
-    // bare. Reading window.location is right on every host with no build step
-    // involved. (Do not write that attribute-and-value literal anywhere in this
-    // file: the deploy would rewrite it, including inside a comment.)
-    //
-    // Keep REMOTE_API in step with API_URL in .github/workflows/pages.yml; that
-    // env var still drives block.html's rewrite.
+    // The backend the block talks to, derived from window.location (NOT hardcoded) because the Pages deploy's data-api rewrite can't reach the ${DEFAULT_API} placeholder and would leave the published page calling localhost. Keep REMOTE_API in step with API_URL in .github/workflows/pages.yml.
+    // Do NOT write the literal data-api attribute + localhost-URL anywhere in this file, even in a comment: the deploy step would rewrite it.
     const LOCAL_API = 'http://localhost:8787';
     const REMOTE_API = 'https://bmw-matcher-api.onrender.com';
     const pageIsLocal = window.location.protocol === 'file:'
@@ -480,10 +418,8 @@ main {
       const block = renderShell(brandKey);
       applyOverrides(block);
 
-      // A 401 on a load-bearing call clears the stored key and fires
-      // vm-auth-failed; re-prompt and remount. This is the real gate: it fires
-      // whenever the server actually rejects a request, whatever we assumed
-      // below — so a keyed server still prompts even on localhost.
+      // A 401 on a load-bearing call clears the stored key and fires vm-auth-failed; re-prompt and remount.
+      // This is the real gate: it fires whenever the server rejects a request, so a keyed server still prompts even on localhost.
       window.addEventListener('vm-auth-failed', () => {
         if (document.querySelector('.vm-gate')) return;
         askForPassword('That password was not right. Please try again.')
@@ -493,14 +429,8 @@ main {
       decorate(block);
     }
 
-    // Whether to prompt for the password up front. A local dev backend runs
-    // keyless (DEMO_ACCESS_KEY unset -> auth off, see server/index.js), so a
-    // pre-emptive prompt on localhost is pure friction: the server returns 200
-    // without a key. So when the page is served locally (pageIsLocal, computed
-    // above) OR it points at a localhost API we render straight away and let the
-    // vm-auth-failed handler in render() catch the (unexpected) case where that
-    // local server *is* keyed. A remote/deployed API keeps the up-front prompt,
-    // and it lands before the brand tiles rather than after.
+    // Whether to prompt up front: a keyless local backend returns 200 without a key, so a prompt is pure friction. When the page is served locally OR points at a localhost API, render straight away and let render()'s vm-auth-failed handler catch a (unexpectedly) keyed local server.
+    // A remote/deployed API keeps the up-front prompt, landing before the brand tiles.
     const apiHost = (() => {
       try { return new URL(params.get('api') || DEFAULT_API, window.location.href).hostname; }
       catch { return ''; }

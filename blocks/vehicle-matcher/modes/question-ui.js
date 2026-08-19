@@ -1,20 +1,6 @@
 /*
- * The question widgets, shared by every mode that asks the buyer something.
- *
- * Lifted out of modes/questionnaire.js when a second mode (podium) needed to ask
- * the same questions inside a different frame. They could not simply be called
- * from there: each widget reached into the questionnaire's own `ctx` to write
- * the answer, and the slider called that mode's debounced preview refresh BY
- * NAME, so reusing a slider meant importing the questionnaire's whole preview
- * strip with it.
- *
- * So the coupling is inverted. A widget is handed the answers object it writes
- * into and a callback to fire once it has written, and knows nothing else about
- * the screen it is mounted in — which is what lets one mode refresh a strip on
- * every commit while another does nothing at all.
- *
- * What a question IS still lives behind the API and in ../quiz-meta.js; this is
- * only how one is drawn.
+ * Shared question widgets. Coupling is inverted so a widget writes into a given
+ * answers object and fires a callback, knowing nothing about the screen it's in.
  */
 
 import { SHOW_IF } from '../quiz-meta.js';
@@ -32,9 +18,8 @@ export function visibleQuestions(questions, answers) {
 }
 
 /**
- * Format a slider value for its readout, per the question's `format` hint:
- *   'gbp' → "£62,000", 'int' → "12,000" (with an optional `unit` suffix).
- * At the ceiling of a `plusAtMax` slider, append "+" ("£150,000+", "25,000+").
+ * Format a slider value for its readout per the question's `format` hint (gbp/int
+ * with optional unit). At a `plusAtMax` slider's ceiling, append "+".
  */
 export function formatSliderValue(value, q) {
   const base = q.format === 'gbp' ? gbp(value) : `${value.toLocaleString('en-GB')}${q.unit || ''}`;
@@ -47,14 +32,8 @@ export function formatRange([lo, hi], q) {
 }
 
 /**
- * A dual-thumb range slider (budget): two native range inputs overlaid on one
- * track, writing a [min, max] pair to answers[q.id]. The thumbs can't cross
- * (kept at least one step apart). Appends readout + track + bounds to `list`.
- *
- * `onChange` fires after every commit, including the one below that happens
- * before the user has touched anything: the starting value is persisted
- * immediately so the caller's Next button is enabled without a drag, and a mode
- * that previews its answers wants that first value as much as any later one.
+ * A dual-thumb range slider (budget) writing [min, max] to answers[q.id]. onChange
+ * fires on every commit, including the immediate initial persist so Next enables without a drag.
  */
 export function renderRangeSlider(list, q, answers, { onChange } = {}) {
   const stored = answers[q.id];
@@ -122,19 +101,8 @@ export function renderRangeSlider(list, q, answers, { onChange } = {}) {
 }
 
 /**
- * The option buttons for a multi- or single-select question, as a role-carrying
- * `.vm-options` list the caller mounts wherever it likes.
- *
- * The live `selected` Set comes back with it, because the commit affordance is
- * the caller's: the questionnaire greys its own Next button while nothing is
- * picked, and a mode with no Next button needs neither the Set nor a callback
- * about it. Handing back the same Set the buttons mutate keeps the two in step
- * without this knowing what the caller does with it.
- *
- * `onChange` fires after ANY answer mutation. `onPick` fires only after a
- * single-select tap, and after `onChange`, because a mode that auto-advances on
- * a tap must still have committed the answer before it moves.
- *
+ * Option buttons for a multi/single-select question as a role-carrying `.vm-options`
+ * list. Returns the live `selected` Set so the caller owns commit; onChange fires on any mutation, onPick after a single-select tap.
  * @returns {{ list: HTMLElement, selected: Set }}
  */
 export function renderOptionList(q, answers, { onChange, onPick } = {}) {
@@ -172,10 +140,8 @@ export function renderOptionList(q, answers, { onChange, onPick } = {}) {
         onChange?.();
       } else {
         answers[q.id] = opt.value;
-        // Reflect the pick in the UI. The questionnaire auto-advances on a
-        // single-select tap so the un-highlighted button is never seen, but a
-        // mode that keeps every question on screen (podium) needs the selected
-        // state painted here. Single-select, so exactly one button is on.
+        // Paint the selected state here for modes that keep questions on screen
+        // (podium); the questionnaire auto-advances so it never sees it. One button on.
         selected.clear();
         selected.add(opt.value);
         optionButtons.forEach(({ button, value }) => {

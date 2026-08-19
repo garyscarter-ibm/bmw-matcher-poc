@@ -1,27 +1,6 @@
 /*
- * BMW UK dealer directory client.
- *
- * The used-car feed (stock.js) tells us which retailer sells a car, but not
- * where that retailer is: `retailer_site` carries only
- * { id, name, contact_number, dealer_number }. To ask the feed for stock
- * *near* a retailer we need that retailer's postcode, and the used-car
- * platform has no endpoint that gives one.
- *
- * BMW's own "Find a BMW Centre" page does. Two iframes deep, it calls the
- * endpoint below for the full UK dealer list — including postcode and
- * coordinates — keyed by `dealer_number`, which is exactly the field the
- * used-car feed already gives us. That shared key is what makes
- * "retailer 96" → "PH1 3GA" possible without a hand-maintained table:
- *
- *   retailer_site=96 → dealer_number 11107 → directory → PH1 3GA
- *
- * Caveats worth knowing before you touch this:
- *  1. Undocumented and not ours. The hostname says "develop" but it IS what
- *     bmw.co.uk's production locator calls (there is no -prod sibling). It
- *     could move without notice — every caller must degrade gracefully.
- *  2. It's ~2MB. Fetched at most once per process and reduced to the four
- *     fields we use; never put it in a request's hot path.
- *  3. Node 16 in local dev has no global fetch — node:https, like stock.js.
+ * BMW UK dealer directory client. The used-car feed gives a car's `dealer_number` but not
+ * its location; BMW's undocumented, third-party "Find a Centre" endpoint maps it → postcode.
  */
 
 import { request } from 'node:https';
@@ -63,9 +42,8 @@ function httpsGet(url) {
 }
 
 /**
- * The payload has been a bare array in every observed response, but it's a
- * third-party shape we don't control — accept the obvious envelopes too
- * rather than throwing on a wrapper appearing.
+ * Payload is a bare array in every observed response, but it's a third-party shape:
+ * accept the obvious envelopes too rather than throwing on a wrapper appearing.
  */
 function recordsFrom(payload) {
   if (Array.isArray(payload)) return payload;
@@ -85,9 +63,8 @@ function project(d) {
   };
 }
 
-// Memoised for the process lifetime: a dealer's address doesn't move, and
-// this is a 2MB fetch against someone else's server. Holds the in-flight
-// promise too, so concurrent first-callers share one request.
+// Memoised for the process lifetime (a 2MB fetch, addresses don't move); holds the
+// in-flight promise too, so concurrent first-callers share one request.
 let directoryPromise = null;
 
 /**
@@ -120,9 +97,8 @@ export function fetchDealerDirectory() {
       throw new DirectoryUnavailableError('Dealer directory payload was not a list');
     }
 
-    // ~1,131 records collapse to ~144 unique dealer_numbers: the same dealer
-    // appears once per address_type (CORPORATE, ONLINE, …). The duplicates
-    // agree on postcode, so first-wins is fine.
+    // ~1,131 records collapse to ~144 unique dealer_numbers (one per address_type).
+    // The duplicates agree on postcode, so first-wins is fine.
     const byNumber = new Map();
     for (const d of records) {
       const key = d?.dealer_number != null ? String(d.dealer_number) : '';

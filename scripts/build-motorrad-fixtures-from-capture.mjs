@@ -1,34 +1,6 @@
 /*
- * Build fixtures/motorrad-bikes.json from a REAL captured feed response.
- *
- * The BMW Motorrad approved-used listing is a session-gated AngularJS app: its
- * feed (POST /api/ResultOverview/ShowResultsFilterChanged, authed with a GMB-SID
- * header the server binds to a live browser session + egress IP) answers a
- * scripted request from this environment with a null envelope. So the real rows,
- * and their real per-vehicle photos, can only be captured from a browser (see the
- * [motorrad-images] entry in DECISIONS.md for the recipe).
- *
- * The feed does return real data — but its `ResTable` is a server-rendered HTML
- * <table> string, one <tr> per bike, NOT a JSON array (that assumption is why the
- * old synthetic fixtures had no images: no field ever held a photo URL). This
- * script turns a capture into fixtures WITHOUT re-deriving anything: it runs the
- * saved envelope through the SAME production path the live adapter uses —
- * motorradRowsFromEnvelope (which parses the HTML ResTable) -> mapMotorradRaw —
- * so the committed snapshot is identical in shape to what the feed serves live,
- * real images and all. If the captured markup differs from what the parser reads,
- * fix it in motorrad-listing.js (one place, shared with the live adapter).
- *
- * Capture recipe (browser, one minute):
- *   1. Open https://approvedused.bmw-motorrad.co.uk/ and let the results load.
- *   2. DevTools > Network > filter "ShowResultsFilterChanged" (or "ShowResults").
- *   3. Right-click the request > Copy > Copy response  (or Save all as HAR).
- *   4. Paste the response into a file, e.g. /tmp/motorrad-capture.json. The
- *      response is a JSON envelope whose ResTable field is an HTML string; save
- *      it verbatim. (A HAR works too: this script digs the response body out.)
- *      A bare ResTable HTML fragment is also accepted (wrapped as an envelope).
- *
- * Run:  node scripts/build-motorrad-fixtures-from-capture.mjs /tmp/motorrad-capture.json
- * Out:  fixtures/motorrad-bikes.json  (mapped bikes the engine scores)
+ * Build fixtures/motorrad-bikes.json from a REAL browser-captured feed response (the session-gated BMW Motorrad feed returns null to scripted requests). Its ResTable is a server-rendered HTML table, not JSON, so this runs the saved envelope through the live adapter's own path — motorradRowsFromEnvelope -> mapMotorradRaw — deriving nothing here; fix parser drift in motorrad-listing.js. Capture recipe in DECISIONS.md [motorrad-images]; accepts a raw envelope, a HAR, or a bare ResTable fragment.
+ * Run:  node scripts/build-motorrad-fixtures-from-capture.mjs /tmp/motorrad-capture.json   ->  fixtures/motorrad-bikes.json
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -65,9 +37,8 @@ try {
   }
 }
 
-/* Accept either a raw feed response or a full HAR export. In a HAR, the feed
- * response body is a string under log.entries[].response.content.text on the
- * ShowResults* request; dig it out and re-parse. */
+/* Accept either a raw feed response or a full HAR export; in a HAR, the feed body
+ * lives under log.entries[].response.content.text on the ShowResults* request. */
 function envelopeFrom(root) {
   if (root?.log?.entries) {
     const entry = root.log.entries.find((e) => /ShowResults/i.test(e?.request?.url || ''));
@@ -81,9 +52,8 @@ function envelopeFrom(root) {
 }
 
 const env = envelopeFrom(parsed);
-// motorradRowsFromEnvelope now returns already-flat raw records: it parses the
-// HTML ResTable (the real shape) itself, and projects a JSON array through
-// motorradRowToRaw for us. So we map straight to the engine schema from here.
+// motorradRowsFromEnvelope returns already-flat raw records (it parses the HTML
+// ResTable itself), so we map straight to the engine schema from here.
 const rows = motorradRowsFromEnvelope(env);
 if (rows.length === 0) {
   console.error('The capture held no vehicle rows. If SearchFilter is null, the');

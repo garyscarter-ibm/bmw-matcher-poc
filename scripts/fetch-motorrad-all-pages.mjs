@@ -1,29 +1,6 @@
 /*
- * Fetch the WHOLE BMW Motorrad approved-used deck by replaying a captured cURL.
- *
- * The listing feed (POST /api/ResultOverview/ShowResults) is session-gated: its
- * GMB-SID header is bound to a live browser session + egress IP, so a cold
- * scripted request answers with a null envelope. But a cURL copied from the
- * browser (DevTools > Network > the ShowResults request > Copy as cURL) carries
- * that live session, and the POST body is a compact request object whose
- * ResOverviewData.selectedPage is the only thing that changes between pages.
- *
- * So we capture ONE cURL, then replay it once per page (1..ceil(total/20)),
- * bumping selectedPage, concatenating every page's HTML ResTable. One paste from
- * the human, one command here, the entire real deck — real per-listing photos
- * and all — instead of hand-capturing 49 pages.
- *
- * The response is a JSON envelope { SearchFilter: null, ResTable: "<html>",
- * ResOverviewData: { totalItemCount, selectedPage, ... }, ErrMsg }. We read
- * totalItemCount off page 1 to learn how many pages to walk, parse each ResTable
- * with the SAME production parser the live adapter uses (motorrad-listing.js),
- * dedupe rows by offer id, map through mapMotorradRaw, and write the fixture.
- *
- * Run:  node scripts/fetch-motorrad-all-pages.mjs /tmp/motorrad.curl
- * Out:  fixtures/motorrad-bikes.json   (every mappable bike, real photos)
- *
- * The session in the cURL expires; if a page comes back null, recapture the cURL
- * and re-run. This is a build-time tool, not a live server path.
+ * Fetch the WHOLE BMW Motorrad approved-used deck by replaying a captured cURL (DevTools > the ShowResults request > Copy as cURL), which carries the session-bound GMB-SID a cold request lacks. Replays it once per page bumping ResOverviewData.selectedPage, reads totalItemCount off page 1, parses each HTML ResTable with the production parser (motorrad-listing.js), dedupes by offer id and maps through mapMotorradRaw. Build-time tool; a null page means the captured session expired — recapture the cURL and re-run.
+ * Run:  node scripts/fetch-motorrad-all-pages.mjs /tmp/motorrad.curl   ->  fixtures/motorrad-bikes.json
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -39,9 +16,8 @@ const OUT = join(REPO_ROOT, 'fixtures', 'motorrad-bikes.json');
 const curlPath = process.argv[2] || '/tmp/motorrad.curl';
 const raw = readFileSync(curlPath, 'utf8');
 
-/* Parse the copied cURL into { url, headers, body }. Copy-as-cURL emits one flag
- * per line joined by "\ \n"; we tolerate that and single-line forms. Values are
- * single-quoted; a literal ' inside is escaped by Chrome as '\'' — unwrap it. */
+/* Parse the copied cURL into { url, headers, body }, tolerating both multi-line and
+ * single-line forms. Values are single-quoted; a literal ' is escaped by Chrome as '\'' — unwrap it. */
 function parseCurl(text) {
   const unquote = (s) => s.replace(/^'/, '').replace(/'$/, '').replace(/'\\''/g, "'");
   const url =

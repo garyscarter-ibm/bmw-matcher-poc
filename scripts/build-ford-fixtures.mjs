@@ -1,34 +1,6 @@
 /*
- * Build fixtures/ford-cars.json — SYNTHETIC deterministic deck (superseded).
- *
- * NOTE (2026-08-13): the committed fixtures/ford-cars.json is now a REAL one-off
- * capture, built by scripts/build-ford-fixtures-from-capture.mjs — Ford's live
- * feed turned out to be reachable (the "Akamai HTTP 000 block" below was a missing
- * header block, not an edge drop). This synthetic builder is kept only for a
- * deterministic, network-free dev deck; running it will OVERWRITE the real snapshot
- * with synthesised cars (no photos, homepage links). Prefer the from-capture builder.
- *
- * The historical rationale, left for context:
- * Ford's live approved-used feed (servicescache.ford.com) was believed to be behind
- * an Akamai edge that drops the connection from this environment (HTTP 000 regardless
- * of method/UA/headers), so unlike Honda there was no raw dump to replay. Instead this
- * script SYNTHESISES a realistic flat-raw dataset
- * — a spread of derivatives per model line, with representative used prices,
- * mileages and plates — and projects it through mapFordRaw(), the same flat-raw
- * → mapped-car projection the live adapter will use once it is reachable. So the
- * fixtures are deterministic, regenerable, and exercise the whole Ford range:
- * the ST/Mustang performance halo, the EV + PHEV split, MPVs, a pickup.
- *
- * Model figures live in server/mapping.js (MODEL_SPECS_FORD); this file only
- * decides WHICH cars exist and at what price/mileage, so a mapping change
- * re-projects here for free. Spec figures were reconciled against carwow /
- * Auto Express / Parkers (see the Ford section of DECISIONS.md).
- *
- * Deterministic: no Date.now()/Math.random() — a fixed LCG seeded per index —
- * so the committed JSON is stable across runs and diffs stay readable.
- *
- * Run:  node scripts/build-ford-fixtures.mjs
- * Out:  fixtures/ford-cars.json  (mapped cars the engine scores)
+ * Build fixtures/ford-cars.json — SYNTHETIC deterministic deck (SUPERSEDED: the committed fixtures are now a real capture from build-ford-fixtures-from-capture.mjs; running this OVERWRITES that snapshot with synthesised cars — no photos, homepage links — so use it only for a network-free dev deck). Synthesises a varied flat-raw deck and projects it through mapFordRaw() (specs from MODEL_SPECS_FORD); deterministic via a per-index LCG (no Date/Math.random) so diffs stay readable.
+ * Run:  node scripts/build-ford-fixtures.mjs   ->  fixtures/ford-cars.json
  */
 
 import { writeFileSync } from 'node:fs';
@@ -52,11 +24,8 @@ function rng(seed) {
   };
 }
 
-/* Each line: how many to emit, the model's title, its derivative variants
- * (trim + engine string as a used listing would read), a fuel hint, and a
- * price band [min, max] for a 2-4 year-old example. The mapper derives body,
- * fuel, specs and the performance halo from title+derivative — this table just
- * populates a realistic, varied deck. */
+/* Each line: count, title, derivative variants (trim + engine string + fuel hint) and a
+ * used-price band. The mapper derives body/fuel/specs/halo from title+derivative; this just seeds a varied deck. */
 const LINES = [
   {
     title: 'Fiesta', count: 7, priceBand: [8500, 15500],

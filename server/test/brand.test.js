@@ -136,8 +136,7 @@ test('MINI copy differs from BMW in words but keeps identical option values', ()
   assert.notEqual(miniById.priorities.title, bmwById.priorities.title);
 
   // But every option VALUE is unchanged for questions common to both brands
-  // (style is MINI-dropped, so it's not in this list), so the scoring engine
-  // sees the same answer space where a question is shared.
+  // (style is MINI-dropped), so the engine sees the same shared answer space.
   for (const id of ['primaryUse', 'people', 'priorities', 'charging']) {
     const bmwVals = (bmwById[id].options || []).map((o) => o.value).sort();
     const miniVals = (miniById[id].options || []).map((o) => o.value).sort();
@@ -207,9 +206,8 @@ test('brand tuning: MINI hard-filters do not exclude a Countryman for a family',
 });
 
 test('body binding applies to BMW too, but still yields when no right shape fits', () => {
-  // BMW honoured a named shape in only 53% of top-3s until body moved to
-  // 4.5 / miss 0 (see BMW_TUNING). A right-shape car that fits the brief must
-  // beat a wrong-shape one that's stronger everywhere else...
+  // Body was lifted to 4.5 / miss 0 (see BMW_TUNING): a right-shape car that
+  // fits the brief must beat a wrong-shape one that's stronger everywhere else...
   const estate = {
     id: 'touring', name: 'BMW 320d Touring', line: '3 Series', body: 'estate', fuel: 'diesel',
     priceMin: 34000, priceMax: 34000, sizeClass: 2, seats: 5, boot: 500, zeroTo62: 7.4,
@@ -234,9 +232,8 @@ test('body binding applies to BMW too, but still yields when no right shape fits
 });
 
 test('body binding: a wrong-shape car cannot top the list when a right-shape one exists', () => {
-  // Regression: a JCW EV crossover was topping "hatchback" searches because
-  // body was only lightly weighted. A wrong-shape car (however strong on fuel/
-  // performance/character) must rank below a right-shape car that also fits.
+  // Regression: a JCW EV crossover topped "hatchback" searches when body was
+  // lightly weighted. A wrong-shape car must rank below a right-shape one.
   const jcwEvSuv = {
     ...miniHatch, id: 'aceman', name: 'MINI JCW Aceman', body: 'suv', fuel: 'ev',
     sizeClass: 2, seats: 5, boot: 300, zeroTo62: 6.4, evRange: 250,
@@ -305,9 +302,8 @@ test('MINI question surgery: drops mileage/style, adds doors + miniVibe; BMW kee
 });
 
 test('miniVibe folds trim + style into the standard answer set without overriding explicit answers', () => {
-  // "sport" carries the styleLine (for scoreStyleLine) AND supplies the style
-  // value the dropped style question no longer collects — the fold that keeps
-  // comfort-vs-sporty signal alive without its own screen.
+  // "sport" carries the styleLine AND supplies the style value the dropped style
+  // question no longer collects, keeping comfort-vs-sporty signal without a screen.
   const folded = applyBespokeAnswers('mini', { priorities: ['image'], miniVibe: 'sport' });
   assert.equal(folded.styleLine, 'sport', 'sport sets the trim line');
   assert.equal(folded.style, '5', 'sport fills the sporty style');
@@ -399,9 +395,7 @@ test('mapVehicle parses MINI styleLine + doors from the derivative; BMW leaves t
     'mini',
   );
   // Style LINE (Classic/Exclusive/Sport/JCW) is distinct from the perf TIER
-  // (Cooper C / Cooper S): ~47% of stock uses the older "Cooper S 3 Door"
-  // naming that states only the tier, no style word → styleLine null (neutral,
-  // never penalised). Doors still parse from either naming.
+  // (Cooper C/S): tier-only names give styleLine null (neutral); doors still parse.
   assert.deepEqual(
     [map('Cooper S 3 Door').styleLine, map('Cooper S 3 Door').doors], [null, 3],
     'Cooper S 3 Door states a tier, not a style line → styleLine null, 3 doors',
@@ -527,11 +521,8 @@ test('contrast roof reads as styling, not as any string with a colour in it', ()
 });
 
 /* ================================================================== *
- * Honda — the first fixtures-source brand. Honda has no Auto Trader
- * feed shape; its stock is scraped into a flat record and projected by
- * mapHondaRaw (not BRAND_MAPPERS), then served as-is by the fixtures
- * source. These prove the projection is engine-valid and the config /
- * tuning resolve, so the brand can't silently rot behind the render test.
+ * Honda — a fixtures-source brand: scraped flat records projected by
+ * mapHondaRaw. These prove the projection is engine-valid and config resolves.
  * ================================================================== */
 
 // The raw scrape shape mapHondaRaw consumes: flat, string-ish fields.
@@ -575,9 +566,8 @@ test('mapHondaRaw projects a flat scrape record into the engine car schema', () 
 });
 
 test('mapHondaRaw folds Honda hybrids onto the petrol axis, carries hybrid identity in tags', () => {
-  // The engine fuel axis is petrol|diesel|phev|ev; Honda's self-charging
-  // i-MMD/e:HEV is not plug-in, so it scores as petrol but must still read as
-  // efficient so a mileage-conscious buyer is steered to it.
+  // Honda's self-charging i-MMD/e:HEV is not plug-in, so it scores as petrol on
+  // the engine axis but must still read as efficient to steer high-mileage buyers.
   const hybrid = mapHondaRaw(hondaRaw({ fuel: 'Petrol Hybrid', title: 'Honda Jazz 1.5 i-MMD Advance' }));
   assert.equal(hybrid.fuel, 'petrol', 'a self-charging hybrid is petrol on the engine axis');
   assert.ok(hybrid.tags.includes('efficient'), 'hybrid identity survives as the efficient tag');
@@ -615,9 +605,8 @@ test('every Honda fixture is engine-valid (real shipped stock, not a synthetic s
 });
 
 test('honda tuning ranks a thrifty hatch a real family buyer would pick', () => {
-  // Honda tuning leans economy + practicality. A frugal Jazz should out-rank a
-  // thirstier, sportier car for a value-minded family, where BMW's image-leaning
-  // curve would not separate them the same way.
+  // Honda tuning leans economy + practicality: a frugal Jazz should out-rank a
+  // thirstier, sportier car for a value family, where BMW's curve would not.
   const jazz = {
     id: 'jazz', name: 'Honda Jazz', line: 'Jazz', body: 'hatchback', fuel: 'petrol',
     priceMin: 17000, priceMax: 17000, sizeClass: 1, seats: 5, boot: 304, zeroTo62: 9.4,
@@ -637,18 +626,12 @@ test('honda tuning ranks a thrifty hatch a real family buyer would pick', () => 
 });
 
 /* ------------------------------------------------------------------ *
- * Honda live listing adapter (honda-listing.js). Honda runs genuinely
- * live now: stock.js fetches usedcars.honda.co.uk and parses the
- * server-rendered cards with these functions, degrading to the fixtures
- * snapshot on any failure. The parser is the fragile seam (it reads real
- * HTML), so it's pinned here against a card in the site's real shape, and
- * the parseCard -> mapHondaRaw handoff is proven so the live path and the
- * snapshot path stay contract-compatible.
+ * Honda live listing adapter (honda-listing.js): the parser is the fragile
+ * seam, pinned here against a real-shape card and the parseCard -> mapHondaRaw handoff.
  * ------------------------------------------------------------------ */
 
-// One vehicle card in the shape the real listing renders: a "vehicle-inner"
-// wrapper, a Honda detail link + title attr, a monthly then a cash £, a spec
-// <li> list (label tag then value tag), a reg data-attr and a /picserver image.
+// One vehicle card in the real listing shape: a "vehicle-inner" wrapper, detail
+// link + title, monthly then cash £, a spec <li> list, a reg data-attr and image.
 const hondaCardHtml = `
 <div class="vehicle-inner">
   <a href="/en/used-cars/approved-cars/honda/civic/1-0-vtec-turbo-se-500243" title="Honda Civic 1.0 VTEC Turbo SE 5dr">
@@ -694,9 +677,8 @@ test('parseListingHtml keeps real vehicle cards and drops chrome', () => {
 });
 
 test('a parsed Honda card feeds mapHondaRaw into an engine-valid car (live == snapshot contract)', () => {
-  // This is the seam that matters: whatever the live parse produces must satisfy
-  // the same projection the committed snapshot went through, or the live deck and
-  // the fixtures deck would disagree in shape.
+  // The seam that matters: the live parse must satisfy the same projection the
+  // committed snapshot went through, or the two decks disagree in shape.
   const [raw] = parseListingHtml(hondaCardHtml);
   const car = mapHondaRaw(raw);
   assert.ok(car, 'a live-parsed card maps to a car');
@@ -727,15 +709,8 @@ test('listingUrl carries the approved-used programme and the location facet, pag
 });
 
 /* ================================================================== *
- * Ford — the second fixtures-source brand, and the broadest range we
- * carry. Its live feed IS reachable but token-gated, so rather than run a
- * live adapter the fixtures are a one-off real snapshot, projected by
- * mapFordRaw (a flat-raw → mapped-car projection, the same shape a live
- * adapter would feed). Ford's mapper is richer than
- * Honda's: a real performance halo (ST/GT speed-up), a genuine EV+PHEV
- * split, and body derivation across estate/convertible/pickup/mpv. These
- * prove all of that, plus the same engine-validity guard the render test
- * relies on. See the Ford section of DECISIONS.md.
+ * Ford — a fixtures-source brand (token-gated feed) projected by mapFordRaw:
+ * ST/GT halo, EV+PHEV split, body derivation. See the Ford section of DECISIONS.md.
  * ================================================================== */
 
 // The flat-raw shape mapFordRaw consumes (curated fixtures, or the live adapter).
@@ -852,9 +827,8 @@ test('every Ford fixture is engine-valid (the curated stock the app serves)', ()
 });
 
 test('ford tuning ranks a practical family SUV a real Ford buyer would pick', () => {
-  // Ford tuning leans practicality + economy + body fit, lighter on image than
-  // BMW. For a family needing space, a roomy Kuga should out-rank a sporty but
-  // impractical Mustang under Ford tuning.
+  // Ford tuning leans practicality + economy + body fit: for a family needing
+  // space, a roomy Kuga should out-rank a sporty but impractical Mustang.
   const kuga = {
     id: 'kuga', name: 'Ford Kuga', line: 'Kuga', body: 'suv', fuel: 'petrol',
     priceMin: 20000, priceMax: 20000, sizeClass: 4, seats: 5, boot: 475, zeroTo62: 9.5,
@@ -875,17 +849,8 @@ test('ford tuning ranks a practical family SUV a real Ford buyer would pick', ()
 });
 
 /* ==================================================================
- * Motorrad — the first NON-CAR brand: BMW's used-bike range on the
- * same engine. It proves the engine is vehicle-agnostic, not just
- * multi-marque. The mapped shape is the identical engine schema, but
- * every field carries a bike meaning: `body` is the riding category
- * (adventure/tourer/sport/naked/roadster/heritage/scooter), `boot` is
- * luggage litres, `seats` is pillion capability, `sizeClass` is a
- * licence-and-manageability band, and the CE scooters are electric. The
- * live feed is a session-gated SPA (unreachable here), so fixtures are
- * curated and projected by mapMotorradRaw. See the Motorrad section of
- * DECISIONS.md for the full field-by-field axis map and the tuning
- * recalibration (bike 0-62 curve, luggage bootNeed, seat floors).
+ * Motorrad — the first NON-CAR brand (BMW's bikes on the same engine), proving it
+ * vehicle-agnostic; projected by mapMotorradRaw. See the Motorrad section of DECISIONS.md.
  * ================================================================== */
 
 // The flat-raw shape mapMotorradRaw consumes (curated fixtures, or the live
@@ -901,11 +866,8 @@ const motorradRaw = (overrides = {}) => ({
 
 test('brand config: motorrad runs live, naming its bikes-file offline pool', () => {
   const cfg = brandConfig('motorrad');
-  // Motorrad fetches its live approved-used pool (source: 'live-motorrad') and,
-  // like every live brand, surfaces a fetch failure as a 502 rather than serving
-  // a stale snapshot (no runtime fallback). The committed snapshot survives only
-  // as the offline test pool, and fixturesFile records where it lives — the bike
-  // file, not <brand>-cars.json.
+  // Motorrad fetches live (source: 'live-motorrad'), surfacing failure as a 502
+  // with no fallback; the snapshot is the offline test pool named by fixturesFile.
   assert.equal(cfg.source, 'live-motorrad', 'motorrad serves live, no silent fallback');
   assert.equal(cfg.fixturesFile, 'motorrad-bikes.json', 'motorrad names the bikes file, not <brand>-cars.json');
   assert.match(cfg.origin, /bmw-motorrad\.co\.uk/);
@@ -950,10 +912,8 @@ test('mapMotorradRaw derives the category (body) from the model across the range
 });
 
 test('mapMotorradRaw resolves the cross-family lines that used to mislabel (F 750, K 1600 Grand America, K 1300 S)', () => {
-  // Regression: these three real titles once fell through motorradLine to a
-  // completely wrong family (F 750 -> R 1250 GS, the two K lines -> R 1250 R),
-  // so 9 of 963 bikes wore the wrong badge and spec. Each must now resolve to
-  // its own line AND pull that line's cc, or the honesty of the deck breaks.
+  // Regression: these titles once fell through motorradLine to the wrong family
+  // (9 of 963 mislabelled). Each must resolve to its own line AND pull its cc.
   const cases = [
     ['BMW F 750 GS TE', 'F 750 GS', 853, 'adventure'],
     ['BMW K 1600 Grand America', 'K 1600 Grand America', 1649, 'tourer'],
@@ -1000,13 +960,8 @@ test('mapMotorradRaw returns null for a priceless record (never invents a price)
 });
 
 test('the Motorrad offline pool is the whole real deck, every bike with a real photo', () => {
-  // The snapshot is the live feed's own output, captured (see
-  // scripts/fetch-motorrad-all-pages.mjs). It's no longer a runtime fallback,
-  // but it IS the offline test pool the render tests mount against, so it must
-  // stay indistinguishable from live — the full ~963-bike pool, and crucially
-  // every bike carrying its real listing photo (the whole point of the
-  // missing-images fix). A rebuild that shrank the deck or dropped photos should
-  // fail here, loudly.
+  // The captured snapshot is the offline test pool, so it must stay like live:
+  // the full ~963-bike deck, every bike with its real photo. A shrink fails here.
   const path = fileURLToPath(new URL('../../fixtures/motorrad-bikes.json', import.meta.url));
   const bikes = JSON.parse(readFileSync(path, 'utf8'));
   assert.ok(bikes.length >= 500, `the pool is the real deck, not a sample (got ${bikes.length})`);
@@ -1061,11 +1016,8 @@ test('applyBespokeAnswers(motorrad) folds ridingStyle into standard engine field
 });
 
 test('motorrad tuning surfaces a go-anywhere GS for an adventure rider, over a sportbike', () => {
-  // The riskiest product claim of the whole bike adaptation: an adventure rider
-  // should be shown a GS, not an S 1000 RR. The GS wins on category fit + size +
-  // luggage once "adventure" folds to roadtrips; the sportbike is quicker but
-  // impractical for the stated use. This is the tuning end-to-end, through the
-  // real bespoke fold and the real rankCars.
+  // The riskiest product claim: an adventure rider is shown a GS, not an S 1000 RR.
+  // The GS wins on category + size + luggage once "adventure" folds to roadtrips.
   const gs = {
     id: 'gs', name: 'BMW R 1250 GS', line: 'R 1250 GS', body: 'adventure', fuel: 'petrol',
     priceMin: 13500, priceMax: 13500, sizeClass: 5, seats: 2, boot: 68, zeroTo62: 3.4,
@@ -1085,15 +1037,8 @@ test('motorrad tuning surfaces a go-anywhere GS for an adventure rider, over a s
 });
 
 /* ------------------------------------------------------------------ *
- * Motorrad live-feed adapter (motorrad-listing.js). The feed's ResTable
- * is NOT a JSON array of vehicles — it's a server-rendered HTML <table>
- * string, one <tr> per bike, each with a real per-vehicle photo. That is
- * why the earlier synthetic fixtures had no images: nothing in the feed
- * was ever an image URL field. These pin the real shape against a captured
- * live response (test/fixtures/motorrad-restable.html), the same way the
- * Honda card is pinned. The gate on the live endpoint is a session/IP one
- * (GMB-SID), so the fetch itself can't run unattended from here, but the
- * parse — the fragile seam — is fully exercised. See DECISIONS.md.
+ * Motorrad live-feed adapter (motorrad-listing.js): ResTable is a rendered HTML
+ * <table>, one <tr>/bike with a real photo. Pinned against a captured live response.
  * ------------------------------------------------------------------ */
 
 const resTableHtml = () => readFileSync(
@@ -1151,10 +1096,8 @@ test('motorradRowsFromEnvelope still accepts a pre-parsed JSON array (resilience
 });
 
 test('parseMotorradSid reads the self-issued session out of the landing page', () => {
-  // The whole live chain hinges on this: the feed's GMB-SID is not minted by JS,
-  // it is embedded in the results page as a hidden #hfSID field, so a plain GET
-  // of the landing page yields a fresh session. This is the exact markup the
-  // real page serves (a base64 of "<ip>;<guid>").
+  // The live chain hinges on this: the GMB-SID is embedded in the page as a hidden
+  // #hfSID field (a base64 of "<ip>;<guid>"), so a plain GET yields a fresh session.
   const sid = 'OAA2AC4AMQA0ADQALgAxADIAOQAuADIANAAwADsAZgA3ADkAMwBkADcAMwBmAC0AOQBiADMANQAtADQANgBjADcALQA4AGQAZAA5AC0ANABlADIAMgA5ADAAOAAyADcAZAA5ADEA';
   const html = `<form><input type="hidden" id="hfSID" name="hfSID" value="${sid}" /></form>`;
   assert.equal(parseMotorradSid(html), sid, 'the #hfSID value is the session token');
@@ -1168,9 +1111,8 @@ test('parseMotorradSid reads the self-issued session out of the landing page', (
 });
 
 test('every parsed live bike maps to the same engine schema as a fixture, photo intact', () => {
-  // The seam that matters: whatever the live parse produces must satisfy the
-  // same projection the committed fixtures went through, and the real photo
-  // must survive into the mapped bike so the deck can paint it.
+  // The seam that matters: the live parse must satisfy the same projection the
+  // fixtures went through, and the real photo must survive into the mapped bike.
   const raws = parseResTable(resTableHtml());
   for (const raw of raws) {
     const bike = mapMotorradRaw(raw);
@@ -1198,9 +1140,8 @@ test('the display name keeps the model + genuine trim but drops the dealer sales
 });
 
 test('the captured rows resolve to the right model lines and honest categories', () => {
-  // Line resolution is the mapper subtlety the capture exposed: nineT must not
-  // collapse to R 12 nineT, GS Adventure must not fall through to a naked
-  // default. Pin the five real rows to the lines they must resolve to.
+  // Line resolution is the mapper subtlety: nineT must not collapse to R 12 nineT,
+  // GS Adventure must not fall to a naked default. Pin the five real rows.
   const byTitle = Object.fromEntries(
     parseResTable(resTableHtml()).map((r) => [r.title, mapMotorradRaw(r)]),
   );
@@ -1221,19 +1162,8 @@ test('the captured rows resolve to the right model lines and honest categories',
 });
 
 /* ================================================================== *
- * Ferrari — a fixtures-source brand of a very different SHAPE to the
- * mainstream marques: a two-seat, high-performance range with no diesel,
- * no hatchbacks, a single four-seat SUV (the Purosangue) and two plug-in
- * hybrids (296, SF90) whose fuel the feed leaves blank. The cars are
- * cold-fetchable (public __NEXT_DATA__ JSON) but the photos are
- * Thron-gallery-gated, so the brand ships a real 148-car snapshot and the
- * live adapter is wired dormant. mapFerrariRaw is the flat-raw -> mapped-car
- * projection (same shape mapFordRaw produces). These tests pin the parts a
- * thin fixture can't guarantee: fuel comes off the SPEC row not the card
- * (so every 296/SF90 is phev, never petrol), body comes off the NAME (so a
- * "GTS"/Spider is convertible and the Purosangue is the SUV), and the spec
- * table never overwrites a real per-listing cc/power. See the Ferrari
- * section of DECISIONS.md.
+ * Ferrari — a fixtures-source brand of a different shape (two-seat, no diesel,
+ * blank-fuel phevs), projected by mapFerrariRaw: fuel off the SPEC row, body off the NAME.
  * ================================================================== */
 
 // The flat-raw shape mapFerrariRaw consumes (snapshot record, or the live
@@ -1276,9 +1206,8 @@ test('mapFerrariRaw projects a flat record into the engine car schema', () => {
 });
 
 test('mapFerrariRaw takes fuel from the SPEC row, never the blank card: every 296/SF90 is phev', () => {
-  // The bug this guards: the feed leaves fuelType blank on exactly the
-  // electrified cars, so a name/card-based check silently maps them petrol.
-  // Fuel is the spec row's, so every plug-in resolves to phev with a range.
+  // The bug this guards: the feed leaves fuelType blank on the electrified cars,
+  // so fuel must come off the spec row, resolving every plug-in to phev with a range.
   for (const name of ['Ferrari 296 GTB', 'Ferrari 296 GTS', '296 GTS', 'Ferrari SF90 Stradale', 'SF90 Spider']) {
     const car = mapFerrariRaw(ferrariRaw({ name, price: 300000, cc: undefined, powerHp: undefined }));
     assert.equal(car.fuel, 'phev', `${name} is a plug-in hybrid, not petrol`);
@@ -1293,9 +1222,8 @@ test('mapFerrariRaw takes fuel from the SPEC row, never the blank card: every 29
 });
 
 test('mapFerrariRaw derives body from the NAME, not the unreliable card bodyStyle', () => {
-  // Every category the range actually has, resolved off the name: the open
-  // cars (Spider/GTS/Portofino/California), the SUV (Purosangue), and coupe
-  // as the default. A "GTS" is open even though the feed reports "coupè".
+  // Every category resolved off the name: open cars (Spider/GTS/Portofino), the
+  // SUV (Purosangue), coupe default. A "GTS" is open even if the feed says "coupè".
   const coupe = mapFerrariRaw(ferrariRaw({ name: 'Ferrari 812 Superfast' }));
   assert.equal(coupe.body, 'coupe');
 
@@ -1332,15 +1260,13 @@ test('mapFerrariRaw returns null for a priceless record (never invents a price)'
 });
 
 test('thronCardImage builds a public, session-less cover URL for a gallery id', () => {
-  // The card image is a Thron DAM asset on the token-free /delivery/public/
-  // path — the clientId (ferrari) and sessId (3zayf6) are hardcoded public
-  // constants, not per-session values, so a cold script resolves the cover.
+  // The card image is a Thron DAM asset on the token-free /delivery/public/ path;
+  // clientId (ferrari) and sessId (3zayf6) are public constants, so a cold script resolves it.
   const gid = 'a643790c-131e-4e24-b053-d2ab73783d8a';
   const url = thronCardImage(gid, '600x400', 'Ferrari 488 GTB');
   assert.ok(url.startsWith('https://ferrari-cdn.thron.com/delivery/public/'), 'lives on the public delivery path');
   // A GALLERY id resolves through the `thumbnail` verb (its cover frame); the
-  // `image` verb is for single-image ids and 404s on a gallery. Getting this
-  // wrong is the whole trap, so pin it.
+  // `image` verb is for single-image ids and 404s on a gallery. The whole trap.
   assert.match(url, /\/delivery\/public\/thumbnail\/ferrari\//, 'a gallery id uses the thumbnail verb');
   assert.ok(url.includes(`/${gid}/3zayf6/std/600x400/`), 'carries the gallery id, public sessId and requested size');
   assert.ok(!url.includes('token') && !url.includes('?'), 'no token or session query param');
@@ -1382,9 +1308,8 @@ test('every Ferrari fixture is engine-valid (the baked snapshot the app serves)'
     else assert.ok(car.mpg > 0, `${car.name} needs mpg`);
     assert.ok(!car.blurb.includes('—'), `${car.name} blurb has an em dash`);
     assert.ok(!car.name.includes('—'), `${car.name} name has an em dash`);
-    // The snapshot now ships a real cover photo per car (public Thron cover
-    // frame). Guard that they stay present and public — a regression to the old
-    // photo-less snapshot, or a token creeping into the URL, fails here.
+    // The snapshot ships a real public Thron cover photo per car. Guard they stay
+    // present and public: a photo-less regression or a token in the URL fails here.
     assert.ok(
       typeof car.photo === 'string' && car.photo.startsWith('https://ferrari-cdn.thron.com/delivery/public/thumbnail/'),
       `${car.name} is missing its public Thron cover photo`,
@@ -1393,9 +1318,8 @@ test('every Ferrari fixture is engine-valid (the baked snapshot the app serves)'
 });
 
 test('ferrari tuning surfaces the outright-fastest car for a performance-led buyer', () => {
-  // Ferrari tuning leans performance + character + body fit, light on economy.
-  // For a buyer who wants the quickest thing, the SF90 (2.5s) should out-rank a
-  // slower classic, even though both are "a Ferrari".
+  // Ferrari tuning leans performance + character, light on economy: for a buyer
+  // who wants the quickest thing, the SF90 (2.5s) out-ranks a slower classic.
   const sf90 = {
     id: 'sf90', name: 'Ferrari SF90 Stradale', line: 'SF90', body: 'coupe', fuel: 'phev',
     priceMin: 300000, priceMax: 300000, sizeClass: 2, seats: 2, boot: 74, zeroTo62: 2.5,
@@ -1406,10 +1330,8 @@ test('ferrari tuning surfaces the outright-fastest car for a performance-led buy
     priceMin: 300000, priceMax: 300000, sizeClass: 3, seats: 2, boot: 140, zeroTo62: 5.2,
     mpg: 15, tags: ['drivers-car', 'image', 'collectable'], blurb: '',
   };
-  // No fuel preference is stated: this buyer is about pace, not powertrain, so
-  // the fuel-fit axis stays neutral and performance + character decide. (State a
-  // petrol-only preference and the phev SF90 rightly loses the fuel bonus — a
-  // different, also-correct answer; that is not what "wants the fastest" tests.)
+  // No fuel preference is stated: this buyer is about pace, so the fuel-fit axis
+  // stays neutral and performance + character decide (a petrol-only pref differs).
   const driver = {
     budget: [250000, 350000], bodyStyles: ['coupe'], fuel: [],
     primaryUse: 'fun', people: 'solo', mileage: 3000, style: '5',

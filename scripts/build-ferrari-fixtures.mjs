@@ -1,38 +1,6 @@
 /*
- * Build fixtures/ferrari-cars.json from a REAL captured listing.
- *
- * preowned.ferrari.com is a server-rendered Next.js app whose every listing page
- * ships the full result set as public JSON in <script id="__NEXT_DATA__"> (see
- * server/ferrari-listing.js). No token, no session, no forgery: a plain GET of
- * each of the 15 result pages returns the whole inventory. This script reads
- * those captured pages, projects each ad to the flat-raw shape mapFerrariRaw()
- * reads, then runs it through mapFerrariRaw() — the exact production projection —
- * so the snapshot is identical in shape to what the live adapter emits: real
- * prices, years, mileages, colours, engines, gearboxes, per-listing power and
- * displacement, and the real dealer holding each car.
- *
- * Model figures (boot, seats, 0-62, sizeClass, mpg, phev evRange) come from
- * MODEL_SPECS_FERRARI in server/mapping.js — honest-but-generic per line; the
- * per-LISTING facts (price, mileage, year, colour, power, cc, dealer) are the
- * real captured values.
- *
- * IMAGES: each card gets a real cover photo, cold. The card image is a Thron
- * DAM asset on the token-free /delivery/public/ path, so ferrari-listing.js
- * (thronCardImage) turns the cardImages.thronGalleryId into a working JPEG URL
- * with no SDK session — the site's clientId/sessId are hardcoded public
- * constants. It's a single cover frame, not the swipeable multi-image gallery
- * (that still needs the runtime session, and the cards read fine on one shot).
- * See DECISIONS.md [ferrari-data].
- *
- * Capture recipe (one minute, no auth):
- *   base=https://preowned.ferrari.com/en-GB/r/europe/used-ferrari/great-britain/rfc
- *   for p in $(seq 1 15); do
- *     url=$base; [ $p -gt 1 ] && url="$base?pl=$p"
- *     curl -s -A "Mozilla/5.0" -o /tmp/ferrari-cap/page$p.html "$url"
- *   done
- *
- * Run:  node scripts/build-ferrari-fixtures.mjs /tmp/ferrari-cap/page*.html
- * Out:  fixtures/ferrari-cars.json  (mapped cars the engine scores)
+ * Build fixtures/ferrari-cars.json from captured preowned.ferrari.com pages (their __NEXT_DATA__ ships the full inventory as public JSON; see server/ferrari-listing.js) run through the production mapFerrariRaw(). Model specs come from MODEL_SPECS_FERRARI; per-listing facts (price/mileage/year/colour/power/cc/dealer) are real; cover photo is a token-free Thron asset, single frame not the gallery. See DECISIONS.md [ferrari-data].
+ * Run:  node scripts/build-ferrari-fixtures.mjs /tmp/ferrari-cap/page*.html   ->  fixtures/ferrari-cars.json
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -71,9 +39,8 @@ for (const raw of rawRecords) {
   cars.push(car);
 }
 
-// Same engine-validity gate as the Ford/Motorrad capture builders: a combustion
-// car needs mpg>0, a plug-in needs evRange>0, the engine-required fields must
-// all be present, and no user-facing string may carry an em dash.
+// Same engine-validity gate as the Ford/Motorrad capture builders: combustion needs
+// mpg>0, plug-in needs evRange>0, required fields all present, no em dash in user strings.
 const REQUIRED = ['id', 'name', 'line', 'body', 'fuel', 'priceMin', 'priceMax',
   'sizeClass', 'seats', 'boot', 'zeroTo62', 'tags', 'blurb'];
 for (const c of cars) {
