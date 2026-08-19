@@ -275,7 +275,7 @@ the engine**:
 
 1. `cd server && npm test` — green, and BMW/MINI output unchanged (no regression).
 2. `node --check` every edited `.js`; check CSS brace balance.
-3. Local run: `npm run serve`, open `?brand=<key>&mode=questionnaire|mingle|knockout` — each
+3. Local run: `npm run serve`, open `?brand=<key>&mode=questionnaire|swipe|head-to-head` — each
    mode paints, populates from the brand's stock, photos de-prioritised, knockout reads
    head-to-head, reveal fires, reduced-motion safe, re-mount safe.
 4. Headless DOM harness (jsdom): mount each mode per brand and assert rendered output.
