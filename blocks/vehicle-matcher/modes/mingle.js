@@ -52,6 +52,13 @@ const DECK_POOL = 16;
  * (§6.1). Below it, finish the deck. */
 const REVEAL_AFTER = 3;
 
+/* The smallest feasible field that still makes "Swipe again" worthwhile. A brief
+ * this narrow (e.g. a low budget band) can leave only one or two cars feasible,
+ * and re-dealing the SAME seed then just replays those same one or two cards —
+ * the reported "one more swipe and it shows your car again" dead end. Below this,
+ * the result offers to widen the brief instead of re-dealing an identical deck. */
+const MIN_RESWIPE = 3;
+
 /* ------------------------------ copy ------------------------------ */
 
 /*
@@ -125,6 +132,7 @@ const MINGLE_COPY = {
     shareCta: 'Share your match',
     shareCopied: 'Link copied',
     againCta: 'Swipe again',
+    widenCta: 'Widen the search',
     shareText: ({ model, retailer }) => `I matched with a ${model} at ${retailer}. `
       + 'What’s your type?',
     // Empty pool at the seed (§4.2)
@@ -183,6 +191,7 @@ const MINGLE_COPY = {
     shareCta: 'Share this match',
     shareCopied: 'Link copied',
     againCta: 'Swipe again',
+    widenCta: 'Widen the search',
     shareText: ({ model, retailer }) => `I matched with a ${model} at ${retailer}.`,
     emptyPoolTitle: 'Nothing in that range just now.',
     emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got anything under that at the `
@@ -240,6 +249,7 @@ const MINGLE_COPY = {
     shareCta: 'Share this match',
     shareCopied: 'Link copied',
     againCta: 'Swipe again',
+    widenCta: 'Widen the search',
     shareText: ({ model, retailer }) => `I matched with a ${model} at ${retailer}.`,
     emptyPoolTitle: 'Nothing in that range just now.',
     emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got anything under that at the `
@@ -301,6 +311,7 @@ const MINGLE_COPY = {
     shareCta: 'Share this match',
     shareCopied: 'Link copied',
     againCta: 'Swipe again',
+    widenCta: 'Widen the search',
     shareText: ({ model, retailer }) => `I matched with a ${model} at ${retailer}.`,
     emptyPoolTitle: 'Nothing in that range just now.',
     emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got anything under that at the `
@@ -360,6 +371,7 @@ const MINGLE_COPY = {
     shareCta: 'Share this match',
     shareCopied: 'Link copied',
     againCta: 'Swipe again',
+    widenCta: 'Widen the search',
     shareText: ({ model, retailer }) => `I matched with a ${model} at ${retailer}.`,
     emptyPoolTitle: 'Nothing in that range just now.',
     emptyPoolLede: ({ retailer }) => `${retailer} hasn’t got anything under that at the `
@@ -1149,10 +1161,22 @@ function mount(root, ctx) {
     share.addEventListener('click', () => doShare(hero, share));
     wrap.append(share);
 
-    const again = el('button', 'vm-mingle-link vm-mingle-again', copy.againCta);
-    again.type = 'button';
-    again.addEventListener('click', () => loadDeck()); // fresh reshuffled deck, same seed
-    wrap.append(again);
+    // "Swipe again" re-deals the same seed, which is a fresh, reshuffled session
+    // when the field is healthy — but a dead-end loop when the brief only fits a
+    // card or two (re-dealing replays the same one or two cards). So when the
+    // deck they just swiped was that thin, offer the real remedy instead: back to
+    // the seed screen (their choices preselected) to widen the brief.
+    if (state.deck.length >= MIN_RESWIPE) {
+      const again = el('button', 'vm-mingle-link vm-mingle-again', copy.againCta);
+      again.type = 'button';
+      again.addEventListener('click', () => loadDeck()); // fresh reshuffled deck, same seed
+      wrap.append(again);
+    } else {
+      const widen = el('button', 'vm-mingle-link vm-mingle-again', copy.widenCta);
+      widen.type = 'button';
+      widen.addEventListener('click', () => renderSeed(state.seed)); // broaden, don't replay
+      wrap.append(widen);
+    }
     return wrap;
   };
 

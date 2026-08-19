@@ -15,10 +15,19 @@
       background: #0d0f12;
       font-family: 'Helvetica Neue', helvetica, arial, sans-serif;
     }
-
-    /* Shared-password gate — carried over verbatim from block.html. This overlay
-       is UX only, not a security boundary: it captures the shared demo password
-       so engine.js can send it as X-Access-Key. The server is the real gate. */
+/* The harness stands in for a host page, so IT owns the page surface.
+   The block itself is transparent (the host section decides its
+   background), which is why this white lives here and not there.
+   Matches the block's own 1280px column (vehicle-matcher.css `.vm`) so the
+   white surface ends where the block does — a narrower wrapper here would
+   clamp the block back down and hide the change. */
+main {
+  width: 100%; max-width: 1280px; margin: 0 auto; box-sizing: border-box;
+  background: #fff;
+}
+/* Shared-password gate: a full-screen overlay over the harness's dark
+   surface. Purely for capturing the demo password (see the module script);
+   the server is the real gate. */
     .vm-gate {
       position: fixed; inset: 0; z-index: 1000;
       display: flex; align-items: center; justify-content: center;
