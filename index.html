@@ -20,9 +20,12 @@
     }
     /* The harness stands in for a host page, so IT owns the page surface.
        The block itself is transparent (the host section decides its
-       background), which is why this white lives here and not there. */
+       background), which is why this white lives here and not there.
+       Matches the block's own 1280px column (vehicle-matcher.css `.vm`) so the
+       white surface ends where the block does — a narrower wrapper here would
+       clamp the block back down and hide the change. */
     main {
-      width: 100%; max-width: 880px; margin: 0 auto; box-sizing: border-box;
+      width: 100%; max-width: 1280px; margin: 0 auto; box-sizing: border-box;
       background: #fff;
     }
     /* Shared-password gate: a full-screen overlay over the harness's dark

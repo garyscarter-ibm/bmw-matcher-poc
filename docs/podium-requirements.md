@@ -57,8 +57,15 @@ flag) lives on a fresh local object, never on the shared `ctx`, so a re-mount fr
 switcher starts clean.
 
 Layout is a CSS grid the mode owns: one column on mobile (questions above, podium
-below), `minmax(320px, 380px) 1fr` at 720px and up. The shell contributes no layout,
-exactly as with Swipe and Head to head.
+below), `minmax(280px, 320px) 1fr` at 720px and up, opening to
+`minmax(320px, 360px) 1fr` with a wider seam at 1080px. The shell contributes no
+layout, exactly as with Swipe and Head to head.
+
+Every pixel the block's own column gained beyond the brief's measure goes to the
+**results** pane, not the brief: the brief is eight short questions in one column and
+reads worse the wider it gets, while the podium is the mode. At the block's 1184px
+content column that leaves the pane ~784px, which is what makes the row layout in §5
+possible.
 
 ## 3. The decisions (locked)
 
@@ -209,6 +216,39 @@ reader.
 - Tail: up to four more compact cards under the "also worth a look" heading.
 - Joint first when the leaders are within `CLUSTER_PTS` (§3.5).
 - Every card carries the dismissal control (§6).
+
+**The ranked steps are rows, and the fold keeps a peek.** Stacked one per row the
+winner *is* the fold — measured at 771px in an 868px scroll pane, so nothing below it
+was even hinted at, and the mode's whole claim (a ranked shortlist you can watch
+re-order) needed a scroll to see. From 1080px up `.vm-podium-steps` is a two-column
+grid:
+
+- **Not tied**: first spans the row, because it is the answer; second and third sit
+  side by side beneath it and are ~230px on screen with it, which is the peek. The
+  spanning winner is re-proportioned for its 776px row rather than scaled up into one —
+  its photo becomes a cinematic band (`max-height: 280px`) and its body runs in two
+  columns beside itself, bringing the hero to ~595px instead of the 721px a
+  full-height 16:9 band would cost. The body's seam is forced where the card's own
+  register changes: what the car **is** on the left (name, score, specs, retailer,
+  blurb), the argument **for** it on the right (what's fitted, why it suits you, the
+  link).
+- **Tied**: nothing spans. Joint firsts share the row at identical widths — a wider
+  card in a row of equals is a winner the engine did not name (§3.5) — and three tied
+  cars wrap 2 + 1 rather than squeezing into three ~240px columns. The wrap is what
+  puts the third above the fold (measured 45px of it).
+- The rank **insets** are dropped in row mode. They were measured for a stack, where a
+  narrower card reads as a step down; side by side they read as two mismatched cards
+  and knock the row out of alignment. Rank still carries on its other three signals:
+  the rule before the label, the card border, and the shadow depth.
+- **Cards in a row keep their natural height**, deliberately, even though matching
+  bottoms looks tidier. Card length here is content: "Choose yours" prints one row per
+  grouped listing, and a national feed returned 47 rows for one joint first against 24
+  for the other. Stretched to a shared height, the shorter card measured 1875px of
+  content inside a 3026px card — 1151px of bordered blank white, which reads as a
+  broken card. Height is not one of the rank signals, so nothing is claimed by letting
+  it vary.
+- Below 1080px the steps stay stacked one per row: at 1024 the pane is only ~544px, so
+  two-up would be ~264px columns.
 
 **Committed (post-CTA)**, from `/api/match`:
 

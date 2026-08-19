@@ -306,15 +306,40 @@
   /* Cap the width on large screens, but fill (never exceed) a narrow viewport:
      box-sizing keeps the side padding inside the 100%, so the block can't push
      past the screen edge on mobile. Without width:100% a centred flex/grid
-     parent sizes the block to its 880px max-content and it overflows. */
+     parent sizes the block to its max-content and it overflows.
+     ---------------------------------------------------------------------
+     The cap is a 1280px COLUMN, not a reading measure. It used to be 880px,
+     which was set when every mode was a single centred column of copy — but
+     podium puts a brief and a live podium side by side, and at 880 that meant a
+     320px pane holding a card the size of the fold, so one car at a time was
+     all you could see. 1280 is the number the host pages already use: MINI's
+     own sections sit in a 1280px column (see the wrapper rule below) and the
+     BMW retailer sections in a 1200px one, and with the 48px gutter added at
+     900px up the content lands at 1184 — within a couple of pixels of the demo
+     shell's own 1180px hero and footer inners, so the tool lines up with the
+     furniture around it instead of reading as an inset panel.
+     Single-column modes keep their own measures (`.vm-lede` is capped in ch,
+     the swipe deck in px), so widening the column does not widen prose. */
   box-sizing: border-box;
   width: 100%;
-  max-width: 880px;
+  max-width: 1280px;
   margin: 0 auto;
   line-height: 1.5;
 }
 
 .vm * { box-sizing: border-box; }
+
+/* The standalone gutter, matching the one the wrapper rule below gives the
+   block on a host page: 48px is what the host's own sections use, so the
+   content column is the same width in the harness, on the Pages demo and in
+   EDS. Kept off small screens, where the 20px base padding is the right edge
+   distance and 48px would eat a fifth of a phone. */
+@media (min-width: 900px) {
+  .vm {
+    padding-left: var(--vm-space-12);
+    padding-right: var(--vm-space-12);
+  }
+}
 
 /*
  * Inside an EDS page the section already provides the content column, so the
@@ -323,7 +348,7 @@
  * the block's content started at 304px while every host section started at
  * 160–270px, because an 880px centred box sat inside EDS's 1200px column — it
  * read as inset and bolted-on. Standalone (the local harness / Pages demo)
- * there's no wrapper, so the block keeps its own 880px reading measure.
+ * there's no wrapper, so the block keeps its own 1280px column.
  */
 .vehicle-matcher-wrapper .vm {
   max-width: none;
@@ -1156,6 +1181,16 @@
   .vm-options { grid-template-columns: 1fr 1fr; }
 }
 
+/* Three up once the block has its full 1184px content column, because two would
+   make a 580px-wide box for the word "SUV". Three keeps the option a
+   button-sized target (~380px), and it shortens the form: eight body styles are
+   three rows instead of four. The podium's left pane overrides this back to one
+   column (it is a 360px column, not the full width) and the slider variant is
+   never a grid — see `.vm-options.vm-slider` below. */
+@media (min-width: 1024px) {
+  .vm-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 .vm-option {
   font-family: var(--vm-font-body);
   font-size: var(--vm-text-body);
@@ -1203,6 +1238,13 @@
   display: block;
   padding: var(--vm-space-2) var(--vm-space-1) 0;
 }
+
+/* A slider is a TRAVEL, not a field: dragged across the block's full 1184px
+   column, a budget thumb has to cross most of the desk to add £5k, and the £0 /
+   £150,000+ end labels end up a screen apart. Capped where the drag still feels
+   proportionate. Scoped to a direct child of a screen so the podium's own panes
+   (a 360px column and a 272px popover) are untouched. */
+.vm-screen > .vm-options.vm-slider { max-width: 760px; }
 
 /* Big live value readout above the track. */
 .vm-slider-value {
@@ -1679,6 +1721,16 @@
   align-items: flex-end;
   padding: var(--vm-space-4) var(--vm-space-5);
   overflow: hidden;
+}
+
+/* A 16:9 band is a photo at 880px and a wall at 1184: held to its aspect ratio
+   the results hero's media alone was 665px tall, more than a laptop fold, and
+   the card it heads came to 1194px. Capped, so the hero crops to a cinematic
+   band (the photo is object-fit: cover, so it crops rather than squashes) and
+   the specs under it stay on screen with it. Only the full-width hero needs
+   this: every other card sits in a column narrow enough that 16:9 is a photo. */
+@media (min-width: 1024px) {
+  .vm-results .vm-card-big > .vm-card-media { max-height: 480px; }
 }
 
 /* Real retailer photo fills the media slot; the line label sits over it. */
@@ -3359,11 +3411,11 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    ====================================================================== */
 
 /* The two-pane grid. One column below 720px (the brief first, then the
-   podium, which is DOM order, so no reordering is needed), two above. The
-   block is capped at 880px, so the left column takes a fixed reading measure
-   and the podium takes the rest. min-width: 0 on both panes because a grid
-   item defaults to min-content width, and a long unbroken model name in a card
-   would otherwise push the whole track wider than the block. */
+   podium, which is DOM order, so no reordering is needed), two above: the left
+   column takes a fixed reading measure and the podium takes the rest.
+   min-width: 0 on both panes because a grid item defaults to min-content width,
+   and a long unbroken model name in a card would otherwise push the whole track
+   wider than the block. */
 .vm-podium {
   display: grid;
   grid-template-columns: 1fr;
@@ -3404,6 +3456,39 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
     overscroll-behavior: contain;
     padding-inline: var(--vm-space-1);
   }
+
+  /* "Choose yours" prints one row per grouped listing, and the count comes from
+     the feed: a retailer with 24 of the same model gives a 1192px list, one with
+     47 gives 2342px. On the questionnaire's results PAGE that is fine — the page
+     scrolls. Here the pane is a fixed-height viewport (above), so an unbounded
+     list is the one thing that can push the next option off the bottom however
+     the steps are laid out: measured, a 24-row picker took the winner to 1712px
+     in an 868px pane and put the runner-up 896px below the fold.
+
+     So the list gets a height and scrolls inside the card. 212px is four rows
+     and a sliver of the fifth — the clipped row is the affordance, the same way
+     the nearby track lets the next tile peek rather than printing a scrollbar
+     hint. Nothing is hidden: every listing is still reachable, and the picker
+     chains its scroll to the pane at both ends (no overscroll-behavior here, on
+     purpose). Podium only; the questionnaire's hero keeps the full list. */
+  .vm-podium-step .vm-pick {
+    max-height: 212px;
+    overflow-y: auto;
+  }
+}
+
+/* Wide: the brief gets a slightly longer measure and a wider seam, and the
+   podium gets everything that buys. Every extra pixel the block gained goes to
+   the RESULTS pane on purpose — the brief is eight short questions in a single
+   column and reads worse the wider it gets, while the podium is the mode. At a
+   1184px content column this leaves the pane ~784px, which is what makes the
+   two-per-row step layout below possible. */
+@media (min-width: 1080px) {
+  .vm-podium {
+    grid-template-columns: minmax(320px, 360px) 1fr;
+    gap: var(--vm-space-10);
+  }
+  .vm-podium-ask { padding-right: var(--vm-space-8); }
 }
 
 /* ---------------------------- left pane: the brief ------------------- */
@@ -3620,6 +3705,90 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    distinction the tie state exists to avoid. */
 .vm-podium-steps.is-tied .vm-podium-step.is-gold .vm-card {
   box-shadow: 0 0 0 1px var(--vm-accent);
+}
+
+/* --- wide: the steps become ROWS, and the fold has to keep a peek ---
+   Stacked one per row in a ~780px pane, the winner IS the fold: it measured
+   771px in an 868px scroll pane, so nothing below it was even hinted at and the
+   mode's whole claim — a ranked shortlist you can watch re-order — needed a
+   scroll to see. Two per row fixes that. First still spans the row, because it
+   is the answer; second and third sit side by side beneath it and are ~230px on
+   screen with it, which is the peek.
+
+   In a TIE nothing spans: joint firsts share the row at identical widths, since
+   a wider card in a row of equals is a winner the engine did not name. Three
+   tied cars wrap 2 + 1 rather than squeezing into three ~240px columns — the
+   third lands under the first at the same width with the same treatment, and
+   the wrap is what puts it above the fold. */
+@media (min-width: 1080px) {
+  .vm-podium-steps {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* Each card takes its natural height rather than the row's.
+       Matching the bottoms was the first instinct — two cards in a row that end
+       on the same line look composed — but card length here is CONTENT, and the
+       content varies enormously: "Choose yours" prints one row per grouped
+       listing, so a national feed returned 47 rows for one joint first against
+       24 for the other. Stretched, the shorter card measured 1875px of content
+       inside a 3026px card: 1151px of blank white with a hairline border round
+       it, which reads as a broken card, not a tidy row. Ragged bottoms are the
+       honest version — one of those cars genuinely has twice as much to choose
+       between — and nothing in the rank ladder is carried by height. */
+    align-items: start;
+  }
+
+  /* The insets are the rank ladder's third signal, and they were measured for a
+     stack, where a narrower card reads as a step down. Side by side they read
+     as two mismatched cards and they knock the row out of alignment. Rank still
+     carries on the other three signals: the rule before the label, the card
+     border, and the shadow depth. */
+  .vm-podium-step.is-silver,
+  .vm-podium-step.is-bronze { margin-inline: 0; }
+
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold { grid-column: 1 / -1; }
+
+  /* The spanning winner, re-proportioned for a 776px row rather than scaled up
+     into one. Held to 16:9 its photo alone would be 436px tall and the card
+     721px, which is the stacked problem again with a bigger picture on it, so
+     the photo becomes a cinematic band and the copy runs in two columns beside
+     itself. Together they bring the hero to ~595px — 2nd and 3rd clear the fold
+     — and the split falls where the card's own content changes register: what
+     this car IS on the left (name, score, specs, retailer, blurb), the argument
+     FOR it on the right (what's fitted, why it suits you, the link).
+
+     Only the spanning winner. A tied gold card is one column wide, so it is a
+     portrait card and keeps the stacked anatomy. */
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-media {
+    flex: none;
+    max-height: 280px;
+  }
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body {
+    display: block;
+    columns: 2;
+    column-gap: var(--vm-space-8);
+  }
+  /* Multi-column will break a paragraph across the gap by default, which turns
+     a two-line spec list into one line at the bottom of one column and one at
+     the top of the other. Every block in this body is a unit. */
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body > * {
+    break-inside: avoid;
+  }
+  /* Put the seam where the register changes instead of wherever the balancer
+     lands: the blurb is the last thing the card says about the car itself, and
+     it is present on every non-compact card, so it is the reliable hinge.
+     Skipped when the blurb is the last child — a payload with no kit, reasons or
+     link would otherwise force an empty second column. */
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body
+    > .vm-blurb:not(:last-child) {
+    break-after: column;
+  }
+  /* Belt and braces for the browsers that ignore a forced column break: a
+     balanced split put "What's fitted" at the foot of one column and the kit it
+     labels at the head of the next. A label is part of the thing it labels. */
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body
+    > .vm-why-label {
+    break-after: avoid;
+  }
 }
 
 /* The rank eyebrow. The rule before the label is the quietest of the four rank
