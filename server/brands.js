@@ -580,13 +580,12 @@ export const BRANDS = {
     //    supplies the `style` value the dropped question no longer collects —
     //    which is exactly how `style` survives as signal without its own screen.
     questions: {
-      drop: ['mileage', 'style'],
+      drop: ['mileage', 'style', 'primaryUse', 'people', 'priorities'],
       add: [
         {
           id: 'doors',
           title: 'THREE DOORS OR FIVE?',
-          help: 'Three is the icon. Five makes the back seats an easy in-and-out.',
-          insertAfter: 'bodyStyles',
+          insertAfter: 'charging',
           // Only meaningful once they're open to a Hatch — the only MINI sold in
           // both counts. Mirrored client-side by SHOW_IF.doors in quiz-meta.js.
           showIf: (a) => {
@@ -604,7 +603,7 @@ export const BRANDS = {
           id: 'miniVibe',
           title: 'WHICH MINI ARE YOU?',
           help: 'Sets the trim character we lean towards. Pick the one that’s most you.',
-          insertAfter: 'people',
+          insertAfter: 'charging',
           options: [
             {
               value: 'classic',
