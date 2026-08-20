@@ -102,7 +102,7 @@ const PODIUM_COPY = {
     wordmark: 'MINI Podium',
     title: 'YOUR TOP THREE, LIVE.',
     lede: 'Tell us what you’re after on the left. The podium on the right shuffles '
-      + 'as you go. No waiting about.',
+      + 'as you go.',
     bannerStart: 'Nothing decided yet. We’ve made a start from your budget anyway.',
     bannerProgress: ({ done, total }) => `${done} of ${total} down. The order moves with every answer.`,
     bannerComplete: 'That’s the lot answered. Go on then, make it official.',

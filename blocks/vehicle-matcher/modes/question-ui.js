@@ -172,6 +172,10 @@ export function renderOptionList(q, answers, { onChange, onPick } = {}) {
         onChange?.();
       } else {
         answers[q.id] = opt.value;
+        optionButtons.forEach(({ button, value }) => {
+          button.classList.toggle('is-selected', value === opt.value);
+          button.setAttribute('aria-checked', String(value === opt.value));
+        });
         onChange?.();
         onPick?.();
       }
