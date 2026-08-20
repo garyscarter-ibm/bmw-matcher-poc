@@ -5,8 +5,9 @@ about your budget, lifestyle and driving, and get matched with the approved-used
 cars your retailer actually has — with a plain-English explanation of *why* each
 one suits you.
 
-The matcher is **brand-agnostic**: the brand (BMW, MINI, …) is authored config,
-not baked in, and the same engine serves every brand. The UI is a **portable
+The matcher is **brand-agnostic**: the brand (BMW, MINI, Ford, Honda, BMW
+Motorrad, Ferrari) is authored config, not baked in, and the same engine serves
+every brand — calibrated per brand by config, never by forking the scorers. The UI is a **portable
 Adobe Edge Delivery Services (EDS) block** — vanilla JS + CSS, no framework, no
 build step — built around interchangeable interface **modes** (see
 `blocks/vehicle-matcher/modes/`) so one page can showcase several matching
@@ -14,8 +15,8 @@ approaches over the shared engine. The scoring engine and car dataset run behind
 a small **backend API** you host outside EDS, so the dataset and weights are
 never shipped to the browser.
 
-> Unofficial tool. Not affiliated with or endorsed by the brands it matches
-> (BMW, MINI). Prices and specs are indicative — always check with a retailer.
+> Unofficial tool. Not affiliated with or endorsed by the brands it matches.
+> Prices and specs are indicative — always check with a retailer.
 
 > **New here, or coming back to it?** Read
 > **[docs/how-it-works.md](docs/how-it-works.md)** — the whole system on one
@@ -106,20 +107,27 @@ blocks/vehicle-matcher/
   engine.js           # shared engine client (apiMatch/apiNearby/… over HTTP)
   ui.js               # shared UI primitives (el, cardinal, gbp)
   quiz-meta.js        # client-only: conditional-question predicates + budget bands
-  modes/
-    index.js          # mode registry — { key, label, mount(root, ctx) }[]
-    questions.js      # the question-by-question interface (the original UI)
+  tokens.css          # all --vm-* design tokens (imported first by the block CSS)
+  demo-chrome.css     # styles the demo homepage / brand picker only
+  modes/              # interchangeable interfaces over the shared engine:
+    index.js          #   mode registry — { key, label, mount(root, ctx) }[]
+    questionnaire.js  #   the question-by-question interface (default)
+    mingle.js         #   'swipe' — a swipe game
+    knockout.js       #   'head-to-head' — pick between two cars
+    podium.js         #   'podium' — a live-narrowing results podium
 server/
   index.js          # zero-dep Node API: /api/questions, /api/match, /health
-  engine.js         # pure scoring engine + WEIGHTS config  (server-side only)
+  engine.js         # brand-agnostic scoring engine (reads per-brand tuning)
+  brands.js         # brand registry: origin/retailer + per-brand engine tuning
   questions.js      # quiz definition + budget bands        (source of truth)
-  stock.js          # live retailer-stock client (usedcars.bmw.co.uk)
+  stock.js          # live retailer-stock client (per-brand feeds)
   mapping.js        # maps live vehicles -> engine schema; MODEL_SPECS lookup
-  data.js           # test fixture cars (~35)                (server/test only)
-  test/engine.test.js # engine tests (node --test)
+  {honda,ferrari,motorrad}-listing.js  # bespoke parsers for non-JSON feeds
+  data.js           # test fixture cars                     (server/test only)
+  test/             # node --test suite (engine, brand, api, render, …)
   package.json      # server: start / test scripts
-index.html          # site root: branded demo homepage / brand picker (?brand=bmw|mini)
-block.html          # standalone preview harness (brand-agnostic; ?brand=bmw|mini)
+index.html          # site root: branded demo homepage / picker (?brand=bmw|mini|ford|honda|motorrad|ferrari)
+block.html          # standalone preview harness (brand-agnostic; same ?brand= keys)
 scripts/serve.js    # zero-dep static server for the block (npm run serve)
 scripts/dump-stock.js         # national stock snapshot -> fixtures/ (--remap: no network)
 scripts/audit-questions.mjs   # do the QUESTIONS earn their screen? (npm run audit)
@@ -145,12 +153,14 @@ after the block, self-contained folder), so porting is a copy-paste:
 3. Add config rows below the block name — first cell the key, second the value.
    All are read with a `readBlockConfig()` helper, the standard `aem-boilerplate`
    convention:
-   - **Brand** — `BMW` or `MINI` (defaults to BMW). The block is brand-agnostic;
-     this row is the only thing that makes it a BMW or a MINI page.
+   - **Brand** — one of `BMW`, `MINI`, `Ford`, `Honda`, `Motorrad`, `Ferrari`
+     (defaults to BMW). The block is brand-agnostic; this row is the only thing
+     that themes it and picks which live feed it sources from.
    - **Mode** — which interface to show, and whether visitors can switch. Set it
-     to a mode key (e.g. `questions`) to **lock** the page to that one interface
-     and hide the switcher — the production case. Leave it blank/absent to show
-     every registered mode with a switcher (the showcase). Mode keys live in
+     to a mode key to **lock** the page to that one interface and hide the
+     switcher — the production case. Keys: `questionnaire` (default), `swipe`,
+     `head-to-head`, `podium`. Leave it blank/absent to show every registered
+     mode with a switcher (the showcase). Mode keys live in
      `blocks/vehicle-matcher/modes/index.js`.
    - **Retailer ID** — the retailer's `retailer_site` ID (e.g. `96`); omit to
      fall back to the backend's default retailer.
@@ -175,7 +185,7 @@ Example authored table:
 | vehicle-matcher |  |
 |---|---|
 | Brand | MINI |
-| Mode | questions |
+| Mode | questionnaire |
 | Retailer ID | 92 |
 | Retailer Name | Sytner Luton MINI |
 | API | https://your-backend.onrender.com |
@@ -183,7 +193,7 @@ Example authored table:
 
 (The blank **Title** row above suppresses the block's own headline, for when it
 sits under the page's own "FIND YOUR MINI." section heading. The **Mode** row
-locks the page to the questions interface with no switcher.)
+locks the page to the questionnaire interface with no switcher.)
 
 The block ships **no font files**: it names the host site's licensed families
 first (`--heading-font-family` / `--body-font-family` on BMW, MINI's own faces
@@ -251,10 +261,11 @@ Deterministic weighted scoring — transparent and unit-tested, no black box.
 2. **Eight soft dimensions** are scored 0–1 per car: budget fit, body style,
    fuel type (EVs are heavily penalised without charging access), practicality,
    performance, running costs, size vs. usage, and character (tag matching).
-3. **Weights** combine the dimensions into a 0–100 match score. Base weights
-   live in `WEIGHTS`; the user's two stated priorities reweight the engine via
-   `PRIORITY_BOOSTS`, and high mileage / sporty-style answers nudge economy and
-   performance weights.
+3. **Weights** combine the dimensions into a 0–100 match score. The engine is
+   brand-agnostic: every calibration constant lives in a per-brand `tuning`
+   object in `server/brands.js` (BMW's is the baseline; other brands override
+   only what must differ). The user's two stated priorities reweight the engine,
+   and high mileage / sporty-style answers nudge economy and performance weights.
 4. **Reasons** are generated from the actual score components: the top 3–4
    highest-contributing dimensions that scored ≥ 0.7 produce the "why this
    suits you" bullets — no canned per-car marketing text.
@@ -264,9 +275,9 @@ Deterministic weighted scoring — transparent and unit-tested, no black box.
 
 | What you want to change | Where |
 |---|---|
-| How much each dimension matters | `WEIGHTS` in `server/engine.js` |
-| How priorities reweight scoring | `PRIORITY_BOOSTS` in `server/engine.js` |
-| Budget stretch tolerance | `STRETCH_FACTOR` in `server/engine.js` |
+| Per-brand weights, priority boosts, stretch tolerance, hard-filter floors | that brand's `tuning` block in `server/brands.js` |
+| The BMW baseline / engine defaults | `WEIGHTS` / `PRIORITY_BOOSTS` / `STRETCH_FACTOR` in `server/engine.js` (sourced from `brandTuning('bmw')`) |
+| Add a brand | new `tuning` block in `server/brands.js` + `MODEL_SPECS`/derivation in `server/mapping.js` — see `docs/onboard-brand-blueprint.md` |
 | New/updated model specs (0–62, boot, seats) | `MODEL_SPECS` in `server/mapping.js` — see [Updating the dataset](#updating-the-dataset) |
 | Test fixture cars | `server/data.js` (see field docs at top; used by `server/test/` only) |
 | Questions, options, budget bands | `server/questions.js` (mirror any conditional-question predicate in `blocks/vehicle-matcher/quiz-meta.js`) |
@@ -291,15 +302,15 @@ hand-edit or keep "current".
 `server/data.js` still exists, but only as **fixture data for the test
 suite** (`server/test/engine.test.js` imports `CARS` from it to test
 `matchCars()` in isolation from the live feed). It is not read by `index.js`
-or `stock.js` and does not need to be kept in sync with the real BMW range —
+or `stock.js` and does not need to be kept in sync with any brand's real range —
 treat it as a small, stable set of test cases, not a product dataset.
 
 What the live feed *can't* tell us is three specs it doesn't carry: 0–62 time,
 boot litres and seat count. Those come from `MODEL_SPECS` in
-`server/mapping.js`, a lookup table keyed by model line (e.g. `X3`, `3
-Series`, `iX1`) with derivative-based overrides for quicker trims (M badges,
-`xDrive50e`, etc.). **This table is what needs updating when BMW releases a
-new model line**:
+`server/mapping.js`, a per-brand lookup table keyed by model line (e.g. BMW's
+`X3`, `3 Series`, `iX1`) with derivative-based overrides for quicker trims (M
+badges, `xDrive50e`, etc.). **This table is what needs updating when a brand
+releases a new model line**:
 
 1. Add an entry to `MODEL_SPECS` keyed by the line name the feed will use in
    its `title` (see `lineFromTitle()` for how the title is normalized — pure-M
