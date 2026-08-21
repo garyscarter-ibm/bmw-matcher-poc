@@ -1,7 +1,12 @@
 node_modules/
 .DS_Store
-.claude/
 .logs/
+
+# Ignore local Claude Code state, but share the onboard-brand project skill.
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/onboard-brand/
 
 # Stock fixtures: keep the mapped-car snapshots (small, used for engine
 # validation); ignore the huge raw feed dumps (regenerate via scripts/dump-stock.js).
