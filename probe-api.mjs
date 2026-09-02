@@ -27,56 +27,67 @@ if (!token) throw new Error('no csrftoken');
 const H = {
   Accept: 'application/json', Cookie: `csrftoken=${token}`, 'X-CSRFToken': token, Referer: `${ORIGIN}/`,
 };
-
 const listUrl = (q) => `${ORIGIN}/vehicle/api/list/?${q}`;
 
-// 1. Baseline: what does an unfiltered page-1 envelope look like?
-const base = await get(listUrl('size=1&page=1'), H);
-const env = JSON.parse(base.body);
-console.log('=== envelope top-level keys ===');
-console.log(Object.keys(env));
-console.log('pagination:', JSON.stringify(env.pagination));
-if (env.facets) console.log('facets keys:', Object.keys(env.facets).slice(0, 60));
-if (env.filters) console.log('filters:', JSON.stringify(env.filters).slice(0, 2000));
-if (env.aggregations) console.log('aggregations keys:', Object.keys(env.aggregations).slice(0, 60));
-
-// 2. Does a bigger page size work?
-console.log('\n=== page size ceiling ===');
-for (const size of [100, 200, 500, 1000]) {
-  const r = await get(listUrl(`size=${size}&page=1`), H);
-  let n = null;
-  let total = null;
+const pages = async (q) => {
+  const r = await get(listUrl(`size=100&page=1&${q}`), H);
   try {
     const e = JSON.parse(r.body);
-    n = (e.results || []).length;
-    total = e.pagination?.total;
-  } catch { /* non-JSON */ }
-  console.log(`size=${size} → HTTP ${r.status}, results=${n}, pagination.total=${total}`);
+    return { pages: e.pagination?.total, items: e.pagination?.items, status: r.status };
+  } catch { return { status: r.status, pages: null, items: null }; }
+};
+
+console.log('=== price param hunt (baseline items should be ~11934) ===');
+const priceCandidates = [
+  'price__gte=20000&price__lte=30000',
+  'price_gte=20000&price_lte=30000',
+  'price_min=20000&price_max=30000',
+  'from_price=20000&to_price=30000',
+  'price-from=20000&price-to=30000',
+  'cash_price_min=20000&cash_price_max=30000',
+  'cash_from=20000&cash_to=30000',
+  'budget_from=20000&budget_to=30000',
+  'monthly_from=200&monthly_to=400',
+  'price=20000-30000',
+  'price_range=20000-30000',
+  'max_price=30000',
+  'price_to=30000',
+  'payment_type=cash&price_from=20000&price_to=30000',
+  'payment_type=cash&cash_price_from=20000&cash_price_to=30000',
+  'payment_type=cash&min=20000&max=30000',
+];
+for (const c of priceCandidates) {
+  const r = await pages(c);
+  console.log(`${c.padEnd(52)} → HTTP ${r.status}, pages=${r.pages}, items=${r.items}`);
 }
 
-// 3. Candidate server-side filter params — does pagination.total move?
-console.log('\n=== filter params (baseline total below) ===');
-const unfiltered = JSON.parse((await get(listUrl('size=100&page=1'), H)).body);
-console.log('unfiltered: total pages =', unfiltered.pagination?.total,
-  ' count =', unfiltered.pagination?.count ?? unfiltered.count ?? 'n/a');
+console.log('\n=== confirm working filters + valid values ===');
+for (const c of [
+  '', 'fuel_type=Diesel', 'fuel_type=Petrol', 'fuel_type=Electric',
+  'fuel_type=Petrol%20Hybrid', 'fuel_type=Electric&body_type=SUV',
+  'body_type=SUV', 'body_type=Hatchback', 'body_type=Saloon', 'body_type=Estate',
+  'max_mileage=20000', 'min_mileage=1000',
+  'fuel_type=Diesel&body_type=Estate&max_mileage=30000',
+]) {
+  const r = await pages(c);
+  console.log(`${(c || '(unfiltered)').padEnd(52)} → pages=${r.pages}, items=${r.items}`);
+}
 
-const candidates = [
-  'fuel_type=Diesel', 'fuel=Diesel', 'fuel_types=Diesel',
-  'body_style=SUV', 'body_type=SUV', 'bodystyle=SUV',
-  'price_from=20000&price_to=30000', 'min_price=20000&max_price=30000',
-  'cash_price_from=20000&cash_price_to=30000',
-  'model=X3', 'model_range=X3', 'series=X3',
-  'transmission=Automatic', 'max_mileage=20000', 'mileage_to=20000',
-  'year_from=2022', 'registration_year_from=2022',
-];
-for (const c of candidates) {
-  const r = await get(listUrl(`size=100&page=1&${c}`), H);
-  let total = null;
-  let count = null;
-  try {
-    const e = JSON.parse(r.body);
-    total = e.pagination?.total;
-    count = e.pagination?.count ?? e.count;
-  } catch { /* ignore */ }
-  console.log(`${c.padEnd(45)} → HTTP ${r.status}, pages=${total}, count=${count}`);
+console.log('\n=== concurrency: how fast can we walk N pages? ===');
+for (const conc of [1, 4, 8]) {
+  const nums = Array.from({ length: 16 }, (_, i) => i + 1);
+  const t0 = Date.now();
+  let bad = 0;
+  const queue = [...nums];
+  const workers = Array.from({ length: conc }, async () => {
+    while (queue.length) {
+      const p = queue.shift();
+      const r = await get(listUrl(`size=100&page=${p}`), H);
+      if (r.status !== 200) bad += 1;
+    }
+  });
+  await Promise.all(workers);
+  const secs = ((Date.now() - t0) / 1000).toFixed(1);
+  console.log(`concurrency=${conc}: 16 pages in ${secs}s, non-200s=${bad}`
+    + ` → est. 120 pages ≈ ${((secs / 16) * 120).toFixed(0)}s`);
 }
