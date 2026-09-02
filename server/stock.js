@@ -20,7 +20,9 @@
  */
 
 import { request } from 'node:https';
-import { readFileSync } from 'node:fs';
+import {
+  readFileSync, writeFileSync, renameSync, mkdirSync,
+} from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
