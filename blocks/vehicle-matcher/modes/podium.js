@@ -244,8 +244,6 @@ const PODIUM_COPY = {
   ford: {
     wordmark: 'Your Shortlist',
     title: 'Your top three, live.',
-    lede: 'Answer what matters on the left. The three cars on the right re-order '
-      + 'as you go, and the button makes it official.',
     bannerStart: 'Nothing committed yet. We’ve made a start from your budget.',
     bannerProgress: ({ done, total }) => `${done} of ${total} answered. The order shifts with each one.`,
     bannerComplete: 'That’s everything answered. Confirm whenever you’re ready.',
