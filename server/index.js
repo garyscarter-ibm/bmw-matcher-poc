@@ -385,17 +385,17 @@ async function handleMatch(req, res, deps) {
   // complete and instant.
   await deps.enrichColours(brand, matches.map((m) => m.car));
   const warmRest = deps.enrichColours(brand, [
-    ...matches.flatMap((m) => m.listings || []),
+    // Round-robin, not card-by-card: the budget runs out long before this queue
+    // does, and taken depth-first the first card's 24 listings consume all of it
+    // — leaving five pickers able to name a single colour. One listing from each
+    // card, then a second from each, spreads the same spend so every picker has
+    // something real to offer.
+    ...interleave(matches.map((m) => m.listings || [])),
     ...alternatives.map((m) => m.car),
-    ...alternatives.flatMap((m) => m.listings || []),
+    ...interleave(alternatives.map((m) => m.listings || [])),
   ]);
   // Detached: a slow or failing PDP must not hold up (or reject) this response.
-  if (warmRest?.catch) {
-    warmRest.then(
-      (out) => console.log(`[dbg] warm done: ${out.filter((c) => c.colour).length}/${out.length}`),
-      (err) => console.log('[dbg] warm FAILED:', err?.message),
-    );
-  }
+  if (warmRest?.catch) warmRest.catch(() => {});
   // Paint is only known after that call, so the group's colour list is filled
   // in here rather than at grouping time. Alternatives get the same treatment:
   // a rejection promotes one into view, and it should arrive able to say what
