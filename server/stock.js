@@ -353,7 +353,18 @@ function readNationalIndex(brand) {
     if (!Array.isArray(snap?.cars) || snap.cars.length === 0) return null;
     return { at: Number(snap.at) || 0, cars: snap.cars };
   } catch {
-    return null; // no snapshot yet, or an unreadable one — walk the feed instead
+    // No usable snapshot. Rather than make the first visitor on a clean machine
+    // sit through the walk (~170s measured for BMW), fall back to the committed
+    // fixture — which is itself a national dump in the same mapped shape
+    // (scripts/dump-stock.js wrote it: 13k BMW cars across 131 retailers). It's
+    // weeks stale, so it's dated `at: 0` to guarantee an immediate refresh, but
+    // it means a fresh clone serves a real national pool from the first request.
+    try {
+      const cars = loadFixtures(brand);
+      return cars?.length ? { at: 0, cars } : null;
+    } catch {
+      return null; // no fixture either — nothing for it but to walk the feed
+    }
   }
 }
 
