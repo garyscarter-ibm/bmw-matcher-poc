@@ -51,13 +51,22 @@ const STOCK_TTL_MS = Number(process.env.STOCK_TTL_MS) || 5 * 60 * 1000; // 5 min
 // The main pool for BMW/MINI is the whole national feed, not one retailer's
 // forecourt (see byNationalQuery) — matches scripts/dump-stock.js's own
 // constants, since it's walking the exact same pagination. 200 is a generous
-// ceiling above the observed ~130 pages, not a real cap in practice. The delay
-// between pages and the retry count are both about the same thing: the feed
-// 429s on a fast burst, so a ~130-page cold walk has to be polite about it.
-const NATIONAL_PAGE_SIZE = 100; // the platform's max page size
+// ceiling above the observed ~120 pages, not a real cap in practice.
+//
+// The delay is the load-bearing constant here, and it is NOT over-caution:
+// measured 2026-09-02 against usedcars.bmw.co.uk, the list endpoint is throttled
+// server-side (DRF-style, `Retry-After: 20`, body "Request was throttled").
+//   - no delay, sequential:  first 429 at request #27
+//   - concurrency 4:         85 of 120 pages 429'd
+//   - 400ms delay:           40/40 pages clean
+// So ~2.5 req/s is the sustainable ceiling and concurrency makes things WORSE,
+// not better. A full 120-page walk therefore costs ~60s and cannot be made
+// fast — which is exactly why the result is persisted (see NATIONAL_INDEX_DIR)
+// and served stale-while-revalidate rather than fetched on the request path.
+const NATIONAL_PAGE_SIZE = 100; // the platform's max page size (size=500 still yields 100)
 const NATIONAL_PAGE_LIMIT = Number(process.env.NATIONAL_PAGE_LIMIT) || 200;
 const NATIONAL_PAGE_DELAY_MS = Number(process.env.NATIONAL_PAGE_DELAY_MS) || 400;
-const RATE_LIMIT_MAX_RETRIES = 5; // per page, linear backoff, when 429'd
+const RATE_LIMIT_MAX_RETRIES = 5; // per page, when 429'd (honours Retry-After)
 
 // Nearby search depth. 4 pages × 100 reaches the 5 nearest retailers from
 // Perth (~31 miles out) — ample for a top-3 carousel, and nowhere near the
