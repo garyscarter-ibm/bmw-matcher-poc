@@ -6,3 +6,7 @@ node_modules/
 # Stock fixtures: keep the mapped-car snapshots (small, used for engine
 # validation); ignore the huge raw feed dumps (regenerate via scripts/dump-stock.js).
 /fixtures/*-raw.json
+
+# Runtime national-stock index (see server/stock.js). Rebuilt from the live feed
+# on demand — machine-local cache, never a source of truth.
+/.cache/
