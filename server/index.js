@@ -371,20 +371,26 @@ async function handleMatch(req, res, deps) {
   // Shown cards get their listings enriched too (the picker needs every
   // colour); the held-back alternatives only need their own paint, since they
   // aren't on screen yet.
-  // Order matters: paint is fetched one page at a time against a wall-clock
-  // budget, so whatever is queued last may not get done. Cards on screen come
-  // first, then the listings behind them (the picker names cars by colour),
-  // then the held-back alternatives, which nobody can see yet.
   // Grouping copies the representative into a fresh `car` object and keeps the
   // originals in `listings`, so enriching one does NOT enrich the other. Both
-  // have to be in this list, or a grouped card gets paint on its headline and
-  // none on the listings behind it.
-  await deps.enrichColours(brand, [
-    ...matches.map((m) => m.car),
+  // have to be enriched, or a grouped card gets paint on its headline and none
+  // on the listings behind it.
+  //
+  // Only the headline cars are waited on. Against a national pool the full
+  // queue (cards + every sampled listing + alternatives) runs to a few hundred
+  // PDPs, which cannot drain inside any budget a user should sit through — so
+  // the request blocks on just the paint that is actually on screen, and the
+  // rest is warmed behind the response. The colour cache is permanent, so the
+  // picker is populated by the time anyone opens it, and a repeat visit is
+  // complete and instant.
+  await deps.enrichColours(brand, matches.map((m) => m.car));
+  const warmRest = deps.enrichColours(brand, [
     ...matches.flatMap((m) => m.listings || []),
     ...alternatives.map((m) => m.car),
     ...alternatives.flatMap((m) => m.listings || []),
   ]);
+  // Detached: a slow or failing PDP must not hold up (or reject) this response.
+  if (warmRest?.catch) warmRest.catch(() => {});
   // Paint is only known after that call, so the group's colour list is filled
   // in here rather than at grouping time. Alternatives get the same treatment:
   // a rejection promotes one into view, and it should arrive able to say what
