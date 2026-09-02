@@ -172,22 +172,24 @@
     const PICKER_ORDER = ['bmw', 'mini', 'ford', 'honda', 'motorrad', 'ferrari'];
 
     // ---- carried over verbatim from index.html ------------------------------
-    // Each brand's default demo retailer name, so switching brand alone doesn't
-    // leave a mismatched "...at Grassicks BMW". Honda/Ford/Motorrad are national
-    // programmes, so they use the programme name. Precedence: ?retailerName=
-    // beats the ?retailer= ID map beats the ?brand= default.
+    // Each brand's default label for the pool the block searched, so switching
+    // brand alone doesn't leave a mismatched "...at Grassicks BMW". Every one is
+    // a national programme rather than a branch, because that is what gets
+    // searched — BMW and MINI walk the whole national feed (nationalStock in
+    // server/stock.js), so naming one dealer would claim a pool that was never
+    // searched. ?retailerName= overrides for a single-dealer demo; ?retailer=<id>
+    // deliberately does not, since it only anchors the nearby-retailer lookup.
     const BRAND_RETAILER_NAMES = {
-      bmw: 'Grassicks BMW', // Grassicks Garage, Perth (retailer 96)
-      mini: 'Sytner Luton MINI', // retailer 92
+      bmw: 'BMW Approved Used',
+      mini: 'MINI Approved Used',
       honda: 'Honda Approved Used',
       ford: 'Ford Approved Used',
       motorrad: 'BMW Motorrad Approved Used',
       ferrari: 'Ferrari Approved',
     };
-    const RETAILER_NAMES = {
-      96: 'Grassicks BMW', // Grassicks Garage, Perth
-      92: 'Sytner Luton MINI',
-    };
+    // Still the nearby-lookup anchor for the two feed brands (Grassicks Garage,
+    // Perth and Sytner Luton MINI) — an address to measure distance from, not a
+    // filter on the main pool.
     const BRAND_RETAILER_IDS = { bmw: '96', mini: '92' };
 
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => (
