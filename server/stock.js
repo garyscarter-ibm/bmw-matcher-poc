@@ -325,6 +325,57 @@ function cachedFetch(cache, key, load) {
   return inflight;
 }
 
+/* --------------------- persisted national index ----------------------- *
+ * A feed brand's national pool costs ~60s to walk and the upstream throttle
+ * makes that irreducible (see NATIONAL_PAGE_DELAY_MS). Paying it on a user's
+ * request is not an option, and paying it again on every process restart is
+ * barely better — so the walk's result is written to disk and re-read on boot.
+ *
+ * That turns the cost model from "~60s per restart" into "~60s once, ever",
+ * and lets a cold process serve a full national pool immediately. The snapshot
+ * is a machine-local cache, never a source of truth: if it's missing or
+ * unreadable we simply walk the feed, and it is always allowed to be stale
+ * (the refresh happens behind whatever we just served — see nationalStock).
+ * --------------------------------------------------------------------- */
+
+const NATIONAL_INDEX_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '.cache');
+const nationalIndexPath = (brand) => join(NATIONAL_INDEX_DIR, `national-${brand}.json`);
+
+/**
+ * The on-disk national index for a brand, or null if there isn't a usable one.
+ * Never throws: a missing, truncated or half-written file is just a cache miss.
+ *
+ * @returns {{ at: number, cars: Array }|null}
+ */
+function readNationalIndex(brand) {
+  try {
+    const snap = JSON.parse(readFileSync(nationalIndexPath(brand), 'utf8'));
+    if (!Array.isArray(snap?.cars) || snap.cars.length === 0) return null;
+    return { at: Number(snap.at) || 0, cars: snap.cars };
+  } catch {
+    return null; // no snapshot yet, or an unreadable one — walk the feed instead
+  }
+}
+
+/**
+ * Persist a brand's national index. Written to a temp file and renamed, so a
+ * crash (or a concurrent reader) can never observe a half-written snapshot —
+ * rename is atomic within a filesystem. Failures are logged, not thrown: this
+ * is a cache, and the cars are already in memory and being served.
+ */
+function writeNationalIndex(brand, cars) {
+  const path = nationalIndexPath(brand);
+  const tmp = `${path}.tmp`;
+  try {
+    mkdirSync(NATIONAL_INDEX_DIR, { recursive: true });
+    writeFileSync(tmp, JSON.stringify({ at: Date.now(), brand, cars }));
+    renameSync(tmp, path);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`[stock] could not persist ${brand} national index:`, err?.message);
+  }
+}
+
 /* ---------------------------- fixtures source ------------------------- *
  * Some brands' live feeds aren't reachable yet (a bot-walled edge, or an SPA
  * whose API we can't replay), so their stock is seeded into a committed
