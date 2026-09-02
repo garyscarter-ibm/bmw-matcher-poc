@@ -147,7 +147,7 @@ export const BRAND_COPY = {
      * That is the whole rule the old banded page broke: "Close, but not level
      * with the cars above" and "two of these fit you equally well" were both
      * quality claims on the same scale, made by different sections, so one
-     * could contradict the other. "At Grassicks Garage" asserts nothing about
+     * could contradict the other. "At BMW Approved Used" asserts nothing about
      * fit, so it cannot contradict a higher score in the group below it. Same
      * reason the old "NEXT BEST" heading had to go: it ranked.
      */
