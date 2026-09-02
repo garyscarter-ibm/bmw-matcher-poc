@@ -54,10 +54,12 @@ export const BRAND_COPY = {
      * the unqualified line stands, because a qualification that isn't doing
      * work is just a smaller claim (docs/results-page-review.md).
      *
-     * The block is authored onto ONE retailer's page, so "at Grassicks Garage"
-     * is not a hedge — it's a more accurate statement of what was searched. A
-     * higher score in the group below then contradicts nothing, because the
-     * headline never claimed to be about that group.
+     * `retailer` names the pool that was actually searched — for BMW and MINI
+     * the national approved-used programme, since stock.js walks the whole feed
+     * rather than one dealer's slice. So "at BMW Approved Used" is not a hedge,
+     * it's a more accurate statement of what was searched. A higher score in the
+     * group below then contradicts nothing, because the headline never claimed
+     * to be about that group.
      */
     tiedTitleHere: ({ count, retailer }) => `At ${retailer}, ${cardinal(count)} of these `
       + 'fit you equally well.',
