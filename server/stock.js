@@ -900,35 +900,100 @@ export async function fetchRetailerStock(brand = 'bmw', retailerSite) {
   // other dealer see the same (much larger) candidate pool. `site` still
   // matters elsewhere (resolveRetailerPostcode anchors the nearby carousel to
   // it), just not for this fetch.
-  const key = keyFor(b, 'national');
-  seenNationalBrands.add(b);
-  return cachedFetch(cacheByRetailer, key, async () => {
-    const query = byNationalQuery();
-    let vehicles;
-    try {
-      const first = await fetchPageWithRetry(origin, query, 1);
-      vehicles = [...(first.results || [])];
-      const totalPages = Math.min(first.pagination?.total || 1, NATIONAL_PAGE_LIMIT);
-      for (let page = 2; page <= totalPages; page += 1) {
-        // Be polite — the feed 429s on a fast burst, and a ~130-page walk is
-        // exactly that burst without this (see scripts/dump-stock.js).
-        // eslint-disable-next-line no-await-in-loop
-        await sleep(NATIONAL_PAGE_DELAY_MS);
-        // eslint-disable-next-line no-await-in-loop
-        const next = await fetchPageWithRetry(origin, query, page);
-        vehicles.push(...(next.results || []));
-      }
-    } catch (err) {
-      if (err instanceof StockUnavailableError) throw err;
-      throw new StockUnavailableError('Live stock fetch failed', { cause: err });
-    }
+  return nationalStock(b, origin);
+}
 
-    const cars = vehicles.map((v) => mapVehicle(v, b)).filter(Boolean);
-    if (cars.length === 0) {
-      throw new StockUnavailableError('Live feed returned no usable vehicles');
+/** One full walk of a brand's national feed → mapped cars. ~60s, throttle-bound
+ * (see NATIONAL_PAGE_DELAY_MS); callers should keep it off the request path. */
+async function walkNationalFeed(origin, brand) {
+  const query = byNationalQuery();
+  let vehicles;
+  try {
+    const first = await fetchPageWithRetry(origin, query, 1);
+    vehicles = [...(first.results || [])];
+    const totalPages = Math.min(first.pagination?.total || 1, NATIONAL_PAGE_LIMIT);
+    for (let page = 2; page <= totalPages; page += 1) {
+      // Be polite — the feed throttles a fast burst, and a ~120-page walk is
+      // exactly that burst without this (see NATIONAL_PAGE_DELAY_MS).
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(NATIONAL_PAGE_DELAY_MS);
+      // eslint-disable-next-line no-await-in-loop
+      const next = await fetchPageWithRetry(origin, query, page);
+      vehicles.push(...(next.results || []));
     }
-    return cars;
-  });
+  } catch (err) {
+    if (err instanceof StockUnavailableError) throw err;
+    throw new StockUnavailableError('Live stock fetch failed', { cause: err });
+  }
+
+  const cars = vehicles.map((v) => mapVehicle(v, brand)).filter(Boolean);
+  if (cars.length === 0) {
+    throw new StockUnavailableError('Live feed returned no usable vehicles');
+  }
+  return cars;
+}
+
+/** Start (or join) a national refresh, persisting the result. Single-flight, so
+ * a warmer tick that overlaps a request shares the one walk. */
+function refreshNational(brand, origin, key) {
+  const entry = cacheByRetailer.get(key);
+  if (entry?.inflight) return entry.inflight;
+
+  const inflight = walkNationalFeed(origin, brand).then(
+    (cars) => {
+      cacheByRetailer.set(key, { at: Date.now(), cars });
+      writeNationalIndex(brand, cars);
+      return cars;
+    },
+    (err) => {
+      // Drop only the in-flight marker; any stale cars keep serving.
+      const prev = cacheByRetailer.get(key);
+      if (prev) delete prev.inflight;
+      throw err;
+    },
+  );
+  cacheByRetailer.set(key, { ...(entry || {}), inflight });
+  return inflight;
+}
+
+/**
+ * A feed brand's national pool, stale-while-revalidate.
+ *
+ * The walk costs ~60s and the upstream throttle makes that irreducible, so the
+ * only way national stock is viable is to never make a user wait for it:
+ *
+ *   fresh in memory      → serve it
+ *   stale in memory/disk → serve it NOW, refresh behind the response
+ *   nothing at all       → no choice but to walk (first run on a clean machine)
+ *
+ * Deliberately serves stale stock rather than blocking or erroring: a pool
+ * that's an hour old still ranks essentially the same cars, and a sold car is
+ * a far smaller problem than a 60-second wait or a 502. Freshness is the
+ * warmer's job, not the request's.
+ */
+function nationalStock(brand, origin) {
+  const key = keyFor(brand, 'national');
+  seenNationalBrands.add(brand);
+
+  const cached = cacheByRetailer.get(key);
+  if (fresh(cached)) return Promise.resolve(cached.cars);
+
+  // Nothing in memory: try the previous process's index before the network, so
+  // a restart doesn't re-pay the walk.
+  if (!cached?.cars) {
+    const snap = readNationalIndex(brand);
+    if (snap) cacheByRetailer.set(key, { ...(cached || {}), at: snap.at, cars: snap.cars });
+  }
+
+  const have = cacheByRetailer.get(key);
+  const refresh = refreshNational(brand, origin, key);
+  if (have?.cars) {
+    // Swallow here so a failed background refresh can't reject the response we
+    // already served (or surface as an unhandled rejection); the warmer retries.
+    refresh.catch(() => {});
+    return Promise.resolve(have.cars);
+  }
+  return refresh;
 }
 
 /* ------------------------- nearby-retailer stock ---------------------- */
