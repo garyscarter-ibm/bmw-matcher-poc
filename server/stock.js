@@ -933,6 +933,11 @@ async function walkNationalFeed(origin, brand) {
   return cars;
 }
 
+// How long to leave a brand's national feed alone after a failed walk. Without
+// this, a persistently broken feed gets re-walked by every request that lands
+// while the pool is stale — 120 requests at an upstream we now know throttles.
+const NATIONAL_FAIL_COOLDOWN_MS = Number(process.env.NATIONAL_FAIL_COOLDOWN_MS) || 60 * 1000;
+
 /** Start (or join) a national refresh, persisting the result. Single-flight, so
  * a warmer tick that overlaps a request shares the one walk. */
 function refreshNational(brand, origin, key) {
@@ -948,7 +953,10 @@ function refreshNational(brand, origin, key) {
     (err) => {
       // Drop only the in-flight marker; any stale cars keep serving.
       const prev = cacheByRetailer.get(key);
-      if (prev) delete prev.inflight;
+      if (prev) {
+        delete prev.inflight;
+        prev.failedAt = Date.now();
+      }
       throw err;
     },
   );
