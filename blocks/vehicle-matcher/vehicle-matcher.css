@@ -3603,6 +3603,10 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-podium-q-toggle:focus-visible .vm-podium-q-title { color: var(--vm-accent-spot); }
 .vm-podium-q-toggle:focus-visible { outline: 2px solid var(--vm-accent-spot); outline-offset: 2px; }
 
+/* The label+title pair grows to fill the row; the badge and chevron after it
+   stay fixed at the end. */
+.vm-podium-q-text { flex: 1 1 auto; min-width: 0; }
+
 .vm-podium-q-label {
   display: block;
   font-family: var(--vm-font-bold);
@@ -3626,13 +3630,6 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   line-height: 1.25;
   transition: color 0.15s ease;
 }
-
-/* The two children after the title live on the toggle's own flex row: the
-   label+title pair grows, the badge and chevron stay fixed at the end. */
-.vm-podium-q-toggle > .vm-podium-q-label,
-.vm-podium-q-toggle > .vm-podium-q-title { flex: 1 1 auto; }
-.vm-podium-q-toggle { flex-wrap: wrap; }
-.vm-podium-q-label { flex: 1 0 100%; }
 
 .vm-podium-q-badge {
   flex: 0 0 auto;
