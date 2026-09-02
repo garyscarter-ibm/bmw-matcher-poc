@@ -828,16 +828,27 @@ export async function fetchRetailerStock(brand = 'bmw', retailerSite) {
     return cachedFetch(cacheByRetailer, key, () => ferrariLiveStock());
   }
 
-  const key = keyFor(b, site);
-  seenRetailers.set(key, { brand: b, retailerSite: site });
+  // BMW/MINI: the main pool is the WHOLE national feed, not `site`'s own
+  // forecourt — every retailer of the brand, one shared cache entry, so a
+  // MINI visitor configured with Sytner Luton and one configured with any
+  // other dealer see the same (much larger) candidate pool. `site` still
+  // matters elsewhere (resolveRetailerPostcode anchors the nearby carousel to
+  // it), just not for this fetch.
+  const key = keyFor(b, 'national');
+  seenNationalBrands.add(b);
   return cachedFetch(cacheByRetailer, key, async () => {
-    const query = byRetailerQuery(site);
+    const query = byNationalQuery();
     let vehicles;
     try {
       const first = await fetchPageWithRetry(origin, query, 1);
       vehicles = [...(first.results || [])];
-      const totalPages = Math.min(first.pagination?.total || 1, PAGE_LIMIT);
+      const totalPages = Math.min(first.pagination?.total || 1, NATIONAL_PAGE_LIMIT);
       for (let page = 2; page <= totalPages; page += 1) {
+        // Be polite — the feed 429s on a fast burst, and a ~130-page walk is
+        // exactly that burst without this (see scripts/dump-stock.js).
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(NATIONAL_PAGE_DELAY_MS);
+        // eslint-disable-next-line no-await-in-loop
         const next = await fetchPageWithRetry(origin, query, page);
         vehicles.push(...(next.results || []));
       }
