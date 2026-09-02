@@ -220,8 +220,17 @@ async function fetchPageWithRetry(origin, query, page) {
   throw new StockUnavailableError(`list/ page ${page} failed after retries`);
 }
 
-/** All of one retailer's stock, unsorted, no distances. */
+/** All of one retailer's stock, unsorted, no distances. Still used to resolve
+ * a retailer's postcode (see resolveRetailerPostcode) for the nearby carousel
+ * — the main pool itself no longer scopes to a single retailer_site, see
+ * byNationalQuery. */
 const byRetailerQuery = (retailerSite) => `retailer_site=${encodeURIComponent(retailerSite)}`;
+
+/** The whole national feed, unfiltered — retailer_site omitted entirely, the
+ * same query scripts/dump-stock.js walks offline. This is the main pool for
+ * every retailer of a feed brand, not one dealer's forecourt: a single
+ * catchment is far smaller than the question set is designed against. */
+const byNationalQuery = () => `size=${NATIONAL_PAGE_SIZE}`;
 
 /**
  * Stock nationwide, nearest-first from `postcode`, with a `distance` on every
