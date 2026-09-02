@@ -340,8 +340,6 @@ const PODIUM_COPY = {
   ferrari: {
     wordmark: 'The Podium',
     title: 'Your top three, live.',
-    lede: 'Tell us how you drive on the left. The order on the right forms as you '
-      + 'go, and the button settles it.',
     bannerStart: 'Nothing settled yet. The order has started from your budget.',
     bannerProgress: ({ done, total }) => `${done} of ${total} answered. The order changes with each one.`,
     bannerComplete: 'That’s everything answered. Settle it when you’re ready.',
