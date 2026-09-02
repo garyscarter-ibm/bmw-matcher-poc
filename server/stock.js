@@ -994,14 +994,22 @@ function nationalStock(brand, origin) {
   }
 
   const have = cacheByRetailer.get(key);
-  const refresh = refreshNational(brand, origin, key);
   if (have?.cars) {
-    // Swallow here so a failed background refresh can't reject the response we
-    // already served (or surface as an unhandled rejection); the warmer retries.
-    refresh.catch(() => {});
+    // Back off after a failure rather than re-walking a throttled feed on every
+    // request — we have cars to serve, so there's no urgency.
+    const cooling = have.failedAt && Date.now() - have.failedAt < NATIONAL_FAIL_COOLDOWN_MS;
+    if (!cooling) {
+      // Detach: a failed background refresh must not reject the response we've
+      // already served, nor surface as an unhandled rejection. The warmer retries.
+      refreshNational(brand, origin, key).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.warn(`[stock] ${brand} national refresh failed (serving stale):`, err?.message);
+      });
+    }
     return Promise.resolve(have.cars);
   }
-  return refresh;
+  // Nothing to serve — the caller has to wait for the walk (first run only).
+  return refreshNational(brand, origin, key);
 }
 
 /* ------------------------- nearby-retailer stock ---------------------- */
