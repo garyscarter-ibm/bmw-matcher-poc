@@ -758,6 +758,11 @@ function mount(root, ctx) {
     if (done === 0) bannerEl.textContent = copy.bannerStart;
     else if (done >= visible.length) bannerEl.textContent = copy.bannerComplete;
     else bannerEl.textContent = copy.bannerProgress({ done, total: visible.length });
+
+    visible.forEach((q) => {
+      const badge = blocks.get(q.id)?.querySelector('.vm-podium-q-badge');
+      if (badge) badge.hidden = !isAnswered(q);
+    });
   };
 
   /*
