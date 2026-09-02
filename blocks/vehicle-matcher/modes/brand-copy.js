@@ -228,7 +228,12 @@ export const BRAND_COPY = {
     // The same "we have not got it" as BMW's, in MINI's register: a shrug that
     // still gives a straight answer, and a reason to come back rather than an
     // apology. See WEAK_SCORE for when it fires.
-    weakTitle: ({ retailer }) => `We haven’t got your MINI at ${retailer} right now.`,
+    //
+    // `retailer` is a programme name ("MINI Approved Used"), not a branch, so
+    // this deliberately doesn't say "your MINI at MINI Approved Used" — the
+    // brand would land twice in one short sentence. The possessive moves to the
+    // end instead, which keeps the shrug and drops the stutter.
+    weakTitle: ({ retailer }) => `Nothing at ${retailer} is quite your MINI right now.`,
     weakLede: () => 'Here’s the nearest we’ve got anyway, but none of them is it. '
       + 'Stock turns over quickly, so it’s worth another look soon.',
     rescueLabel: 'NOT HERE, BUT NOT FAR.',
