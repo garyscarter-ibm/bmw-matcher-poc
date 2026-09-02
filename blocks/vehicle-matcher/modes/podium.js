@@ -700,14 +700,14 @@ function mount(root, ctx) {
     toggle.type = 'button';
     toggle.setAttribute('aria-expanded', 'true');
     toggle.setAttribute('aria-controls', panelId);
-    const chevron = el('span', 'vm-podium-q-chevron');
-    chevron.setAttribute('aria-hidden', 'true');
-    toggle.append(
+    const text = el('span', 'vm-podium-q-text');
+    text.append(
       el('span', 'vm-podium-q-label', `${String(index + 1).padStart(2, '0')} / ${shortLabel(q, ctx.brand)}`),
       el('span', 'vm-podium-q-title', q.title),
-      el('span', 'vm-podium-q-badge', 'Answered'),
-      chevron,
     );
+    const chevron = el('span', 'vm-podium-q-chevron');
+    chevron.setAttribute('aria-hidden', 'true');
+    toggle.append(text, el('span', 'vm-podium-q-badge', 'Answered'), chevron);
     heading.append(toggle);
 
     const panel = el('div', 'vm-podium-q-panel');
