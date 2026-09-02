@@ -18,43 +18,57 @@ function get(url, headers = {}) {
     req.end();
   });
 }
+const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
 
 const root = await get(`${ORIGIN}/`, { Accept: 'text/html' });
 const token = /(?:^|;\s*)csrftoken=([^;]+)/.exec(
   (root.headers['set-cookie'] || []).find((c) => c.includes('csrftoken')) || '',
 )?.[1];
-if (!token) throw new Error('no csrftoken');
 const H = {
   Accept: 'application/json', Cookie: `csrftoken=${token}`, 'X-CSRFToken': token, Referer: `${ORIGIN}/`,
 };
 const listUrl = (q) => `${ORIGIN}/vehicle/api/list/?${q}`;
 
-const CONC = Number(process.argv[2]) || 4;
-
-const first = JSON.parse((await get(listUrl('size=100&page=1'), H)).body);
-const totalPages = first.pagination.total;
-console.log(`FULL WALK: ${totalPages} pages, ${first.pagination.items} items, concurrency=${CONC}`);
-
-const queue = Array.from({ length: totalPages }, (_, i) => i + 1);
-const statuses = new Map();
-let vehicles = 0;
-let bytes = 0;
-const t0 = Date.now();
-
-await Promise.all(Array.from({ length: CONC }, async () => {
-  while (queue.length) {
-    const p = queue.shift();
-    const r = await get(listUrl(`size=100&page=${p}`), H);
-    statuses.set(r.status, (statuses.get(r.status) || 0) + 1);
-    bytes += r.body.length;
-    if (r.status === 200) {
-      try { vehicles += (JSON.parse(r.body).results || []).length; } catch { /* ignore */ }
-    }
+// 1. What does a 429 actually tell us? Burst until we get one, inspect headers.
+console.log('=== 429 shape: burst until limited ===');
+let firstLimitAt = null;
+for (let p = 1; p <= 60; p += 1) {
+  const r = await get(listUrl(`size=100&page=${p}`), H);
+  if (r.status === 429) {
+    firstLimitAt = p;
+    console.log(`first 429 on request #${p}`);
+    console.log('retry-after:', r.headers['retry-after']);
+    const rateHeaders = Object.entries(r.headers)
+      .filter(([k]) => /rate|limit|retry|reset/i.test(k));
+    console.log('rate-ish headers:', JSON.stringify(rateHeaders));
+    console.log('body (first 300):', r.body.slice(0, 300));
+    break;
   }
-}));
+}
+if (!firstLimitAt) console.log('no 429 within 60 sequential no-delay requests');
 
-const secs = (Date.now() - t0) / 1000;
-console.log(`done in ${secs.toFixed(1)}s`);
-console.log('status counts:', JSON.stringify(Object.fromEntries(statuses)));
-console.log(`vehicles fetched: ${vehicles}`);
-console.log(`raw JSON transferred: ${(bytes / 1024 / 1024).toFixed(1)} MB`);
+// 2. How long until it lets us back in?
+console.log('\n=== recovery: poll every 5s until a 200 ===');
+for (let i = 1; i <= 24; i += 1) {
+  await sleep(5000);
+  const r = await get(listUrl('size=100&page=1'), H);
+  if (r.status === 200) { console.log(`recovered after ~${i * 5}s`); break; }
+  if (i === 24) console.log('still limited after 120s');
+}
+
+// 3. Sustainable rate: 40 pages at a given delay, count 429s.
+console.log('\n=== sustainable delay (40 pages each) ===');
+for (const delay of [400, 1000]) {
+  await sleep(20000); // let the bucket refill between trials
+  let ok = 0;
+  let limited = 0;
+  const t0 = Date.now();
+  for (let p = 1; p <= 40; p += 1) {
+    const r = await get(listUrl(`size=100&page=${p}`), H);
+    if (r.status === 200) ok += 1; else if (r.status === 429) limited += 1;
+    await sleep(delay);
+  }
+  const secs = ((Date.now() - t0) / 1000).toFixed(0);
+  console.log(`delay=${delay}ms → ${ok} ok, ${limited} rate-limited, in ${secs}s`
+    + ` → est. 120 pages ≈ ${((secs / 40) * 120).toFixed(0)}s (if clean)`);
+}
