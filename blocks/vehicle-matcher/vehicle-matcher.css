@@ -3570,65 +3570,6 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   margin: 0 0 var(--vm-space-2);
 }
 
-/* Sized off .vm-title but two steps down: this headline lives in a 320px
-   column beside a live result, so the questionnaire's 40px would take four
-   lines and push the first question below the fold. */
-.vm-podium-title {
-  font-family: var(--vm-font-heading);
-  font-size: var(--vm-text-h2);
-  font-weight: 300;
-  line-height: 1.15;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  margin: 0 0 var(--vm-space-3);
-}
-
-/* The lede sets in the BODY font at every brand, not the heading font that
-   .vm-lede uses. Four of the six brands already override .vm-lede back to body
-   copy, and the two that do not (BMW, Motorrad) set it in a light grotesque
-   that reads thin at this size in a narrow column. One rule beats six. */
-.vm-podium-lede {
-  font-family: var(--vm-font-body);
-  font-weight: 400;
-  font-size: var(--vm-text-body);
-  line-height: 1.4;
-  color: var(--vm-ink-muted);
-  margin: 0 0 var(--vm-space-5);
-}
-
-.vm-podium-progress {
-  height: 4px;
-  background: var(--vm-surface-alt);
-  border-radius: var(--vm-radius);
-  overflow: hidden;
-  margin: 0 0 var(--vm-space-2);
-}
-.vm-podium-progress-bar {
-  height: 100%;
-  width: 0;
-  background: var(--vm-accent-spot);
-  border-radius: var(--vm-radius);
-  transition: width 0.3s ease;
-}
-
-/* A live region, so it gains and loses text as the brief fills in. The
-   reserved min-height stops that from nudging the first question up and down
-   under the reader. */
-.vm-podium-banner {
-  margin: 0 0 var(--vm-space-6);
-  min-height: 1.4em;
-  font-size: var(--vm-text-label);
-  line-height: 1.4;
-  color: var(--vm-ink-muted);
-}
-/* Once the brief is committed the banner is reporting a result, not nudging
-   for more answers, so it takes the accent and the bold face. */
-.vm-podium.is-committed .vm-podium-banner {
-  font-family: var(--vm-font-bold);
-  font-weight: 700;
-  color: var(--vm-accent-spot);
-}
-
 /* One block per visible question. Conditional questions are spliced in and out
    here, so the separation is a hairline between siblings rather than a border
    on the block itself: adding or removing a block never leaves a stray rule at
@@ -3637,10 +3578,33 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   display: flex;
   flex-direction: column;
 }
-.vm-podium-q { padding: var(--vm-space-5) 0; }
 .vm-podium-q + .vm-podium-q { border-top: var(--vm-border-width) solid var(--vm-line); }
 
+/* The twisty header: a full-width button so the whole row (label, title,
+   badge, chevron) is the hit target, not just the chevron glyph. Text-align
+   left and a transparent background so it reads as a heading, not a button,
+   until hovered/focused. */
+.vm-podium-q-heading { margin: 0; }
+.vm-podium-q-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--vm-space-3);
+  width: 100%;
+  padding: var(--vm-space-4) 0;
+  border: 0;
+  background: transparent;
+  appearance: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.vm-podium-q-toggle:hover .vm-podium-q-title,
+.vm-podium-q-toggle:focus-visible .vm-podium-q-title { color: var(--vm-accent-spot); }
+.vm-podium-q-toggle:focus-visible { outline: 2px solid var(--vm-accent-spot); outline-offset: 2px; }
+
 .vm-podium-q-label {
+  display: block;
   font-family: var(--vm-font-bold);
   font-weight: 700;
   font-size: var(--vm-text-eyebrow);
@@ -3655,15 +3619,54 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    them share a column with a live result, so they read as a form, not as eight
    consecutive headlines. */
 .vm-podium-q-title {
+  display: block;
   font-family: var(--vm-font-heading);
   font-weight: 300;
   font-size: var(--vm-text-body-lg);
   line-height: 1.25;
-  margin: 0;
+  transition: color 0.15s ease;
 }
 
+/* The two children after the title live on the toggle's own flex row: the
+   label+title pair grows, the badge and chevron stay fixed at the end. */
+.vm-podium-q-toggle > .vm-podium-q-label,
+.vm-podium-q-toggle > .vm-podium-q-title { flex: 1 1 auto; }
+.vm-podium-q-toggle { flex-wrap: wrap; }
+.vm-podium-q-label { flex: 1 0 100%; }
+
+.vm-podium-q-badge {
+  flex: 0 0 auto;
+  padding: 3px var(--vm-space-2);
+  border-radius: var(--vm-radius-control);
+  background: var(--vm-surface-alt);
+  color: var(--vm-ink-muted);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+
+/* A plain CSS chevron (no icon font/SVG), rotated by aria-expanded so it needs
+   no separate open/closed asset. */
+.vm-podium-q-chevron {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-right: 2px;
+  border-right: var(--vm-border-width) solid var(--vm-ink-muted);
+  border-bottom: var(--vm-border-width) solid var(--vm-ink-muted);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.vm-podium-q-toggle[aria-expanded='false'] .vm-podium-q-chevron { transform: rotate(-45deg); }
+
+.vm-podium-q-panel { padding: 0 0 var(--vm-space-5); }
+.vm-podium-q-panel[hidden] { display: none; }
+
 .vm-podium-q-help {
-  margin: var(--vm-space-1) 0 0;
+  margin: 0 0 var(--vm-space-3);
   font-size: var(--vm-text-label);
   line-height: 1.4;
   color: var(--vm-ink-muted);
@@ -3671,15 +3674,15 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 
 /* The shared option list carries the questionnaire's generous margins, which
    were measured for a full-width screen with one question on it. */
-.vm-podium-q .vm-options { margin: var(--vm-space-3) 0 0; }
-.vm-podium-q .vm-options.vm-slider { padding-top: var(--vm-space-1); }
-.vm-podium-q .vm-slider-value { font-size: var(--vm-text-body-lg); margin-bottom: var(--vm-space-3); }
+.vm-podium-q-panel .vm-options { margin: 0; }
+.vm-podium-q-panel .vm-options.vm-slider { padding-top: var(--vm-space-1); }
+.vm-podium-q-panel .vm-slider-value { font-size: var(--vm-text-body-lg); margin-bottom: var(--vm-space-3); }
 
 @media (min-width: 720px) {
   /* .vm-options goes 2-up from a 560px VIEWPORT, but from 720px this pane is a
      320px column, so the two-up grid would put two labels in ~150px each. */
-  .vm-podium-q .vm-options { grid-template-columns: 1fr; }
-  .vm-podium-q .vm-option { padding: var(--vm-space-3) var(--vm-space-4); }
+  .vm-podium-q-panel .vm-options { grid-template-columns: 1fr; }
+  .vm-podium-q-panel .vm-option { padding: var(--vm-space-3) var(--vm-space-4); }
 }
 
 .vm-podium-commit {
