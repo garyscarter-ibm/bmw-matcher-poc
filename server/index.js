@@ -81,6 +81,18 @@ function clampFieldSize(raw) {
   return Math.min(n, FIELD_MAX);
 }
 
+/** Flatten lists breadth-first: one item from each, then the next from each.
+ * For work queues that get cut off by a budget, this shares the spend across
+ * every list instead of finishing the first and starving the rest. */
+function interleave(lists) {
+  const out = [];
+  const longest = Math.max(0, ...lists.map((l) => l.length));
+  for (let i = 0; i < longest; i += 1) {
+    for (const list of lists) if (i < list.length) out.push(list[i]);
+  }
+  return out;
+}
+
 const CORS_HEADERS = {
   // Read-only tool. Origin stays '*' on purpose: the block is driven by a
   // runtime ?api=<url> from arbitrary origins (and file:// locally), and the
