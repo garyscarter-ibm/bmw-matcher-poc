@@ -117,9 +117,7 @@ const PODIUM_COPY = {
     // UNMET_PHRASES vocabulary, then owns it. A shrug, never an apology.
     unmetNote: ({ list, retailer }) => `No ${list} at ${retailer} just now. `
       + 'This lot is the closest we’ve got to the rest of your brief.',
-    // Same reason as brand-copy.js's weakTitle: `retailer` is the programme
-    // ("MINI Approved Used"), so "your MINI at MINI Approved Used" would stutter.
-    weakNote: ({ retailer }) => `Nothing at ${retailer} is quite your MINI this week. `
+    weakNote: ({ retailer }) => `We haven’t got your MINI at ${retailer} this week. `
       + 'Here’s the nearest we’ve got, but none of them is it.',
     rejectLabel: 'Not this one',
     popTitle: 'Go on then, what’s wrong with it?',
