@@ -3412,17 +3412,15 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    Every animation is disabled in the reduced-motion block at the end.
    ====================================================================== */
 
-/* The two-pane grid. One column below 720px (the brief first, then the
-   podium, which is DOM order, so no reordering is needed), two above: the left
-   column takes a fixed reading measure and the podium takes the rest.
-   min-width: 0 on both panes because a grid item defaults to min-content width,
-   and a long unbroken model name in a card would otherwise push the whole track
-   wider than the block. */
+/* The outer wrapper is a plain flex column now: .vm-podium-head sits full width
+   above, .vm-podium-grid owns the two-pane split that used to live directly on
+   .vm-podium. Splitting them is what let the wordmark/title/progress move into
+   the space the tab switcher used to occupy (see vm-switcher in
+   vehicle-matcher.js) without fighting the grid's own column widths. */
 .vm-podium {
-  display: grid;
-  grid-template-columns: 1fr;
-  align-items: start;
-  gap: var(--vm-space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--vm-space-6);
   animation: vm-in 0.25s ease;
   /* The stage is also the confetti host: celebrate() drops an absolutely
      positioned layer into it, so it needs to be the containing block or the
@@ -3431,11 +3429,24 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
      pane scrolls internally above 720px and would clip the burst. */
   position: relative;
 }
+
+/* The two-pane grid. One column below 720px (the brief first, then the
+   podium, which is DOM order, so no reordering is needed), two above: the left
+   column takes a fixed reading measure and the podium takes the rest.
+   min-width: 0 on both panes because a grid item defaults to min-content width,
+   and a long unbroken model name in a card would otherwise push the whole track
+   wider than the block. */
+.vm-podium-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: var(--vm-space-8);
+}
 .vm-podium-ask,
 .vm-podium-results { min-width: 0; }
 
 @media (min-width: 720px) {
-  .vm-podium {
+  .vm-podium-grid {
     grid-template-columns: minmax(280px, 320px) 1fr;
     gap: var(--vm-space-8);
   }
@@ -3486,11 +3497,64 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    1184px content column this leaves the pane ~784px, which is what makes the
    two-per-row step layout below possible. */
 @media (min-width: 1080px) {
-  .vm-podium {
+  .vm-podium-grid {
     grid-template-columns: minmax(320px, 360px) 1fr;
     gap: var(--vm-space-10);
   }
   .vm-podium-ask { padding-right: var(--vm-space-8); }
+}
+
+/* ------------------------------ the head band -------------------------- */
+
+/* Full width, above the grid: the wordmark/title/progress/banner used to live
+   cramped in the 320px left pane, in the space a tab-style switcher would
+   otherwise have taken above the stage. Moving the switcher into a compact
+   dropdown (see vm-switcher) freed that space, so the brief's own identity and
+   progress move up into it and get room to read as a heading rather than a
+   sidebar label. */
+.vm-podium-head { max-width: 640px; }
+
+.vm-podium-title {
+  font-family: var(--vm-font-heading);
+  font-size: clamp(28px, 4vw, var(--vm-text-h1));
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  margin: 0 0 var(--vm-space-4);
+}
+
+.vm-podium-progress {
+  height: 8px;
+  background: var(--vm-surface-alt);
+  border-radius: var(--vm-radius);
+  overflow: hidden;
+  margin: 0 0 var(--vm-space-2);
+}
+.vm-podium-progress-bar {
+  height: 100%;
+  width: 0;
+  background: var(--vm-accent-spot);
+  border-radius: var(--vm-radius);
+  transition: width 0.3s ease;
+}
+
+/* A live region, so it gains and loses text as the brief fills in. The
+   reserved min-height stops that from nudging the grid below up and down
+   under the reader. */
+.vm-podium-banner {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: var(--vm-text-body);
+  line-height: 1.4;
+  color: var(--vm-ink-muted);
+}
+/* Once the brief is committed the banner is reporting a result, not nudging
+   for more answers, so it takes the accent and the bold face. */
+.vm-podium.is-committed .vm-podium-banner {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  color: var(--vm-accent-spot);
 }
 
 /* ---------------------------- left pane: the brief ------------------- */
