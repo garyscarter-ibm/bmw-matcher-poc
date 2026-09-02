@@ -684,15 +684,44 @@ function mount(root, ctx) {
     updateProgress(visible);
   };
 
+  /*
+   * A twisty, not a flat block: every question starts open (so the pane reads
+   * the same as before on first paint) but a user filling in the easy ones can
+   * collapse them out of the way. The badge is the "you already did this one"
+   * signal a collapsed question can no longer show via a filled-in control.
+   */
   const buildQuestion = (q, index) => {
     const block = el('div', 'vm-podium-q');
     block.dataset.qid = q.id;
-    block.append(
-      el('p', 'vm-podium-q-label', `${String(index + 1).padStart(2, '0')} / ${shortLabel(q, ctx.brand)}`),
-      el('h3', 'vm-podium-q-title', q.title),
+
+    const panelId = `vm-podium-q-panel-${q.id}`;
+    const heading = el('h3', 'vm-podium-q-heading');
+    const toggle = el('button', 'vm-podium-q-toggle');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.setAttribute('aria-controls', panelId);
+    const chevron = el('span', 'vm-podium-q-chevron');
+    chevron.setAttribute('aria-hidden', 'true');
+    toggle.append(
+      el('span', 'vm-podium-q-label', `${String(index + 1).padStart(2, '0')} / ${shortLabel(q, ctx.brand)}`),
+      el('span', 'vm-podium-q-title', q.title),
+      el('span', 'vm-podium-q-badge', 'Answered'),
+      chevron,
     );
-    if (q.help) block.append(el('p', 'vm-podium-q-help', q.help));
-    block.append(buildControl(q, state.answers, answerChanged));
+    heading.append(toggle);
+
+    const panel = el('div', 'vm-podium-q-panel');
+    panel.id = panelId;
+    if (q.help) panel.append(el('p', 'vm-podium-q-help', q.help));
+    panel.append(buildControl(q, state.answers, answerChanged));
+
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      panel.hidden = expanded;
+    });
+
+    block.append(heading, panel);
     return block;
   };
 
