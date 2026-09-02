@@ -133,29 +133,33 @@
     const retailerOverride = params.get('retailer');
     if (retailerOverride) setRow('retailer id', retailerOverride);
 
-    // Retailer *Name* is a third authored row, hardcoded to "Grassicks BMW" in
-    // the markup above (the BMW default). It is NOT the brand row, so switching
-    // brand with ?brand= alone used to leave the name as "Grassicks BMW" — every
-    // non-BMW brand then read "...at Grassicks BMW", and Motorrad additionally
-    // "...bikes at Grassicks BMW". Fix: each brand carries its own default demo
-    // retailer name, applied whenever ?brand= is set. Honda/Ford/Motorrad are
-    // national approved-used programmes, not a single named dealer, so they use
-    // the programme name. Precedence: ?retailerName= (explicit) beats the
-    // ?retailer= ID map beats the ?brand= default.
+    // Retailer *Name* is a third authored row: the label the copy uses for the
+    // pool it searched ("AT BMW APPROVED USED", "Nothing at … is close to what
+    // you asked for"). It is NOT the brand row, so switching brand with ?brand=
+    // alone would leave the name as whatever the markup hardcoded — every other
+    // brand then read "...at Grassicks BMW". Fix: each brand carries its own
+    // default label, applied whenever ?brand= is set.
+    //
+    // Every label is the brand's national programme, not a single dealer,
+    // because that is what the block now searches: BMW and MINI walk the whole
+    // national feed (see nationalStock in server/stock.js), so the cards come
+    // from ~130 retailers apiece. Naming one branch would claim a pool that was
+    // never searched — "Nothing at Sytner Luton MINI is close to what you asked
+    // for" over a card reading "At Group 1 Lincoln". Honda/Ford/Motorrad/Ferrari
+    // were already national programmes; BMW and MINI have simply joined them.
     const BRAND_RETAILER_NAMES = {
-      bmw: 'Grassicks BMW', // Grassicks Garage, Perth (retailer 96)
-      mini: 'Sytner Luton MINI', // retailer 92
+      bmw: 'BMW Approved Used',
+      mini: 'MINI Approved Used',
       honda: 'Honda Approved Used',
       ford: 'Ford Approved Used',
       motorrad: 'BMW Motorrad Approved Used',
       ferrari: 'Ferrari Approved',
     };
-    const RETAILER_NAMES = {
-      96: 'Grassicks BMW', // Grassicks Garage, Perth
-      92: 'Sytner Luton MINI',
-    };
+    // ?retailerName= still overrides it, for demoing a genuinely single-dealer
+    // page. Deliberately NOT derived from ?retailer=<id> any more: that row only
+    // anchors the "other retailers nearby" postcode lookup (fetchNearbyStock),
+    // and no longer narrows the main pool, so an ID can't name it.
     const nameOverride = params.get('retailerName')
-      || RETAILER_NAMES[retailerOverride]
       || (brandOverride && BRAND_RETAILER_NAMES[brandOverride.toLowerCase()]);
     if (nameOverride) setRow('retailer name', nameOverride);
 
