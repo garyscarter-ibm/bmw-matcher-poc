@@ -150,8 +150,6 @@ const PODIUM_COPY = {
   bmw: {
     wordmark: 'Your Shortlist',
     title: 'Your top three, live.',
-    lede: 'Answer what matters on the left. The three cars on the right re-order '
-      + 'as you go, and the button confirms it.',
     bannerStart: 'Nothing committed yet. The podium is already working from your budget.',
     bannerProgress: ({ done, total }) => `${done} of ${total} answered. The order updates with each one.`,
     bannerComplete: 'That’s everything answered. Confirm when you’re ready.',
