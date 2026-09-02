@@ -353,10 +353,8 @@
       const retailerOverride = params.get('retailer');
       if (retailerOverride) setRow('retailer id', retailerOverride);
 
-      // Retailer-name precedence: ?retailerName= > RETAILER_NAMES[id] >
-      // BRAND_RETAILER_NAMES[brand].
+      // Retailer-name precedence: ?retailerName= > BRAND_RETAILER_NAMES[brand].
       const nameOverride = params.get('retailerName')
-        || RETAILER_NAMES[retailerOverride]
         || (brandOverride && BRAND_RETAILER_NAMES[brandOverride.toLowerCase()]);
       if (nameOverride) setRow('retailer name', nameOverride);
       // Title is already authored to "none" in the shell markup to suppress the
