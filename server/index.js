@@ -390,7 +390,12 @@ async function handleMatch(req, res, deps) {
     ...alternatives.flatMap((m) => m.listings || []),
   ]);
   // Detached: a slow or failing PDP must not hold up (or reject) this response.
-  if (warmRest?.catch) warmRest.catch(() => {});
+  if (warmRest?.catch) {
+    warmRest.then(
+      (out) => console.log(`[dbg] warm done: ${out.filter((c) => c.colour).length}/${out.length}`),
+      (err) => console.log('[dbg] warm FAILED:', err?.message),
+    );
+  }
   // Paint is only known after that call, so the group's colour list is filled
   // in here rather than at grouping time. Alternatives get the same treatment:
   // a rejection promotes one into view, and it should arrive able to say what
