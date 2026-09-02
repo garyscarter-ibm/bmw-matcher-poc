@@ -180,11 +180,8 @@ export const BRAND_COPY = {
     name: 'MINI',
     title: 'Find your perfect MINI.',
     cta: 'Let’s find your MINI',
-    // "the MINIs at ${retailer}" stuttered once `retailer` became the programme
-    // ("the MINIs at MINI Approved Used"), so the pool is named once and the
-    // possessive carries the rest.
     lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
-      + `your miles and your money. We’ll find the ones at ${retailer} `
+      + `your miles and your money. We’ll find the MINIs at ${retailer} `
       + 'with your name on them, and tell you exactly why.',
     // Same fact, MINI's register: the UPPERCASE-with-a-full-stop beat as the
     // lead-in, then warm and plain. A shortage is a shrug, never a shrug-off.
