@@ -574,11 +574,13 @@ function mount(root, ctx) {
     const shell = el('div', 'vm-podium vm-podium-skeleton');
     shell.setAttribute('aria-busy', 'true');
     shell.setAttribute('aria-label', 'Loading');
+    const grid = el('div', 'vm-podium-grid');
     const ask = el('section', 'vm-podium-ask');
     for (let i = 0; i < 5; i += 1) ask.append(el('div', 'vm-skel vm-skel-line'));
     const results = el('section', 'vm-podium-results');
     for (let i = 0; i < 3; i += 1) results.append(el('div', 'vm-skel vm-skel-line'));
-    shell.append(ask, results);
+    grid.append(ask, results);
+    shell.append(grid);
     root.append(shell);
   };
 
