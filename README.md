@@ -151,8 +151,14 @@ after the block, self-contained folder), so porting is a copy-paste:
      every registered mode with a switcher (the showcase). Mode keys live in
      `blocks/vehicle-matcher/modes/index.js`.
    - **Retailer ID** — the retailer's `retailer_site` ID (e.g. `96`); omit to
-     fall back to the backend's default retailer.
-   - **Retailer Name** — the display name shown in copy.
+     fall back to the backend's default retailer. On BMW and MINI the main pool
+     is national, so this no longer narrows it — it's the address the "other
+     retailers nearby" carousel measures distance from.
+   - **Retailer Name** — the display name shown in copy, for the pool that was
+     searched. Since BMW and MINI search the whole national feed, that's the
+     programme (`BMW Approved Used`), not a branch: naming one dealer would
+     claim a pool that was never searched. The dealer actually holding each car
+     is named on the card itself.
    - **API** — your deployed backend's base URL. **This is how you point an
      EDS-authored block at its backend**: authored content can set config rows
      but not HTML attributes, so the block reads the API base from this row
