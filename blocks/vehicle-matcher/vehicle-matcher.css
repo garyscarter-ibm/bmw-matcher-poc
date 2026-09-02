@@ -4188,6 +4188,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   .vm-podium-step .vm-card,
   .vm-podium-tail-grid > *,
   .vm-podium-progress-bar,
+  .vm-podium-q-title,
+  .vm-podium-q-chevron,
   .vm-podium-reject { transition: none; }
   /* No re-rank cross-fade: the new order simply appears, which is the honest
      version of the same information. */
