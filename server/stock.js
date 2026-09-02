@@ -256,7 +256,17 @@ const cacheNearby = new Map(); // "brand:retailerSite" -> { at, cars, inflight }
 
 // Every brand+retailer we've been asked about, so the warmer knows what to keep
 // hot. Stored as { brand, retailerSite } objects keyed by "brand:retailer".
+// Feed brands' MAIN pool no longer belongs here — it's brand-wide, not
+// retailer-scoped — see seenNationalBrands; this still tracks the per-retailer
+// nearby-carousel anchor for those brands, and the whole pool for every other
+// source type (fixtures/live-honda/live-motorrad/live-ferrari).
 const seenRetailers = new Map(); // "brand:retailer" -> { brand, retailerSite }
+
+// Feed brands (BMW, MINI) whose national pool has been requested at least
+// once, so the warmer keeps it hot. A Set, not a Map keyed by retailer: the
+// pool is the same regardless of which retailer_site a visitor was configured
+// with, so every request for a feed brand collapses onto one warm entry.
+const seenNationalBrands = new Set(); // brand
 
 /** Cache/seen key for a brand+retailer pair. */
 const keyFor = (brand, retailerSite) => `${brand}:${retailerSite}`;
