@@ -191,19 +191,33 @@ async function fetchPage(origin, query, page) {
  */
 async function fetchPageWithRetry(origin, query, page) {
   if (!csrfByOrigin.has(origin)) await bootstrap(origin);
-  let res = await fetchPage(origin, query, page);
-  if (res.status === 403) {
-    await bootstrap(origin); // token likely rotated/expired
-    res = await fetchPage(origin, query, page);
+  for (let attempt = 0; attempt <= RATE_LIMIT_MAX_RETRIES; attempt += 1) {
+    let res = await fetchPage(origin, query, page);
+    if (res.status === 403) {
+      await bootstrap(origin); // token likely rotated/expired
+      res = await fetchPage(origin, query, page);
+    }
+    // The feed rate-limits a fast burst (see scripts/dump-stock.js) — a small
+    // retailer-scoped fetch rarely trips it, but the ~130-page national walk
+    // reliably does. Linear backoff, same schedule as the offline dump script.
+    if (res.status === 429) {
+      if (attempt === RATE_LIMIT_MAX_RETRIES) {
+        throw new StockUnavailableError(`list/ still rate-limited on page ${page} after ${RATE_LIMIT_MAX_RETRIES} retries`);
+      }
+      await sleep(2000 * (attempt + 1)); // 2s, 4s, 6s…
+      continue;
+    }
+    if (res.status !== 200) {
+      throw new StockUnavailableError(`list/ returned HTTP ${res.status} on page ${page}`);
+    }
+    try {
+      return JSON.parse(res.body);
+    } catch (cause) {
+      throw new StockUnavailableError('list/ returned non-JSON', { cause });
+    }
   }
-  if (res.status !== 200) {
-    throw new StockUnavailableError(`list/ returned HTTP ${res.status} on page ${page}`);
-  }
-  try {
-    return JSON.parse(res.body);
-  } catch (cause) {
-    throw new StockUnavailableError('list/ returned non-JSON', { cause });
-  }
+  // Unreachable: the loop above always returns or throws.
+  throw new StockUnavailableError(`list/ page ${page} failed after retries`);
 }
 
 /** All of one retailer's stock, unsorted, no distances. */
