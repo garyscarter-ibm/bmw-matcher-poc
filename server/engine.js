@@ -831,13 +831,20 @@ export function groupListings(ranked) {
         ...match.car,
         // The feed's tidiest name for this car wins the card.
         name: listings.reduce((a, b) => (b.name.length < a.length ? b.name : a), match.car.name),
+        // Aggregates describe the WHOLE group, deliberately computed before the
+        // sample below: a national pool really does hold 392 of a given Cooper,
+        // and the card should say so even though it only carries a few examples.
         listingCount: listings.length,
         priceFrom: prices.length ? Math.min(...prices) : match.car.priceMin,
         priceTo: prices.length ? Math.max(...prices) : match.car.priceMin,
         colours,
         features: [...new Set(listings.flatMap((c) => c.features || []))],
       },
-      listings,
+      // Only a sample travels. `ranked` is score-ordered, so these are the
+      // group's best examples, and every one costs a PDP fetch to colour plus
+      // its own slice of the response — 392 of them buys the buyer nothing and
+      // guarantees the paint budget is spent before the queue is drained.
+      listings: listings.slice(0, LISTING_SAMPLE),
     };
   });
 }
