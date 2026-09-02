@@ -70,9 +70,10 @@ export const BRAND_COPY = {
     tasteTitleHere: ({ model, retailer }) => `Your best match at ${retailer} is the ${model}.`,
     tasteLede: () => 'Several of these suit you equally well on paper. This one lines up '
       + 'best with what you said matters.',
-    // The retailer is named on every card, so the lede doesn't repeat it —
-    // and a brand plural appended to a retailer label reads "Sytner Luton
-    // MINI MINIs", which is why neither brand's copy builds one.
+    // The retailer is named on every card (the dealer holding that car), so the
+    // lede doesn't repeat it — and a brand plural appended to the pool label
+    // reads "MINI Approved Used MINIs", which is why neither brand's copy
+    // builds one.
     tiedLede: () => 'On your answers we can’t split them: each suits you as well as the next. '
       + 'The difference now is which you prefer the look of.',
     /*
