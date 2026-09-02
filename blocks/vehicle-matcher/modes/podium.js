@@ -599,21 +599,26 @@ function mount(root, ctx) {
     root.replaceChildren();
     stage = el('div', 'vm-podium');
 
-    // Left: the brief.
-    const ask = el('section', 'vm-podium-ask');
-    ask.append(
+    // A full-width head, above the two-pane grid: the campaign wordmark, the
+    // headline and the live progress, sized to lead the whole view now that
+    // the mode switcher no longer reserves that space as a tab row.
+    const head = el('div', 'vm-podium-head');
+    head.append(
       el('p', 'vm-podium-wordmark', copy.wordmark),
       el('h2', 'vm-podium-title', copy.title),
-      el('p', 'vm-podium-lede', copy.lede),
     );
-
     const progress = el('div', 'vm-podium-progress');
     progressBar = el('div', 'vm-podium-progress-bar');
     progress.append(progressBar);
     bannerEl = el('p', 'vm-podium-banner', copy.bannerStart);
     bannerEl.setAttribute('role', 'status');
-    ask.append(progress, bannerEl);
+    head.append(progress, bannerEl);
+    stage.append(head);
 
+    const grid = el('div', 'vm-podium-grid');
+
+    // Left: the brief.
+    const ask = el('section', 'vm-podium-ask');
     questionsWrap = el('div', 'vm-podium-questions');
     ask.append(questionsWrap);
 
@@ -638,7 +643,8 @@ function mount(root, ctx) {
     noteEl.hidden = true;
     results.append(liveEl, stepsEl, tailEl, noteEl);
 
-    stage.append(ask, results);
+    grid.append(ask, results);
+    stage.append(grid);
     stage.append(buildPopover());
     root.append(stage);
 
