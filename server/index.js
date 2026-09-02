@@ -701,10 +701,11 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     console.log(`Matcher API listening on http://localhost:${PORT}`);
 
     // Keep live stock hot off the request path so the slow cold fetch (chiefly
-    // the nearby distance search) isn't paid by a user. Prime each brand's
-    // default retailer now so even the first visitor hits a warm cache; the
-    // warmer then keeps every served brand+retailer fresh. Failures are
-    // non-fatal — the request path still fetches on demand.
+    // BMW/MINI's national pagination and the nearby distance search) isn't
+    // paid by a user. Prime each brand's main pool now so even the first
+    // visitor hits a warm cache; the warmer then keeps every served brand
+    // (and, for BMW/MINI, the national pool) fresh. Failures are non-fatal —
+    // the request path still fetches on demand.
     startStockWarmer();
     // Prime every brand's main pool, and the nearby carousel for the two feed
     // brands that have one (BMW/MINI). Priming a brand also enrols it in the
