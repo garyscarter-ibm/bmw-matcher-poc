@@ -791,6 +791,14 @@ export const TASTE_PTS = 6;
 /** How many next-best cars to hold back so a rejection has somewhere to go. */
 export const ALTERNATIVES = 6;
 
+// How many individual listings a grouped card carries. One dealer's forecourt
+// held a handful of any given model, so the group was its own sample; a national
+// pool holds hundreds, and every extra one is a PDP fetch for paint and more
+// JSON on the wire. 24 is well past what a buyer will scroll while still leaving
+// the refine/reject layer real cars to filter. The card's stated count, price
+// spread and equipment union still describe the full group — see groupListings.
+export const LISTING_SAMPLE = 24;
+
 /*
  * Collapse repeat listings of the same car into one match.
  *
