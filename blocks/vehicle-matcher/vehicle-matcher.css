@@ -2339,62 +2339,64 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    Only present when the block is UNLOCKED and more than one interface mode is
    registered (the showcase). A production page authors a "Mode" row, which
    hides the switcher entirely — so these rules never apply there and the block
-   looks exactly as it did before modes existed. A quiet segmented control: it
-   picks the interface, so it must not compete with the interface's own CTA.
-   Themed off the shared tokens, so it follows brand (BMW blue / MINI green)
-   without a per-brand rule. */
+   looks exactly as it did before modes existed. A tab row here used to reserve
+   a full-width bar above every mode's own content; a picker this minor (four
+   interfaces, one chosen at a time) doesn't earn that much of the fold, and on
+   podium specifically it was the row the mode's own title/progress needed
+   (see .vm-podium-head). So it's a single right-aligned dropdown, tucked above
+   the stage rather than laid out across it. Themed off the shared tokens, so
+   it follows brand (BMW blue / MINI green) without a per-brand rule. */
 .vm-switcher {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--vm-line);
+  justify-content: flex-end;
+  margin-bottom: var(--vm-space-4);
 }
-.vm-switcher-tab {
+.vm-switcher-select {
   appearance: none;
-  border: 1px solid var(--vm-line);
+  border: var(--vm-border-width) solid var(--vm-line);
   background: transparent;
   color: var(--vm-ink-muted);
   /* The brand's bold face, not plain body — the wordmark-adjacent chrome should
      carry the typeface the brand shouts in (BMW Type Next bold, MINI Sans,
-     FordF1, Proxima Nova), so the control reads as the brand's at rest, before
-     any tab is active. */
+     FordF1, Proxima Nova), so the control reads as the brand's at rest. */
   font-family: var(--vm-font-bold);
   font-weight: 700;
   font-size: 13px;
   letter-spacing: 0.02em;
-  padding: 7px 14px;
+  padding: 7px 30px 7px 14px;
   border-radius: var(--vm-radius-control);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
-/* Resting/hover state carries the brand accent, not a neutral grey — so the two
-   inactive tabs also read as the brand's, not just the one active tab. */
-.vm-switcher-tab:hover {
+.vm-switcher-select:hover,
+.vm-switcher-select:focus-visible {
   color: var(--vm-accent);
   border-color: var(--vm-accent);
 }
-.vm-switcher-tab.is-active {
-  color: var(--vm-accent-ink);
-  background: var(--vm-accent);
-  border-color: var(--vm-accent);
-  cursor: default;
+/* The native arrow is stripped by `appearance: none` above (styling it
+   consistently across browsers is the one thing a native select won't allow),
+   so this quiet chevron replaces it. Sits over the padding the select reserved
+   for it and never intercepts the click. */
+.vm-switcher::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 6px;
+  height: 6px;
+  margin-top: -4px;
+  border-right: var(--vm-border-width) solid var(--vm-ink-muted);
+  border-bottom: var(--vm-border-width) solid var(--vm-ink-muted);
+  transform: rotate(45deg);
+  pointer-events: none;
 }
 
 /* Motorrad's switcher wears the marque's CTA signature, same as its buttons
-   (see .vm.vm-motorrad .vm-btn above): UPPERCASE labels, and the active tab is
-   the near-black fill rather than blue — blue is a link/accent colour for
-   Motorrad, not a fill. Without this the tabs read as the generic grey control
-   and Motorrad's strong identity stops at the stage edge. */
-.vm.vm-motorrad .vm-switcher-tab {
+   (see .vm.vm-motorrad .vm-btn above): UPPERCASE, tracked out. */
+.vm.vm-motorrad .vm-switcher-select {
   text-transform: uppercase;
   letter-spacing: 0.06em;
-}
-.vm.vm-motorrad .vm-switcher-tab.is-active {
-  background: var(--vm-ink-strong);
-  border-color: var(--vm-ink-strong);
-  color: #fff;
 }
 
 /* The active mode mounts here. Transparent and layout-neutral: with no
