@@ -208,14 +208,18 @@ async function fetchPageWithRetry(origin, query, page) {
       await bootstrap(origin); // token likely rotated/expired
       res = await fetchPage(origin, query, page);
     }
-    // The feed rate-limits a fast burst (see scripts/dump-stock.js) — a small
-    // retailer-scoped fetch rarely trips it, but the ~130-page national walk
-    // reliably does. Linear backoff, same schedule as the offline dump script.
+    // The feed rate-limits a fast burst — a small retailer-scoped fetch rarely
+    // trips it, but a national walk reliably does. The throttle states its own
+    // window in Retry-After (observed: 20s), so obey that rather than guessing;
+    // a linear 2s/4s/6s backoff under-waits and just earns another 429.
     if (res.status === 429) {
       if (attempt === RATE_LIMIT_MAX_RETRIES) {
         throw new StockUnavailableError(`list/ still rate-limited on page ${page} after ${RATE_LIMIT_MAX_RETRIES} retries`);
       }
-      await sleep(2000 * (attempt + 1)); // 2s, 4s, 6s…
+      const retryAfter = Number(res.headers['retry-after']);
+      await sleep(Number.isFinite(retryAfter) && retryAfter > 0
+        ? (retryAfter + 1) * 1000 // +1s of slack so we don't race the window's edge
+        : 2000 * (attempt + 1));
       continue;
     }
     if (res.status !== 200) {
