@@ -147,42 +147,36 @@ function resolveMode(block) {
 }
 
 /**
- * The mode switcher: one tab per registered mode. Clicking a tab re-mounts the
- * selected mode into the stage. Only rendered when the block is unlocked and
- * there's more than one mode to choose between — a single mode needs no switch.
+ * The mode switcher: a compact dropdown, not a row of tabs, so it never
+ * competes with a mode's own header for screen space (podium in particular
+ * reclaims that space for its own title/progress — see vm-podium-head in
+ * vehicle-matcher.css). Only rendered when the block is unlocked and there's
+ * more than one mode to choose between — a single mode needs no switch.
  */
 function renderSwitcher(block, stage, ctx, current) {
   if (MODES.length < 2) return null;
   const bar = document.createElement('div');
   bar.className = 'vm-switcher';
-  bar.setAttribute('role', 'tablist');
-  bar.setAttribute('aria-label', 'Matching interface');
 
-  let active = current;
-  const tabs = MODES.map((mode) => {
-    const tab = document.createElement('button');
-    tab.type = 'button';
-    tab.className = 'vm-switcher-tab';
-    tab.textContent = mode.label;
-    tab.setAttribute('role', 'tab');
-    const select = () => {
-      if (mode === active) return;
-      active = mode;
-      tabs.forEach((t) => {
-        const on = t === tab;
-        t.classList.toggle('is-active', on);
-        t.setAttribute('aria-selected', String(on));
-      });
-      stage.replaceChildren();
-      mode.mount(stage, ctx);
-    };
-    tab.addEventListener('click', select);
-    const on = mode === active;
-    tab.classList.toggle('is-active', on);
-    tab.setAttribute('aria-selected', String(on));
-    bar.append(tab);
-    return tab;
+  const select = document.createElement('select');
+  select.className = 'vm-switcher-select';
+  select.setAttribute('aria-label', 'Matching interface');
+  MODES.forEach((mode) => {
+    const option = document.createElement('option');
+    option.value = mode.key;
+    option.textContent = mode.label;
+    select.append(option);
   });
+  select.value = current.key;
+
+  select.addEventListener('change', () => {
+    const next = modeByKey(select.value);
+    if (!next) return;
+    stage.replaceChildren();
+    next.mount(stage, ctx);
+  });
+
+  bar.append(select);
   return bar;
 }
 
