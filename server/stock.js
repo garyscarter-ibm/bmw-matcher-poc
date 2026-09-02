@@ -1028,6 +1028,9 @@ export function startStockWarmer() {
       warmOne(cacheByRetailer, key, brand, retailerSite, fetchRetailerStock);
       warmOne(cacheNearby, key, brand, retailerSite, fetchNearbyStock);
     }
+    for (const brand of seenNationalBrands) {
+      warmOne(cacheByRetailer, keyFor(brand, 'national'), brand, undefined, fetchRetailerStock);
+    }
   };
 
   warmTimer = setInterval(tick, WARM_INTERVAL_MS);
