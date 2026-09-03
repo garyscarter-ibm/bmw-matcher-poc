@@ -1186,11 +1186,8 @@ function mount(root, ctx) {
     state.axes.forEach((axis) => {
       const chip = chipsEl.querySelector(`[data-axis="${axis.key}"]`);
       if (!chip) return;
-      const wide = axis.wide();
-      chip.classList.toggle('is-on', !wide);
-      chip.querySelector('.vm-gw-chip-value').textContent = wide
-        ? copy.anySummary
-        : axis.summary();
+      chip.classList.toggle('is-on', axis.narrowed());
+      chip.querySelector('.vm-gw-chip-value').textContent = axis.summary();
     });
   };
 
