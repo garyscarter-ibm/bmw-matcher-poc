@@ -877,9 +877,90 @@ function mount(root, ctx) {
         // start, and printing "Any" over a live filter would misdescribe it.
         summary: () => `${gbp(f.price[0])} – ${gbp(f.price[1])}`,
         build: (host) => renderRangeSlider(host, q, f, { onChange: filtersChanged }),
+        clear: () => { f.price = [lo, hi]; },
         test: () => {
           const [a, b] = f.price;
           return (i) => pool.price[i] >= a && pool.price[i] <= b;
+        },
+      });
+    }
+
+    /*
+     * Distance: "within N miles of my postcode".
+     *
+     * The one axis that needs a second fact the pool can't carry — where the
+     * BUYER is — so it is also the only one that touches the network after the
+     * first paint (apiGeocode, one request per postcode typed, cached server-side
+     * for the life of the process). Everything else here is arithmetic on columns
+     * already in memory.
+     *
+     * Two halves, and the axis only exists if it has both. The retailers' end
+     * arrives as pool.sites, a lat/lon pair per entry of the `retailers`
+     * dictionary rather than per car (see siteCoords in server/index.js) — that's
+     * ~130 pairs instead of 12,000, and it means the distance is computed once per
+     * DEALER and the per-car test is one array read. The buyer's end arrives when
+     * they type. No postcode, no filter: the axis reads "Any" and lets everything
+     * through, which is the honest state for a question nobody has answered.
+     *
+     * Self-suppressing, exactly as colour is: fewer than two located sites and the
+     * chip never appears. That is not a hypothetical — a pool built from a stock
+     * cache written before dealer_number was mapped has no coordinates at all, and
+     * a "Distance" chip that silently empties the board would be worse than no
+     * chip. Two, not one, because with a single located site the control can only
+     * say "that one" or "nothing", and neither is a distance.
+     */
+    const sites = pool.sites || {};
+    const siteLat = sites.lat || [];
+    const siteLon = sites.lon || [];
+    const located = siteLat.reduce((n, v, at) => (v != null && siteLon[at] != null ? n + 1 : n), 0);
+    if (located > 1) {
+      // Miles from the buyer to every retailer, memoised on the postcode. Rebuilt
+      // only when the origin moves, not on every filter change: `test()` is called
+      // for each axis on each render, and a postcode is typed once per session.
+      let distFor = null;
+      let distCache = null;
+      const distances = (origin) => {
+        if (distFor === origin.postcode) return distCache;
+        const out = new Float64Array(pool.retailers.length);
+        for (let at = 0; at < out.length; at += 1) {
+          const lat = siteLat[at];
+          const lon = siteLon[at];
+          // Infinity, not a skip: an unlocated dealer's cars are excluded the
+          // moment a distance is asked for, because Infinity fails every cap. Same
+          // rule as every other unknown value here (see decodePool).
+          out[at] = (lat == null || lon == null)
+            ? Infinity
+            : milesBetween(origin.latitude, origin.longitude, lat, lon);
+        }
+        distFor = origin.postcode;
+        distCache = out;
+        return out;
+      };
+
+      const q = {
+        id: 'radius',
+        title: copy.prompts.place,
+        options: RADIUS_BANDS.map((m) => ({ value: m, label: `${miles(m)} miles` })),
+      };
+      f.origin = null;
+      f.radius = DEFAULT_RADIUS;
+      axes.push({
+        key: 'place',
+        q,
+        narrowed: () => !!f.origin,
+        // The radius alone is never "narrowed" and never shown: 25 miles of
+        // nowhere is not a filter, and printing it would claim one is running.
+        summary: () => (f.origin ? `${f.radius} miles of ${f.origin.postcode}` : copy.anySummary),
+        build: (host) => buildPlaceControl(host, q),
+        clear: () => { f.origin = null; f.radius = DEFAULT_RADIUS; },
+        /** This car's distance from the buyer, for the "too far" rejection.
+         *  Infinity when we can't say — no origin, or an unlocated dealer. */
+        milesTo: (i) => (f.origin ? distances(f.origin)[pool.retailer[i]] : Infinity),
+        test: () => {
+          if (!f.origin) return null;
+          const dist = distances(f.origin);
+          const cap = f.radius;
+          return (i) => dist[pool.retailer[i]] <= cap;
         },
       });
     }
