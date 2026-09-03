@@ -580,26 +580,60 @@ const stageFor = (track) => STAGES.find((s) => track >= s.min && track < s.max)
   || (track >= STAGES[0].max ? STAGES[0] : STAGES[STAGES.length - 1]);
 
 /**
- * The largest card size at which `count` cards still fit the height budget.
+ * The grid `count` cards make at a given track width, and the total height of it.
  *
- * Walks widths down from the biggest card to the smallest dot and returns the
- * first that fits, which makes the survivors grow as the board empties without
- * any explicit "if fewer than N" rules. The column count is computed the way CSS
- * grid's `repeat(auto-fill, minmax(track, 1fr))` computes it, and the height uses
- * the RESULTING cell width rather than the track, because auto-fill hands the
+ * The column count is computed the way CSS grid's
+ * `repeat(auto-fill, minmax(track, 1fr))` computes it, and the height uses the
+ * RESULTING cell width rather than the track, because auto-fill hands the
  * leftover pixels back to the columns and a wider cell is a taller one.
  */
+function measureLayout(count, width, track) {
+  const stage = stageFor(track);
+  const cols = Math.max(1, Math.floor((width + stage.gap) / (track + stage.gap)));
+  const cell = (width - (cols - 1) * stage.gap) / cols;
+  const rows = Math.ceil(count / cols);
+  const cellH = cell * MEDIA_RATIO + stage.body;
+  return {
+    total: rows * (cellH + stage.gap),
+    layout: {
+      stage: stage.key, track, gap: stage.gap, cellH,
+    },
+  };
+}
+
+/**
+ * The largest card size at which `count` cards still fit the height budget.
+ *
+ * Walks widths down from the biggest card to the smallest dot and takes the first
+ * that fits, which makes the survivors grow as the board empties without any
+ * explicit "if fewer than N" rules.
+ *
+ * With one correction, because the ladder is not continuous. A tile carries a
+ * 54px caption and a chip carries none, so stepping from the smallest tile to the
+ * largest chip cuts the grid's height by nearly half in a single 2px step of
+ * track. A count that just misses the tile budget therefore falls all the way to
+ * photo-only chips and uses barely half the room it was given: measured on a
+ * 1440x720 viewport, 58 survivors landed on 126px chips totalling 588px against a
+ * 1,113px budget, when 139px captioned tiles would have wanted 1,208px. "Grow and
+ * reorganise to fill the screen space" is the brief, and 47% of the budget unused
+ * is not that. So a miss in a HIGHER stage than the winner is preferred when it is
+ * within OVERSHOOT — the tolerance is deliberately confined to that case, because
+ * within a single stage the ladder is smooth and the budget means what it says.
+ */
+const OVERSHOOT = 1.25;
+
 function pickLayout(count, width, height) {
   const budget = Math.max(240, height) * SCREENS;
+  let miss = null; // the closest layout that did NOT fit — always one step bigger
   for (let track = STAGES[0].max; track >= MIN_TRACK; track -= 2) {
-    const stage = stageFor(track);
-    const cols = Math.max(1, Math.floor((width + stage.gap) / (track + stage.gap)));
-    const cell = (width - (cols - 1) * stage.gap) / cols;
-    const rows = Math.ceil(count / cols);
-    const cellH = cell * MEDIA_RATIO + stage.body;
-    if (rows * (cellH + stage.gap) <= budget) {
-      return { stage: stage.key, track, gap: stage.gap, cellH };
+    const m = measureLayout(count, width, track);
+    if (m.total <= budget) {
+      if (miss && miss.layout.stage !== m.layout.stage && miss.total <= budget * OVERSHOOT) {
+        return miss.layout;
+      }
+      return m.layout;
     }
+    miss = m;
   }
   const last = STAGES[STAGES.length - 1];
   return {
