@@ -768,9 +768,9 @@ function mount(root, ctx) {
         },
       });
     };
-    dictAxis('fuel', pool.fuels, pool.fuel, (v) => FUEL_SPEC[v] || cap1(v), false);
-    dictAxis('body', pool.bodies, pool.body, (v) => SPEC_LABELS[v] || cap1(v), false);
-    dictAxis('colour', pool.shades, pool.shade, (v) => cap1(v), true);
+    dictAxis('fuel', pool.fuels, pool.fuel, (v) => FUEL_SPEC[v] || cap(v), false);
+    dictAxis('body', pool.bodies, pool.body, (v) => SPEC_LABELS[v] || cap(v), false);
+    dictAxis('colour', pool.shades, pool.shade, (v) => cap(v), true);
 
     /* --- seats: multi-pick over the counts the pool actually holds --- */
     const seatValues = [...new Set([...pool.seats].filter((v) => v > 0))].sort((a, b) => a - b);
