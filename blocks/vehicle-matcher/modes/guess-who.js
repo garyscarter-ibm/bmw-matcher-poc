@@ -1131,6 +1131,109 @@ function mount(root, ctx) {
     state.axes = axes;
   };
 
+  /* ------------------------- the postcode box ------------------------- */
+
+  /*
+   * The distance popover's contents: where are you, then how far will you go.
+   *
+   * Built here rather than in ./question-ui.js because it is not a question
+   * widget. Every control in there writes an answer straight into the answers
+   * object and is done; this one has to ASK A SERVER whether what was typed is a
+   * place at all, and has three outcomes to show for it — a coordinate, "there is
+   * no such postcode", and "we couldn't check" — which is a shape no quiz
+   * question has. Putting it in the shared file would mean giving every mode a
+   * network dependency for the sake of one filter in one of them.
+   *
+   * "Postcode" and "Find" are hardcoded rather than per-brand, on the same
+   * grounds as the popover's own "Done" button and the filter names above: they
+   * name a control, they don't speak in a voice.
+   */
+  const buildPlaceControl = (host, q) => {
+    const f = state.filters;
+    const wrap = el('div', 'vm-gw-place');
+
+    const row = el('div', 'vm-gw-place-row');
+    const input = el('input', 'vm-gw-place-input');
+    input.type = 'text';
+    input.name = 'postcode';
+    // A postcode-shaped keyboard on a phone, capitals as typed, and no
+    // autocorrect improving "NG1" into a word.
+    input.autocomplete = 'postal-code';
+    input.autocapitalize = 'characters';
+    input.spellcheck = false;
+    input.maxLength = 8;
+    input.placeholder = 'NG1 2AB';
+    input.setAttribute('aria-label', 'Postcode');
+    input.value = f.origin ? f.origin.postcode : '';
+    const find = el('button', 'vm-gw-place-go', 'Find');
+    find.type = 'button';
+    row.append(input, find);
+
+    const status = el('p', 'vm-gw-place-status');
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    const say = (message) => { status.textContent = message || ''; };
+
+    /*
+     * A lookup can land after its own popover has been closed, and that still has
+     * to be ONE undo step. filtersChanged only banks while a popover is open (it
+     * reads state.pop.before), so an orphaned answer banks its own point here.
+     */
+    const commit = (origin) => {
+      if (!state.pop) bank();
+      f.origin = origin;
+      filtersChanged();
+    };
+
+    const resolve = async () => {
+      const typed = input.value.trim();
+      say('');
+      // An empty box is the way back to "anywhere", and the only one: there is no
+      // "any distance" option in the list, because a radius of infinity is not a
+      // distance a buyer would ever pick, it's them changing their mind.
+      if (!typed) {
+        if (f.origin) commit(null);
+        return;
+      }
+      // Already resolved and unchanged: pressing Find again is not a new question.
+      if (f.origin && typed.toUpperCase() === f.origin.postcode.toUpperCase()) return;
+      find.disabled = true;
+      try {
+        const place = await apiGeocode(ctx.api, typed);
+        if (!place) { say(copy.postcode.unknown); return; }
+        // The canonical spelling written back into the box IS the confirmation:
+        // type "ng12ab", get "NG1 2AB", and the board thins out behind it. A
+        // separate "found it" line would say the same thing twice.
+        input.value = place.postcode;
+        commit(place);
+      } catch {
+        // apiGeocode throws only for "we couldn't ask", which is not the buyer's
+        // fault and isn't phrased as though it were. The pool is long since
+        // loaded, so nothing else about the mode is affected.
+        say(copy.postcode.failed);
+      } finally {
+        find.disabled = false;
+      }
+    };
+
+    find.addEventListener('click', resolve);
+    input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      // There is no form here so nothing would submit, but Enter is what a buyer
+      // will press, and without this it does nothing whatsoever.
+      e.preventDefault();
+      resolve();
+    });
+
+    const radius = renderOptionList(q, f, { onChange: filtersChanged }).list;
+    // Two controls under one dialog title, so the radiogroup names itself rather
+    // than inheriting "Where are you looking from?" from the popover.
+    radius.setAttribute('aria-label', labelFor(ctx.brand, 'place'));
+
+    wrap.append(row, status, radius);
+    host.append(wrap);
+  };
+
   /* ---------------------------- filtering ---------------------------- */
 
   /** The survivors, as pool indices in pool order. Measured at 0.035 ms for
