@@ -354,7 +354,7 @@ const GUESS_WHO_COPY = {
   ford: {
     wordmark: 'Guess Who',
     title: 'Rule them out.',
-    startNote: ({ total }) => `The whole lot — all ${total} of them. Start narrowing.`,
+    startNote: ({ total }) => `The whole lot, all ${total} of them. Start narrowing.`,
     liveNote: ({ left, gone }) => `${gone} ruled out. ${left} still in.`,
     oneNote: 'One left. That’s your car, then.',
     fewNote: ({ left }) => `Down to ${left}. Have a good look.`,
