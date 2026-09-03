@@ -1088,6 +1088,7 @@ function mount(root, ctx) {
         narrowed: () => f.mileage.length > 0,
         summary: () => ticked(q.options, f.mileage),
         build: (host) => host.append(renderOptionList(q, f, { onChange: filtersChanged }).list),
+        clear: () => { f.mileage = []; },
         test: () => {
           if (!f.mileage.length) return null;
           const ranges = MILEAGE_BANDS.filter((b) => f.mileage.includes(b.id));
