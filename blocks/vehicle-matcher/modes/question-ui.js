@@ -159,6 +159,16 @@ export function renderOptionList(q, answers, { onChange, onPick } = {}) {
     btn.setAttribute('role', q.multi ? 'checkbox' : 'radio');
     btn.setAttribute('aria-checked', String(selected.has(opt.value)));
     if (selected.has(opt.value)) btn.classList.add('is-selected');
+    // A colour dot, for the one axis where the option IS a colour. Same
+    // .vm-swatch the cards use (SWATCH_HEX in ./result-card.js), so "the green
+    // one" reads the same in the filter as it does on the card it filtered to.
+    // Presentational only — the label still carries the name, so an option with
+    // no hex simply has no dot.
+    if (opt.swatch) {
+      const dot = el('span', 'vm-swatch');
+      dot.style.background = opt.swatch;
+      btn.append(dot);
+    }
     btn.append(el('span', 'vm-option-label', opt.label));
     if (opt.sub) btn.append(el('span', 'vm-option-sub', opt.sub));
     btn.addEventListener('click', () => {
