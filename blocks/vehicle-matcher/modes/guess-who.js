@@ -1139,9 +1139,25 @@ function mount(root, ctx) {
     state.exitTimer = window.setTimeout(() => commit(keep), EXIT_MS);
   };
 
-  /** Every filter change, wherever it came from: bank an undo point, re-filter,
-   *  re-lay-out. No debounce — the pass is 0.035 ms. */
+  /*
+   * Every edit made inside an open popover.
+   *
+   * No debounce: the filter pass is 0.035 ms over 12,000 cars, so the board can
+   * afford to re-filter on every pixel of a slider drag — and it should, because
+   * watching the wall thin out as you drag IS the mode.
+   *
+   * Undo is banked once per popover session rather than once per event. A drag
+   * fires this fifty times and fifty identical undo steps are no undo at all;
+   * the state captured when the popover opened is the one a buyer means by "put
+   * that back". Rejections bank their own point (see setAxis), because each of
+   * those is a single deliberate act.
+   */
   function filtersChanged() {
+    if (state.pop && !state.pop.banked) {
+      state.pop.banked = true;
+      state.history.push(state.pop.before);
+      if (state.history.length > HISTORY_MAX) state.history.shift();
+    }
     render();
   }
 
