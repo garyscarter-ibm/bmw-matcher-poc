@@ -4677,7 +4677,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   color: var(--vm-ink);
   background: var(--vm-surface-dark);
   border: var(--vm-border-width) solid var(--vm-line);
-  border-radius: var(--vm-radius);
+  /* -control, not -radius: this is a button, and MINI's buttons are pills. */
+  border-radius: var(--vm-radius-control);
   cursor: pointer;
 }
 .vm-gw-place-go:hover { border-color: var(--vm-ink); }
