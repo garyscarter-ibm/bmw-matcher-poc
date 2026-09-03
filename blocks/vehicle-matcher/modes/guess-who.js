@@ -28,9 +28,10 @@
  * The elimination itself is deliberately cheap: eliminated cards are given a
  * class that transitions ONLY transform and opacity (compositor-safe, so the
  * 12,000-node case never touches the main thread for the fade), and the
- * survivors' reflow is a FLIP — but only above FLIP_MIN_TRACK, because a 12px
- * card's travel is imperceptible and FLIP costs 55 ms at that scale. Measured
- * numbers behind all of this are in docs/spikes/guess-who-render-spike.html.
+ * survivors' reflow is a FLIP — but never at dot stage, because a 12px card's
+ * travel is imperceptible, FLIP costs 55 ms at that scale, and there can be
+ * thousands of dots each taking a composited layer for it. Measured numbers
+ * behind all of this are in docs/spikes/guess-who-render-spike.html.
  *
  * What it shares rather than reinvents: the cards (./result-card.js, with the
  * score badge suppressed because there is no score), the option/slider widgets
