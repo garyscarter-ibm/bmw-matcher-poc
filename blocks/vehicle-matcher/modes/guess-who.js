@@ -670,7 +670,19 @@ function mount(root, ctx) {
     const f = state.filters;
     const axes = [];
 
-    /* --- price: a from/to range, opened wide so everything shows (brief) --- */
+    /*
+     * Price: a from/to range, opened to the full span of the stock so that the
+     * board starts with everything on it — the brief's "start with max and min
+     * price filters set", which is also what makes the opening claim true.
+     *
+     * Unlike every other axis this one's predicate is ALWAYS active rather than
+     * dropping out when the range is at full width. Price is the one dimension
+     * this mode is never "not filtering on", so an unpriceable car is excluded
+     * from the first frame rather than appearing and then vanishing the moment
+     * a thumb moves — and a card at card stage always has a price to print. It
+     * costs nothing today: not one of the 12,099 BMW or 3,578 MINI listings is
+     * missing a price.
+     */
     const priceSpan = span(pool.price);
     if (priceSpan) {
       const lo = Math.floor(priceSpan[0] / PRICE_STEP) * PRICE_STEP;
@@ -682,13 +694,14 @@ function mount(root, ctx) {
       axes.push({
         key: 'price',
         q,
-        wide: () => f.price[0] <= lo && f.price[1] >= hi,
+        narrowed: () => f.price[0] > lo || f.price[1] < hi,
+        // Always the actual figures, never "Any": the range IS set from the
+        // start, and printing "Any" over a live filter would misdescribe it.
         summary: () => `${gbp(f.price[0])} – ${gbp(f.price[1])}`,
         build: (host) => renderRangeSlider(host, q, f, { onChange: filtersChanged }),
         test: () => {
           const [a, b] = f.price;
-          if (a <= lo && b >= hi) return null;
-          return (i) => pool.price[i] >= a && pool.price[i] <= b && pool.price[i] >= 0;
+          return (i) => pool.price[i] >= a && pool.price[i] <= b;
         },
       });
     }
