@@ -785,8 +785,8 @@ function mount(root, ctx) {
       axes.push({
         key: 'seats',
         q,
-        wide: () => !f.seats.length,
-        summary: () => f.seats.slice().sort((a, b) => a - b).join(', '),
+        narrowed: () => f.seats.length > 0,
+        summary: () => ticked(q.options, f.seats, (o) => String(o.value)),
         build: (host) => host.append(renderOptionList(q, f, { onChange: filtersChanged }).list),
         test: () => {
           if (!f.seats.length) return null;
