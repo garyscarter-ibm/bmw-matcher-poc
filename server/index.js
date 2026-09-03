@@ -228,6 +228,122 @@ function publicCar(car) {
   };
 }
 
+/* ------------------------- the whole-pool wire format ------------------ *
+ * Every other endpoint here sends a handful of cars, richly described. This one
+ * sends the ENTIRE national pool, because the Guess Who mode is a hard filter
+ * over all of it: the user watches twelve thousand cars become nine, so the
+ * client has to hold twelve thousand cars.
+ *
+ * Sent as columns with dictionaries rather than an array of objects, which is
+ * not premature cleverness — it is the difference between viable and not.
+ * Measured on the real BMW pool (12,084 cars):
+ *
+ *   full mapped pool, as-is        865 KB gzip
+ *   object per car, filter fields  452 KB gzip
+ *   these columns, card-complete   377 KB gzip
+ *
+ * The saving comes from how little actual variety there is: 553 distinct model
+ * names across 12,084 cars, 22 distinct features, one link prefix. Dictionaries
+ * turn each of those into an index, and `link` stops being sent at all.
+ *
+ * Two consequences worth stating, because they are the whole point:
+ *  1. ONE request serves the entire mode. There is no hydrate-on-demand tier and
+ *     no pagination, so no filter interaction can ever wait on the network.
+ *  2. Filtering is then a pass over parallel arrays — measured at 0.035 ms for
+ *     eight predicates over 12,012 cars. That is why the mode can re-filter on
+ *     every pointer move instead of debouncing.
+ *
+ * `features` is a BITMASK, not a list: both brands have fewer than 31 distinct
+ * feature concepts, so a car's whole equipment set fits in one integer and a
+ * must-have test is `(car & wanted) === wanted`.
+ * --------------------------------------------------------------------- */
+
+/** Dictionary-encode a column: returns [distinctValues, indexPerCar]. */
+function dictionary(values) {
+  const distinct = [];
+  const index = new Map();
+  const out = new Array(values.length);
+  for (let i = 0; i < values.length; i += 1) {
+    const v = values[i] ?? null;
+    let at = index.get(v);
+    if (at === undefined) {
+      at = distinct.length;
+      distinct.push(v);
+      index.set(v, at);
+    }
+    out[i] = at;
+  }
+  return [distinct, out];
+}
+
+/**
+ * The national pool as columns, for the hard-filter mode.
+ *
+ * Thumbnails, not full photos. Both CDNs the feed uses expose a small variant,
+ * and at ~5 KB against ~165 KB it is a 31× saving — which matters when a first
+ * paint is hundreds of cards rather than five. Neither CDN is the throttled
+ * used-car origin, so thumbnails cost nothing against that rate limit. The
+ * client swaps up to the full image once cards are big enough to show one.
+ */
+function thumbnail(url) {
+  if (!url) return null;
+  // eu.cdn.autosonshow.tv/…/e01_md.jpg → _sm.jpg (160×90)
+  if (url.includes('autosonshow')) return url.replace('_md.jpg', '_sm.jpg');
+  // m.atcdn.co.uk/a/media/{resize}/<hash>.jpg — the feed leaves {resize}
+  // unsubstituted, and the CDN then redirects it to the full-size original, so
+  // filling it in is both smaller AND one redirect cheaper.
+  return url.replace('{resize}', 'w160');
+}
+
+function publicPool(brand, cars) {
+  // Only the concepts this pool actually contains, so the bitmask stays as
+  // narrow as possible and the client's filter list has no dead options.
+  const featureKeys = [...new Set(cars.flatMap((c) => c.features || []))].sort();
+  const featureBit = new Map(featureKeys.map((k, i) => [k, i]));
+
+  const [names, name] = dictionary(cars.map((c) => c.name));
+  const [lines, line] = dictionary(cars.map((c) => c.line));
+  const [bodies, body] = dictionary(cars.map((c) => c.body));
+  const [fuels, fuel] = dictionary(cars.map((c) => c.fuel));
+  const [transmissions, transmission] = dictionary(cars.map((c) => c.transmission));
+  const [retailers, retailer] = dictionary(cars.map((c) => c.retailerName));
+  // Paint, in both forms the UI needs: the normalised basic name the filter
+  // groups by ("Grey") and the marketing name a card prints ("Brooklyn Grey").
+  // Absent for any car the colour warm pass hasn't reached yet — those are
+  // silently excluded from the colour filter rather than shown with a caveat.
+  const [shades, shade] = dictionary(cars.map((c) => c.colour?.colour ?? null));
+  const [paints, paint] = dictionary(cars.map((c) => (
+    c.colour?.manufacturerColour ?? c.colour?.colour ?? null)));
+
+  // `link` is always the same prefix plus the advert id, for every car of a
+  // brand, so send the prefix once instead of 12,000 near-identical URLs.
+  const linkPrefix = cars.find((c) => c.link)?.link?.replace(/[^/]+$/, '') || null;
+
+  return {
+    brand,
+    n: cars.length,
+    linkPrefix,
+    // Dictionaries. Each pairs with the same-named column below.
+    names, lines, bodies, fuels, transmissions, retailers, shades, paints,
+    featureKeys,
+    // Columns — every one exactly `n` long and index-aligned.
+    id: cars.map((c) => c.id),
+    name, line, body, fuel, transmission, retailer, shade, paint,
+    retailerId: cars.map((c) => c.retailerId ?? null),
+    price: cars.map((c) => c.priceMin ?? null),
+    mileage: cars.map((c) => c.mileage ?? null),
+    year: cars.map((c) => c.year ?? null),
+    plate: cars.map((c) => c.plate ?? null),
+    seats: cars.map((c) => c.seats ?? null),
+    boot: cars.map((c) => c.boot ?? null),
+    zeroTo62: cars.map((c) => c.zeroTo62 ?? null),
+    mpg: cars.map((c) => c.mpg ?? null),
+    features: cars.map((c) => (c.features || [])
+      .reduce((mask, k) => mask | (1 << featureBit.get(k)), 0)),
+    photo: cars.map((c) => thumbnail(c.photo)),
+  };
+}
+
 function publicMatch({
   car, score, stretch, reasons, tradeOffs, listings,
 }) {
