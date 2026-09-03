@@ -1118,7 +1118,7 @@ function mount(root, ctx) {
    */
   const commit = (keep) => {
     const layout = pickLayout(Math.max(keep.length, 1), board.clientWidth || 1200, boardHeight());
-    const flip = layout.track >= FLIP_MIN_TRACK
+    const flip = layout.stage !== 'dot'
       && keep.length <= FLIP_MAX_CELLS
       && !reducedMotion;
 
