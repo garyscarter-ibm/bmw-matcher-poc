@@ -1250,7 +1250,11 @@ function mount(root, ctx) {
 
   function openPop(trigger, axis) {
     if (state.pop) closePop();
-    state.pop = { trigger, axis };
+    // `before` is the state to hand back if this session changes anything;
+    // `building` suppresses the widgets' mount-time commit (see filtersChanged).
+    state.pop = {
+      trigger, axis, before: snapshot(), banked: false, building: true,
+    };
     popTitle.textContent = axis.q.title;
     pop.setAttribute('aria-label', axis.q.title);
     popBody.replaceChildren();
