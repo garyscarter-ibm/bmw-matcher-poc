@@ -4650,7 +4650,7 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   flex: 1 1 auto;
   min-width: 0;
   padding: var(--vm-space-2) var(--vm-space-3);
-  font-family: inherit;
+  font-family: var(--vm-font-body);
   font-size: var(--vm-text-label);
   /* Postcodes are read back character by character ("is that an O or a zero"),
      so the value is spaced rather than set tight. */
@@ -4659,7 +4659,7 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   color: var(--vm-ink);
   background: var(--vm-surface);
   border: var(--vm-border-width) solid var(--vm-line);
-  border-radius: var(--vm-radius-sm);
+  border-radius: var(--vm-radius);
 }
 /* The placeholder is an example, not a label, and has to lose to the value it
    sits behind — otherwise "NG1 2AB" grey reads as a postcode already entered. */
@@ -4677,7 +4677,7 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   color: var(--vm-ink);
   background: var(--vm-surface-dark);
   border: var(--vm-border-width) solid var(--vm-line);
-  border-radius: var(--vm-radius-sm);
+  border-radius: var(--vm-radius);
   cursor: pointer;
 }
 .vm-gw-place-go:hover { border-color: var(--vm-ink); }
