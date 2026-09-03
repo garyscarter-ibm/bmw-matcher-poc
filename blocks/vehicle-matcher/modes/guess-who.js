@@ -111,6 +111,9 @@ const EXIT_MS = 380;
 const FLIP_MS = 320;
 /** How long the headline count takes to tick down to its new value. */
 const COUNT_MS = 420;
+/** How long the win burst needs before its layer can be binned: the 1.5s fall in
+ *  vm-mingle-fall plus the 0.45s stagger celebrate() spreads it over, rounded up. */
+const CONFETTI_MS = 2400;
 /** Popover width (for the viewport clamp only — the real width is the CSS's). */
 const POP_WIDTH = 300;
 const POP_MARGIN = 8;
