@@ -4632,6 +4632,72 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   margin-top: var(--vm-space-4);
 }
 
+/* --- the distance filter's postcode box ---
+
+   The only text input in the whole block, which is why these rules exist at all:
+   there is no shared .vm-input to lean on, and inventing one for a single field
+   would be six brands' worth of theming for one control. It borrows the option
+   buttons' border and radius instead, so it reads as part of the same set. */
+.vm-gw-place-row {
+  display: flex;
+  gap: var(--vm-space-2);
+  margin-bottom: var(--vm-space-2);
+}
+.vm-gw-place-input {
+  /* min-width: auto because a flex item's default min-width is its intrinsic
+     size, and an 8-character input's is wide enough to push the Find button out
+     of a 260px popover. */
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--vm-space-2) var(--vm-space-3);
+  font-family: inherit;
+  font-size: var(--vm-text-label);
+  /* Postcodes are read back character by character ("is that an O or a zero"),
+     so the value is spaced rather than set tight. */
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vm-ink);
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius-sm);
+}
+/* The placeholder is an example, not a label, and has to lose to the value it
+   sits behind — otherwise "NG1 2AB" grey reads as a postcode already entered. */
+.vm-gw-place-input::placeholder {
+  color: var(--vm-ink-muted);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.vm-gw-place-go {
+  flex: none;
+  padding: var(--vm-space-2) var(--vm-space-3);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink);
+  background: var(--vm-surface-dark);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius-sm);
+  cursor: pointer;
+}
+.vm-gw-place-go:hover { border-color: var(--vm-ink); }
+/* Disabled only for the moment a lookup is in flight, so this is a "working on
+   it" state rather than a permanent one: dimmed, but the label stays readable. */
+.vm-gw-place-go:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+/* Empty most of the time, and it must not reserve a line when it is: a gap above
+   the radius options that only sometimes contains text reads as a rendering
+   fault. :empty gets no margin; text gets one. */
+.vm-gw-place-status {
+  margin: 0;
+  font-size: var(--vm-text-eyebrow);
+  line-height: 1.35;
+  color: var(--vm-ink-muted);
+}
+.vm-gw-place-status:not(:empty) { margin-bottom: var(--vm-space-3); }
+
 /* --- nothing left --- */
 
 /* Not an error and not styled like one. A hard filter that matches nothing has
