@@ -46,7 +46,7 @@ import { renderRangeSlider, renderOptionList } from './question-ui.js';
 import {
   matchCard, SPEC_LABELS, FUEL_SPEC, SWATCH_HEX, CONCEPT_LABELS,
 } from './result-card.js';
-import { celebrate } from './match-signal.js';
+import { celebrate, cap } from './match-signal.js';
 
 /* ---------------------------- the size ladder ---------------------------- */
 
