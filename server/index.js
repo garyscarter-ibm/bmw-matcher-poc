@@ -892,6 +892,20 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       } else {
         console.log('[warmer] initial stock primed (BMW + MINI + Honda + Ford + Motorrad + Ferrari)');
       }
+      /*
+       * Colour last, and only once stock exists, because it needs the pool to
+       * know which adverts to ask about (see startColourWarmer).
+       *
+       * Off by default. It is thousands of requests at someone else's site —
+       * a ~4h20m first pass for BMW + MINI at one request per second — so it
+       * is opted into with COLOUR_WARM=1 rather than fired by anyone who
+       * happens to run the server. Subsequent passes are small deltas, since
+       * paint is cached per advert forever and persisted to .cache/.
+       */
+      if (process.env.COLOUR_WARM === '1') {
+        console.log('[colour] warm pass enabled (COLOUR_WARM=1) — see .cache/colours-*.json');
+        startColourWarmer();
+      }
     });
   });
 }
