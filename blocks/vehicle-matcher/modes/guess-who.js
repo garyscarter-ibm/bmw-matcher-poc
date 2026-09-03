@@ -148,6 +148,39 @@ const MILEAGE_BANDS = [
   { id: 'm60', lo: 60000, hi: Infinity },
 ];
 
+/*
+ * How far the buyer will travel. Single-pick, not multi: "within 50 miles" is a
+ * nested set, so ticking 25 as well as 50 would say nothing that 50 doesn't
+ * already say, and a control whose options can't disagree with each other is a
+ * radio group wearing checkboxes.
+ *
+ * 25 is the preselected one because it is the only figure here that is a normal
+ * thing to do on a Saturday; 200 exists so a rare car is still findable, which
+ * for Ferrari (fifteen sites in the country) is the difference between a filter
+ * and a dead end.
+ */
+const RADIUS_BANDS = [10, 25, 50, 100, 200];
+const DEFAULT_RADIUS = 25;
+
+/*
+ * Great-circle miles between two points.
+ *
+ * Haversine rather than a flat approximation: over Great Britain the error of
+ * treating degrees as a plane reaches several miles north to south, which on a
+ * ten-mile band is the difference between a dealer being in and out. It runs once
+ * per RETAILER (about 130 of them, see the place axis) rather than once per car,
+ * so its cost is irrelevant and its accuracy is not.
+ */
+const EARTH_MILES = 3958.8;
+const toRad = Math.PI / 180;
+function milesBetween(lat1, lon1, lat2, lon2) {
+  const dLat = (lat2 - lat1) * toRad;
+  const dLon = (lon2 - lon1) * toRad;
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.sin(dLon / 2) ** 2;
+  return 2 * EARTH_MILES * Math.asin(Math.sqrt(a));
+}
+
 const miles = (n) => n.toLocaleString('en-GB');
 const bandLabel = (b) => {
   if (b.lo === 0) return `Under ${miles(b.hi)}`;
