@@ -40,7 +40,7 @@
  * nothing else.
  */
 
-import { apiPool } from '../engine.js';
+import { apiPool, apiGeocode } from '../engine.js';
 import { el, gbp } from '../ui.js';
 import { BRAND_COPY } from './brand-copy.js';
 import { renderRangeSlider, renderOptionList } from './question-ui.js';
