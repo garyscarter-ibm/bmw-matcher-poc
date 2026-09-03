@@ -570,6 +570,10 @@ function decodePool(raw) {
     body: idx(raw.body),
     fuel: idx(raw.fuel),
     shade: idx(raw.shade),
+    // Not for its name — that's read once per visible card, from the dictionary.
+    // This is the proximity axis's hot column: the distance is precomputed per
+    // retailer, so the per-car test is this index into that little table.
+    retailer: idx(raw.retailer),
   };
 }
 
