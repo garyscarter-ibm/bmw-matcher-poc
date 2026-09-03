@@ -163,6 +163,26 @@ const ageCapPhrase = (years) => {
   return years === 1 ? '1 year' : `${years} years`;
 };
 
+/*
+ * An option label as it reads mid-sentence, article included: "an estate",
+ * "a hatchback", "an SUV".
+ *
+ * Both halves of that are things the label on its own can't give us. Lowercasing
+ * everything produces "not a suv", which no retailer would print, so an acronym
+ * keeps its case. And the article has to agree with whichever form we end up
+ * with — "a estate" and "a SUV" are both wrong — which is why the "a" lives here
+ * instead of in the six brand copy tables. For an acronym that means agreeing
+ * with the spoken letter rather than the written one: A, E, F, H, I, L, M, N, O,
+ * R, S and X are the letters whose names begin with a vowel sound, which is what
+ * makes it "an SUV" but "a GT".
+ */
+const withArticle = (label) => {
+  const acronym = label === label.toUpperCase();
+  const word = acronym ? label : label.toLowerCase();
+  const vowelish = acronym ? /^[aefhilmnorsx]/i : /^[aeiou]/i;
+  return `${vowelish.test(word) ? 'an' : 'a'} ${word}`;
+};
+
 /* -------------------------------- copy -------------------------------- */
 
 /*
