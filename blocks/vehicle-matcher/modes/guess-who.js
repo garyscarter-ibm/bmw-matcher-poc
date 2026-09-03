@@ -208,6 +208,7 @@ const FILTER_LABELS = {
   mileage: 'Mileage',
   age: 'Age',
   colour: 'Colour',
+  place: 'Distance',
 };
 const FILTER_LABELS_BY_BRAND = {
   // A bike has no body style and no seat count worth filtering on; the shape
