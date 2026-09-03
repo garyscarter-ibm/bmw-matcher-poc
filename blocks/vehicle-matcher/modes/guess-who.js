@@ -90,14 +90,18 @@ const MIN_TRACK = STAGES[STAGES.length - 1].min;
  */
 const SCREENS = 1.9;
 
-/** Above this track width the survivors' reflow is worth animating (FLIP). At
- *  12px a card moves a few pixels and nobody sees it, and FLIP costs 55 ms at
- *  that node count — so below this the new layout simply appears. */
+/*
+ * When the survivors' reflow is worth animating (FLIP).
+ *
+ * Below FLIP_MIN_TRACK a card moves a few pixels and nobody sees it, while FLIP
+ * measured 55 ms at 12px — all cost, no perceived movement — so the new layout
+ * simply appears instead. FLIP_MAX_CELLS is the belt-and-braces half: chip stage
+ * tops out around 1,500 cells on a 1440×900 screen and comfortably animates, but
+ * a very large display could put several thousand in the same stage, and past a
+ * point the honest trade is a still frame over a janky slide.
+ */
 const FLIP_MIN_TRACK = 24;
-
-/** Stages where a card is big enough to argue with. Below this "not this one"
- *  has nothing to point at. */
-const REJECTABLE = new Set(['tile', 'card']);
+const FLIP_MAX_CELLS = 2000;
 
 /* ------------------------------- timings ------------------------------- */
 
@@ -144,6 +148,20 @@ const bandLabel = (b) => {
 };
 /** Which band a mileage falls in, or -1 for none (missing figure). */
 const bandOf = (m) => (m < 0 ? -1 : MILEAGE_BANDS.findIndex((b) => m >= b.lo && m < b.hi));
+
+/**
+ * An age cap as a noun phrase that fits "No older than …".
+ *
+ * The chips can say "12 yrs" because they are a two-word readout under a label;
+ * a menu line is a sentence and has to read like one, which means spelling
+ * "years" out, saying "1 year" rather than "1 yrs", and having something
+ * sensible for a cap of zero — turning down a one-year-old car leaves only
+ * this year's, and "no older than 0 yrs" is not how anyone says that.
+ */
+const ageCapPhrase = (years) => {
+  if (years <= 0) return 'this year’s';
+  return years === 1 ? '1 year' : `${years} years`;
+};
 
 /* -------------------------------- copy -------------------------------- */
 
@@ -572,6 +590,25 @@ function focusablesIn(host) {
 /** The hex for a normalised paint name, or null. Same table the cards use. */
 const hexOf = (shade) => SWATCH_HEX[(shade || '').toLowerCase()] || null;
 
+/*
+ * The fill for a dot-stage cell whose paint we don't know yet.
+ *
+ * A wall of twelve thousand identical greys reads as one rectangle rather than
+ * as the stock, so each cell gets a small stable offset — five steps mixed off
+ * --vm-line, which keeps it on the brand's own tokens instead of hard-coding
+ * greys that would be wrong for six themes. TEXTURE, NOT INFORMATION: it says
+ * nothing about the car, and the moment a real paint is known (see paintCell)
+ * that colour replaces it.
+ *
+ * A background colour rather than a `filter: brightness()`, which is what this
+ * was first written as: a filter makes every cell a stacking context, and 12,000
+ * of them is 12,000 composited layers for a decorative effect.
+ */
+const blankTint = (i) => {
+  const step = ((i * 2654435761) >>> 0) % 5;
+  return `color-mix(in srgb, var(--vm-line) ${84 + step * 4}%, var(--vm-surface-dark))`;
+};
+
 /* ------------------------------- mount ------------------------------- */
 
 function mount(root, ctx) {
@@ -595,7 +632,7 @@ function mount(root, ctx) {
     pop: null, // { trigger, axis }
     won: false, // the "one left" celebration has fired
     exitTimer: 0,
-    countTimer: 0,
+    countGen: 0,
     resizeTimer: 0,
   };
 
@@ -607,7 +644,8 @@ function mount(root, ctx) {
   let nodeStage = [];
 
   // Live DOM, assigned by buildStage().
-  let stage = null;
+  let shell = null;
+  let barEl = null;
   let countEl = null;
   let noteEl = null;
   let chipsEl = null;
@@ -640,17 +678,17 @@ function mount(root, ctx) {
    * cells rather than the usual lines, because that IS what is coming. */
   const renderSkeleton = () => {
     root.replaceChildren();
-    const shell = el('div', 'vm-gw vm-gw-skeleton');
-    shell.setAttribute('aria-busy', 'true');
-    shell.setAttribute('aria-label', 'Loading');
+    const skel = el('div', 'vm-gw vm-gw-skeleton');
+    skel.setAttribute('aria-busy', 'true');
+    skel.setAttribute('aria-label', 'Loading');
     const bar = el('div', 'vm-gw-bar');
     bar.append(el('div', 'vm-skel vm-skel-line'));
     const grid = el('div', 'vm-gw-board');
     grid.style.setProperty('--vm-gw-track', '46px');
     grid.style.setProperty('--vm-gw-gap', '5px');
     for (let i = 0; i < 240; i += 1) grid.append(el('div', 'vm-gw-cell is-blank'));
-    shell.append(bar, grid);
-    root.append(shell);
+    skel.append(bar, grid);
+    root.append(skel);
   };
 
   /* ---------------------------- the axes ---------------------------- */
@@ -900,12 +938,10 @@ function mount(root, ctx) {
 
     if (stageKey === 'dot') {
       // A photo is neither readable nor affordable at this size (12,000 image
-      // requests), so the cell carries the one fact that survives: the paint,
-      // when the enrichment pass has reached this car. Before it has, the wall
-      // is neutral — the tint jitter set at build is texture, not information.
-      const hex = hexOf(pool.shades[pool.shade[i]]);
-      if (hex) node.style.setProperty('--vm-gw-tint', hex);
-      else node.style.removeProperty('--vm-gw-tint');
+      // requests), so the cell carries the one fact that survives at 12px: the
+      // paint, once the enrichment pass has reached this car. Until then it gets
+      // a neutral (see blankTint).
+      node.style.setProperty('--vm-gw-tint', hexOf(pool.shades[pool.shade[i]]) || blankTint(i));
       return;
     }
 
@@ -1022,11 +1058,18 @@ function mount(root, ctx) {
     while (board.children.length > keep.length) board.lastElementChild.remove();
   };
 
-  /** The board's available height — viewport below the bar, floored so a tiny
-   *  window doesn't collapse the ladder to dots. */
+  /*
+   * The board's available height — the viewport minus the sticky bar above it,
+   * floored so a short window doesn't collapse the whole ladder to dots.
+   *
+   * Measured from the BAR's height rather than the board's viewport top, which
+   * looks equivalent and isn't: the bar is sticky, so the board's top moves as
+   * the page scrolls, and reading it would make the card size a function of how
+   * far down the page you happen to be.
+   */
   const boardHeight = () => {
-    const top = board?.getBoundingClientRect?.().top ?? 0;
-    return Math.max(320, (window.innerHeight || 800) - top - 24);
+    const barH = barEl?.offsetHeight || 0;
+    return Math.max(320, (window.innerHeight || 800) - barH - 24);
   };
 
   /*
@@ -1040,7 +1083,9 @@ function mount(root, ctx) {
    */
   const commit = (keep) => {
     const layout = pickLayout(Math.max(keep.length, 1), board.clientWidth || 1200, boardHeight());
-    const flip = layout.track >= FLIP_MIN_TRACK && !reducedMotion;
+    const flip = layout.track >= FLIP_MIN_TRACK
+      && keep.length <= FLIP_MAX_CELLS
+      && !reducedMotion;
 
     // First: where every survivor sits before the layout changes.
     const first = flip ? new Map() : null;
@@ -1072,7 +1117,7 @@ function mount(root, ctx) {
     }
 
     if (flip) play(first, keep);
-    if (stageChanged) stage.dataset.stage = layout.stage;
+    if (stageChanged) shell.dataset.stage = layout.stage;
 
     paintCount(keep.length);
     paintChips();
@@ -1083,7 +1128,7 @@ function mount(root, ctx) {
     // that deserves a flourish. Fires once per run.
     if (keep.length === 1 && !state.won && !reducedMotion) {
       state.won = true;
-      celebrate(stage, { brand: ctx.brand });
+      celebrate(shell, { brand: ctx.brand });
     }
     if (keep.length !== 1) state.won = false;
   };
@@ -1186,22 +1231,35 @@ function mount(root, ctx) {
     })();
     undoBtn.hidden = !state.history.length;
 
-    window.clearTimeout(state.countTimer);
+    /*
+     * The true figure lands FIRST, then the tween plays over it.
+     *
+     * Written the obvious way round — tween up to the final value — the number on
+     * screen is only correct once the animation has finished, and
+     * requestAnimationFrame does not run in a background tab. So filtering in a
+     * hidden tab left the headline reading 3,578 over a board of 317 cars: the
+     * count is this mode's primary readout, and it cannot be contingent on an
+     * effect. Set it, then decorate it.
+     */
     const from = state.shown;
-    if (reducedMotion || from === left) {
-      state.shown = left;
-      countEl.textContent = miles(left);
-      return;
-    }
+    state.shown = left;
+    countEl.textContent = miles(left);
+    if (reducedMotion || from === left) return;
+
+    // A generation stamp, because the tween is rAF-driven and a second filter
+    // lands long before 420 ms is up. Without it two tweens race and the digits
+    // flicker between two counts.
+    state.countGen += 1;
+    const gen = state.countGen;
     const started = performance.now();
     const tick = () => {
+      if (gen !== state.countGen) return;
       const t = Math.min(1, (performance.now() - started) / COUNT_MS);
       // Ease-out: most of the travel happens immediately, so the number reads as
       // a drop rather than a slow scroll.
       const value = Math.round(from + (left - from) * (1 - (1 - t) ** 3));
       countEl.textContent = miles(value);
       if (t < 1) window.requestAnimationFrame(tick);
-      else state.shown = left;
     };
     window.requestAnimationFrame(tick);
   };
@@ -1245,7 +1303,7 @@ function mount(root, ctx) {
     pop.hidden = true;
     popTitle = el('p', 'vm-gw-pop-title');
     popBody = el('div', 'vm-gw-pop-body');
-    const done = el('button', 'vm-gw-pop-done', 'Done');
+    const done = el('button', 'vm-btn vm-btn-primary vm-gw-pop-done', 'Done');
     done.type = 'button';
     done.addEventListener('click', () => closePop());
     pop.append(popTitle, popBody, done);
@@ -1481,9 +1539,9 @@ function mount(root, ctx) {
 
   const buildStage = () => {
     root.replaceChildren();
-    stage = el('div', 'vm-gw');
+    shell = el('div', 'vm-gw');
 
-    const bar = el('div', 'vm-gw-bar');
+    barEl = el('div', 'vm-gw-bar');
     const lead = el('div', 'vm-gw-lead');
     lead.append(el('p', 'vm-gw-wordmark', copy.wordmark));
     const tally = el('div', 'vm-gw-tally');
@@ -1508,7 +1566,7 @@ function mount(root, ctx) {
     resetBtn.addEventListener('click', reset);
     tools.append(undoBtn, resetBtn);
 
-    bar.append(lead, chipsEl, tools);
+    barEl.append(lead, chipsEl, tools);
 
     board = el('div', 'vm-gw-board');
 
@@ -1523,8 +1581,8 @@ function mount(root, ctx) {
       emptyReset,
     );
 
-    stage.append(bar, board, emptyEl, buildPopover());
-    root.append(stage);
+    shell.append(barEl, board, emptyEl, buildPopover());
+    root.append(shell);
   };
 
   /*
@@ -1539,21 +1597,20 @@ function mount(root, ctx) {
     nodes = new Array(pool.n);
     nodeStage = new Array(pool.n);
     state.layout = pickLayout(pool.n, board.clientWidth || 1200, boardHeight());
+    // The exit duration lives in one place. The CSS transitions on it and the JS
+    // waits for it before collapsing the board, so the two cannot drift.
+    board.style.setProperty('--vm-gw-exit', `${EXIT_MS}ms`);
     board.style.setProperty('--vm-gw-track', `${state.layout.track}px`);
     board.style.setProperty('--vm-gw-gap', `${state.layout.gap}px`);
     board.style.setProperty('--vm-gw-cell-h', `${Math.round(state.layout.cellH)}px`);
     board.dataset.stage = state.layout.stage;
     board.setAttribute('aria-hidden', String(state.layout.stage === 'dot'));
-    stage.dataset.stage = state.layout.stage;
+    shell.dataset.stage = state.layout.stage;
 
     const frag = document.createDocumentFragment();
     for (let i = 0; i < pool.n; i += 1) {
       const node = el('div', 'vm-gw-cell');
       node.dataset.i = String(i);
-      // A small, stable brightness jitter so a wall of unknown-colour cells
-      // reads as many objects rather than one grey rectangle. Texture, not
-      // information — and overridden the moment a real paint is known.
-      node.style.setProperty('--vm-gw-jit', String(0.94 + ((i * 37) % 13) / 100));
       nodes[i] = node;
       paintCell(node, i, state.layout.stage);
       frag.append(node);
@@ -1606,7 +1663,7 @@ function mount(root, ctx) {
     // The retailer label is authored config; the mode names the pool it searched
     // in its own note only when the shell gave it one.
     if (ctx.retailerLabel && ctx.retailerLabel !== brandCopy.name) {
-      stage.dataset.retailer = ctx.retailerLabel;
+      shell.dataset.retailer = ctx.retailerLabel;
     }
   };
 
