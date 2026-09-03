@@ -249,7 +249,7 @@ const GUESS_WHO_COPY = {
     reject: {
       price: ({ price }) => `Too dear at ${price}`,
       fuel: ({ fuel }) => `No ${fuel}, thanks`,
-      body: ({ body }) => `Not a ${body}`,
+      body: ({ body }) => `Not ${body}`,
       colour: ({ shade }) => `Nothing in ${shade}`,
       mileage: ({ cap }) => `Under ${cap} miles only`,
       age: ({ years }) => `No older than ${years}`,
@@ -289,7 +289,7 @@ const GUESS_WHO_COPY = {
     reject: {
       price: ({ price }) => `Too expensive at ${price}`,
       fuel: ({ fuel }) => `No ${fuel}`,
-      body: ({ body }) => `Not a ${body}`,
+      body: ({ body }) => `Not ${body}`,
       colour: ({ shade }) => `Nothing in ${shade}`,
       mileage: ({ cap }) => `Under ${cap} miles only`,
       age: ({ years }) => `No older than ${years}`,
@@ -329,7 +329,7 @@ const GUESS_WHO_COPY = {
     reject: {
       price: ({ price }) => `Too expensive at ${price}`,
       fuel: ({ fuel }) => `No ${fuel}`,
-      body: ({ body }) => `Not a ${body}`,
+      body: ({ body }) => `Not ${body}`,
       colour: ({ shade }) => `Nothing in ${shade}`,
       mileage: ({ cap }) => `Under ${cap} miles only`,
       age: ({ years }) => `No older than ${years}`,
@@ -369,7 +369,7 @@ const GUESS_WHO_COPY = {
     reject: {
       price: ({ price }) => `Too dear at ${price}`,
       fuel: ({ fuel }) => `No ${fuel}`,
-      body: ({ body }) => `Not a ${body}`,
+      body: ({ body }) => `Not ${body}`,
       colour: ({ shade }) => `Nothing in ${shade}`,
       mileage: ({ cap }) => `Under ${cap} miles only`,
       age: ({ years }) => `No older than ${years}`,
@@ -408,7 +408,7 @@ const GUESS_WHO_COPY = {
     reject: {
       price: ({ price }) => `Too expensive at ${price}`,
       fuel: ({ fuel }) => `No ${fuel}`,
-      body: ({ body }) => `Not a ${body}`,
+      body: ({ body }) => `Not ${body}`,
       colour: ({ shade }) => `Nothing in ${shade}`,
       mileage: ({ cap }) => `Under ${cap} miles only`,
       age: ({ years }) => `No older than ${years}`,
@@ -447,7 +447,7 @@ const GUESS_WHO_COPY = {
     reject: {
       price: ({ price }) => `Too much at ${price}`,
       fuel: ({ fuel }) => `No ${fuel}`,
-      body: ({ body }) => `Not a ${body}`,
+      body: ({ body }) => `Not ${body}`,
       colour: ({ shade }) => `Nothing in ${shade}`,
       mileage: ({ cap }) => `Under ${cap} miles only`,
       age: ({ years }) => `No older than ${years}`,
