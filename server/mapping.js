@@ -1727,6 +1727,16 @@ export function mapVehicle(v, brand = 'bmw') {
     // Internal: lets the nearby fetch drop the anchor retailer's own cars.
     // Deliberately NOT exposed by index.js publicCar().
     retailerId: v?.retailer_site?.id,
+    // The dealer directory's join key. `retailer_site` carries no postcode and
+    // no coordinates, and the used-car platform has no retailer-directory
+    // endpoint, so dealer_number is the only route from "which site sells this"
+    // to "where that site is" (see dealers.js, which is indexed on exactly
+    // this). That is what lets the hard-filter mode measure a car's distance
+    // from the buyer. Left undefined when the feed omits it — it does, on some
+    // rows (resolveRetailerPostcode in stock.js scans for the first that has
+    // one) — so anything joining on it must tolerate a miss. Like retailerId,
+    // internal: publicCar() does not expose it.
+    dealerNumber: v?.retailer_site?.dealer_number,
     // Public PDP is /vehicle/{advert_id} (confirmed against the live site);
     // fall back to the retailer's stock page if the feed ever omits it.
     link: v?.advert_id
