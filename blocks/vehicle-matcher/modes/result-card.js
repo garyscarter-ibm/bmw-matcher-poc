@@ -191,14 +191,16 @@ export function matchCard(match, {
   const body = el('div', 'vm-card-body');
   const head = el('div', 'vm-card-head');
   head.append(el('h3', 'vm-card-name', car.name));
-  const badge = el('span', 'vm-score', `${score}%`);
-  // The number has been unexplained since fit and taste were split, and two
-  // cards sharing one reads as a bug unless you know it is a claim that they
-  // suit you equally. Said properly in the working note under the cards; this
-  // is the affordance for the reader who points at the badge itself.
-  badge.title = 'Match score: how well this car fits the answers you gave. Cars that '
-    + 'suit you equally get the same score.';
-  head.append(badge);
+  if (showScore) {
+    const badge = el('span', 'vm-score', `${score}%`);
+    // The number has been unexplained since fit and taste were split, and two
+    // cards sharing one reads as a bug unless you know it is a claim that they
+    // suit you equally. Said properly in the working note under the cards; this
+    // is the affordance for the reader who points at the badge itself.
+    badge.title = 'Match score: how well this car fits the answers you gave. Cars that '
+      + 'suit you equally get the same score.';
+    head.append(badge);
+  }
   body.append(head);
 
   // Single used price when min === max (live stock), else the range.
