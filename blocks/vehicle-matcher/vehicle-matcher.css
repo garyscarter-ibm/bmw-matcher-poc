@@ -4667,6 +4667,41 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   background: var(--vm-surface-alt);
 }
 
+/* --- narrow viewports ---
+
+   Measured at 375x812 on MINI's unfiltered pool: the seven chips wrap into
+   three rows, which stands the bar at 315px and starts the board at y=388 —
+   less than half of the first screen showing cars, and permanently, because the
+   bar is sticky. Narrowing a filter makes it worse, not better: a longer value
+   widens its chip and can push the wrap to a fourth row.
+
+   One horizontal strip instead puts the bar back to roughly 200px. The whole
+   point of this mode is watching cars disappear, so the controls cannot own the
+   screen they disappear from. --- */
+@media (max-width: 767px) {
+  .vm-gw-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    /* A chip's focus ring would be clipped by the strip's own overflow — set
+       one axis to auto and the other computes to auto too — so the strip
+       carries the 4px the ring needs and takes it back out of the page gutter,
+       leaving the chips aligned with the count above them. */
+    padding: 4px;
+    margin-inline: -4px;
+  }
+  /* flex-shrink defaults to 1, so in a nowrap strip the seven chips would
+     squeeze into the 303px on offer rather than scroll, clipping every value to
+     a couple of characters. The strip scrolls; the chips keep their size. */
+  .vm-gw-chip {
+    flex: none;
+    /* Down from 220px, which is two thirds of this screen: one chip plus a
+       sliver of the next reads as a row that has ended, and nobody scrolls a
+       row that looks finished. At 140 the widest case still shows two whole
+       chips and the start of a third (140 + 8 + 140 = 288 of 303). */
+    max-width: 140px;
+  }
+}
+
 /* --- brand tweaks --- */
 
 /* MINI reserves solid black for buttons and selected states, so a narrowed chip
