@@ -67,6 +67,12 @@ export function renderRangeSlider(list, q, answers, { onChange } = {}) {
 
   const readout = el('output', 'vm-slider-value', formatRange([lo, hi], q));
 
+  // What the two thumbs are called to a screen reader. "budget" is only right
+  // for the question this was written for; `q.thumbNoun` lets a caller reusing
+  // the same widget on another axis (the hard-filter mode's age range) name them
+  // honestly. The budget question sets nothing and reads exactly as before.
+  const noun = q.thumbNoun || 'budget';
+
   const track = el('div', 'vm-range');
   const fill = el('div', 'vm-range-fill');
   const mkInput = (cls, label, value) => {
