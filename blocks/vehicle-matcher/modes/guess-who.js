@@ -1874,8 +1874,12 @@ function mount(root, ctx) {
      */
     const place = axisFor('place');
     if (place && f.origin) {
+      // Infinity means an unlocated dealer, which can't be on the board while a
+      // distance is set — but the guard keeps it from ever inventing a cap.
       const away = place.milesTo(i);
-      const tighter = RADIUS_BANDS.filter((m) => m < away && m < f.radius);
+      const tighter = Number.isFinite(away)
+        ? RADIUS_BANDS.filter((m) => m < away && m < f.radius)
+        : [];
       const capped = tighter[tighter.length - 1];
       if (capped) {
         out.push({
