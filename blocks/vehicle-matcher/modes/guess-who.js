@@ -732,6 +732,11 @@ function mount(root, ctx) {
       });
     }
 
+    /** A multi-pick's chip text: what is ticked, or "Any" while nothing is. */
+    const ticked = (options, chosen, labelOf = (o) => o.label) => (chosen.length
+      ? options.filter((o) => chosen.includes(o.value)).map(labelOf).join(', ')
+      : copy.anySummary);
+
     /* --- the dictionary multi-picks: fuel, body, colour --- */
     const dictAxis = (key, dict, column, labels, swatches) => {
       // Only values this pool actually holds, and never the null slot: a car we
