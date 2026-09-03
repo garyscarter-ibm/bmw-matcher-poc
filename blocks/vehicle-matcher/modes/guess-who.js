@@ -1117,6 +1117,7 @@ function mount(root, ctx) {
         narrowed: () => f.features.length > 0,
         summary: () => ticked(featureOptions, f.features),
         build: (host) => host.append(renderOptionList(q, f, { onChange: filtersChanged }).list),
+        clear: () => { f.features = []; },
         test: () => {
           if (!f.features.length) return null;
           // MUST-have, so every requested bit has to be present: one AND and one
