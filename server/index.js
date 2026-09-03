@@ -372,6 +372,9 @@ function publicPool(brand, cars, directory = null) {
     // Dictionaries. Each pairs with the same-named column below.
     names, lines, bodies, fuels, transmissions, retailers, shades, paints,
     featureKeys,
+    // The one table that is not per-car: it pairs with `retailers` above, not
+    // with a column. See siteCoords.
+    sites: siteCoords(cars, retailers, retailer, directory),
     // Columns — every one exactly `n` long and index-aligned.
     id: cars.map((c) => c.id),
     name, line, body, fuel, transmission, retailer, shade, paint,
