@@ -1306,19 +1306,26 @@ function colourFromPdp(html) {
   return null;
 }
 
-/** One advert's colour, cached forever, single-flighted, never throwing. */
+/** One advert's colour, cached forever, single-flighted, never throwing.
+ *  A fetch that failed rather than answered caches COLOUR_SOFT_MISS, which
+ *  reads as "no colour" here but stays retryable for the warm pass. */
 function fetchColour(origin, advertId) {
   const id = String(advertId);
-  if (colourByAdvert.has(id)) return Promise.resolve(colourByAdvert.get(id));
+  if (colourByAdvert.has(id)) {
+    const hit = colourByAdvert.get(id);
+    return Promise.resolve(hit === COLOUR_SOFT_MISS ? null : hit);
+  }
   if (colourInflight.has(id)) return colourInflight.get(id);
 
   const p = httpsGet(`${origin}/vehicle/${encodeURIComponent(id)}`, { Accept: 'text/html' })
-    .then((res) => (res.status === 200 ? colourFromPdp(res.body) : null))
-    .catch(() => null)
+    // A 200 that parses to nothing is a real answer (no paint on record); any
+    // other status is a failure to ask, not an answer — see COLOUR_SOFT_MISS.
+    .then((res) => (res.status === 200 ? colourFromPdp(res.body) : COLOUR_SOFT_MISS))
+    .catch(() => COLOUR_SOFT_MISS)
     .then((colour) => {
       colourByAdvert.set(id, colour);
       colourInflight.delete(id);
-      return colour;
+      return colour === COLOUR_SOFT_MISS ? null : colour;
     });
   colourInflight.set(id, p);
   return p;
