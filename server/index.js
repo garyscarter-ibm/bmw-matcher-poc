@@ -824,6 +824,12 @@ export function buildServer(deps = {}) {
     fetchRetailerStock,
     fetchNearbyStock,
     enrichColours,
+    // The two location dependencies are on the same seam for the same reason as
+    // the stock ones: both call a third-party host that is not ours (a 2MB
+    // dealer directory, and postcodes.io), so a test that reached either would
+    // be neither hermetic nor fast.
+    fetchDealerDirectory,
+    geocodePostcode,
     ...deps,
   };
 
