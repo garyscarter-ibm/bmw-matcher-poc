@@ -718,7 +718,7 @@ function mount(root, ctx) {
       axes.push({
         key: 'age',
         q,
-        wide: () => f.age[0] <= 0 && f.age[1] >= maxAge,
+        narrowed: () => f.age[0] > 0 || f.age[1] < maxAge,
         summary: () => (f.age[0] === 0 ? `Up to ${f.age[1]} yrs` : `${f.age[0]}–${f.age[1]} yrs`),
         build: (host) => renderRangeSlider(host, q, f, { onChange: filtersChanged }),
         test: () => {
