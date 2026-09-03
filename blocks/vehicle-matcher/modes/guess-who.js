@@ -761,9 +761,15 @@ function mount(root, ctx) {
         key: 'age',
         q,
         narrowed: () => f.age[0] > 0 || f.age[1] < maxAge,
-        summary: () => (f.age[0] === 0
-          ? `Up to ${f.age[1] === 1 ? '1 yr' : `${f.age[1]} yrs`}`
-          : `${f.age[0]}–${f.age[1]} yrs`),
+        // "0 yrs" is a real state (reject a one-year-old car and the cap lands
+        // there), and it means "this year's plate only" — so it gets said that
+        // way rather than as a number a chip can't explain.
+        summary: () => {
+          const [a, b] = f.age;
+          if (b === 0) return 'This year only';
+          const upper = b === 1 ? '1 yr' : `${b} yrs`;
+          return a === 0 ? `Up to ${upper}` : `${a}–${b} yrs`;
+        },
         build: (host) => renderRangeSlider(host, q, f, { onChange: filtersChanged }),
         test: () => {
           const [a, b] = f.age;
