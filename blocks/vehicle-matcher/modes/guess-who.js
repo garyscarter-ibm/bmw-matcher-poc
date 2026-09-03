@@ -1153,6 +1153,11 @@ function mount(root, ctx) {
    * those is a single deliberate act.
    */
   function filtersChanged() {
+    // renderRangeSlider commits its starting value on mount (so a caller's Next
+    // button is enabled without a drag). Here that fires before the buyer has
+    // touched anything, writing the value that is already set — so opening the
+    // price popover would otherwise bank an undo step and repaint for nothing.
+    if (state.pop?.building) return;
     if (state.pop && !state.pop.banked) {
       state.pop.banked = true;
       state.history.push(state.pop.before);
