@@ -248,7 +248,8 @@ export function matchCard(match, {
       `0–62 ${car.zeroTo62}s`,
       car.fuel === 'ev' ? `${car.evRange} mi range` : `${car.mpg} mpg`,
     ]).filter(Boolean);
-    if (!paint || compact) {
+    // No paint to print, or a compact tile whose caller hasn't asked for it.
+    if (!paint || (compact && !showPaint)) {
       specs.textContent = [...head, ...tail].join('  ·  ');
       return;
     }
