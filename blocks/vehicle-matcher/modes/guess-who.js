@@ -117,6 +117,10 @@ const POP_MARGIN = 8;
  *  can cap at. £500 is fine enough to be useful and coarse enough to read. */
 const PRICE_STEP = 500;
 
+/** How many steps back the undo button can walk. Deep enough to unpick a run of
+ *  rejections, shallow enough that "start again" is the honest answer beyond it. */
+const HISTORY_MAX = 24;
+
 /*
  * Mileage as bands rather than a max slider, because the brief asks for it
  * multi-pick. Multi-pick means a buyer can take "under 10,000" and "40–60,000"
