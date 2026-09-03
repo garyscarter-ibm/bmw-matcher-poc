@@ -880,10 +880,44 @@ export function buildServer(deps = {}) {
       const brand = normalizeBrand(searchParams.get('brand'));
       try {
         const cars = await resolved.fetchRetailerStock(brand, searchParams.get('retailer') || undefined);
-        return sendJson(res, 200, publicPool(brand, cars));
+        // Retailer coordinates, for the proximity filter. Memoised for the
+        // process lifetime and primed at boot, so this awaits nothing in
+        // practice; a directory that is down costs the pool nothing but its
+        // `sites` table, which is a state the client already handles. Never
+        // allowed to fail the request — the mode's premise is every car.
+        const directory = await resolved.fetchDealerDirectory().catch((err) => {
+          console.warn('[pool] dealer directory unavailable:', err?.message);
+          return null;
+        });
+        return sendJson(res, 200, publicPool(brand, cars, directory));
       } catch (err) {
         console.warn('[pool] stock unavailable:', err?.message);
         return sendJson(res, 502, { error: 'Stock temporarily unavailable' });
+      }
+    }
+
+    /*
+     * One postcode to one coordinate pair, for the proximity filter.
+     *
+     * A GET with the postcode in the query string, because it is neither a
+     * secret nor an answer to score — and because it is then as cacheable as the
+     * pool it pairs with. Deliberately NOT folded into /api/pool: the pool is
+     * one shared payload for every visitor, and a per-buyer postcode in it would
+     * make it uncacheable for the sake of two numbers.
+     *
+     * 404, not 502, for a postcode that does not exist: the buyer typed
+     * something wrong and the honest answer is "no such postcode", not "we are
+     * broken". 502 is reserved for the geocoder itself being unreachable, and
+     * the client keeps the filter usable either way.
+     */
+    if (req.method === 'GET' && pathname === '/api/geocode') {
+      try {
+        const place = await resolved.geocodePostcode(searchParams.get('postcode'));
+        if (!place) return sendJson(res, 404, { error: 'No such postcode' });
+        return sendJson(res, 200, place);
+      } catch (err) {
+        console.warn('[geocode] lookup failed:', err?.message);
+        return sendJson(res, 502, { error: 'Postcode lookup temporarily unavailable' });
       }
     }
 
