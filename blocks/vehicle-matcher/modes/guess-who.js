@@ -1160,6 +1160,12 @@ function mount(root, ctx) {
     if (keep.length === 1 && !state.won && !reducedMotion) {
       state.won = true;
       celebrate(shell, { brand: ctx.brand });
+      // celebrate() has no teardown of its own, because the two game modes that
+      // wrote it throw their host away when the round ends. This shell lives for
+      // the whole session and a buyer can arrive at one car, relax a filter and
+      // arrive again, so bin the spent layer rather than stacking them up.
+      const layer = shell.lastElementChild;
+      window.setTimeout(() => layer.remove(), CONFETTI_MS);
     }
     if (keep.length !== 1) state.won = false;
   };
