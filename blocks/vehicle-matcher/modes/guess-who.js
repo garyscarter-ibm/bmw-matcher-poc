@@ -1657,10 +1657,11 @@ function mount(root, ctx) {
 
   const reset = () => {
     bank();
-    state.axes.forEach((axis) => {
-      if (axis.q.type === 'slider') state.filters[axis.key] = [axis.q.min, axis.q.max];
-      else state.filters[axis.key] = [];
-    });
+    // Each axis puts its own filter back, because only the axis knows what "not
+    // filtering" looks like for it: a full-width range for the sliders, an empty
+    // array for the multi-picks, and no postcode at all for distance, which owns
+    // two fields under one chip and neither of them is an array.
+    state.axes.forEach((axis) => axis.clear());
     state.out = new Set();
     closePop();
     render();
