@@ -815,8 +815,8 @@ function mount(root, ctx) {
       axes.push({
         key: 'mileage',
         q,
-        wide: () => !f.mileage.length,
-        summary: () => bandsPresent.filter((b) => f.mileage.includes(b.id)).map(bandLabel).join(', '),
+        narrowed: () => f.mileage.length > 0,
+        summary: () => ticked(q.options, f.mileage),
         build: (host) => host.append(renderOptionList(q, f, { onChange: filtersChanged }).list),
         test: () => {
           if (!f.mileage.length) return null;
