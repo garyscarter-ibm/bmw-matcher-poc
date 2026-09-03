@@ -496,7 +496,7 @@ const GUESS_WHO_COPY = {
     },
     postcode: {
       unknown: 'We don’t recognise that postcode.',
-      failed: 'We couldn’t check that just now. Try again in a moment.',
+      failed: 'We couldn’t check that just now. Please try again shortly.',
     },
     errKicker: 'Sorry',
     errTitle: 'We couldn’t reach the stock',
