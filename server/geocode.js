@@ -110,8 +110,11 @@ const inflight = new Map();
  */
 export function geocodePostcode(input) {
   const key = normalise(input);
-  const outcodeOnly = !FULL.test(key) && OUTCODE.test(key);
-  if (!FULL.test(key) && !outcodeOnly) return Promise.resolve(null);
+  // A full postcode wins where both could match, because it is the more precise
+  // reading of the same characters.
+  const full = FULL.test(key);
+  const outcodeOnly = !full && OUTCODE.test(key);
+  if (!full && !outcodeOnly) return Promise.resolve(null);
   if (cache.has(key)) return Promise.resolve(cache.get(key));
   if (inflight.has(key)) return inflight.get(key);
 
