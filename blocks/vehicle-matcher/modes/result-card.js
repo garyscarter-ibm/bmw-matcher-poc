@@ -166,9 +166,19 @@ export function mediaWell(car, extraClass = '') {
  * One result card.
  * `big` adds the "why it suits you" reasons; `compact` is the carousel tile —
  * same anatomy, but trades the blurb and reasons for a distance line.
+ *
+ * `showScore` and `showPaint` exist for the hard-filter mode (modes/guess-who.js),
+ * which is not a recommender:
+ *  - showScore: false — there is no score. A hard filter says yes or no, so a
+ *    badge would either print "undefined%" or invent a 100% the engine never
+ *    awarded. Every scoring mode leaves it alone and keeps its badge.
+ *  - showPaint: true — put the paint in a COMPACT card's spec line, which it
+ *    normally omits for width. A mode whose whole premise is filtering by colour
+ *    has to name the colour on the cars it filtered down to.
  */
 export function matchCard(match, {
   big = false, compact = false, brand: brandKey = 'bmw',
+  showScore = true, showPaint = false,
   rejectOptions, rejectLabel, rejectPrompt,
 } = {}) {
   const { car, score, reasons } = match;
