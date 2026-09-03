@@ -843,9 +843,8 @@ function mount(root, ctx) {
       axes.push({
         key: 'features',
         q,
-        wide: () => !f.features.length,
-        summary: () => featureOptions.filter((o) => f.features.includes(o.value))
-          .map((o) => o.label).join(', '),
+        narrowed: () => f.features.length > 0,
+        summary: () => ticked(featureOptions, f.features),
         build: (host) => host.append(renderOptionList(q, f, { onChange: filtersChanged }).list),
         test: () => {
           if (!f.features.length) return null;
