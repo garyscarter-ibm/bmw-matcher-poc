@@ -296,7 +296,52 @@ function thumbnail(url) {
   return url.replace('{resize}', 'w160');
 }
 
-function publicPool(brand, cars) {
+/**
+ * Where each retailer in the `retailers` dictionary is, as two arrays aligned
+ * with THAT dictionary rather than with the cars: `lat[retailer[i]]` is car i's
+ * site. One entry per retailer (130 for BMW, 121 for MINI) instead of one per
+ * car is the whole reason it is shaped this way — a per-car coordinate pair
+ * would be 12,000 of each for 130 distinct values.
+ *
+ * Hung off `retailers` and not `retailerId` deliberately. For BMW and MINI the
+ * two are interchangeable (measured: 130 ids to 130 names, and 121 to 121), but
+ * every other brand carries a single brand-wide id string against real
+ * per-listing names — Ferrari has 1 id and 15 names — so keying on the id would
+ * collapse fifteen dealers into one place and make the filter lie.
+ *
+ * `directory` is the dealer directory (dealers.js), or null when it could not be
+ * fetched. Null coordinates are an ordinary outcome, not a failure: they mean
+ * this retailer's site could not be located, and the client drops those cars
+ * from the proximity filter exactly as it drops colourless cars from the colour
+ * filter. Notably every car is in that state until a national walk has run since
+ * `dealerNumber` was added to mapVehicle, because the cached and committed pools
+ * predate the field.
+ *
+ * Rounded to 4 decimal places — about 11 metres, against a filter whose
+ * narrowest band is ten miles. It halves the bytes for precision no-one could
+ * act on.
+ */
+function siteCoords(cars, retailers, retailer, directory) {
+  const lat = new Array(retailers.length).fill(null);
+  const lon = new Array(retailers.length).fill(null);
+  if (!directory) return { lat, lon };
+
+  const round = (n) => Math.round(n * 1e4) / 1e4;
+  for (let i = 0; i < cars.length; i += 1) {
+    const at = retailer[i];
+    // First car that locates this retailer wins. Not simply the first car of the
+    // retailer: the feed omits dealer_number on some rows (see mapVehicle), so
+    // an unlocated slot has to stay open to the next car that might fill it.
+    if (lat[at] !== null) continue;
+    const site = directory.get(String(cars[i].dealerNumber ?? ''));
+    if (!Number.isFinite(site?.latitude) || !Number.isFinite(site?.longitude)) continue;
+    lat[at] = round(site.latitude);
+    lon[at] = round(site.longitude);
+  }
+  return { lat, lon };
+}
+
+function publicPool(brand, cars, directory = null) {
   // Only the concepts this pool actually contains, so the bitmask stays as
   // narrow as possible and the client's filter list has no dead options.
   const featureKeys = [...new Set(cars.flatMap((c) => c.features || []))].sort();
