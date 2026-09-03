@@ -988,6 +988,7 @@ function mount(root, ctx) {
           return a === 0 ? `Up to ${upper}` : `${a}–${b} yrs`;
         },
         build: (host) => renderRangeSlider(host, q, f, { onChange: filtersChanged }),
+        clear: () => { f.age = [0, maxAge]; },
         test: () => {
           const [a, b] = f.age;
           if (a <= 0 && b >= maxAge) return null;
