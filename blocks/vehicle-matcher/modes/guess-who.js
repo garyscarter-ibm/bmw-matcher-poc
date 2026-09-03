@@ -1026,6 +1026,7 @@ function mount(root, ctx) {
         narrowed: () => f[key].length > 0,
         summary: () => ticked(options, f[key]),
         build: (host) => host.append(renderOptionList(q, f, { onChange: filtersChanged }).list),
+        clear: () => { f[key] = []; },
         test: () => {
           if (!f[key].length) return null;
           // A lookup by dictionary index beats a Set of strings in the inner
