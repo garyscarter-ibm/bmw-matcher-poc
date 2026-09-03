@@ -434,7 +434,7 @@ const GUESS_WHO_COPY = {
       mileage: 'How many miles, roughly?',
       age: 'How old can it be?',
       colour: 'Which colours suit you?',
-      place: 'Where are you looking from?',
+      place: 'Where are you riding from?',
     },
     anySummary: 'Any',
     rejectLabel: 'Not this one',
