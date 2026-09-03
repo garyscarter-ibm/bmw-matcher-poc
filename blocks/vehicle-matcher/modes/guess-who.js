@@ -1057,6 +1057,7 @@ function mount(root, ctx) {
         narrowed: () => f.seats.length > 0,
         summary: () => ticked(q.options, f.seats, (o) => String(o.value)),
         build: (host) => host.append(renderOptionList(q, f, { onChange: filtersChanged }).list),
+        clear: () => { f.seats = []; },
         test: () => {
           if (!f.seats.length) return null;
           const want = new Set(f.seats);
