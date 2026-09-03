@@ -1517,7 +1517,7 @@ function mount(root, ctx) {
       const capped = carAge - 1;
       if (capped >= f.age[0] && capped < f.age[1]) {
         out.push({
-          label: copy.reject.age({ years: `${capped} yrs` }),
+          label: copy.reject.age({ years: ageCapPhrase(capped) }),
           apply: () => setAxis('age', [f.age[0], capped]),
         });
       }
