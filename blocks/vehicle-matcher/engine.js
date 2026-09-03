@@ -162,6 +162,29 @@ export async function apiPool(base, brandKey) {
 }
 
 /**
+ * One postcode to one point on the map, for the hard-filter mode's proximity
+ * axis. Takes a full postcode or just the outward code ("NG1"), and echoes back
+ * the canonical spelling so the UI can show it understood.
+ *
+ * The two failure modes are deliberately different values rather than one, because
+ * the buyer needs to be told different things: `null` is "no such postcode", which
+ * is about what they typed, and a THROW is "we couldn't ask", which is not their
+ * fault and shouldn't be phrased as though it were. The pool is already loaded by
+ * the time anyone types here, so neither ends the mode.
+ *
+ * @returns {Promise<{postcode, latitude, longitude} | null>}
+ */
+export async function apiGeocode(base, postcode) {
+  const url = new URL(`${base}/api/geocode`);
+  url.searchParams.set('postcode', postcode);
+  const res = await fetch(url, { headers: authHeaders() });
+  if (res.status === 401) onUnauthorized();
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Postcode lookup failed (${res.status})`);
+  return res.json();
+}
+
+/**
  * The game modes' field — the roster a swipe deck or a knockout bracket plays.
  * Sibling to apiPreview, not a replacement: it reads the SAME engine over the
  * SAME retailer stock, but asks for a wider slice (`size`, up to the server's
