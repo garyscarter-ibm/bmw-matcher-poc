@@ -1518,7 +1518,7 @@ function mount(root, ctx) {
       out.push({ label: label(opt), apply: () => setAxis(key, next) });
     };
     dictReject('fuel', (o) => copy.reject.fuel({ fuel: o.label.toLowerCase() }));
-    dictReject('body', (o) => copy.reject.body({ body: o.label.toLowerCase() }));
+    dictReject('body', (o) => copy.reject.body({ body: withArticle(o.label) }));
     dictReject('colour', (o) => copy.reject.colour({ shade: o.label.toLowerCase() }));
 
     // Too many miles → keep only the bands below this car's.
