@@ -405,8 +405,8 @@ const GUESS_WHO_COPY = {
       just: 'Just not for me',
     },
     postcode: {
-      unknown: 'We don’t recognise that postcode.',
-      failed: 'We couldn’t check that just now. Try again in a moment.',
+      unknown: 'That postcode doesn’t look right to us. Have another go.',
+      failed: 'Couldn’t check that just now. Give it another go.',
     },
     errKicker: 'Sorry',
     errTitle: 'We couldn’t reach the stock',
