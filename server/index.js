@@ -808,6 +808,28 @@ export function buildServer(deps = {}) {
       });
     }
 
+    /*
+     * The whole pool, for the hard-filter mode (see publicPool).
+     *
+     * A GET, unlike the other stock endpoints, because it takes no answers —
+     * there is nothing to score, only stock to hand over. That also makes it
+     * cacheable, which matters for a payload this size.
+     *
+     * Serves whatever the pool currently is, including a stale one, exactly as
+     * fetchRetailerStock does: a mode whose entire premise is "here is every
+     * car" must not 502 because a refresh is mid-flight.
+     */
+    if (req.method === 'GET' && pathname === '/api/pool') {
+      const brand = normalizeBrand(searchParams.get('brand'));
+      try {
+        const cars = await resolved.fetchRetailerStock(brand, searchParams.get('retailer') || undefined);
+        return sendJson(res, 200, publicPool(brand, cars));
+      } catch (err) {
+        console.warn('[pool] stock unavailable:', err?.message);
+        return sendJson(res, 502, { error: 'Stock temporarily unavailable' });
+      }
+    }
+
     if (req.method === 'POST' && pathname === '/api/match') {
       return handleMatch(req, res, resolved);
     }
