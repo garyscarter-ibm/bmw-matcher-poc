@@ -968,6 +968,11 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     // Ferrari runs live too (its cold ~15-page walk is ~50s), so it's primed at
     // boot for the same reason as Motorrad: the first Ferrari visitor must not
     // pay that walk on the request path.
+    // The dealer directory rides along for the same reason, and more sharply:
+    // it is a ~2MB response from someone else's server that its own module
+    // forbids on a request path, and /api/pool now needs it to say where each
+    // retailer is. Memoised for the process lifetime, so this is the only fetch
+    // of it; failing here just leaves the proximity filter unavailable.
     Promise.allSettled([
       fetchRetailerStock('bmw'), fetchNearbyStock('bmw'),
       fetchRetailerStock('mini'), fetchNearbyStock('mini'),
@@ -975,6 +980,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       fetchRetailerStock('ford'),
       fetchRetailerStock('motorrad'),
       fetchRetailerStock('ferrari'),
+      fetchDealerDirectory(),
     ]).then((r) => {
       const failed = r.filter((x) => x.status === 'rejected');
       if (failed.length) {
