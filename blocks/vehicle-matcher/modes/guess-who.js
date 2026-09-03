@@ -568,8 +568,6 @@ function focusablesIn(host) {
 /** The hex for a normalised paint name, or null. Same table the cards use. */
 const hexOf = (shade) => SWATCH_HEX[(shade || '').toLowerCase()] || null;
 
-const cap1 = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
-
 /* ------------------------------- mount ------------------------------- */
 
 function mount(root, ctx) {
