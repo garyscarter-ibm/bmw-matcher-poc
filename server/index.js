@@ -41,6 +41,8 @@ import {
   QUESTIONS, BUDGET_BANDS, questionsForBrand, applyBespokeAnswers,
 } from './questions.js';
 import { normalizeBrand, brandTuning } from './brands.js';
+import { fetchDealerDirectory } from './dealers.js';
+import { geocodePostcode } from './geocode.js';
 
 const PORT = Number(process.env.PORT) || 8787;
 const MAX_BODY_BYTES = 16 * 1024; // quiz answers are tiny; reject anything bigger
