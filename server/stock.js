@@ -1370,3 +1370,241 @@ export async function enrichColours(brand, cars, budgetMs = COLOUR_BUDGET_MS) {
   }
   return cars;
 }
+
+/* --------------------- persisted colour, and the warm pass ------------- *
+ * enrichColours above is the request-path story: colour the handful of cars
+ * about to be shown, inside a 4.5s budget. That is right for a ranked page
+ * showing five cars and useless for the Guess Who mode, which offers colour as
+ * a HARD FILTER over the whole national pool — a filter that only knows the
+ * paint of cars someone happened to look at is a filter that hides stock.
+ *
+ * So colour gets acquired up front instead, for every car in the pool, by a
+ * background pass slow enough to be a good guest. Two properties make that
+ * affordable where it would otherwise be absurd:
+ *
+ *   - Paint is immutable per advert. A car coloured once is coloured forever,
+ *     so the expensive pass runs ONCE and every later sweep is a small delta of
+ *     adverts that appeared since — minutes, not hours.
+ *   - The cost is per advert, not per pool. Keying the store by advert id means
+ *     a car that moves between dealers, or drops out of the feed and returns,
+ *     is already known.
+ *
+ * Deliberately slow: COLOUR_WARM_DELAY_MS is one request per second, serial,
+ * no concurrency. That is ~4h20m for the first full BMW+MINI pass (12,012 +
+ * 3,537 adverts) and roughly 40× under the burst rate that first drew a 429
+ * from this platform. The slowness is the feature — the alternative is looking
+ * like a scraper to someone else's infrastructure. Do not "optimise" it.
+ *
+ * Cars whose colour is still unknown are simply excluded from the colour filter
+ * while it is in use, and nothing in the UI says "still cataloguing": a caveat
+ * would cost more user confidence than the missing cars cost.
+ * ---------------------------------------------------------------------- */
+
+const colourSidecarPath = (brand) => join(NATIONAL_INDEX_DIR, `colours-${brand}.json`);
+
+/*
+ * Colour lives in its own file rather than inside the national index, because
+ * the two have completely different lifetimes. The index is rewritten wholesale
+ * by every feed walk (see refreshNational); colour takes hours to gather. Baked
+ * into the index it would be destroyed by the next refresh, so the warm pass
+ * could never get ahead of the walker. Keyed separately by advert id, it simply
+ * survives.
+ */
+
+/** Load a brand's persisted colours into the in-memory map. Never throws — a
+ *  missing or corrupt sidecar just means the warm pass has more to do. Returns
+ *  how many entries were adopted. */
+function readColourSidecar(brand) {
+  try {
+    const snap = JSON.parse(readFileSync(colourSidecarPath(brand), 'utf8'));
+    const entries = Object.entries(snap?.byAdvert || {});
+    let n = 0;
+    for (const [id, colour] of entries) {
+      // Don't clobber anything already learned this process, and don't re-adopt
+      // soft misses — they serialise as `false` precisely so a restart retries
+      // them rather than inheriting a stale failure.
+      if (colourByAdvert.has(id)) continue;
+      if (colour === false) continue;
+      colourByAdvert.set(id, colour);
+      n += 1;
+    }
+    return n;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Persist what we know about one brand's colours.
+ *
+ * Written from the brand's CURRENT pool rather than from the whole in-memory
+ * map, which both scopes the file to one brand (the map is shared, keyed by
+ * advert id alone) and prunes it: adverts that have left the feed stop being
+ * written, so the sidecar stays proportional to the stock instead of growing
+ * forever. Temp-file-and-rename, like the index, so a crash can't leave a
+ * half-written file for the next boot to adopt.
+ */
+function writeColourSidecar(brand, cars) {
+  const byAdvert = {};
+  for (const car of cars) {
+    if (!car?.id) continue;
+    const id = String(car.id);
+    if (!colourByAdvert.has(id)) continue;
+    const hit = colourByAdvert.get(id);
+    // `false` marks a soft miss: recorded so the file is a complete picture of
+    // what was attempted, but read back as "ask again" (see readColourSidecar).
+    byAdvert[id] = hit === COLOUR_SOFT_MISS ? false : hit;
+  }
+  const path = colourSidecarPath(brand);
+  const tmp = `${path}.tmp`;
+  try {
+    mkdirSync(NATIONAL_INDEX_DIR, { recursive: true });
+    writeFileSync(tmp, JSON.stringify({ at: Date.now(), brand, byAdvert }));
+    renameSync(tmp, path);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`[colour] could not persist ${brand} colours:`, err?.message);
+  }
+}
+
+// One request per second, serial. See the block comment above before changing.
+const COLOUR_WARM_DELAY_MS = Number(process.env.COLOUR_WARM_DELAY_MS) || 1000;
+
+// Flush the sidecar every N fetches. Small enough that a restart loses seconds
+// of work rather than hours; large enough not to rewrite a 12k-entry file every
+// second. At 1 req/s this is a write every ~3 minutes.
+const COLOUR_FLUSH_EVERY = Number(process.env.COLOUR_FLUSH_EVERY) || 200;
+
+// How long to wait before sweeping a brand again once it's fully coloured.
+// Nothing to do but pick up adverts new since the last pass, so this is a
+// delta-sized job — cheap, and hourly is ample for used-car stock.
+const COLOUR_SWEEP_IDLE_MS = Number(process.env.COLOUR_SWEEP_IDLE_MS) || 60 * 60 * 1000;
+
+let colourWarmRunning = false;
+let colourWarmStop = false;
+
+/** Adverts in this pool we still have no definitive answer for, soft misses
+ *  included (a soft miss is a failure to ask, so the warmer re-asks). */
+function uncolouredIn(cars) {
+  return cars.filter((c) => {
+    if (!c?.id) return false;
+    const id = String(c.id);
+    return !colourByAdvert.has(id) || colourByAdvert.get(id) === COLOUR_SOFT_MISS;
+  });
+}
+
+/** Progress for one brand: how much of its pool has a known colour. */
+export function colourCoverage(brand) {
+  const b = normalizeBrand(brand);
+  const cars = cacheByRetailer.get(keyFor(b, 'national'))?.cars || [];
+  let known = 0;
+  for (const car of cars) {
+    const hit = car?.id != null ? colourByAdvert.get(String(car.id)) : undefined;
+    if (hit && hit !== COLOUR_SOFT_MISS) known += 1;
+  }
+  return { total: cars.length, known, pending: uncolouredIn(cars).length };
+}
+
+/**
+ * One pass over a brand's pool, colouring what isn't known yet.
+ *
+ * Returns when the pool is exhausted or the warmer is stopped. Every failure is
+ * swallowed: this is a background nicety and must never take the process down.
+ */
+async function colourSweep(brand) {
+  const { origin, source } = brandConfig(brand);
+  // Same exclusions enrichColours makes: these brands have no PDP on this
+  // origin to read paint from (fixtures point at the real brand site; Motorrad
+  // and Honda already carry colour by the time they're mapped).
+  if (source === 'fixtures' || source === 'live-motorrad' || source === 'live-honda') return;
+
+  const cars = cacheByRetailer.get(keyFor(brand, 'national'))?.cars;
+  if (!cars?.length) return; // pool not walked yet — try again next tick
+
+  const todo = uncolouredIn(cars);
+  if (!todo.length) return;
+
+  // eslint-disable-next-line no-console
+  console.log(`[colour] ${brand}: ${todo.length} of ${cars.length} adverts need colour`
+    + ` (~${Math.round((todo.length * COLOUR_WARM_DELAY_MS) / 60000)} min at ${COLOUR_WARM_DELAY_MS}ms each)`);
+
+  let done = 0;
+  for (const car of todo) {
+    if (colourWarmStop) break;
+    const id = String(car.id);
+    // Clear a previous soft miss so fetchColour actually re-asks rather than
+    // returning the cached failure.
+    if (colourByAdvert.get(id) === COLOUR_SOFT_MISS) colourByAdvert.delete(id);
+    // eslint-disable-next-line no-await-in-loop
+    const colour = await fetchColour(origin, id);
+    // Paint the in-memory car too, so the pool being served gains colour as the
+    // pass proceeds rather than only after the next feed walk.
+    if (colour) car.colour = colour;
+    done += 1;
+    if (done % COLOUR_FLUSH_EVERY === 0) {
+      writeColourSidecar(brand, cars);
+      // eslint-disable-next-line no-console
+      console.log(`[colour] ${brand}: ${done}/${todo.length} fetched`);
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await sleep(COLOUR_WARM_DELAY_MS);
+  }
+  writeColourSidecar(brand, cars);
+  const { known, total } = colourCoverage(brand);
+  // eslint-disable-next-line no-console
+  console.log(`[colour] ${brand}: pass complete — ${known}/${total} coloured`);
+}
+
+/**
+ * Start the background colour warm pass.
+ *
+ * Loads whatever previous runs persisted, then sweeps each feed brand in turn,
+ * forever, sleeping COLOUR_SWEEP_IDLE_MS between complete rounds. Serial across
+ * brands as well as within them, so the one-request-per-second budget is the
+ * whole process's, not per brand.
+ *
+ * Idempotent. Call once from server boot — NOT on import, so tests and tooling
+ * never fire thousands of requests at someone else's site.
+ *
+ * @returns {() => void} a stop function
+ */
+export function startColourWarmer() {
+  if (colourWarmRunning) return () => stopColourWarmer();
+  colourWarmRunning = true;
+  colourWarmStop = false;
+
+  const brands = ['bmw', 'mini'];
+  for (const brand of brands) {
+    const n = readColourSidecar(brand);
+    if (n) {
+      // eslint-disable-next-line no-console
+      console.log(`[colour] ${brand}: adopted ${n} known colours from disk`);
+    }
+  }
+
+  (async () => {
+    while (!colourWarmStop) {
+      for (const brand of brands) {
+        if (colourWarmStop) break;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await colourSweep(brand);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn(`[colour] ${brand} sweep failed:`, err?.message);
+        }
+      }
+      if (colourWarmStop) break;
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(COLOUR_SWEEP_IDLE_MS);
+    }
+    colourWarmRunning = false;
+  })();
+
+  return () => stopColourWarmer();
+}
+
+/** Stop the colour warmer after the in-flight fetch settles. */
+export function stopColourWarmer() {
+  colourWarmStop = true;
+}
