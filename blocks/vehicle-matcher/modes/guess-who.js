@@ -1863,6 +1863,28 @@ function mount(root, ctx) {
       }
     }
 
+    /*
+     * Too far → pull the radius in to the largest band that would leave this car
+     * outside it. Only offered once a postcode is set, because without one we
+     * genuinely don't know how far away anything is, and a menu line that means
+     * "first tell us where you live" is not a reason for turning down a car.
+     *
+     * Keyed on 'radius' rather than 'place' because that's the filter field the
+     * chip is built from; the axis owns two of them (see the place axis).
+     */
+    const place = axisFor('place');
+    if (place && f.origin) {
+      const away = place.milesTo(i);
+      const tighter = RADIUS_BANDS.filter((m) => m < away && m < f.radius);
+      const capped = tighter[tighter.length - 1];
+      if (capped) {
+        out.push({
+          label: copy.reject.place({ cap: capped }),
+          apply: () => setAxis('radius', capped),
+        });
+      }
+    }
+
     // The escape hatch. Not a filter, and deliberately last.
     out.push({
       label: copy.reject.just,
