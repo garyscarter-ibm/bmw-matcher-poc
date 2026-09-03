@@ -1345,7 +1345,7 @@ function mount(root, ctx) {
 
   const bank = () => {
     state.history.push(snapshot());
-    if (state.history.length > 24) state.history.shift();
+    if (state.history.length > HISTORY_MAX) state.history.shift();
   };
 
   const undo = () => {
