@@ -93,14 +93,18 @@ const SCREENS = 1.9;
 /*
  * When the survivors' reflow is worth animating (FLIP).
  *
- * Below FLIP_MIN_TRACK a card moves a few pixels and nobody sees it, while FLIP
- * measured 55 ms at 12px — all cost, no perceived movement — so the new layout
- * simply appears instead. FLIP_MAX_CELLS is the belt-and-braces half: chip stage
- * tops out around 1,500 cells on a 1440×900 screen and comfortably animates, but
- * a very large display could put several thousand in the same stage, and past a
- * point the honest trade is a still frame over a janky slide.
+ * Not at dot stage, at any track width. A dot is 9–44px, so it moves a few pixels
+ * into its new slot and nobody sees it — but there can be twelve thousand of them,
+ * and every one that moves takes an inline transform transition, which is a
+ * composited layer. Measured 55 ms of scripting at 12px for movement no-one can
+ * perceive, and BMW's electric-only cut lands at 1,953 dots, which is 1,953 layers
+ * for the same nothing. Above dot stage the movement is the whole point.
+ *
+ * FLIP_MAX_CELLS is the belt-and-braces half: chip stage tops out under a thousand
+ * cells on a 1440×900 screen and animates comfortably, but a very large display
+ * could put several thousand in the same stage, and past a point the honest trade
+ * is a still frame over a janky slide.
  */
-const FLIP_MIN_TRACK = 24;
 const FLIP_MAX_CELLS = 2000;
 
 /* ------------------------------- timings ------------------------------- */
