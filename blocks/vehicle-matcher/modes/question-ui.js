@@ -86,8 +86,8 @@ export function renderRangeSlider(list, q, answers, { onChange } = {}) {
     input.setAttribute('aria-valuetext', formatSliderValue(value, q));
     return input;
   };
-  const minInput = mkInput('vm-range-min', 'Minimum budget', lo);
-  const maxInput = mkInput('vm-range-max', 'Maximum budget', hi);
+  const minInput = mkInput('vm-range-min', `Minimum ${noun}`, lo);
+  const maxInput = mkInput('vm-range-max', `Maximum ${noun}`, hi);
 
   const span = q.max - q.min || 1;
   const paintFill = () => {
