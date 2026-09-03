@@ -136,6 +136,32 @@ export async function apiPreview(base, answers, retailer, brandKey, group = fals
 }
 
 /**
+ * The WHOLE pool for a brand, columnar, in one request — the hard-filter mode's
+ * only data call.
+ *
+ * Every other function here asks the engine to choose; this one asks for the
+ * unranked lot, because Guess Who eliminates rather than recommends and the user
+ * watches twelve thousand cars become nine. That has two consequences worth
+ * stating: the payload is columns with dictionaries rather than objects (377 KB
+ * gzip for BMW's 12,084 cars — see publicPool in server/index.js), and there is
+ * no second tier, so no filter interaction ever waits on the network.
+ *
+ * Deliberately NOT retailer-scoped: the mode's premise is "every car we have",
+ * and location is one of its own filters rather than a pre-applied narrowing.
+ *
+ * THROWS on failure, like apiGetQuestions and for the same reason — there is no
+ * degraded version of this mode. No pool, no board.
+ */
+export async function apiPool(base, brandKey) {
+  const url = new URL(`${base}/api/pool`);
+  if (brandKey) url.searchParams.set('brand', brandKey);
+  const res = await fetch(url, { headers: authHeaders() });
+  if (res.status === 401) onUnauthorized();
+  if (!res.ok) throw new Error(`Pool request failed (${res.status})`);
+  return res.json();
+}
+
+/**
  * The game modes' field — the roster a swipe deck or a knockout bracket plays.
  * Sibling to apiPreview, not a replacement: it reads the SAME engine over the
  * SAME retailer stock, but asks for a wider slice (`size`, up to the server's
