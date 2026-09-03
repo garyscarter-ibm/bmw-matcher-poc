@@ -1237,6 +1237,23 @@ export function stopStockWarmer() {
 const colourByAdvert = new Map();
 const colourInflight = new Map(); // advert_id -> Promise, single-flight
 
+/*
+ * A third state, between "known" and "never asked": the fetch itself failed —
+ * a timeout, a reset, a 502 — so we learned nothing about this car's paint.
+ *
+ * It matters because the two failures need opposite treatment. A 200 whose blob
+ * carries no colour is a fact: that advert has no paint on record and asking
+ * again is waste, so it caches as `null` forever. A transport error is not a
+ * fact about the car, and caching it as `null` would let one dropped connection
+ * exclude a car from the colour filter permanently — the silent-exclusion rule
+ * turns a blip into an invisible, undiagnosable gap in the pool.
+ *
+ * So a failure caches this sentinel instead. The request path treats it exactly
+ * like `null` (don't re-fetch while a user waits), but the warm pass clears it
+ * and tries again on its next sweep, where a second attempt costs nothing.
+ */
+const COLOUR_SOFT_MISS = Symbol('colour-soft-miss');
+
 // How many PDPs to fetch at once. Deliberately small — this runs while a user
 // waits, against a site we're a guest on.
 const COLOUR_CONCURRENCY = 4;
