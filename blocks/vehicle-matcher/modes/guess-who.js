@@ -1268,6 +1268,7 @@ function mount(root, ctx) {
     } else {
       axis.build(popBody);
     }
+    state.pop.building = false;
     pop.hidden = false;
     trigger.setAttribute('aria-expanded', 'true');
     placePop(trigger);
