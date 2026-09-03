@@ -35,6 +35,7 @@ import {
 } from './engine.js';
 import {
   fetchRetailerStock, fetchNearbyStock, startStockWarmer, StockUnavailableError, enrichColours,
+  startColourWarmer,
 } from './stock.js';
 import {
   QUESTIONS, BUDGET_BANDS, questionsForBrand, applyBespokeAnswers,
