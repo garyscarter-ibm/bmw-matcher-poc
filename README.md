@@ -209,6 +209,14 @@ The standalone `index.html` harness uses a `data-api` attribute + `?api=`
 override instead (no DA needed); `?retailer=<id>` tries a different retailer
 without editing the file. Both paths resolve through the same `apiBase()`.
 
+`?mode=<key>` and `?scope=dealer|national` are read straight from the query
+string by the block, so they override an authored row and need none of their own.
+That is what lets one deployed page demo both scopes: compare
+`?brand=mini&retailer=92&scope=dealer` with `?brand=mini&scope=national`. The
+harness re-derives **Retailer Name** from whichever brand and scope are in the
+URL, so its label always matches its pool; a real authored page sets the row by
+hand instead.
+
 Notes:
 - The block itself ships no dataset or weights — those stay behind the API.
 - Styles are scoped under `.vm` and won't fight your site's global CSS.
