@@ -907,13 +907,58 @@ export async function fetchRetailerStock(brand = 'bmw', retailerSite, scope) {
     return cachedFetch(cacheByRetailer, key, () => ferrariLiveStock());
   }
 
-  // BMW/MINI: the main pool is the WHOLE national feed, not `site`'s own
-  // forecourt — every retailer of the brand, one shared cache entry, so a
-  // MINI visitor configured with Sytner Luton and one configured with any
-  // other dealer see the same (much larger) candidate pool. `site` still
-  // matters elsewhere (resolveRetailerPostcode anchors the nearby carousel to
-  // it), just not for this fetch.
-  return nationalStock(b, origin);
+  /*
+   * BMW/MINI are the only brands with two genuinely different pools, so they're
+   * the only ones `scope` changes:
+   *
+   *   dealer   → `site`'s own forecourt (~100 cars, one page). The original
+   *              behaviour, and the default: a tool authored onto one
+   *              retailer's page must not silently answer for the whole country.
+   *   national → every retailer of the brand (~12k BMW / ~3.5k MINI),
+   *              stale-while-revalidate because the walk costs ~60s.
+   *
+   * The two cache under different keys ("bmw:96" vs "bmw:national"), so both
+   * stay hot at once and neither clobbers the other. `site` matters to the
+   * nearby carousel either way (resolveRetailerPostcode anchors distances to it).
+   */
+  if (sc === 'national') return nationalStock(b, origin);
+
+  const key = keyFor(b, site);
+  seenRetailers.set(key, { brand: b, retailerSite: site });
+  seenDealerPools.set(key, { brand: b, retailerSite: site });
+  return cachedFetch(cacheByRetailer, key, () => walkRetailerFeed(origin, b, site));
+}
+
+/** One retailer's own forecourt → mapped cars. A single dealer is ~100 cars, so
+ * this is 1–2 pages and cheap enough to sit on the request path (unlike the
+ * national walk). Paginates for the rare large dealer; same politeness delay. */
+async function walkRetailerFeed(origin, brand, retailerSite) {
+  const query = byRetailerQuery(retailerSite);
+  let vehicles;
+  try {
+    const first = await fetchPageWithRetry(origin, query, 1);
+    vehicles = [...(first.results || [])];
+    const totalPages = Math.min(first.pagination?.total || 1, RETAILER_PAGE_LIMIT);
+    for (let page = 2; page <= totalPages; page += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(NATIONAL_PAGE_DELAY_MS);
+      // eslint-disable-next-line no-await-in-loop
+      const next = await fetchPageWithRetry(origin, query, page);
+      vehicles.push(...(next.results || []));
+    }
+  } catch (err) {
+    if (err instanceof StockUnavailableError) throw err;
+    throw new StockUnavailableError('Live stock fetch failed', { cause: err });
+  }
+
+  const cars = vehicles.map((v) => mapVehicle(v, brand)).filter(Boolean);
+  if (cars.length === 0) {
+    // Names the site, because by far the likeliest cause is a retailer_site ID
+    // that doesn't exist — a misconfigured embed, not an outage. The API turns
+    // this into a 502 whose message says which ID drew a blank.
+    throw new StockUnavailableError(`Live feed returned no usable vehicles for retailer_site=${retailerSite}`);
+  }
+  return cars;
 }
 
 /** One full walk of a brand's national feed → mapped cars. ~60s, throttle-bound
