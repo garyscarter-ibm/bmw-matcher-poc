@@ -87,6 +87,34 @@ test('mapVehicle(mini) resolves a MINI spec, body and MINI PDP link', () => {
   assert.match(car.link, /approvedusedminis\.co\.uk\/vehicle\/202500002/);
 });
 
+/*
+ * dealerNumber is the join key the distance filter hangs off, and it is the kind
+ * of field that breaks silently: `retailer_site` carries no postcode and no
+ * coordinates, so this number is the only route from "which site sells this car"
+ * to "where that site is" (see dealers.js, indexed on exactly this). Drop it and
+ * nothing throws — every retailer simply becomes unlocated, the pool ships null
+ * coordinates, and Guess Who quietly hides its Distance chip. A test is the only
+ * thing that would notice.
+ */
+test('mapVehicle carries the dealer_number through, and tolerates a feed row without one', () => {
+  assert.equal(mapVehicle(bmwVehicle, 'bmw').dealerNumber, '11107');
+  assert.equal(mapVehicle(miniVehicle, 'mini').dealerNumber, '15127');
+
+  // Some live rows omit it (resolveRetailerPostcode in stock.js scans for the
+  // first that has one), so absent must be undefined rather than a crash or a
+  // string like "undefined" that would then miss in the directory.
+  const noDealer = mapVehicle(
+    { ...bmwVehicle, retailer_site: { id: 96, name: 'Grassicks BMW' } },
+    'bmw',
+  );
+  assert.equal(noDealer.dealerNumber, undefined);
+  assert.equal(noDealer.retailerName, 'Grassicks BMW', 'the rest of the car still maps');
+
+  // And a row with no retailer_site at all.
+  const noSite = mapVehicle({ ...bmwVehicle, retailer_site: undefined }, 'bmw');
+  assert.equal(noSite.dealerNumber, undefined);
+});
+
 test('mapVehicle(mini) maps ELECTRIC fuel and an electric line', () => {
   const car = mapVehicle(miniElectric, 'mini');
   assert.equal(car.fuel, 'ev');
@@ -125,29 +153,45 @@ test('the budget slider is capped lower for MINI than for BMW', () => {
   assert.ok(lo >= miniBudget.min && hi <= miniBudget.max, 'MINI default is inside its range');
 });
 
-test('MINI copy differs from BMW in words but keeps identical option values', () => {
+test('MINI copy differs from BMW in words, and narrows option values without inventing any', () => {
   const bmw = questionsForBrand('bmw');
   const mini = questionsForBrand('mini');
   const bmwById = Object.fromEntries(bmw.map((q) => [q.id, q]));
   const miniById = Object.fromEntries(mini.map((q) => [q.id, q]));
 
-  // Titles are reworded for MINI (e.g. budget, priorities).
-  assert.notEqual(miniById.budget.title, bmwById.budget.title);
-  assert.notEqual(miniById.priorities.title, bmwById.priorities.title);
+  // What MINI still shares with BMW, pinned so the surgery below can't quietly
+  // change which questions this test is even talking about.
+  const shared = mini.filter((q) => bmwById[q.id]).map((q) => q.id);
+  assert.deepEqual(shared, ['budget', 'bodyStyles', 'fuel', 'charging'],
+    'MINI keeps four of the shared pool; the rest is dropped or replaced bespoke');
 
-  // But every option VALUE is unchanged for questions common to both brands
-  // (style is MINI-dropped, so it's not in this list), so the scoring engine
-  // sees the same answer space where a question is shared.
-  for (const id of ['primaryUse', 'people', 'priorities', 'charging']) {
-    const bmwVals = (bmwById[id].options || []).map((o) => o.value).sort();
-    const miniVals = (miniById[id].options || []).map((o) => o.value).sort();
-    assert.deepEqual(miniVals, bmwVals, `${id} option values must match across brands`);
+  // Every one of them is reworded in MINI's voice.
+  for (const id of shared) {
+    assert.notEqual(miniById[id].title, bmwById[id].title, `${id} title is reworded for MINI`);
   }
-  // A reworded label actually changed (primaryUse value 'fun') while its value held.
-  const miniFun = miniById.primaryUse.options.find((o) => o.value === 'fun');
-  const bmwFun = bmwById.primaryUse.options.find((o) => o.value === 'fun');
-  assert.notEqual(miniFun.label, bmwFun.label);
-  assert.match(miniFun.sub, /go-kart/i);
+
+  // Option VALUES may narrow but must never widen. optionsOverride cuts the
+  // shapes and fuels MINI doesn't sell, so the sets are NOT equal across brands
+  // — but a MINI-only value would reach a scorer that has no case for it and
+  // score as nothing at all. So the invariant is subset-of-BMW, not equal-to.
+  for (const id of shared) {
+    const bmwVals = new Set((bmwById[id].options || []).map((o) => o.value));
+    const invented = (miniById[id].options || []).map((o) => o.value)
+      .filter((v) => !bmwVals.has(v));
+    assert.deepEqual(invented, [], `${id} must not invent values BMW's engine can't score`);
+  }
+
+  // And the narrowing is real, not just permitted.
+  const miniBody = miniById.bodyStyles.options.map((o) => o.value);
+  assert.ok(!miniBody.includes('saloon') && !miniBody.includes('coupe') && !miniBody.includes('mpv'),
+    'MINI drops the shapes it does not sell');
+  assert.ok(!miniById.fuel.options.map((o) => o.value).includes('diesel'), 'MINI drops diesel');
+
+  // A reworded label actually changed while its value held.
+  const miniHatch = miniById.bodyStyles.options.find((o) => o.value === 'hatchback');
+  const bmwHatch = bmwById.bodyStyles.options.find((o) => o.value === 'hatchback');
+  assert.notEqual(miniHatch.label, bmwHatch.label);
+  assert.match(miniHatch.label, /classic hatch/i);
 });
 
 test('questionsForBrand(bmw) keeps the full option set', () => {
@@ -286,17 +330,24 @@ test('annual mileage changes the ranking (efficient cars rise at high mileage)',
 
 /* ---- bespoke per-brand question ---- */
 
-test('MINI question surgery: drops mileage/style, adds doors + miniVibe; BMW keeps its full set', () => {
+test('MINI question surgery: drops five, adds doors + miniVibe; BMW keeps its full set', () => {
   const mini = questionsForBrand('mini');
   const ids = mini.map((q) => q.id);
-  // Dropped for MINI (dead against its range), kept for BMW.
-  assert.ok(!ids.includes('mileage'), 'MINI drops mileage');
-  assert.ok(!ids.includes('style'), 'MINI drops style (folded into miniVibe)');
   const bmwIds = questionsForBrand('bmw').map((q) => q.id);
-  assert.ok(bmwIds.includes('mileage') && bmwIds.includes('style'), 'BMW keeps both');
-  // Added for MINI: doors right after bodyStyles, miniVibe after people.
-  assert.equal(ids.indexOf('doors'), ids.indexOf('bodyStyles') + 1, 'doors follows bodyStyles');
-  assert.equal(ids.indexOf('miniVibe'), ids.indexOf('people') + 1, 'miniVibe follows people');
+  // Dropped for MINI (dead or near-dead against its range), kept for BMW.
+  const dropped = ['mileage', 'style', 'primaryUse', 'people', 'priorities'];
+  for (const id of dropped) {
+    assert.ok(!ids.includes(id), `MINI drops ${id}`);
+    assert.ok(bmwIds.includes(id), `BMW keeps ${id}`);
+  }
+  // Added for MINI. Both declare insertAfter: 'charging' — the last shared
+  // question — so the bespoke pair closes the flow. Note the rendered order is
+  // the REVERSE of the declaration order in brands.js: each insert lands
+  // immediately after its anchor and pushes the previous one down, so `doors`
+  // (declared first) ends up last. Assert the order the client actually gets.
+  assert.equal(ids.indexOf('miniVibe'), ids.indexOf('charging') + 1, 'miniVibe follows charging');
+  assert.equal(ids.indexOf('doors'), ids.indexOf('miniVibe') + 1, 'doors follows miniVibe');
+  assert.equal(ids.at(-1), 'doors', 'doors is the last question MINI asks');
   assert.ok(!bmwIds.includes('doors') && !bmwIds.includes('miniVibe'), 'BMW has neither');
   // scoresAs is engine-internal and must never cross to the client.
   for (const o of mini.find((q) => q.id === 'miniVibe').options) {

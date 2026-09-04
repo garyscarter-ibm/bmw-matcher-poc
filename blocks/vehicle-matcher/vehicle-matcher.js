@@ -97,10 +97,15 @@ function copyOverrides(block) {
 
 const DEFAULT_RETAILER_NAME = 'our retailer network';
 
-/** Retailer display name for this block instance: authored "Retailer Name"
- * config row. Required alongside Retailer ID so the copy can name the
- * retailer the stock is actually sourced from; falls back to a generic
- * phrase (and warns) if the page author forgot to set it. */
+/** Display name for the pool this block searched: authored "Retailer Name"
+ * config row. Required alongside Retailer ID so the copy can name where the
+ * stock actually came from — which is a question of Scope, and the reason the
+ * two rows have to be authored together. At dealer scope the pool IS the branch,
+ * so this is its name ("Grassicks Garage"). At national scope stock.js walks the
+ * whole feed, so no branch is the truthful answer: name the programme instead
+ * ("BMW Approved Used") and let each car's own card name the dealer holding it.
+ * Falls back to a generic phrase (and warns) if the page author forgot to set
+ * it. */
 function retailerName(block) {
   const config = readBlockConfig(block);
   const name = config['retailer-name'];
@@ -131,6 +136,31 @@ function brand(block) {
 }
 
 /**
+ * Which stock pool this block searches:
+ *   - 'dealer'   — the Retailer ID's own forecourt;
+ *   - 'national' — every retailer of the brand.
+ * An authored "Scope" config row, overridable with ?scope= (like ?mode=) so one
+ * deployed page can demo both. Anything absent, blank or unrecognised is
+ * 'dealer', because a block authored onto one retailer's page must never
+ * silently answer for the whole country — of the two ways to get this wrong,
+ * offering a user only the cars they can actually go and see is the safe one.
+ *
+ * Only BMW and MINI have two pools to choose between; the fixtures-backed brands
+ * serve their one file whatever this says. Mirrors SCOPES/normalizeScope in
+ * server/stock.js, which validates the value again on arrival — the client copy
+ * exists so the Retailer Name row can be authored to match (see retailerName).
+ */
+const SCOPES = ['dealer', 'national'];
+const DEFAULT_SCOPE = 'dealer';
+
+function resolveScope(block) {
+  const params = new URLSearchParams(window.location.search);
+  const requested = (params.get('scope') || readBlockConfig(block).scope || '')
+    .trim().toLowerCase();
+  return SCOPES.includes(requested) ? requested : DEFAULT_SCOPE;
+}
+
+/**
  * Which interface mode to run, and whether the switcher is shown:
  *   - an authored "Mode" config row, or a ?mode= query override, LOCKS the
  *     block to that mode (switcher hidden) — the production case;
@@ -147,42 +177,36 @@ function resolveMode(block) {
 }
 
 /**
- * The mode switcher: one tab per registered mode. Clicking a tab re-mounts the
- * selected mode into the stage. Only rendered when the block is unlocked and
- * there's more than one mode to choose between — a single mode needs no switch.
+ * The mode switcher: a compact dropdown, not a row of tabs, so it never
+ * competes with a mode's own header for screen space (podium in particular
+ * reclaims that space for its own title/progress — see vm-podium-head in
+ * vehicle-matcher.css). Only rendered when the block is unlocked and there's
+ * more than one mode to choose between — a single mode needs no switch.
  */
 function renderSwitcher(block, stage, ctx, current) {
   if (MODES.length < 2) return null;
   const bar = document.createElement('div');
   bar.className = 'vm-switcher';
-  bar.setAttribute('role', 'tablist');
-  bar.setAttribute('aria-label', 'Matching interface');
 
-  let active = current;
-  const tabs = MODES.map((mode) => {
-    const tab = document.createElement('button');
-    tab.type = 'button';
-    tab.className = 'vm-switcher-tab';
-    tab.textContent = mode.label;
-    tab.setAttribute('role', 'tab');
-    const select = () => {
-      if (mode === active) return;
-      active = mode;
-      tabs.forEach((t) => {
-        const on = t === tab;
-        t.classList.toggle('is-active', on);
-        t.setAttribute('aria-selected', String(on));
-      });
-      stage.replaceChildren();
-      mode.mount(stage, ctx);
-    };
-    tab.addEventListener('click', select);
-    const on = mode === active;
-    tab.classList.toggle('is-active', on);
-    tab.setAttribute('aria-selected', String(on));
-    bar.append(tab);
-    return tab;
+  const select = document.createElement('select');
+  select.className = 'vm-switcher-select';
+  select.setAttribute('aria-label', 'Matching interface');
+  MODES.forEach((mode) => {
+    const option = document.createElement('option');
+    option.value = mode.key;
+    option.textContent = mode.label;
+    select.append(option);
   });
+  select.value = current.key;
+
+  select.addEventListener('change', () => {
+    const next = modeByKey(select.value);
+    if (!next) return;
+    stage.replaceChildren();
+    next.mount(stage, ctx);
+  });
+
+  bar.append(select);
   return bar;
 }
 
@@ -194,6 +218,7 @@ export default async function decorate(block) {
   const api = apiBase(block);
   const brandKey = brand(block);
   const overrides = copyOverrides(block);
+  const scope = resolveScope(block);
   const { mode, locked } = resolveMode(block);
 
   block.replaceChildren();
@@ -209,6 +234,10 @@ export default async function decorate(block) {
     retailer,
     retailerLabel,
     brand: brandKey,
+    // 'dealer' | 'national' — which pool every stock request asks for. Sent on
+    // each call rather than read once, so a mode swap can't leave two modes
+    // disagreeing about it.
+    scope,
     // Authored copy overrides (title / kicker / disclaimer) — see copyRow.
     overrides,
   };

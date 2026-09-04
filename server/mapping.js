@@ -630,7 +630,11 @@ export function mapHondaRaw(raw) {
     mpg: fuel === 'ev' ? num(raw.mpg) : (num(raw.mpg) || spec.mpg),
     ...(evRange ? { evRange } : {}),
     tags: hondaTags(line, body, raw.fuel),
-    blurb: hondaBlurb(line, body, raw.fuel, HONDA_RETAILER_NAME),
+    // No retailer name: Honda's scrape carries no per-dealer identity, so the
+    // only name available is the pool label — "from Honda Approved Used" after
+    // "Approved-used Honda" is a tautology. BMW/MINI still name the real dealer
+    // holding the car (docs/tone-style-guide.md).
+    blurb: hondaBlurb(line, body, raw.fuel),
 
     // ---- display-only (surfaced by index.js publicCar) ----
     mileage: num(raw.mileage),
@@ -902,7 +906,10 @@ export function mapFordRaw(raw) {
     mpg: fuel === 'ev' ? num(raw?.mpg) : (num(raw?.mpg) || spec.mpg),
     ...(evRange ? { evRange } : {}),
     tags: fordTags(line, body, fuel, derivative),
-    blurb: fordBlurb(line, body, fuel, FORD_RETAILER_NAME, derivative),
+    // The real dealer when the feed names one (as BMW/MINI do), never the pool
+    // label — "from Ford Approved Used" after "Approved-used Ford" is a
+    // tautology, and the falsy guard in fordBlurb drops the clause entirely.
+    blurb: fordBlurb(line, body, fuel, raw?.dealer || '', derivative),
 
     // ---- display-only (surfaced by index.js publicCar) ----
     mileage: num(raw?.mileage),
@@ -1143,7 +1150,9 @@ export function mapFerrariRaw(raw) {
     mpg: spec.mpg,
     ...(evRange ? { evRange } : {}),
     tags: ferrariTags(line, body, fuel, spec.seats),
-    blurb: ferrariBlurb(displayName, body, fuel, raw?.engine, FERRARI_RETAILER_NAME),
+    // The real dealer when the feed names one, never the pool label — the blurb
+    // already opens "Ferrari Approved", so "from Ferrari Approved" said it twice.
+    blurb: ferrariBlurb(displayName, body, fuel, raw?.engine, raw?.dealerName || ''),
 
     // ---- display-only (surfaced by index.js publicCar) ----
     mileage: num(raw?.mileage),
@@ -1428,7 +1437,10 @@ export function mapMotorradRaw(raw) {
     // card layer keys the unit off the brand.
     power: num(raw?.powerKw) || undefined,
     tags: motorradTags(spec.category, spec.sizeClass, fuel),
-    blurb: motorradBlurb(line, spec.category, fuel, MOTORRAD_RETAILER_NAME),
+    // No retailer name: the feed gives every bike the one synthetic identity, so
+    // the only name available is the pool label, and "Approved-used BMW … from
+    // BMW Motorrad Approved Used" is a tautology.
+    blurb: motorradBlurb(line, spec.category, fuel),
 
     // ---- display-only ----
     mileage: num(raw?.mileage),
@@ -1727,6 +1739,16 @@ export function mapVehicle(v, brand = 'bmw') {
     // Internal: lets the nearby fetch drop the anchor retailer's own cars.
     // Deliberately NOT exposed by index.js publicCar().
     retailerId: v?.retailer_site?.id,
+    // The dealer directory's join key. `retailer_site` carries no postcode and
+    // no coordinates, and the used-car platform has no retailer-directory
+    // endpoint, so dealer_number is the only route from "which site sells this"
+    // to "where that site is" (see dealers.js, which is indexed on exactly
+    // this). That is what lets the hard-filter mode measure a car's distance
+    // from the buyer. Left undefined when the feed omits it — it does, on some
+    // rows (resolveRetailerPostcode in stock.js scans for the first that has
+    // one) — so anything joining on it must tolerate a miss. Like retailerId,
+    // internal: publicCar() does not expose it.
+    dealerNumber: v?.retailer_site?.dealer_number,
     // Public PDP is /vehicle/{advert_id} (confirmed against the live site);
     // fall back to the retailer's stock page if the feed ever omits it.
     link: v?.advert_id

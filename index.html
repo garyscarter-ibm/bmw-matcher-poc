@@ -180,24 +180,63 @@ main {
     // Picker tile order (BMW, MINI, Ford, Honda, Motorrad, Ferrari).
     const PICKER_ORDER = ['bmw', 'mini', 'ford', 'honda', 'motorrad', 'ferrari'];
 
-    // ---- carried over verbatim from block.html ------------------------------
-    // Each brand's default demo retailer name, so switching brand alone doesn't
-    // leave a mismatched "...at Grassicks BMW". Honda/Ford/Motorrad are national
-    // programmes, so they use the programme name. Precedence: ?retailerName=
-    // beats the ?retailer= ID map beats the ?brand= default.
+    // ---- carried over from block.html ---------------------------------------
+    // The Retailer Name row names the pool the block SEARCHED, and ?scope=
+    // makes that two different things, so there are two maps rather than one.
+    //
+    //   national — BMW and MINI walk the whole feed (nationalStock in
+    //              server/stock.js), so the cards come from ~130 retailers
+    //              apiece and no single branch is a true answer. Name the
+    //              programme; each card names the dealer holding it.
+    //   dealer   — one branch's own forecourt, so name the branch. These are
+    //              the feed's own names (the `retailers` dictionary /api/pool
+    //              returns at ?scope=dealer), not invented ones.
+    //
+    // Both ways of getting it wrong show on screen: a national pool labelled
+    // "Nothing at Sytner Luton is close to what you asked for" over a card
+    // reading "At Group 1 Lincoln", or a dealer pool labelled "BMW Approved
+    // Used", implying twelve thousand cars when it searched forty-one.
+    //
+    // Honda/Ford/Motorrad/Ferrari have no per-dealer pool at all — one national
+    // programme feed each — so the programme name is right for them either way.
     const BRAND_RETAILER_NAMES = {
-      bmw: 'Grassicks BMW', // Grassicks Garage, Perth (retailer 96)
-      mini: 'Sytner Luton MINI', // retailer 92
+      bmw: 'BMW Approved Used',
+      mini: 'MINI Approved Used',
       honda: 'Honda Approved Used',
       ford: 'Ford Approved Used',
       motorrad: 'BMW Motorrad Approved Used',
       ferrari: 'Ferrari Approved',
     };
-    const RETAILER_NAMES = {
-      96: 'Grassicks BMW', // Grassicks Garage, Perth
-      92: 'Sytner Luton MINI',
-    };
+    const DEALER_NAMES = { 96: 'Grassicks Garage', 92: 'Sytner Luton' };
     const BRAND_RETAILER_IDS = { bmw: '96', mini: '92' };
+    // Only BMW and MINI have a per-dealer pool to name at all (source: 'feed'
+    // in server/brands.js). The rest are a single national programme feed each,
+    // so BOTH scopes search the same cars for them and the programme name is
+    // the true label either way. Without this, a Ford page would read the
+    // dealer map, find the harness's BMW retailer ID sitting in the row, and
+    // label a national Ford pool "Grassicks Garage".
+    const DEALER_POOL_BRANDS = new Set(['bmw', 'mini']);
+
+    // ?scope= needs no authored row (the block reads the query string itself —
+    // see resolveScope in vehicle-matcher.js), but the label above depends on
+    // it, so resolve it here the same way and with the same default.
+    const scope = params.get('scope')?.trim().toLowerCase() === 'national'
+      ? 'national'
+      : 'dealer';
+
+    // The label for a given brand + retailer under the scope in the URL.
+    const poolNameFor = (brandKey, retailerId) => {
+      if (scope === 'national' || !DEALER_POOL_BRANDS.has(brandKey)) {
+        // An unknown ?brand= falls back to bmw in the block, so mirror that
+        // here rather than labelling a BMW pool with a generic phrase.
+        return BRAND_RETAILER_NAMES[brandKey] || BRAND_RETAILER_NAMES.bmw;
+      }
+      // A BMW/MINI dealer we ship no name for gets an honest generic. "this
+      // retailer" reads correctly in every copy shape that takes the label, and
+      // a vague label is much the lesser evil next to either confidently naming
+      // the wrong branch or claiming the whole programme.
+      return DEALER_NAMES[retailerId] || 'this retailer';
+    };
 
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => (
       { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -303,8 +342,11 @@ main {
     // ------------------------------------------------------------------
     function renderShell(brandKey) {
       const b = BRANDS[brandKey];
-      const retailerName = BRAND_RETAILER_NAMES[brandKey] || '';
       const retailerId = BRAND_RETAILER_IDS[brandKey] || '';
+      // Named for the scope in the URL, not fixed: this page authors no Scope
+      // row, so the block resolves it from the query string, and the label has
+      // to follow it or it describes a pool that was never searched.
+      const retailerName = poolNameFor(brandKey, retailerId);
 
       root.innerHTML = `
         <div class="vm vm-${brandKey} demo-shell" data-brand="${brandKey}">
@@ -360,7 +402,7 @@ main {
     // ------------------------------------------------------------------
     // Query overrides on the block's authored config rows — mirrors block.html.
     // ------------------------------------------------------------------
-    function applyOverrides(block) {
+    function applyOverrides(block, brandKey) {
       // ?api=<url> points the block at a deployed backend; else the data-api
       // localhost default holds for local dev.
       const apiOverride = params.get('api');
@@ -374,18 +416,19 @@ main {
         if (row) row.lastElementChild.textContent = value;
       };
 
-      const brandOverride = params.get('brand');
-      if (brandOverride) setRow('brand', brandOverride);
+      // The shell already authored Brand from the RESOLVED brandKey (unknown
+      // brands having fallen back to bmw), so there is nothing to override here.
 
       const retailerOverride = params.get('retailer');
       if (retailerOverride) setRow('retailer id', retailerOverride);
 
-      // Retailer-name precedence: ?retailerName= > RETAILER_NAMES[id] >
-      // BRAND_RETAILER_NAMES[brand].
-      const nameOverride = params.get('retailerName')
-        || RETAILER_NAMES[retailerOverride]
-        || (brandOverride && BRAND_RETAILER_NAMES[brandOverride.toLowerCase()]);
-      if (nameOverride) setRow('retailer name', nameOverride);
+      // Retailer Name, re-derived rather than overridden: ?retailer= may just
+      // have changed which pool is searched, and one hardcoded label cannot be
+      // true for both scopes or for an arbitrary dealer ID. Set unconditionally
+      // so no path can leave the shell's authored label stale. ?retailerName=
+      // still wins, for demoing a page whose dealer this harness doesn't ship.
+      const retailerId = retailerOverride || BRAND_RETAILER_IDS[brandKey] || '';
+      setRow('retailer name', params.get('retailerName') || poolNameFor(brandKey, retailerId));
       // Title is already authored to "none" in the shell markup to suppress the
       // block's own H1 (the hero owns the headline). ?mode= is read by the block
       // itself, so it needs no row here.
@@ -478,7 +521,7 @@ main {
       // Unknown brand falls back to bmw, matching the block's own DEFAULT_BRAND.
       const brandKey = BRANDS[brandParam] ? brandParam : 'bmw';
       const block = renderShell(brandKey);
-      applyOverrides(block);
+      applyOverrides(block, brandKey);
 
       // A 401 on a load-bearing call clears the stored key and fires
       // vm-auth-failed; re-prompt and remount. This is the real gate: it fires

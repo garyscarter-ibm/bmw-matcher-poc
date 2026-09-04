@@ -20,9 +20,17 @@
     }
     /* The harness stands in for a host page, so IT owns the page surface.
        The block itself is transparent (the host section decides its
-       background), which is why this white lives here and not there. */
+       background), which is why this white lives here and not there.
+       Matches the block's own 1280px column (vehicle-matcher.css `.vm`) so the
+       white surface ends where the block does — a narrower wrapper here would
+       clamp the block back down and hide the change. Measured at 880px: the
+       podium board halves to 376px, so the spanning gold hero — proportioned
+       for a 776px row — comes out 376px wide and 911px tall instead of 780px,
+       its two-column body squeezed into 180px columns, and 2nd and 3rd stop
+       clearing the fold. The desktop rules are keyed on VIEWPORT width, so they
+       still fire at 880px; they just have nowhere to land. */
     main {
-      width: 100%; max-width: 880px; margin: 0 auto; box-sizing: border-box;
+      width: 100%; max-width: 1280px; margin: 0 auto; box-sizing: border-box;
       background: #fff;
     }
     /* Shared-password gate: a full-screen overlay over the harness's dark
@@ -77,12 +85,23 @@
          defaults for local dev, overridable via the query string:
            ?brand=bmw|mini   — which brand to theme + source
            ?retailer=<id>    — which retailer's stock
+           ?scope=dealer|national — that retailer's own forecourt, or every
+                               retailer of the brand (BMW/MINI only; default
+                               dealer)
            ?mode=<key>       — lock to one interface, else the switcher shows.
-                               Keys: questionnaire, swipe, head-to-head, podium.
+                               Keys: questionnaire, swipe, head-to-head, podium,
+                               guess-who. Note the keys differ from the file
+                               names for two of them (swipe is mingle.js,
+                               head-to-head is knockout.js).
            ?api=<url>        — point at a deployed backend
 
-         No "Mode" row is authored here on purpose: unlocked, the block shows
-         its mode switcher — this page IS the multi-interface showcase. -->
+         No "Mode" or "Scope" row is authored here on purpose: both are read
+         from the query string by the block itself, and unlocked the block shows
+         its mode switcher — this page IS the multi-interface showcase.
+
+         Retailer Name is authored to match the DEFAULT scope, but the script
+         below re-derives it whenever brand or scope changes, because one
+         hardcoded label cannot be true for both scopes. -->
     <div class="vehicle-matcher block" data-block-name="vehicle-matcher" data-api="http://localhost:8787">
       <div>
         <div>Brand</div>
@@ -94,7 +113,7 @@
       </div>
       <div>
         <div>Retailer Name</div>
-        <div>Grassicks BMW</div>
+        <div>Grassicks Garage</div>
       </div>
     </div>
   </main>
@@ -114,48 +133,101 @@
 
     // Rewrite an authored config row's value in place, found by its label so
     // the right row is hit regardless of order. Used by the ?brand / ?retailer
-    // overrides below. (?mode is read by the block itself from the query string,
-    // so it needs no row here.)
+    // overrides below. (?mode and ?scope are read by the block itself from the
+    // query string, so they need no row here.)
+    const findRow = (label) => [...block.children].find(
+      (r) => r.firstElementChild?.textContent.trim().toLowerCase() === label,
+    );
     const setRow = (label, value) => {
-      const row = [...block.children].find(
-        (r) => r.firstElementChild?.textContent.trim().toLowerCase() === label,
-      );
+      const row = findRow(label);
       if (row) row.lastElementChild.textContent = value;
     };
+    // Read a row back, so the label logic below works from the block's EFFECTIVE
+    // config — the authored value, or whatever ?brand / ?retailer just replaced
+    // it with — instead of re-deriving that precedence a second time.
+    const getRow = (label) => findRow(label)?.lastElementChild.textContent.trim() || '';
 
     // ?brand=bmw|mini|honda|ford|motorrad overrides the authored Brand row.
     const brandOverride = params.get('brand');
     if (brandOverride) setRow('brand', brandOverride);
 
+    // The branch each dealer-pool brand calls home. Only BMW and MINI have
+    // per-dealer pools (source: 'feed'); the rest run one national programme
+    // feed and ignore the Retailer ID row entirely, so they need no entry.
+    const BRAND_RETAILER_IDS = { bmw: '96', mini: '92' };
+
     // ?retailer=<id> overrides the authored Retailer ID row.
     const retailerOverride = params.get('retailer');
-    if (retailerOverride) setRow('retailer id', retailerOverride);
+    if (retailerOverride) {
+      setRow('retailer id', retailerOverride);
+    } else if (brandOverride) {
+      // Changing brand without naming a retailer has to move the Retailer ID
+      // too. The authored 96 is a BMW branch, so ?brand=mini alone asked the
+      // MINI feed for a dealer it has never heard of ("Retailer 96 reports no
+      // dealer_number"), which came back as an empty pool — a 502 from
+      // /api/preview — under a heading naming a BMW dealer. Mirrors
+      // BRAND_RETAILER_IDS in index.html, so both harnesses agree.
+      const homeBranch = BRAND_RETAILER_IDS[brandOverride.trim().toLowerCase()];
+      if (homeBranch) setRow('retailer id', homeBranch);
+    }
 
-    // Retailer *Name* is a third authored row, hardcoded to "Grassicks BMW" in
-    // the markup above (the BMW default). It is NOT the brand row, so switching
-    // brand with ?brand= alone used to leave the name as "Grassicks BMW" — every
-    // non-BMW brand then read "...at Grassicks BMW", and Motorrad additionally
-    // "...bikes at Grassicks BMW". Fix: each brand carries its own default demo
-    // retailer name, applied whenever ?brand= is set. Honda/Ford/Motorrad are
-    // national approved-used programmes, not a single named dealer, so they use
-    // the programme name. Precedence: ?retailerName= (explicit) beats the
-    // ?retailer= ID map beats the ?brand= default.
+    // ?scope=dealer|national needs no row (the block reads the query string
+    // itself — see resolveScope), but the Retailer Name below depends on it, so
+    // resolve it the same way and with the same default.
+    const scope = params.get('scope')?.trim().toLowerCase() === 'national'
+      ? 'national'
+      : 'dealer';
+
+    // Retailer *Name* is a third authored row: the label the copy uses for the
+    // pool it searched ("AT BMW APPROVED USED", "Nothing at … is close to what
+    // you asked for"). Its one job is to name the pool that was ACTUALLY
+    // searched, and since ?scope= that is two different things:
+    //
+    //   dealer (default) — one branch's own forecourt, so name the branch.
+    //   national         — BMW and MINI walk the whole feed (nationalStock in
+    //                      server/stock.js), so the cards come from ~130
+    //                      retailers apiece and no branch is a true answer. Name
+    //                      the programme; each card names the dealer holding it.
+    //
+    // Both ways of getting it wrong show up on screen: a national pool labelled
+    // "Nothing at Sytner Luton MINI is close to what you asked for" over a card
+    // reading "At Group 1 Lincoln", or a dealer pool labelled "BMW Approved
+    // Used", implying twelve thousand cars when it searched forty-one.
     const BRAND_RETAILER_NAMES = {
-      bmw: 'Grassicks BMW', // Grassicks Garage, Perth (retailer 96)
-      mini: 'Sytner Luton MINI', // retailer 92
+      bmw: 'BMW Approved Used',
+      mini: 'MINI Approved Used',
       honda: 'Honda Approved Used',
       ford: 'Ford Approved Used',
       motorrad: 'BMW Motorrad Approved Used',
       ferrari: 'Ferrari Approved',
     };
-    const RETAILER_NAMES = {
-      96: 'Grassicks BMW', // Grassicks Garage, Perth
-      92: 'Sytner Luton MINI',
-    };
-    const nameOverride = params.get('retailerName')
-      || RETAILER_NAMES[retailerOverride]
-      || (brandOverride && BRAND_RETAILER_NAMES[brandOverride.toLowerCase()]);
-    if (nameOverride) setRow('retailer name', nameOverride);
+    // Dealer scope: the branches this harness ships in its Retailer ID row. A
+    // real retailer's page authors its own name; a demo offering a switch has to
+    // know the names on both sides of it. Read off the feed (the `retailers`
+    // dictionary /api/pool returns at ?scope=dealer), not invented.
+    const DEALER_NAMES = { 96: 'Grassicks Garage', 92: 'Sytner Luton' };
+    // Only BMW and MINI have a per-dealer pool to name at all (source: 'feed' in
+    // server/brands.js). The rest are a single national programme feed each, so
+    // BOTH scopes search the same cars for them and the programme name is the
+    // true label either way. Without this, ?brand=ford would read the dealer map,
+    // find the BMW retailer ID this page authors, and label a national Ford pool
+    // "Grassicks Garage".
+    const DEALER_POOL_BRANDS = new Set(['bmw', 'mini']);
+
+    // Set unconditionally, not just on an override: the markup can only hardcode
+    // one label, so any change of brand or scope leaves it stale. ?retailerName=
+    // still wins, for demoing a page whose dealer this harness doesn't ship.
+    const brandKey = getRow('brand').toLowerCase();
+    const poolName = scope === 'national' || !DEALER_POOL_BRANDS.has(brandKey)
+      // An unknown ?brand= falls back to bmw in the block, so mirror that here
+      // rather than labelling a BMW pool with a generic phrase.
+      ? BRAND_RETAILER_NAMES[brandKey] || BRAND_RETAILER_NAMES.bmw
+      // A BMW/MINI dealer we ship no name for gets an honest generic. "this
+      // retailer" reads correctly in every copy shape that takes the label, and a
+      // vague label is much the lesser evil next to either confidently naming the
+      // wrong branch or claiming the whole programme.
+      : DEALER_NAMES[getRow('retailer id')] || 'this retailer';
+    setRow('retailer name', params.get('retailerName') || poolName);
 
     // ---- Shared-password gate ---------------------------------------------
     // This overlay is UX only, not a security boundary: it captures the shared

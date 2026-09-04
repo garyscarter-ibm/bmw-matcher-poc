@@ -705,7 +705,9 @@ function mount(root, ctx) {
     // a thinner one like MINI returns fewer and largestPowerOfTwo snaps down. No
     // enrich: painting all 16 would fetch a PDP per round-one loser, so the
     // face-off card falls back to a neutral swatch (swatchFor handles absent colour).
-    const matches = await apiField(ctx.api, state.seed, ctx.retailer, ctx.brand, MAX_FIELD);
+    const matches = await apiField(
+      ctx.api, state.seed, ctx.retailer, ctx.brand, ctx.scope, MAX_FIELD,
+    );
     // Field returns match objects { car, score, ... }; the game plays with the
     // display cars, exactly as the swipe game does with match.car — but we no
     // longer THROW AWAY the engine's per-car score. Stash it (keyed by stable
@@ -1098,7 +1100,7 @@ function mount(root, ctx) {
     const answers = bracketToAnswers(state.rounds, state.seed);
     let result;
     try {
-      result = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand);
+      result = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand, ctx.scope);
     } catch {
       showError(() => showResult(champion));
       return;

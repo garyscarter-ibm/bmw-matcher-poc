@@ -25,7 +25,12 @@ import { apiPreview } from '../engine.js';
 export const PREVIEW_DEBOUNCE_MS = 250;
 
 /**
- * A debounced, latest-wins preview fetcher for one retailer's stock.
+ * A debounced, latest-wins preview fetcher for one block's stock.
+ *
+ * `scope` decides whose stock that is — this retailer's forecourt or the brand's
+ * whole network. It belongs to the block rather than to the request, so a feed
+ * carries one for its lifetime and never varies it between refreshes: a preview
+ * that answered from a different pool than the final match would contradict it.
  *
  * `group` is passed straight through to the engine: a strip of individual cars
  * wants every listing, a podium wants them grouped by model, and that is a
@@ -44,7 +49,7 @@ export const PREVIEW_DEBOUNCE_MS = 250;
  * @returns {{ schedule: (answers, onResult) => void, cancel: () => void }}
  */
 export function createPreviewFeed({
-  api, retailer, brand, group = false,
+  api, retailer, brand, scope, group = false,
 }) {
   let timer = null;
   let seq = 0;
@@ -57,7 +62,7 @@ export function createPreviewFeed({
         // Snapshot: the request is about the answers as they were when it left,
         // and the caller's object goes on mutating underneath it.
         const snapshot = { ...answers };
-        apiPreview(api, snapshot, retailer, brand, group).then((matches) => {
+        apiPreview(api, snapshot, retailer, brand, scope, group).then((matches) => {
           // A newer answer already superseded this request — drop the stale result.
           if (mine !== seq) return;
           onResult(matches);

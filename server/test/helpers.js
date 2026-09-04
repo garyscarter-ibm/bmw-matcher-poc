@@ -23,6 +23,25 @@ import { fileURLToPath } from 'node:url';
 import { buildServer } from '../index.js';
 import { mapVehicle } from '../mapping.js';
 
+/*
+ * The two location deps, stubbed out by default rather than left to buildServer's
+ * real ones.
+ *
+ * Both call a third party: fetchDealerDirectory pulls a ~2MB directory and
+ * geocodePostcode hits postcodes.io. /api/pool asks for the directory on every
+ * request, so a suite that didn't stub this would quietly make a live 2MB fetch
+ * per pool test — hermetic in its assertions, but not in its behaviour, and
+ * failing on a plane. An empty Map is a real answer, not an error: the pool ships
+ * null site coordinates and the client's distance filter self-suppresses, which
+ * is exactly the state of a brand whose stock cache predates dealer_number.
+ *
+ * A test that wants to exercise either one passes its own, as with any other dep.
+ */
+const INERT_LOCATION = {
+  fetchDealerDirectory: async () => new Map(),
+  geocodePostcode: async () => null,
+};
+
 /**
  * Spin up a server with injected stock on an ephemeral port. Returns the base
  * URL and a close() that resolves when the socket is fully shut. Every fake
@@ -35,7 +54,7 @@ import { mapVehicle } from '../mapping.js';
  * does.
  */
 export async function startTestServer(deps = {}) {
-  const server = buildServer(deps);
+  const server = buildServer({ ...INERT_LOCATION, ...deps });
   server.listen(0);
   await once(server, 'listening');
   const { port } = server.address();
@@ -222,13 +241,17 @@ export function ferrariPool(n = 20) {
 
 /**
  * A fake fetchRetailerStock that serves a per-brand pool and records every
- * call's (brand, retailer) so a test can assert the handler threaded them
+ * call's (brand, retailer, scope) so a test can assert the handler threaded them
  * through. Unknown brands fall back to the bmw pool (matching normalizeBrand's
  * default). `.calls` is the audit log.
+ *
+ * The pool served is the same whatever the scope: what the scope tests assert is
+ * that the handler PASSED it on, which is the only part of the decision that
+ * lives in the request path. Which cars a scope yields is stock.js's business.
  */
 export function fakeStock({ bmw = bmwPool(), mini = miniPool() } = {}) {
-  const fn = async (brand, retailer) => {
-    fn.calls.push({ brand, retailer });
+  const fn = async (brand, retailer, scope) => {
+    fn.calls.push({ brand, retailer, scope });
     return brand === 'mini' ? mini : bmw;
   };
   fn.calls = [];

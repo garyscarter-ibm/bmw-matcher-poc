@@ -58,7 +58,10 @@ authoring/config-row model. `docs/how-it-works.md` is the whole system on one pa
 `vehicle-matcher.js` is only a shell: it reads authored config, applies the brand theme class,
 and mounts one **mode** into a stage (with a switcher when unlocked). A mode is a plain object
 `{ key, label, mount(root, ctx) }` registered in `blocks/vehicle-matcher/modes/index.js`
-(currently `questionnaire`, `mingle`, `knockout`, `podium`; first is the default). Modes share
+(currently `questionnaire`, `swipe`, `head-to-head`, `podium`, `guess-who`; first is the
+default). **Two keys differ from their filenames**: `swipe` lives in `mingle.js` and
+`head-to-head` in `knockout.js`. The old `?mode=mingle` / `?mode=knockout` are retired — the
+key is what `?mode=` matches, not the file. Modes share
 `engine.js` (HTTP client), `ui.js` (primitives), `question-ui.js`, `result-card.js`, and
 `brand-copy.js`. **Add an interface** = a new `modes/<key>.js` + one import/array entry; the
 shell needs no change.
@@ -90,5 +93,14 @@ real EDS page gets it transitively. `demo-chrome.css` styles the demo homepage/p
   (predicates can't cross JSON, so `/api/questions` strips them and the client re-applies).
 - **Counts are server-owned:** `TOP_MATCHES` and the question set ship via `/api/questions` so
   intro copy states numbers without a block rebuild — don't hardcode them client-side.
-</content>
-</invoke>
+- **`?scope=` and the Retailer Name row must agree.** `?scope=dealer|national` (default
+  **dealer**) chooses the pool: one branch's forecourt, or every retailer of the brand.
+  Only BMW and MINI have two pools (`source: 'feed'` in `brands.js`); the other four run a
+  single national programme feed each, so both scopes search the same cars for them and the
+  programme name is the true label either way. The authored **Retailer Name** row is only a
+  label, so nothing stops it naming a pool that wasn't searched — and both ways of getting it
+  wrong are visible on screen ("Nothing at Sytner Luton is close…" above a card reading "At
+  Group 1 Lincoln", or a 41-car forecourt labelled "BMW Approved Used"). Both harnesses
+  re-derive it from brand + scope rather than trusting the authored value; a real retailer page
+  authors one scope and one matching name. `resolveScope` narrows anything unrecognised *down*
+  to dealer, so a typo'd embed can never widen a pool the page has already named.

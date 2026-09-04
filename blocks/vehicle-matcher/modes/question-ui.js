@@ -67,6 +67,12 @@ export function renderRangeSlider(list, q, answers, { onChange } = {}) {
 
   const readout = el('output', 'vm-slider-value', formatRange([lo, hi], q));
 
+  // What the two thumbs are called to a screen reader. "budget" is only right
+  // for the question this was written for; `q.thumbNoun` lets a caller reusing
+  // the same widget on another axis (the hard-filter mode's age range) name them
+  // honestly. The budget question sets nothing and reads exactly as before.
+  const noun = q.thumbNoun || 'budget';
+
   const track = el('div', 'vm-range');
   const fill = el('div', 'vm-range-fill');
   const mkInput = (cls, label, value) => {
@@ -80,8 +86,8 @@ export function renderRangeSlider(list, q, answers, { onChange } = {}) {
     input.setAttribute('aria-valuetext', formatSliderValue(value, q));
     return input;
   };
-  const minInput = mkInput('vm-range-min', 'Minimum budget', lo);
-  const maxInput = mkInput('vm-range-max', 'Maximum budget', hi);
+  const minInput = mkInput('vm-range-min', `Minimum ${noun}`, lo);
+  const maxInput = mkInput('vm-range-max', `Maximum ${noun}`, hi);
 
   const span = q.max - q.min || 1;
   const paintFill = () => {
@@ -153,6 +159,16 @@ export function renderOptionList(q, answers, { onChange, onPick } = {}) {
     btn.setAttribute('role', q.multi ? 'checkbox' : 'radio');
     btn.setAttribute('aria-checked', String(selected.has(opt.value)));
     if (selected.has(opt.value)) btn.classList.add('is-selected');
+    // A colour dot, for the one axis where the option IS a colour. Same
+    // .vm-swatch the cards use (SWATCH_HEX in ./result-card.js), so "the green
+    // one" reads the same in the filter as it does on the card it filtered to.
+    // Presentational only — the label still carries the name, so an option with
+    // no hex simply has no dot.
+    if (opt.swatch) {
+      const dot = el('span', 'vm-swatch');
+      dot.style.background = opt.swatch;
+      btn.append(dot);
+    }
     btn.append(el('span', 'vm-option-label', opt.label));
     if (opt.sub) btn.append(el('span', 'vm-option-sub', opt.sub));
     btn.addEventListener('click', () => {

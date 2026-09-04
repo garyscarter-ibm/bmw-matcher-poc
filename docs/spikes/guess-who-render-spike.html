@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<!--
+  Render spike for the "Guess Who" mode.
+
+  NOT production code and not part of the block. It exists to answer one
+  question with numbers rather than opinion: how many car cards can we put on
+  screen at once, and still animate an elimination pass smoothly?
+
+  Loads the REAL BMW national pool (12,012 cars, columnar) and real thumbnail
+  URLs, so the image cost is honest — 12,012 distinct URLs, no cache cheating.
+
+  Measured knobs: live node count, whether content-visibility is on, and
+  whether survivors are animated with FLIP.
+-->
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Guess Who — render spike</title>
+<style>
+  :root {
+    --card: 46px;          /* tiny-card track width; grown by the size stepper */
+    --gap: 4px;
+    --dur: 380ms;
+    --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0d0f12; color: #e9edf2;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10; padding: 10px 14px;
+    background: #14181d; border-bottom: 1px solid #262c34;
+    display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  }
+  label { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+  button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid #39424e;
+           background: #1d232b; color: #e9edf2; cursor: pointer; }
+  button:hover { background: #262e38; }
+  #stats { margin-left: auto; font-variant-numeric: tabular-nums; font-size: 12px; }
+  #stats b { color: #7fd4ff; }
+
+  /* The grid is the whole trick: auto-fill + minmax means the browser reflows
+     and re-columns for free when cards leave, and bumping --card grows them. */
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--card), 1fr));
+    gap: var(--gap);
+    padding: 14px;
+    align-content: start;
+  }
+
+  .cardx {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border-radius: 3px;
+    overflow: hidden;
+    background: #1b2028;
+    /* Only transform + opacity animate: both compositor-safe, no layout. */
+    transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+    will-change: auto;
+  }
+  .cardx img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* content-visibility lets the browser skip layout/paint for offscreen cards.
+     Toggled so the spike can measure what it actually buys. */
+  body.cv .cardx { content-visibility: auto; contain-intrinsic-size: auto 46px; }
+
+  /* The elimination effect: shrink + fade + a slight tilt. */
+  .cardx.is-out {
+    opacity: 0;
+    transform: scale(0.35) rotate(-8deg);
+    pointer-events: none;
+  }
+  /* Removed from flow once the exit has played, so the grid can reflow. */
+  .cardx.gone { display: none; }
+
+  /* FLIP: survivors get their delta applied instantly, then transition to zero. */
+  .cardx.flip { transition: none; }
+
+  #log { padding: 10px 14px; font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+         white-space: pre-wrap; color: #9fb0c3; border-top: 1px solid #262c34; }
+</style>
+</head>
+<body>
+<header>
+  <label>live cap
+    <select id="cap">
+      <option value="12012">12012 (all)</option>
+      <option value="6000">6000</option>
+      <option value="3000">3000</option>
+      <option value="2000" selected>2000</option>
+      <option value="1000">1000</option>
+      <option value="500">500</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="cv" checked> content-visibility</label>
+  <label><input type="checkbox" id="images" checked> images</label>
+  <label><input type="checkbox" id="flip" checked> FLIP survivors</label>
+  <label>card <input type="range" id="size" min="30" max="220" value="46"></label>
+  <button id="render">Render</button>
+  <button id="elim">Eliminate ~70%</button>
+  <button id="reset">Reset</button>
+  <div id="stats"></div>
+</header>
+<div id="grid"></div>
+<div id="log"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const grid = $('#grid');
+const logEl = $('#log');
+let pool = null;
+let cards = [];      // live DOM nodes, index-aligned with `shown`
+let shown = [];      // pool indices currently mounted
+
+const log = (m) => { logEl.textContent = m + '\n' + logEl.textContent; };
+
+// A frame-time recorder: samples rAF deltas for `ms` and reports the worst
+// frames, which is what "does it jank" actually means.
+function recordFrames(ms) {
+  return new Promise((resolve) => {
+    const deltas = [];
+    let last = performance.now();
+    const t0 = last;
+    function tick(now) {
+      deltas.push(now - last);
+      last = now;
+      if (now - t0 < ms) requestAnimationFrame(tick);
+      else {
+        deltas.sort((a, b) => b - a);
+        const long = deltas.filter((d) => d > 20).length;
+        resolve({
+          frames: deltas.length,
+          worst: deltas[0]?.toFixed(1),
+          p95: deltas[Math.floor(deltas.length * 0.05)]?.toFixed(1),
+          median: deltas[Math.floor(deltas.length / 2)]?.toFixed(1),
+          longFrames: long,
+        });
+      }
+    }
+    requestAnimationFrame(tick);
+  });
+}
+
+function stats(extra = '') {
+  const live = grid.querySelectorAll('.cardx:not(.gone)').length;
+  $('#stats').innerHTML = `pool <b>${pool ? pool.n : 0}</b> · mounted <b>${cards.length}</b> · visible <b>${live}</b> ${extra}`;
+}
+
+function render() {
+  const cap = Number($('#cap').value);
+  const withImages = $('#images').checked;
+  const t0 = performance.now();
+
+  grid.replaceChildren();
+  cards = [];
+  shown = [];
+  const n = Math.min(cap, pool.n);
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('div');
+    d.className = 'cardx';
+    if (withImages && pool.photo[i]) {
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.src = pool.photo[i];
+      img.alt = '';
+      d.append(img);
+    }
+    frag.append(d);
+    cards.push(d);
+    shown.push(i);
+  }
+  grid.append(frag);
+  const build = performance.now() - t0;
+
+  // Force layout so we time the real cost, not just node creation.
+  const t1 = performance.now();
+  void grid.offsetHeight;
+  const layout = performance.now() - t1;
+
+  log(`render ${n} cards: build ${build.toFixed(1)}ms, forced layout ${layout.toFixed(1)}ms, total ${(build + layout).toFixed(1)}ms  [images=${withImages}, cv=${$('#cv').checked}]`);
+  stats();
+}
+
+async function eliminate() {
+  const useFlip = $('#flip').checked;
+  const live = cards.filter((c) => !c.classList.contains('gone'));
+  if (!live.length) { log('nothing to eliminate — Render first'); return; }
+
+  // Deterministic 70% cull so runs are comparable.
+  const doomed = live.filter((_, i) => i % 10 >= 3);
+  const survivors = live.filter((_, i) => i % 10 < 3);
+
+  const t0 = performance.now();
+
+  // FLIP step 1: record survivor positions BEFORE the layout change.
+  let first = null;
+  if (useFlip) {
+    const tm = performance.now();
+    first = survivors.map((c) => c.getBoundingClientRect());
+    log(`  FLIP first-rects for ${survivors.length} survivors: ${(performance.now() - tm).toFixed(1)}ms`);
+  }
+
+  // Play the exit. Class flip only — no per-node style writes.
+  doomed.forEach((c) => c.classList.add('is-out'));
+  const mark = performance.now() - t0;
+
+  const framesDuring = recordFrames(420);
+
+  // After the exit animation, drop them from flow so the grid reflows.
+  await new Promise((r) => setTimeout(r, 400));
+  const t2 = performance.now();
+  doomed.forEach((c) => c.classList.add('gone'));
+
+  if (useFlip) {
+    // FLIP step 2: measure after, apply inverted delta, then release.
+    const last = survivors.map((c) => c.getBoundingClientRect());
+    survivors.forEach((c, i) => {
+      const dx = first[i].left - last[i].left;
+      const dy = first[i].top - last[i].top;
+      const ds = first[i].width / (last[i].width || 1);
+      if (!dx && !dy && Math.abs(ds - 1) < 0.01) return;
+      c.classList.add('flip');
+      c.style.transform = `translate(${dx}px, ${dy}px) scale(${ds})`;
+    });
+    void grid.offsetHeight;                       // commit the inverted state
+    survivors.forEach((c) => {
+      c.classList.remove('flip');
+      c.style.transform = '';
+    });
+  }
+  const reflow = performance.now() - t2;
+  const f = await framesDuring;
+
+  log(`eliminate ${doomed.length} → ${survivors.length} survive`
+    + `\n  class-mark: ${mark.toFixed(1)}ms · reflow+FLIP: ${reflow.toFixed(1)}ms`
+    + `\n  frames during exit: median ${f.median}ms, p95 ${f.p95}ms, worst ${f.worst}ms, >20ms: ${f.longFrames}/${f.frames}`);
+  stats();
+}
+
+$('#render').onclick = render;
+$('#elim').onclick = eliminate;
+$('#reset').onclick = () => {
+  cards.forEach((c) => { c.classList.remove('is-out', 'gone'); c.style.transform = ''; });
+  stats();
+};
+$('#cv').onchange = (e) => document.body.classList.toggle('cv', e.target.checked);
+$('#size').oninput = (e) => document.documentElement.style.setProperty('--card', `${e.target.value}px`);
+
+(async function boot() {
+  document.body.classList.toggle('cv', $('#cv').checked);
+  const t0 = performance.now();
+  const res = await fetch('./pool-bmw.json');
+  const bytes = Number(res.headers.get('content-length')) || 0;
+  pool = await res.json();
+  log(`pool loaded: ${pool.n} cars, ${(bytes / 1024).toFixed(0)}KB wire, ${(performance.now() - t0).toFixed(0)}ms`);
+  window.__spikeReady = true;
+  stats();
+})();
+</script>
+</body>
+</html>

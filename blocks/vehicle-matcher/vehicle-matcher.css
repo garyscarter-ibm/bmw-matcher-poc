@@ -2059,62 +2059,64 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    Only present when the block is UNLOCKED and more than one interface mode is
    registered (the showcase). A production page authors a "Mode" row, which
    hides the switcher entirely — so these rules never apply there and the block
-   looks exactly as it did before modes existed. A quiet segmented control: it
-   picks the interface, so it must not compete with the interface's own CTA.
-   Themed off the shared tokens, so it follows brand (BMW blue / MINI green)
-   without a per-brand rule. */
+   looks exactly as it did before modes existed. A tab row here used to reserve
+   a full-width bar above every mode's own content; a picker this minor (four
+   interfaces, one chosen at a time) doesn't earn that much of the fold, and on
+   podium specifically it was the row the mode's own title/progress needed
+   (see .vm-podium-head). So it's a single right-aligned dropdown, tucked above
+   the stage rather than laid out across it. Themed off the shared tokens, so
+   it follows brand (BMW blue / MINI green) without a per-brand rule. */
 .vm-switcher {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--vm-line);
+  justify-content: flex-end;
+  margin-bottom: var(--vm-space-4);
 }
-.vm-switcher-tab {
+.vm-switcher-select {
   appearance: none;
-  border: 1px solid var(--vm-line);
+  border: var(--vm-border-width) solid var(--vm-line);
   background: transparent;
   color: var(--vm-ink-muted);
   /* The brand's bold face, not plain body — the wordmark-adjacent chrome should
      carry the typeface the brand shouts in (BMW Type Next bold, MINI Sans,
-     FordF1, Proxima Nova), so the control reads as the brand's at rest, before
-     any tab is active. */
+     FordF1, Proxima Nova), so the control reads as the brand's at rest. */
   font-family: var(--vm-font-bold);
   font-weight: 700;
   font-size: 13px;
   letter-spacing: 0.02em;
-  padding: 7px 14px;
+  padding: 7px 30px 7px 14px;
   border-radius: var(--vm-radius-control);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
-/* Resting/hover state carries the brand accent, not a neutral grey — so the two
-   inactive tabs also read as the brand's, not just the one active tab. */
-.vm-switcher-tab:hover {
+.vm-switcher-select:hover,
+.vm-switcher-select:focus-visible {
   color: var(--vm-accent);
   border-color: var(--vm-accent);
 }
-.vm-switcher-tab.is-active {
-  color: var(--vm-accent-ink);
-  background: var(--vm-accent);
-  border-color: var(--vm-accent);
-  cursor: default;
+/* The native arrow is stripped by `appearance: none` above (styling it
+   consistently across browsers is the one thing a native select won't allow),
+   so this quiet chevron replaces it. Sits over the padding the select reserved
+   for it and never intercepts the click. */
+.vm-switcher::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 6px;
+  height: 6px;
+  margin-top: -4px;
+  border-right: var(--vm-border-width) solid var(--vm-ink-muted);
+  border-bottom: var(--vm-border-width) solid var(--vm-ink-muted);
+  transform: rotate(45deg);
+  pointer-events: none;
 }
 
 /* Motorrad's switcher wears the marque's CTA signature, same as its buttons
-   (see .vm.vm-motorrad .vm-btn above): UPPERCASE labels, and the active tab is
-   the near-black fill rather than blue — blue is a link/accent colour for
-   Motorrad, not a fill. Without this the tabs read as the generic grey control
-   and Motorrad's strong identity stops at the stage edge. */
-.vm.vm-motorrad .vm-switcher-tab {
+   (see .vm.vm-motorrad .vm-btn above): UPPERCASE, tracked out. */
+.vm.vm-motorrad .vm-switcher-select {
   text-transform: uppercase;
   letter-spacing: 0.06em;
-}
-.vm.vm-motorrad .vm-switcher-tab.is-active {
-  background: var(--vm-ink-strong);
-  border-color: var(--vm-ink-strong);
-  color: #fff;
 }
 
 /* The active mode mounts here. Transparent and layout-neutral: with no
@@ -3130,17 +3132,15 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    Every animation is disabled in the reduced-motion block at the end.
    ====================================================================== */
 
-/* The two-pane grid. One column below 720px (the brief first, then the
-   podium, which is DOM order, so no reordering is needed), two above: the left
-   column takes a fixed reading measure and the podium takes the rest.
-   min-width: 0 on both panes because a grid item defaults to min-content width,
-   and a long unbroken model name in a card would otherwise push the whole track
-   wider than the block. */
+/* The outer wrapper is a plain flex column now: .vm-podium-head sits full width
+   above, .vm-podium-grid owns the two-pane split that used to live directly on
+   .vm-podium. Splitting them is what let the wordmark/title/progress move into
+   the space the tab switcher used to occupy (see vm-switcher in
+   vehicle-matcher.js) without fighting the grid's own column widths. */
 .vm-podium {
-  display: grid;
-  grid-template-columns: 1fr;
-  align-items: start;
-  gap: var(--vm-space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--vm-space-6);
   animation: vm-in 0.25s ease;
   /* The stage is also the confetti host: celebrate() drops an absolutely
      positioned layer into it, so it needs to be the containing block or the
@@ -3149,11 +3149,24 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
      pane scrolls internally above 720px and would clip the burst. */
   position: relative;
 }
+
+/* The two-pane grid. One column below 720px (the brief first, then the
+   podium, which is DOM order, so no reordering is needed), two above: the left
+   column takes a fixed reading measure and the podium takes the rest.
+   min-width: 0 on both panes because a grid item defaults to min-content width,
+   and a long unbroken model name in a card would otherwise push the whole track
+   wider than the block. */
+.vm-podium-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: var(--vm-space-8);
+}
 .vm-podium-ask,
 .vm-podium-results { min-width: 0; }
 
 @media (min-width: 720px) {
-  .vm-podium {
+  .vm-podium-grid {
     grid-template-columns: minmax(280px, 320px) 1fr;
     gap: var(--vm-space-8);
   }
@@ -3204,11 +3217,64 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    1184px content column this leaves the pane ~784px, which is what makes the
    two-per-row step layout below possible. */
 @media (min-width: 1080px) {
-  .vm-podium {
+  .vm-podium-grid {
     grid-template-columns: minmax(320px, 360px) 1fr;
     gap: var(--vm-space-10);
   }
   .vm-podium-ask { padding-right: var(--vm-space-8); }
+}
+
+/* ------------------------------ the head band -------------------------- */
+
+/* Full width, above the grid: the wordmark/title/progress/banner used to live
+   cramped in the 320px left pane, in the space a tab-style switcher would
+   otherwise have taken above the stage. Moving the switcher into a compact
+   dropdown (see vm-switcher) freed that space, so the brief's own identity and
+   progress move up into it and get room to read as a heading rather than a
+   sidebar label. */
+.vm-podium-head { max-width: 640px; }
+
+.vm-podium-title {
+  font-family: var(--vm-font-heading);
+  font-size: clamp(28px, 4vw, var(--vm-text-h1));
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  margin: 0 0 var(--vm-space-4);
+}
+
+.vm-podium-progress {
+  height: 8px;
+  background: var(--vm-surface-alt);
+  border-radius: var(--vm-radius);
+  overflow: hidden;
+  margin: 0 0 var(--vm-space-2);
+}
+.vm-podium-progress-bar {
+  height: 100%;
+  width: 0;
+  background: var(--vm-accent-spot);
+  border-radius: var(--vm-radius);
+  transition: width 0.3s ease;
+}
+
+/* A live region, so it gains and loses text as the brief fills in. The
+   reserved min-height stops that from nudging the grid below up and down
+   under the reader. */
+.vm-podium-banner {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: var(--vm-text-body);
+  line-height: 1.4;
+  color: var(--vm-ink-muted);
+}
+/* Once the brief is committed the banner is reporting a result, not nudging
+   for more answers, so it takes the accent and the bold face. */
+.vm-podium.is-committed .vm-podium-banner {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  color: var(--vm-accent-spot);
 }
 
 /* ---------------------------- left pane: the brief ------------------- */
@@ -3224,65 +3290,6 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   margin: 0 0 var(--vm-space-2);
 }
 
-/* Sized off .vm-title but two steps down: this headline lives in a 320px
-   column beside a live result, so the questionnaire's 40px would take four
-   lines and push the first question below the fold. */
-.vm-podium-title {
-  font-family: var(--vm-font-heading);
-  font-size: var(--vm-text-h2);
-  font-weight: 300;
-  line-height: 1.15;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  margin: 0 0 var(--vm-space-3);
-}
-
-/* The lede sets in the BODY font at every brand, not the heading font that
-   .vm-lede uses. Four of the six brands already override .vm-lede back to body
-   copy, and the two that do not (BMW, Motorrad) set it in a light grotesque
-   that reads thin at this size in a narrow column. One rule beats six. */
-.vm-podium-lede {
-  font-family: var(--vm-font-body);
-  font-weight: 400;
-  font-size: var(--vm-text-body);
-  line-height: 1.4;
-  color: var(--vm-ink-muted);
-  margin: 0 0 var(--vm-space-5);
-}
-
-.vm-podium-progress {
-  height: 4px;
-  background: var(--vm-surface-alt);
-  border-radius: var(--vm-radius);
-  overflow: hidden;
-  margin: 0 0 var(--vm-space-2);
-}
-.vm-podium-progress-bar {
-  height: 100%;
-  width: 0;
-  background: var(--vm-accent-spot);
-  border-radius: var(--vm-radius);
-  transition: width 0.3s ease;
-}
-
-/* A live region, so it gains and loses text as the brief fills in. The
-   reserved min-height stops that from nudging the first question up and down
-   under the reader. */
-.vm-podium-banner {
-  margin: 0 0 var(--vm-space-6);
-  min-height: 1.4em;
-  font-size: var(--vm-text-label);
-  line-height: 1.4;
-  color: var(--vm-ink-muted);
-}
-/* Once the brief is committed the banner is reporting a result, not nudging
-   for more answers, so it takes the accent and the bold face. */
-.vm-podium.is-committed .vm-podium-banner {
-  font-family: var(--vm-font-bold);
-  font-weight: 700;
-  color: var(--vm-accent-spot);
-}
-
 /* One block per visible question. Conditional questions are spliced in and out
    here, so the separation is a hairline between siblings rather than a border
    on the block itself: adding or removing a block never leaves a stray rule at
@@ -3291,10 +3298,37 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   display: flex;
   flex-direction: column;
 }
-.vm-podium-q { padding: var(--vm-space-5) 0; }
 .vm-podium-q + .vm-podium-q { border-top: var(--vm-border-width) solid var(--vm-line); }
 
+/* The twisty header: a full-width button so the whole row (label, title,
+   badge, chevron) is the hit target, not just the chevron glyph. Text-align
+   left and a transparent background so it reads as a heading, not a button,
+   until hovered/focused. */
+.vm-podium-q-heading { margin: 0; }
+.vm-podium-q-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--vm-space-3);
+  width: 100%;
+  padding: var(--vm-space-4) 0;
+  border: 0;
+  background: transparent;
+  appearance: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.vm-podium-q-toggle:hover .vm-podium-q-title,
+.vm-podium-q-toggle:focus-visible .vm-podium-q-title { color: var(--vm-accent-spot); }
+.vm-podium-q-toggle:focus-visible { outline: 2px solid var(--vm-accent-spot); outline-offset: 2px; }
+
+/* The label+title pair grows to fill the row; the badge and chevron after it
+   stay fixed at the end. */
+.vm-podium-q-text { flex: 1 1 auto; min-width: 0; }
+
 .vm-podium-q-label {
+  display: block;
   font-family: var(--vm-font-bold);
   font-weight: 700;
   font-size: var(--vm-text-eyebrow);
@@ -3309,15 +3343,47 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    them share a column with a live result, so they read as a form, not as eight
    consecutive headlines. */
 .vm-podium-q-title {
+  display: block;
   font-family: var(--vm-font-heading);
   font-weight: 300;
   font-size: var(--vm-text-body-lg);
   line-height: 1.25;
-  margin: 0;
+  transition: color 0.15s ease;
 }
 
+.vm-podium-q-badge {
+  flex: 0 0 auto;
+  padding: 3px var(--vm-space-2);
+  border-radius: var(--vm-radius-control);
+  background: var(--vm-surface-alt);
+  color: var(--vm-ink-muted);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+
+/* A plain CSS chevron (no icon font/SVG), rotated by aria-expanded so it needs
+   no separate open/closed asset. */
+.vm-podium-q-chevron {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-right: 2px;
+  border-right: var(--vm-border-width) solid var(--vm-ink-muted);
+  border-bottom: var(--vm-border-width) solid var(--vm-ink-muted);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.vm-podium-q-toggle[aria-expanded='false'] .vm-podium-q-chevron { transform: rotate(-45deg); }
+
+.vm-podium-q-panel { padding: 0 0 var(--vm-space-5); }
+.vm-podium-q-panel[hidden] { display: none; }
+
 .vm-podium-q-help {
-  margin: var(--vm-space-1) 0 0;
+  margin: 0 0 var(--vm-space-3);
   font-size: var(--vm-text-label);
   line-height: 1.4;
   color: var(--vm-ink-muted);
@@ -3325,15 +3391,15 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 
 /* The shared option list carries the questionnaire's generous margins, which
    were measured for a full-width screen with one question on it. */
-.vm-podium-q .vm-options { margin: var(--vm-space-3) 0 0; }
-.vm-podium-q .vm-options.vm-slider { padding-top: var(--vm-space-1); }
-.vm-podium-q .vm-slider-value { font-size: var(--vm-text-body-lg); margin-bottom: var(--vm-space-3); }
+.vm-podium-q-panel .vm-options { margin: 0; }
+.vm-podium-q-panel .vm-options.vm-slider { padding-top: var(--vm-space-1); }
+.vm-podium-q-panel .vm-slider-value { font-size: var(--vm-text-body-lg); margin-bottom: var(--vm-space-3); }
 
 @media (min-width: 720px) {
   /* .vm-options goes 2-up from a 560px VIEWPORT, but from 720px this pane is a
      320px column, so the two-up grid would put two labels in ~150px each. */
-  .vm-podium-q .vm-options { grid-template-columns: 1fr; }
-  .vm-podium-q .vm-option { padding: var(--vm-space-3) var(--vm-space-4); }
+  .vm-podium-q-panel .vm-options { grid-template-columns: 1fr; }
+  .vm-podium-q-panel .vm-option { padding: var(--vm-space-3) var(--vm-space-4); }
 }
 
 .vm-podium-commit {
@@ -3378,9 +3444,9 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-podium-steps.is-updating { opacity: 0.45; }
 
 /* A step is a frame around a shared card, not a card itself, so it paints no
-   background or border of its own (that would double every card edge). It is
-   the positioning context for the reject trigger, and it carries the dismissal
-   transition for the whole tile. */
+   background or border of its own (that would double every card edge). It holds
+   the rank eyebrow plus .vm-podium-card, and carries the dismissal transition
+   for the whole tile. The chip anchors to that inner wrapper, not to this. */
 .vm-podium-step {
   position: relative;
   transition: opacity 0.35s var(--vm-ease), transform 0.35s var(--vm-ease);
@@ -3484,11 +3550,11 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 
      Only the spanning winner. A tied gold card is one column wide, so it is a
      portrait card and keeps the stacked anatomy. */
-  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-media {
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-podium-card > .vm-card > .vm-card-media {
     flex: none;
     max-height: 280px;
   }
-  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body {
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-podium-card > .vm-card > .vm-card-body {
     display: block;
     columns: 2;
     column-gap: var(--vm-space-8);
@@ -3496,7 +3562,7 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   /* Multi-column will break a paragraph across the gap by default, which turns
      a two-line spec list into one line at the bottom of one column and one at
      the top of the other. Every block in this body is a unit. */
-  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body > * {
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-podium-card > .vm-card > .vm-card-body > * {
     break-inside: avoid;
   }
   /* Put the seam where the register changes instead of wherever the balancer
@@ -3504,14 +3570,14 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
      it is present on every non-compact card, so it is the reliable hinge.
      Skipped when the blurb is the last child — a payload with no kit, reasons or
      link would otherwise force an empty second column. */
-  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-podium-card > .vm-card > .vm-card-body
     > .vm-blurb:not(:last-child) {
     break-after: column;
   }
   /* Belt and braces for the browsers that ignore a forced column break: a
      balanced split put "What's fitted" at the foot of one column and the kit it
      labels at the head of the next. A label is part of the thing it labels. */
-  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-podium-card > .vm-card > .vm-card-body
     > .vm-why-label {
     break-after: avoid;
   }
@@ -3848,6 +3914,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   .vm-podium-step .vm-card,
   .vm-podium-tail-grid > *,
   .vm-podium-progress-bar,
+  .vm-podium-q-title,
+  .vm-podium-q-chevron,
   .vm-podium-reject { transition: none; }
   /* No re-rank cross-fade: the new order simply appears, which is the honest
      version of the same information. */
@@ -3857,4 +3925,610 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   .vm-podium-step.is-dismissed,
   .vm-podium-tail-grid > .is-dismissed { transform: none; opacity: 0; }
   .vm-podium-skeleton .vm-skel { animation: none; background-image: none; }
+}
+
+/* ======================================================================
+   Guess Who (the `guess-who` mode, modes/guess-who.js)
+   ----------------------------------------------------------------------
+   The elimination board. Every other mode draws a handful of cards; this one
+   draws the whole national pool — 12,099 for BMW, 3,578 for MINI — and takes
+   cars away as filters land. That single fact sets every rule below.
+
+   THE SIZE LADDER. One grid, four densities: dot → chip → tile → card. The JS
+   (pickLayout / STAGES) picks the largest track width whose grid still fits ~1.9
+   screens and writes it to --vm-gw-track, --vm-gw-gap and --vm-gw-cell-h, plus
+   a data-stage on the board. So there are no breakpoints here for how many cars
+   are left — the stage attribute is the breakpoint, and it is driven by count
+   and viewport together rather than by viewport alone.
+
+   WHY content-visibility IS NOT OPTIONAL. At 12,000 cells, laying out the board
+   costs 512 ms without it and 64 ms with it — an 8× difference between a mode
+   that feels instant and one that visibly hangs on every filter. It is applied
+   at chip and tile stage, where cells carry photos worth skipping, and paired
+   with contain-intrinsic-size fed from the same numbers that size the real cell
+   so the scrollbar doesn't lurch as rows render. Card stage is excluded: those
+   cards have variable height, there are only ever a few dozen, and a remembered
+   size would be wrong for them.
+
+   WHAT ANIMATES. Only transform and opacity, ever — an eliminated card's exit
+   and a survivor's FLIP both run on the compositor, which is the only way 3,000
+   cells can move at once. Nothing here transitions width, height, top or left,
+   and nothing animates a property the browser would have to re-layout for.
+
+   All tokens, no hex, except the two places a real paint colour is the content
+   (--vm-gw-tint, set per cell in JS from the car's shade). Every animation is
+   disabled in the reduced-motion block at the end.
+   ====================================================================== */
+
+.vm-gw {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vm-space-4);
+  /* The containing block for celebrate()'s inset:0 confetti layer (see
+     match-signal.js, which requires a positioned host). Without it the layer
+     resolves against the initial containing block and the burst rains from the
+     top of the document rather than over the last car standing. */
+  position: relative;
+}
+
+/* --- the bar: what's left, and the nine ways to narrow it --- */
+
+/* Sticky, because the board below it can run to two screens and the count is
+   the readout for every action taken in the chips. Scrolling away from "1,204
+   left" while still filtering would leave the buyer working blind. */
+.vm-gw-bar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--vm-space-3) var(--vm-space-5);
+  padding: var(--vm-space-4) 0 var(--vm-space-3);
+  background: var(--vm-surface);
+  border-bottom: var(--vm-border-width) solid var(--vm-line);
+}
+
+.vm-gw-lead {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.vm-gw-wordmark {
+  margin: 0 0 var(--vm-space-1);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--vm-ink-muted);
+}
+
+.vm-gw-tally {
+  display: flex;
+  align-items: baseline;
+  gap: var(--vm-space-3);
+}
+
+/* The count is the headline, not the title: it is the one number that changes,
+   and the JS ticks it down rather than snapping so the drop is legible as an
+   event. Tabular figures keep the digits from shuffling sideways mid-tick,
+   which is what made an earlier version read as a flicker rather than a count. */
+.vm-gw-count {
+  font-family: var(--vm-font-heading);
+  font-size: var(--vm-text-h1);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  color: var(--vm-ink);
+}
+
+.vm-gw-title {
+  margin: 0;
+  font-family: var(--vm-font-heading);
+  font-size: var(--vm-text-h3);
+  line-height: 1.1;
+  color: var(--vm-ink);
+}
+
+.vm-gw-note {
+  margin: var(--vm-space-2) 0 0;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+  /* An empty note (the board is empty and the empty state is speaking instead)
+     must not collapse the bar's height and shift the chips under the pointer. */
+  min-height: 1.2em;
+}
+
+/* --- the chips: one per filter, each showing what it is set to --- */
+
+.vm-gw-chips {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--vm-space-2);
+  order: 3;
+}
+
+/* Two lines per chip: the axis and its current value. A single-line chip has to
+   choose between naming the filter and showing the setting, and with nine of
+   them on screen the buyer needs both — "Fuel: Petrol, Electric" scans, "Petrol,
+   Electric" makes you work out which control it belongs to. */
+.vm-gw-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 220px;
+  padding: var(--vm-space-2) var(--vm-space-3);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius-control);
+  background: var(--vm-surface);
+  cursor: pointer;
+  text-align: left;
+  color: var(--vm-ink);
+}
+.vm-gw-chip-label {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--vm-ink-muted);
+}
+/* One line, clipped: "Must have" can hold six concepts and a chip that grows to
+   fit them would push the board off the screen. The popover is the full list. */
+.vm-gw-chip-value {
+  font-size: var(--vm-text-label);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vm-gw-chip:hover { border-color: var(--vm-accent); }
+.vm-gw-chip:focus-visible {
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: 2px;
+}
+/* A narrowed filter is doing something to the board, so it says so — an accent
+   edge and the value in full ink. Nine quiet chips give no clue which of them
+   is responsible for a board that has gone empty. */
+.vm-gw-chip.is-on {
+  border-color: var(--vm-accent-spot);
+  box-shadow: inset 2px 0 0 var(--vm-accent-spot);
+}
+.vm-gw-chip.is-on .vm-gw-chip-label { color: var(--vm-ink); }
+.vm-gw-chip[aria-expanded='true'] { border-color: var(--vm-accent); }
+
+/* --- undo / start again: quiet text buttons, as in the podium popover. The
+   loud controls in this mode are the ones that remove cars. --- */
+.vm-gw-tools {
+  display: flex;
+  gap: var(--vm-space-4);
+  align-items: baseline;
+}
+.vm-gw-tool {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--vm-ink-muted);
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-label);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.vm-gw-tool:hover { color: var(--vm-ink); }
+.vm-gw-tool:focus-visible {
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: 2px;
+}
+.vm-gw-tool[hidden] { display: none; }
+
+/* --- the board --- */
+
+/* auto-fill with minmax(track, 1fr) rather than a fixed column count: the JS
+   computes the same column count to size the board, and handing the leftover
+   pixels back to the columns is what "reorganise to fill the screen space"
+   means — the last row is short, but no row is narrower than the screen. */
+.vm-gw-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--vm-gw-track, 46px), 1fr));
+  gap: var(--vm-gw-gap, 5px);
+  align-content: start;
+}
+.vm-gw-board[hidden] { display: none; }
+
+.vm-gw-cell {
+  position: relative;
+  min-width: 0;
+  /* The exit. Overridden inline by the FLIP pass, which sets its own transition
+     for one frame and then clears it, restoring this. */
+  transition:
+    opacity var(--vm-gw-exit, 380ms) var(--vm-ease),
+    transform var(--vm-gw-exit, 380ms) var(--vm-ease);
+}
+
+/* Eliminated: still holding its grid slot, on its way out. The survivors don't
+   move until this has finished (the JS waits EXIT_MS), because a board that
+   collapses while cars are still fading loses the thing worth watching. */
+.vm-gw-cell.is-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* dot / chip — the cars pop out of existence. At this size there is no room for
+   a graceful exit and the effect that reads is the gap appearing. */
+.vm-gw-board[data-stage='dot'] .vm-gw-cell.is-out,
+.vm-gw-board[data-stage='chip'] .vm-gw-cell.is-out { transform: scale(0.1); }
+
+/* tile / card — big enough to watch leave, so they sink and shrink slightly
+   rather than vanishing. */
+.vm-gw-board[data-stage='tile'] .vm-gw-cell.is-out,
+.vm-gw-board[data-stage='card'] .vm-gw-cell.is-out {
+  transform: scale(0.9) translateY(10px);
+}
+
+/* The 8× win. See the section header — chip and tile only. */
+.vm-gw-board[data-stage='chip'] .vm-gw-cell,
+.vm-gw-board[data-stage='tile'] .vm-gw-cell {
+  content-visibility: auto;
+  contain-intrinsic-size:
+    auto var(--vm-gw-track, 46px)
+    auto var(--vm-gw-cell-h, 40px);
+}
+
+/* --- dot stage: the wall --- */
+
+/* No photo and no text — 12,000 image requests is not a design, and no type is
+   legible at 12px. --vm-gw-tint is set per cell in JS: the car's paint once the
+   enrichment pass has reached it, and one of five token-derived neutrals until
+   then (see blankTint), so an unknown-colour wall reads as many objects rather
+   than one grey rectangle. A background colour and nothing else — the first
+   version varied brightness with a filter, which is 12,000 composited layers
+   for a decorative effect. */
+.vm-gw-board[data-stage='dot'] .vm-gw-cell {
+  aspect-ratio: 16 / 10;
+  background: var(--vm-gw-tint, var(--vm-line));
+}
+
+/* --- chip stage: photo only --- */
+.vm-gw-photo {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  background: var(--vm-surface-alt);
+  overflow: hidden;
+}
+.vm-gw-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* ~8% of live listings have no photo at all (942 of BMW's 12,099). A flat tinted
+   field, never a broken-image icon and never a "photo coming soon" caption that
+   would be unreadable at this size — the shared card says that properly at card
+   stage, where there is room for it. */
+.vm-gw-photo.is-blank { background: var(--vm-surface-dark); opacity: 0.25; }
+
+/* --- tile stage: photo, name, price, and the first size you can argue with --- */
+.vm-gw-board[data-stage='tile'] .vm-gw-cell {
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+  overflow: hidden;
+}
+.vm-gw-tile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--vm-space-2);
+}
+/* Two lines, clipped. Feed names run to 80 characters ("BMW 1.5 118i Sport
+   Hatchback 5dr Petrol Auto Euro 6 (s/s)") and a tile is 128–236px wide, so an
+   unclipped name would set the row height for every tile on the board. */
+.vm-gw-tile-name {
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-eyebrow);
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.vm-gw-tile-price {
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink-muted);
+}
+
+/* "Not this one" on a tile: an overlay, because a tile has no room for a
+   full-width button and the shared .vm-reject-open would double its height.
+   Same .vm-reject-menu and .vm-reject-option as every other surface, so the
+   reasons read identically wherever they are offered. */
+.vm-gw-reject {
+  position: absolute;
+  inset: 0 0 auto auto;
+  margin: 0;
+  z-index: 2;
+}
+.vm-gw-reject .vm-reject-open {
+  width: auto;
+  padding: 2px var(--vm-space-2);
+  font-size: var(--vm-text-eyebrow);
+  background: var(--vm-surface);
+  border-color: var(--vm-line);
+  opacity: 0;
+}
+/* Revealed on hover or focus rather than always on: nine hundred visible ✕
+   buttons is a page that looks like it wants you to leave. Focus-within keeps
+   it fully reachable by keyboard, where there is no hover to depend on. */
+.vm-gw-cell:hover .vm-gw-reject .vm-reject-open,
+.vm-gw-cell:focus-within .vm-gw-reject .vm-reject-open { opacity: 1; }
+.vm-gw-reject .vm-reject-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 3;
+  width: 220px;
+  margin-top: 2px;
+  border: var(--vm-border-width) solid var(--vm-line);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+}
+
+/* --- card stage: the shared card, shorter than the podium's --- */
+
+/* "Similar to Podium mode (but not as tall!)" — the compact tile rather than the
+   hero, which already drops the blurb, the kit list and the reasons. What is
+   left to remove is the carousel's own sizing: .vm-card-compact is a flex item
+   with a clamped basis, and here it is a grid child that must fill its track. */
+.vm-gw-board[data-stage='card'] .vm-card-compact {
+  flex: none;
+  width: 100%;
+  height: 100%;
+  border-color: var(--vm-line);
+  box-shadow: none;
+}
+/* Tighter than the carousel's tile: several dozen of these are on screen at
+   once, not three in a scroller. */
+.vm-gw-board[data-stage='card'] .vm-card-compact .vm-card-body {
+  padding: var(--vm-space-3);
+  gap: 2px;
+}
+.vm-gw-board[data-stage='card'] .vm-card-compact .vm-card-name {
+  font-size: var(--vm-text-label);
+}
+.vm-gw-board[data-stage='card'] .vm-reject { margin-top: var(--vm-space-3); }
+.vm-gw-board[data-stage='card'] .vm-reject-open {
+  padding: var(--vm-space-2) var(--vm-space-3);
+}
+
+/* --- the popover: one filter at a time --- */
+
+/* Fixed and positioned in JS from the chip's rect, clamped into the viewport —
+   the same contract as .vm-podium-pop, and the same z-index band, because the
+   two are the same kind of object. Scrollable: "Must have" offers 22 concepts,
+   which is taller than any screen worth pinning a dialog to. */
+.vm-gw-pop {
+  position: fixed;
+  z-index: 50;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  max-height: min(60vh, 520px);
+  overflow-y: auto;
+  padding: var(--vm-space-4);
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.18);
+}
+/* Toggled with the hidden attribute, and a display value in a stylesheet beats
+   the browser's default rule for it. */
+.vm-gw-pop[hidden] { display: none; }
+
+.vm-gw-pop-title {
+  margin: 0 0 var(--vm-space-3);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink);
+}
+
+/* The shared question controls arrive sized for a full-width screen (two and
+   three columns at the block's wider breakpoints). Everything here is a fit for
+   ~260px of usable width, mirroring .vm-podium-pop-body. */
+.vm-gw-pop-body .vm-options {
+  grid-template-columns: 1fr;
+  margin: 0;
+}
+.vm-gw-pop-body .vm-option {
+  padding: var(--vm-space-2) var(--vm-space-3);
+  font-size: var(--vm-text-label);
+}
+.vm-gw-pop-body .vm-options.vm-slider { padding: 0; }
+.vm-gw-pop-body .vm-slider-value {
+  font-size: var(--vm-text-body-lg);
+  margin-bottom: var(--vm-space-3);
+}
+.vm-gw-pop-body .vm-slider-bounds { font-size: var(--vm-text-eyebrow); }
+.vm-gw-pop-done {
+  width: 100%;
+  max-width: 100%;
+  margin-top: var(--vm-space-4);
+}
+
+/* --- the distance filter's postcode box ---
+
+   The only text input in the whole block, which is why these rules exist at all:
+   there is no shared .vm-input to lean on, and inventing one for a single field
+   would be six brands' worth of theming for one control. It borrows the option
+   buttons' border and radius instead, so it reads as part of the same set. */
+.vm-gw-place-row {
+  display: flex;
+  gap: var(--vm-space-2);
+  margin-bottom: var(--vm-space-2);
+}
+.vm-gw-place-input {
+  /* min-width: auto because a flex item's default min-width is its intrinsic
+     size, and an 8-character input's is wide enough to push the Find button out
+     of a 260px popover. */
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--vm-space-2) var(--vm-space-3);
+  font-family: var(--vm-font-body);
+  font-size: var(--vm-text-label);
+  /* Postcodes are read back character by character ("is that an O or a zero"),
+     so the value is spaced rather than set tight. */
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vm-ink);
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  border-radius: var(--vm-radius);
+}
+/* The placeholder is an example, not a label, and has to lose to the value it
+   sits behind — otherwise "NG1 2AB" grey reads as a postcode already entered. */
+.vm-gw-place-input::placeholder {
+  color: var(--vm-ink-muted);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.vm-gw-place-go {
+  flex: none;
+  padding: var(--vm-space-2) var(--vm-space-3);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  color: var(--vm-ink);
+  background: var(--vm-surface-dark);
+  border: var(--vm-border-width) solid var(--vm-line);
+  /* -control, not -radius: this is a button, and MINI's buttons are pills. */
+  border-radius: var(--vm-radius-control);
+  cursor: pointer;
+}
+.vm-gw-place-go:hover { border-color: var(--vm-ink); }
+/* Disabled only for the moment a lookup is in flight, so this is a "working on
+   it" state rather than a permanent one: dimmed, but the label stays readable. */
+.vm-gw-place-go:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+/* Empty most of the time, and it must not reserve a line when it is: a gap above
+   the radius options that only sometimes contains text reads as a rendering
+   fault. :empty gets no margin; text gets one. */
+.vm-gw-place-status {
+  margin: 0;
+  font-size: var(--vm-text-eyebrow);
+  line-height: 1.35;
+  color: var(--vm-ink-muted);
+}
+.vm-gw-place-status:not(:empty) { margin-bottom: var(--vm-space-3); }
+
+/* --- nothing left --- */
+
+/* Not an error and not styled like one. A hard filter that matches nothing has
+   found something true about the stock, and the copy says so; the only thing
+   this needs to be is calm and to put the way back within reach. */
+.vm-gw-empty {
+  padding: var(--vm-space-12) var(--vm-space-5);
+  text-align: center;
+  border: var(--vm-border-width) dashed var(--vm-line);
+  border-radius: var(--vm-radius);
+}
+.vm-gw-empty[hidden] { display: none; }
+.vm-gw-empty-title {
+  margin: 0 0 var(--vm-space-3);
+  font-family: var(--vm-font-heading);
+  font-size: var(--vm-text-h3);
+  color: var(--vm-ink);
+}
+.vm-gw-empty-note {
+  margin: 0 auto var(--vm-space-6);
+  max-width: 44ch;
+  font-size: var(--vm-text-body);
+  color: var(--vm-ink-muted);
+}
+
+/* --- first paint --- */
+
+/* A grid of blank cells rather than the usual skeleton lines, because that is
+   literally what is coming: the shape of the wait matches the shape of the
+   arrival, so nothing jumps when the pool lands. */
+.vm-gw-skeleton .vm-gw-cell.is-blank {
+  aspect-ratio: 16 / 10;
+  background: var(--vm-surface-alt);
+}
+
+/* --- narrow viewports ---
+
+   Measured at 375x812 on MINI's unfiltered pool: the seven chips wrap into
+   three rows, which stands the bar at 315px and starts the board at y=388 —
+   less than half of the first screen showing cars, and permanently, because the
+   bar is sticky. Narrowing a filter makes it worse, not better: a longer value
+   widens its chip and can push the wrap to a fourth row.
+
+   One horizontal strip instead puts the bar back to roughly 200px. The whole
+   point of this mode is watching cars disappear, so the controls cannot own the
+   screen they disappear from. --- */
+@media (max-width: 767px) {
+  .vm-gw-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    /* A chip's focus ring would be clipped by the strip's own overflow — set
+       one axis to auto and the other computes to auto too — so the strip
+       carries the 4px the ring needs and takes it back out of the page gutter,
+       leaving the chips aligned with the count above them. */
+    padding: 4px;
+    margin-inline: -4px;
+  }
+  /* flex-shrink defaults to 1, so in a nowrap strip the seven chips would
+     squeeze into the 303px on offer rather than scroll, clipping every value to
+     a couple of characters. The strip scrolls; the chips keep their size. */
+  .vm-gw-chip {
+    flex: none;
+    /* Down from 220px, which is two thirds of this screen: one chip plus a
+       sliver of the next reads as a row that has ended, and nobody scrolls a
+       row that looks finished. At 140 the widest case still shows two whole
+       chips and the start of a third (140 + 8 + 140 = 288 of 303). */
+    max-width: 140px;
+  }
+}
+
+/* --- brand tweaks --- */
+
+/* MINI reserves solid black for buttons and selected states, so a narrowed chip
+   takes the green spot rather than the near-black --vm-accent, which would read
+   as a heavy box and lose the on/off distinction entirely. Same argument as the
+   podium's gold step. */
+.vm.vm-mini .vm-gw-chip.is-on {
+  border-color: var(--vm-accent-spot);
+  box-shadow: inset 2px 0 0 var(--vm-accent-spot);
+}
+.vm.vm-mini .vm-gw-chip:hover { border-color: var(--vm-accent-spot); }
+/* MINI's heading face is a serif, which the count carries well at h1 but which
+   needs the extra weight to hold against the title beside it. */
+.vm.vm-mini .vm-gw-count { font-family: var(--vm-font-heading); }
+
+/* Ferrari and Motorrad set their headings in caps with tracking; the count is a
+   number in that same face and inherits the tracking as a gap after the last
+   digit, which reads as a stray space before the title. */
+.vm.vm-ferrari .vm-gw-count,
+.vm.vm-motorrad .vm-gw-count { letter-spacing: 0; }
+
+/* --- reduced motion: no exit travel, no reflow slide, no counting up. Every
+   state stays reachable and the board is always correct — the only thing
+   removed is the transition between two states, never a state. The JS reads the
+   same media query and skips the FLIP pass and the count tween outright, so
+   these rules are the belt to that braces. --- */
+@media (prefers-reduced-motion: reduce) {
+  .vm-gw-cell,
+  .vm-gw-reject .vm-reject-open { transition: none; }
+  /* Eliminated cards keep their opacity STATE (it is what says they are going)
+     and lose the scale travel, so nothing shrinks under the reader. */
+  .vm-gw-cell.is-out { transform: none; }
+  /* No hover-reveal on the reject control: without a transition it would blink
+     in and out, so it is simply always there at tile stage. */
+  .vm-gw-reject .vm-reject-open { opacity: 1; }
+  .vm-gw-skeleton .vm-skel { animation: none; background-image: none; }
 }

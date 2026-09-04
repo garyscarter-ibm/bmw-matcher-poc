@@ -791,6 +791,14 @@ export const TASTE_PTS = 6;
 /** How many next-best cars to hold back so a rejection has somewhere to go. */
 export const ALTERNATIVES = 6;
 
+// How many individual listings a grouped card carries. One dealer's forecourt
+// held a handful of any given model, so the group was its own sample; a national
+// pool holds hundreds, and every extra one is a PDP fetch for paint and more
+// JSON on the wire. 24 is well past what a buyer will scroll while still leaving
+// the refine/reject layer real cars to filter. The card's stated count, price
+// spread and equipment union still describe the full group — see groupListings.
+export const LISTING_SAMPLE = 24;
+
 /*
  * Collapse repeat listings of the same car into one match.
  *
@@ -831,13 +839,20 @@ export function groupListings(ranked) {
         ...match.car,
         // The feed's tidiest name for this car wins the card.
         name: listings.reduce((a, b) => (b.name.length < a.length ? b.name : a), match.car.name),
+        // Aggregates describe the WHOLE group, deliberately computed before the
+        // sample below: a national pool really does hold 392 of a given Cooper,
+        // and the card should say so even though it only carries a few examples.
         listingCount: listings.length,
         priceFrom: prices.length ? Math.min(...prices) : match.car.priceMin,
         priceTo: prices.length ? Math.max(...prices) : match.car.priceMin,
         colours,
         features: [...new Set(listings.flatMap((c) => c.features || []))],
       },
-      listings,
+      // Only a sample travels. `ranked` is score-ordered, so these are the
+      // group's best examples, and every one costs a PDP fetch to colour plus
+      // its own slice of the response — 392 of them buys the buyer nothing and
+      // guarantees the paint budget is spent before the queue is drained.
+      listings: listings.slice(0, LISTING_SAMPLE),
     };
   });
 }

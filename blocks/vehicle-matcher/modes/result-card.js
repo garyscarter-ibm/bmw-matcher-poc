@@ -166,9 +166,19 @@ export function mediaWell(car, extraClass = '') {
  * One result card.
  * `big` adds the "why it suits you" reasons; `compact` is the carousel tile —
  * same anatomy, but trades the blurb and reasons for a distance line.
+ *
+ * `showScore` and `showPaint` exist for the hard-filter mode (modes/guess-who.js),
+ * which is not a recommender:
+ *  - showScore: false — there is no score. A hard filter says yes or no, so a
+ *    badge would either print "undefined%" or invent a 100% the engine never
+ *    awarded. Every scoring mode leaves it alone and keeps its badge.
+ *  - showPaint: true — put the paint in a COMPACT card's spec line, which it
+ *    normally omits for width. A mode whose whole premise is filtering by colour
+ *    has to name the colour on the cars it filtered down to.
  */
 export function matchCard(match, {
   big = false, compact = false, brand: brandKey = 'bmw',
+  showScore = true, showPaint = false,
   rejectOptions, rejectLabel, rejectPrompt,
 } = {}) {
   const { car, score, reasons } = match;
@@ -181,14 +191,16 @@ export function matchCard(match, {
   const body = el('div', 'vm-card-body');
   const head = el('div', 'vm-card-head');
   head.append(el('h3', 'vm-card-name', car.name));
-  const badge = el('span', 'vm-score', `${score}%`);
-  // The number has been unexplained since fit and taste were split, and two
-  // cards sharing one reads as a bug unless you know it is a claim that they
-  // suit you equally. Said properly in the working note under the cards; this
-  // is the affordance for the reader who points at the badge itself.
-  badge.title = 'Match score: how well this car fits the answers you gave. Cars that '
-    + 'suit you equally get the same score.';
-  head.append(badge);
+  if (showScore) {
+    const badge = el('span', 'vm-score', `${score}%`);
+    // The number has been unexplained since fit and taste were split, and two
+    // cards sharing one reads as a bug unless you know it is a claim that they
+    // suit you equally. Said properly in the working note under the cards; this
+    // is the affordance for the reader who points at the badge itself.
+    badge.title = 'Match score: how well this car fits the answers you gave. Cars that '
+      + 'suit you equally get the same score.';
+    head.append(badge);
+  }
   body.append(head);
 
   // Single used price when min === max (live stock), else the range.
@@ -236,7 +248,8 @@ export function matchCard(match, {
       `0–62 ${car.zeroTo62}s`,
       car.fuel === 'ev' ? `${car.evRange} mi range` : `${car.mpg} mpg`,
     ]).filter(Boolean);
-    if (!paint || compact) {
+    // No paint to print, or a compact tile whose caller hasn't asked for it.
+    if (!paint || (compact && !showPaint)) {
       specs.textContent = [...head, ...tail].join('  ·  ');
       return;
     }

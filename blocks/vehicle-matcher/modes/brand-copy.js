@@ -37,8 +37,8 @@ export const BRAND_COPY = {
     // No promised count: results now show one clear winner or the whole tie
     // (up to MAX_SHOWN), so naming a number here would be wrong half the time.
     lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
-      + `your miles and your budget. We’ll match you with the approved-used `
-      + `cars at ${retailer} that suit you best, and tell you why.`,
+      + `your miles and your budget. We’ll match you with the `
+      + `vehicles at ${retailer} that suit you best, and tell you why.`,
     // Approved Used's no-surprises register: state the fact, name the
     // retailer, don't dress it up (docs/tone-style-guide.md). No label —
     // BMW's copy states things rather than announcing them.
@@ -54,10 +54,12 @@ export const BRAND_COPY = {
      * the unqualified line stands, because a qualification that isn't doing
      * work is just a smaller claim (docs/results-page-review.md).
      *
-     * The block is authored onto ONE retailer's page, so "at Grassicks Garage"
-     * is not a hedge — it's a more accurate statement of what was searched. A
-     * higher score in the group below then contradicts nothing, because the
-     * headline never claimed to be about that group.
+     * `retailer` names the pool that was actually searched — for BMW and MINI
+     * the national approved-used programme, since stock.js walks the whole feed
+     * rather than one dealer's slice. So "at BMW Approved Used" is not a hedge,
+     * it's a more accurate statement of what was searched. A higher score in the
+     * group below then contradicts nothing, because the headline never claimed
+     * to be about that group.
      */
     tiedTitleHere: ({ count, retailer }) => `At ${retailer}, ${cardinal(count)} of these `
       + 'fit you equally well.',
@@ -68,9 +70,10 @@ export const BRAND_COPY = {
     tasteTitleHere: ({ model, retailer }) => `Your best match at ${retailer} is the ${model}.`,
     tasteLede: () => 'Several of these suit you equally well on paper. This one lines up '
       + 'best with what you said matters.',
-    // The retailer is named on every card, so the lede doesn't repeat it —
-    // and a brand plural appended to a retailer label reads "Sytner Luton
-    // MINI MINIs", which is why neither brand's copy builds one.
+    // The retailer is named on every card (the dealer holding that car), so the
+    // lede doesn't repeat it — and a brand plural appended to the pool label
+    // reads "MINI Approved Used MINIs", which is why neither brand's copy
+    // builds one.
     tiedLede: () => 'On your answers we can’t split them: each suits you as well as the next. '
       + 'The difference now is which you prefer the look of.',
     /*
@@ -145,7 +148,7 @@ export const BRAND_COPY = {
      * That is the whole rule the old banded page broke: "Close, but not level
      * with the cars above" and "two of these fit you equally well" were both
      * quality claims on the same scale, made by different sections, so one
-     * could contradict the other. "At Grassicks Garage" asserts nothing about
+     * could contradict the other. "At BMW Approved Used" asserts nothing about
      * fit, so it cannot contradict a higher score in the group below it. Same
      * reason the old "NEXT BEST" heading had to go: it ranked.
      */
@@ -178,7 +181,7 @@ export const BRAND_COPY = {
     title: 'Find your perfect MINI.',
     cta: 'Let’s find your MINI',
     lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
-      + `your miles and your money. We’ll find the MINIs at ${retailer} `
+      + `your miles and your money. We’ll find the vehicles at ${retailer} `
       + 'with your name on them, and tell you exactly why.',
     // Same fact, MINI's register: the UPPERCASE-with-a-full-stop beat as the
     // lead-in, then warm and plain. A shortage is a shrug, never a shrug-off.
@@ -270,11 +273,12 @@ BRAND_COPY.honda = {
   title: 'Find the right Honda for you.',
   cta: 'Find my Honda',
   // Honda's plain, practical register: no superlative ("best"), lead on the
-  // sensible fit (life, running, budget) and the reassurance of approved-used.
+  // sensible fit (life, running, budget). The approved-used reassurance comes
+  // from the retailer label itself, so the lede doesn't restate it.
   // See docs/tone-style-guide.md (Honda).
   lede: ({ questions, retailer }) => `${questions} quick questions about your days, `
-    + 'your mileage and what you want to spend. We’ll find the approved-used '
-    + `Hondas at ${retailer} that genuinely suit how you live, and show our working.`,
+    + 'your mileage and what you want to spend. We’ll find the '
+    + `vehicles at ${retailer} that genuinely suit how you live, and show our working.`,
   unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
     + 'These are the closest to everything else you told us.',
   tiedTitle: ({ count }) => `${cardinal(count)} of these fit you just as well.`,
@@ -346,8 +350,8 @@ BRAND_COPY.ford = {
   // proud of being the sensible, well-priced choice with room for the spirited
   // side. See docs/tone-style-guide.md (Ford).
   lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
-    + 'your miles and your budget. We’ll pull together the approved-used '
-    + `Fords at ${retailer} that make real sense for you, and back it up with the reasons.`,
+    + 'your miles and your budget. We’ll pull together the '
+    + `vehicles at ${retailer} that make real sense for you, and back it up with the reasons.`,
   unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
     + 'These are the closest to everything else you told us.',
   tiedTitle: ({ count }) => `${cardinal(count)} of these fit you just as well.`,
@@ -422,8 +426,8 @@ BRAND_COPY.motorrad = {
   // a Ride"): lead on the riding, not "your life", and on the machine under you
   // rather than a soft "suit you best". See docs/tone-style-guide.md (Motorrad).
   lede: ({ questions, retailer }) => `${questions} quick questions about your riding, `
-    + 'your licence and your budget. We’ll match you to the approved-used '
-    + `BMW Motorrad bikes at ${retailer} built for the road you ride, and tell you why.`,
+    + 'your licence and your budget. We’ll match you to the '
+    + `bikes at ${retailer} built for the road you ride, and tell you why.`,
   unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
     + 'These are the closest matches to everything else you asked for.',
   refineStatus: ({ shown, wants }) => (shown === 1
@@ -460,8 +464,8 @@ BRAND_COPY.ferrari = {
   // Ferrari Approved programme rather than "approved-used". See DECISIONS.md and
   // docs/tone-style-guide.md (Ferrari).
   lede: ({ questions, retailer }) => `${questions} quick questions about how you drive, `
-    + 'the roads you love and your budget. We’ll match you with the Ferrari Approved '
-    + `cars at ${retailer} that were made for you, and tell you why.`,
+    + 'the roads you love and your budget. We’ll match you with the '
+    + `vehicles at ${retailer} that were made for you, and tell you why.`,
   unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby just now. `
     + 'These are the closest to everything else you told us.',
   tasteTitle: ({ model }) => `The one for you is the ${model}.`,
@@ -503,7 +507,7 @@ export const UNMET_PHRASES = {
   },
   mini: {
     fuel: {
-      petrol: 'petrol MINIs', phev: 'plug-in hybrid MINIs', ev: 'all-electric MINIs',
+      petrol: 'petrol cars', phev: 'plug-in hybrids', ev: 'all-electric cars',
     },
     bodyStyles: {
       hatchback: 'hatchbacks', estate: 'Clubman estates', suv: 'Countryman crossovers',
@@ -515,7 +519,7 @@ export const UNMET_PHRASES = {
     // (see hondaFuel in mapping.js), so the fuel warnings only ever name petrol,
     // diesel or fully electric — the values the quiz collects.
     fuel: {
-      petrol: 'petrol Hondas', diesel: 'diesel Hondas', ev: 'fully electric Hondas',
+      petrol: 'petrol cars', diesel: 'diesels', ev: 'fully electric cars',
     },
     bodyStyles: {
       hatchback: 'hatchbacks', suv: 'SUVs',
@@ -526,8 +530,8 @@ export const UNMET_PHRASES = {
     // Kuga PHEV, and the Mach-E / Explorer / Capri / Puma Gen-E EVs) and every
     // body from a supermini to a pickup.
     fuel: {
-      petrol: 'petrol Fords', diesel: 'diesel Fords', phev: 'plug-in hybrid Fords',
-      ev: 'fully electric Fords',
+      petrol: 'petrol cars', diesel: 'diesels', phev: 'plug-in hybrids',
+      ev: 'fully electric cars',
     },
     bodyStyles: {
       hatchback: 'hatchbacks', estate: 'estates', suv: 'SUVs', coupe: 'coupés',
@@ -552,7 +556,7 @@ export const UNMET_PHRASES = {
     // diesel or fully electric. Its three bodies are named the way the quiz
     // names them: the Spider for a convertible, the Purosangue for the SUV.
     fuel: {
-      petrol: 'petrol Ferraris', phev: 'plug-in hybrid Ferraris',
+      petrol: 'petrol cars', phev: 'plug-in hybrids',
     },
     bodyStyles: {
       coupe: 'coupés', convertible: 'Spiders', suv: 'the Purosangue',

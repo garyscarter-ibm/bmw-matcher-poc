@@ -163,8 +163,23 @@ after the block, self-contained folder), so porting is a copy-paste:
      mode with a switcher (the showcase). Mode keys live in
      `blocks/vehicle-matcher/modes/index.js`.
    - **Retailer ID** — the retailer's `retailer_site` ID (e.g. `96`); omit to
-     fall back to the backend's default retailer.
-   - **Retailer Name** — the display name shown in copy.
+     fall back to the brand's default (`defaultRetailer` in `server/brands.js`).
+     It does two jobs: at dealer **Scope** it is the pool, and at either scope it
+     is the address the "other retailers nearby" carousel measures distance from.
+   - **Scope** — `dealer` (default) or `national`: whether the block searches this
+     retailer's own forecourt or every retailer of the brand. Only BMW and MINI
+     have both — the other brands' feeds are a single national programme, so the
+     row does nothing there. Dealer scope is the default because a block authored
+     onto one retailer's page should answer for that retailer; national scope is
+     the group/programme case, and turns on Guess Who's Distance filter (with one
+     forecourt there is nothing to sort by distance, so it hides itself).
+   - **Retailer Name** — the display name shown in copy, for the pool that was
+     searched. Author it to match **Scope**: at dealer scope that is the branch
+     (`Grassicks Garage`), at national scope the programme (`BMW Approved Used`).
+     Getting it the wrong way round makes the copy lie about what it searched —
+     either claiming a pool of 12,000 when it looked at 41, or naming one branch
+     over cards from 130 of them. The dealer actually holding each car is always
+     named on the card itself.
    - **API** — your deployed backend's base URL. **This is how you point an
      EDS-authored block at its backend**: authored content can set config rows
      but not HTML attributes, so the block reads the API base from this row
@@ -187,13 +202,15 @@ Example authored table:
 | Brand | MINI |
 | Mode | questionnaire |
 | Retailer ID | 92 |
-| Retailer Name | Sytner Luton MINI |
+| Scope | dealer |
+| Retailer Name | Sytner Luton |
 | API | https://your-backend.onrender.com |
 | Title |  |
 
 (The blank **Title** row above suppresses the block's own headline, for when it
 sits under the page's own "FIND YOUR MINI." section heading. The **Mode** row
-locks the page to the questionnaire interface with no switcher.)
+locks the page to the questionnaire interface with no switcher. **Scope** and
+**Retailer Name** agree, so the copy names the forecourt it actually searched.)
 
 The block ships **no font files**: it names the host site's licensed families
 first (`--heading-font-family` / `--body-font-family` on BMW, MINI's own faces
@@ -203,6 +220,14 @@ when run standalone.
 The standalone `block.html` harness uses a `data-api` attribute + `?api=`
 override instead (no DA needed); `?retailer=<id>` tries a different retailer
 without editing the file. Both paths resolve through the same `apiBase()`.
+
+`?mode=<key>` and `?scope=dealer|national` are read straight from the query
+string by the block, so they override an authored row and need none of their own.
+That is what lets one deployed page demo both scopes: compare
+`?brand=mini&retailer=92&scope=dealer` with `?brand=mini&scope=national`. The
+harness re-derives **Retailer Name** from whichever brand and scope are in the
+URL, so its label always matches its pool; a real authored page sets the row by
+hand instead.
 
 Notes:
 - The block itself ships no dataset or weights — those stay behind the API.
@@ -223,9 +248,14 @@ The backend exposes two endpoints (plus `GET /health` → `{ ok: true }`):
   can state the number without hardcoding it. Both counts are server-owned: a
   brand gaining a question, or `TOP_MATCHES` changing, updates the intro copy on
   the next page load with no block rebuild.
-- **`POST /api/match`** with body `{ answers, retailer? }` → `{ matches, unmet }`.
-  `retailer` is the retailer_site ID to match against; omit it to use the
-  backend's default (`RETAILER_SITE` env var, or `96` if unset).
+- **`POST /api/match`** with body `{ answers, retailer?, brand?, scope? }` →
+  `{ matches, unmet }`. `retailer` is the retailer_site ID to match against; omit
+  it for the brand's `defaultRetailer` (`server/brands.js` — `96` for BMW, `92`
+  for MINI). `scope` is `dealer` (the default) or `national`: that retailer's own
+  stock, or every retailer of the brand. Anything unrecognised resolves to
+  `dealer`, deliberately — a mistyped scope must never widen a pool the page has
+  already named. `/api/preview`, `/api/field` and `/api/pool` take the same two
+  (`/api/pool` on the query string, and it echoes back the `scope` it used).
   Each match is `{ car, score, stretch, reasons }`, where `car` carries **only
   display fields** (name, line, body, fuel, price range, 0–62, mpg/range, blurb).
   Internal scoring fields (tags, size class, seats, boot…) are omitted, so the

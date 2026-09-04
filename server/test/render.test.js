@@ -49,7 +49,7 @@ const BRANDS = [
   { key: 'ferrari', pool: () => ferrariPool(20), name: /Ferrari/i },
 ];
 
-const MODES = ['questionnaire', 'mingle', 'knockout', 'podium'];
+const MODES = ['questionnaire', 'mingle', 'knockout', 'podium', 'guess-who'];
 
 let server;
 let modes;
@@ -232,6 +232,97 @@ test('re-mounting a mode starts a clean run', async () => {
   assert.equal(stages.length, 1, 'a re-mount left a stale interface behind');
 });
 
+/*
+ * Scope plumbing — ctx.scope has to reach the wire, and nothing on screen shows
+ * whether it did.
+ *
+ * A mode handed the national scope but silently asking for the dealer's stock
+ * paints perfectly: right theme, right copy, real cars, just the wrong pool. So
+ * these two tests watch the server's own record of what it was asked for rather
+ * than the DOM. Guess Who is the mode driven here because it reads the pool on
+ * mount with no playthrough; the other four are covered by the source guard
+ * below, which is what actually catches a positional-argument slip.
+ */
+test('a mode mounted at national scope asks the server for the national pool', async () => {
+  // Its own server: stockCalls is cumulative, and the suite's shared instance has
+  // every other test's requests in it.
+  const own = await startModeServer({ bmw: bmwPool() });
+  try {
+    const stage = mountMode(modes['guess-who'], { base: own.base, brand: 'bmw', scope: 'national' });
+    await settle(stage, (s) => s.textContent.replace(/\s/g, '').length > 20);
+    assert.ok(own.stockCalls.length > 0, 'guess-who must read the pool on mount');
+    for (const call of own.stockCalls) {
+      assert.equal(call.scope, 'national', 'ctx.scope did not reach the request');
+    }
+  } finally {
+    await own.close();
+  }
+});
+
+test('a mode mounted with no scope gets the dealer pool, the way an embed with no ?scope= does', async () => {
+  const own = await startModeServer({ bmw: bmwPool() });
+  try {
+    const stage = mountMode(modes['guess-who'], { base: own.base, brand: 'bmw' });
+    await settle(stage, (s) => s.textContent.replace(/\s/g, '').length > 20);
+    assert.ok(own.stockCalls.length > 0, 'guess-who must read the pool on mount');
+    for (const call of own.stockCalls) {
+      assert.equal(call.scope, 'dealer', 'an unset scope must resolve to the dealer, not the network');
+    }
+  } finally {
+    await own.close();
+  }
+});
+
+/*
+ * Every stock call a mode makes must name a scope.
+ *
+ * The engine's stock functions take scope positionally, so the way this breaks is
+ * not a missing argument but a misplaced one: apiField(api, seed, retailer, brand,
+ * SIZE) still runs, still returns cars, and quietly reads size as the scope and
+ * nothing as the size. A new mode, or a new call site in an old one, is the likely
+ * moment. Nothing about the resulting screen looks wrong, so guard it at the
+ * source: find each stock call and require the word scope inside its arguments.
+ */
+test('every mode stock call passes a scope', () => {
+  const MODE_FILES = [
+    'modes/questionnaire.js', 'modes/mingle.js', 'modes/knockout.js',
+    'modes/podium.js', 'modes/guess-who.js', 'modes/preview-feed.js',
+  ];
+  // The engine calls that read stock, plus the shared preview scheduler that
+  // wraps one of them. apiNearby is absent on purpose: it searches OTHER
+  // retailers by distance, which is not a pool this block chooses.
+  const STOCK_CALLS = /\b(apiMatch|apiPreview|apiField|apiPool|createPreviewFeed)\s*\(/g;
+  const blockDir = new URL('../../blocks/vehicle-matcher/', import.meta.url);
+  const offenders = [];
+
+  for (const rel of MODE_FILES) {
+    const src = readFileSync(fileURLToPath(new URL(rel, blockDir)), 'utf8');
+    for (const m of src.matchAll(STOCK_CALLS)) {
+      // Walk to the matching close paren so a multi-line argument list is read
+      // whole; depth counting keeps nested calls and object literals together.
+      let depth = 0;
+      let end = m.index + m[0].length - 1;
+      do {
+        if (src[end] === '(') depth += 1;
+        else if (src[end] === ')') depth -= 1;
+        end += 1;
+      } while (depth > 0 && end < src.length);
+      const args = src.slice(m.index, end);
+      // The definition of createPreviewFeed lives in preview-feed.js and takes
+      // scope as a destructured param, which reads the same to this check.
+      if (!/\bscope\b/.test(args)) {
+        const line = src.slice(0, m.index).split('\n').length;
+        offenders.push(`${rel}:${line}  ${args.replace(/\s+/g, ' ').slice(0, 90)}`);
+      }
+    }
+  }
+
+  assert.equal(
+    offenders.length, 0,
+    `stock call with no scope (it will read the dealer pool whatever the embed asked for):\n${offenders.join('\n')}`,
+  );
+});
+
 // No user-facing em dashes on the first painted screen of any mode/brand. The
 // house rule (no em dashes in on-screen copy) gets a machine guard here.
 test('no em dashes in painted copy', async () => {
@@ -267,7 +358,7 @@ test('no em dashes in painted copy', async () => {
 test('no em dashes in any string literal across the client copy surface', () => {
   const CLIENT_FILES = [
     'modes/questionnaire.js', 'modes/mingle.js', 'modes/knockout.js',
-    'modes/podium.js', 'modes/match-signal.js',
+    'modes/podium.js', 'modes/guess-who.js', 'modes/match-signal.js',
     // The shared render modules lifted out of questionnaire.js. Their string
     // literals are on-screen copy for every mode that renders a card or a
     // question, so they belong in the same guard.

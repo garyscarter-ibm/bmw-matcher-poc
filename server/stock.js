@@ -20,7 +20,9 @@
  */
 
 import { request } from 'node:https';
-import { readFileSync } from 'node:fs';
+import {
+  readFileSync, writeFileSync, renameSync, mkdirSync,
+} from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -45,13 +47,38 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // brand-parameterised: origin comes from brandConfig(brand), and caches/CSRF
 // are keyed by brand so the two feeds never collide.
 const STOCK_TTL_MS = Number(process.env.STOCK_TTL_MS) || 5 * 60 * 1000; // 5 min
-const PAGE_LIMIT = 10; // safety cap on pagination (stock is ~3 pages)
+
+// The main pool for BMW/MINI is the whole national feed, not one retailer's
+// forecourt (see byNationalQuery) — matches scripts/dump-stock.js's own
+// constants, since it's walking the exact same pagination. 200 is a generous
+// ceiling above the observed ~120 pages, not a real cap in practice.
+//
+// The delay is the load-bearing constant here, and it is NOT over-caution:
+// measured 2026-09-02 against usedcars.bmw.co.uk, the list endpoint is throttled
+// server-side (DRF-style, `Retry-After: 20`, body "Request was throttled").
+//   - no delay, sequential:  first 429 at request #27
+//   - concurrency 4:         85 of 120 pages 429'd
+//   - 400ms delay:           40/40 pages clean
+// So ~2.5 req/s is the sustainable ceiling and concurrency makes things WORSE,
+// not better. A full 120-page walk therefore costs ~60s and cannot be made
+// fast — which is exactly why the result is persisted (see NATIONAL_INDEX_DIR)
+// and served stale-while-revalidate rather than fetched on the request path.
+const NATIONAL_PAGE_SIZE = 100; // the platform's max page size (size=500 still yields 100)
+const NATIONAL_PAGE_LIMIT = Number(process.env.NATIONAL_PAGE_LIMIT) || 200;
+// A dealer-scoped walk. The biggest UK BMW retailer is a few hundred cars, so 8
+// pages is generous headroom; the cap only exists so a feed bug can't turn one
+// forecourt into an unbounded walk.
+const RETAILER_PAGE_LIMIT = Number(process.env.RETAILER_PAGE_LIMIT) || 8;
+const NATIONAL_PAGE_DELAY_MS = Number(process.env.NATIONAL_PAGE_DELAY_MS) || 400;
+const RATE_LIMIT_MAX_RETRIES = 5; // per page, when 429'd (honours Retry-After)
 
 // Nearby search depth. 4 pages × 100 reaches the 5 nearest retailers from
 // Perth (~31 miles out) — ample for a top-3 carousel, and nowhere near the
 // ~132-page national list. Lower this first if cold-cache latency bites.
 const NEARBY_PAGES = Number(process.env.NEARBY_PAGES) || 4;
 const NEARBY_PAGE_SIZE = Number(process.env.NEARBY_PAGE_SIZE) || 100; // API caps at 100
+
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
 // A real browser UA — the platform serves bot-y clients differently.
 const USER_AGENT =
@@ -179,23 +206,50 @@ async function fetchPage(origin, query, page) {
  */
 async function fetchPageWithRetry(origin, query, page) {
   if (!csrfByOrigin.has(origin)) await bootstrap(origin);
-  let res = await fetchPage(origin, query, page);
-  if (res.status === 403) {
-    await bootstrap(origin); // token likely rotated/expired
-    res = await fetchPage(origin, query, page);
+  for (let attempt = 0; attempt <= RATE_LIMIT_MAX_RETRIES; attempt += 1) {
+    let res = await fetchPage(origin, query, page);
+    if (res.status === 403) {
+      await bootstrap(origin); // token likely rotated/expired
+      res = await fetchPage(origin, query, page);
+    }
+    // The feed rate-limits a fast burst — a small retailer-scoped fetch rarely
+    // trips it, but a national walk reliably does. The throttle states its own
+    // window in Retry-After (observed: 20s), so obey that rather than guessing;
+    // a linear 2s/4s/6s backoff under-waits and just earns another 429.
+    if (res.status === 429) {
+      if (attempt === RATE_LIMIT_MAX_RETRIES) {
+        throw new StockUnavailableError(`list/ still rate-limited on page ${page} after ${RATE_LIMIT_MAX_RETRIES} retries`);
+      }
+      const retryAfter = Number(res.headers['retry-after']);
+      await sleep(Number.isFinite(retryAfter) && retryAfter > 0
+        ? (retryAfter + 1) * 1000 // +1s of slack so we don't race the window's edge
+        : 2000 * (attempt + 1));
+      continue;
+    }
+    if (res.status !== 200) {
+      throw new StockUnavailableError(`list/ returned HTTP ${res.status} on page ${page}`);
+    }
+    try {
+      return JSON.parse(res.body);
+    } catch (cause) {
+      throw new StockUnavailableError('list/ returned non-JSON', { cause });
+    }
   }
-  if (res.status !== 200) {
-    throw new StockUnavailableError(`list/ returned HTTP ${res.status} on page ${page}`);
-  }
-  try {
-    return JSON.parse(res.body);
-  } catch (cause) {
-    throw new StockUnavailableError('list/ returned non-JSON', { cause });
-  }
+  // Unreachable: the loop above always returns or throws.
+  throw new StockUnavailableError(`list/ page ${page} failed after retries`);
 }
 
-/** All of one retailer's stock, unsorted, no distances. */
+/** All of one retailer's stock, unsorted, no distances. Still used to resolve
+ * a retailer's postcode (see resolveRetailerPostcode) for the nearby carousel
+ * — the main pool itself no longer scopes to a single retailer_site, see
+ * byNationalQuery. */
 const byRetailerQuery = (retailerSite) => `retailer_site=${encodeURIComponent(retailerSite)}`;
+
+/** The whole national feed, unfiltered — retailer_site omitted entirely, the
+ * same query scripts/dump-stock.js walks offline. This is the main pool for
+ * every retailer of a feed brand, not one dealer's forecourt: a single
+ * catchment is far smaller than the question set is designed against. */
+const byNationalQuery = () => `size=${NATIONAL_PAGE_SIZE}`;
 
 /**
  * Stock nationwide, nearest-first from `postcode`, with a `distance` on every
@@ -221,10 +275,42 @@ const cacheNearby = new Map(); // "brand:retailerSite" -> { at, cars, inflight }
 
 // Every brand+retailer we've been asked about, so the warmer knows what to keep
 // hot. Stored as { brand, retailerSite } objects keyed by "brand:retailer".
+// Feed brands' MAIN pool no longer belongs here — it's brand-wide, not
+// retailer-scoped — see seenNationalBrands; this still tracks the per-retailer
+// nearby-carousel anchor for those brands, and the whole pool for every other
+// source type (fixtures/live-honda/live-motorrad/live-ferrari).
 const seenRetailers = new Map(); // "brand:retailer" -> { brand, retailerSite }
+
+// Feed brands (BMW, MINI) whose national pool has been requested at least
+// once, so the warmer keeps it hot. A Set, not a Map keyed by retailer: the
+// pool is the same regardless of which retailer_site a visitor was configured
+// with, so every request for a feed brand collapses onto one warm entry.
+const seenNationalBrands = new Set(); // brand
+
+// Feed brands whose DEALER-scoped pool has been requested, so the warmer keeps
+// that forecourt hot too. Deliberately separate from seenRetailers, which also
+// tracks the nearby-carousel anchor for every brand: a national visitor's
+// nearby request must not cause their dealer pool to be warmed as well.
+const seenDealerPools = new Map(); // "brand:retailerSite" -> { brand, retailerSite }
 
 /** Cache/seen key for a brand+retailer pair. */
 const keyFor = (brand, retailerSite) => `${brand}:${retailerSite}`;
+
+/*
+ * Which pool a feed brand should serve. Only BMW/MINI have two (see
+ * fetchRetailerStock); every other source type has one and ignores this.
+ *
+ * Unrecognised or absent values resolve to 'dealer'. That's the safe direction
+ * for a typo: `?scope=nationl` shows one forecourt rather than silently
+ * answering for the whole country on a retailer's own page. /api/pool echoes
+ * the resolved scope so a misconfigured embed is visible rather than guessed at.
+ */
+export const SCOPES = ['dealer', 'national'];
+export const DEFAULT_SCOPE = 'dealer';
+export const normalizeScope = (value) => {
+  const v = String(value ?? '').trim().toLowerCase();
+  return SCOPES.includes(v) ? v : DEFAULT_SCOPE;
+};
 
 /** node:https has no argless Date.now ban — this is server runtime, fine to use. */
 function fresh(entry) {
@@ -263,6 +349,68 @@ function cachedFetch(cache, key, load) {
   // Preserve stale cars (if any) alongside the in-flight promise.
   cache.set(key, { ...(entry || {}), inflight });
   return inflight;
+}
+
+/* --------------------- persisted national index ----------------------- *
+ * A feed brand's national pool costs ~60s to walk and the upstream throttle
+ * makes that irreducible (see NATIONAL_PAGE_DELAY_MS). Paying it on a user's
+ * request is not an option, and paying it again on every process restart is
+ * barely better — so the walk's result is written to disk and re-read on boot.
+ *
+ * That turns the cost model from "~60s per restart" into "~60s once, ever",
+ * and lets a cold process serve a full national pool immediately. The snapshot
+ * is a machine-local cache, never a source of truth: if it's missing or
+ * unreadable we simply walk the feed, and it is always allowed to be stale
+ * (the refresh happens behind whatever we just served — see nationalStock).
+ * --------------------------------------------------------------------- */
+
+const NATIONAL_INDEX_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '.cache');
+const nationalIndexPath = (brand) => join(NATIONAL_INDEX_DIR, `national-${brand}.json`);
+
+/**
+ * The on-disk national index for a brand, or null if there isn't a usable one.
+ * Never throws: a missing, truncated or half-written file is just a cache miss.
+ *
+ * @returns {{ at: number, cars: Array }|null}
+ */
+function readNationalIndex(brand) {
+  try {
+    const snap = JSON.parse(readFileSync(nationalIndexPath(brand), 'utf8'));
+    if (!Array.isArray(snap?.cars) || snap.cars.length === 0) return null;
+    return { at: Number(snap.at) || 0, cars: snap.cars };
+  } catch {
+    // No usable snapshot. Rather than make the first visitor on a clean machine
+    // sit through the walk (~170s measured for BMW), fall back to the committed
+    // fixture — which is itself a national dump in the same mapped shape
+    // (scripts/dump-stock.js wrote it: 13k BMW cars across 131 retailers). It's
+    // weeks stale, so it's dated `at: 0` to guarantee an immediate refresh, but
+    // it means a fresh clone serves a real national pool from the first request.
+    try {
+      const cars = loadFixtures(brand);
+      return cars?.length ? { at: 0, cars } : null;
+    } catch {
+      return null; // no fixture either — nothing for it but to walk the feed
+    }
+  }
+}
+
+/**
+ * Persist a brand's national index. Written to a temp file and renamed, so a
+ * crash (or a concurrent reader) can never observe a half-written snapshot —
+ * rename is atomic within a filesystem. Failures are logged, not thrown: this
+ * is a cache, and the cars are already in memory and being served.
+ */
+function writeNationalIndex(brand, cars) {
+  const path = nationalIndexPath(brand);
+  const tmp = `${path}.tmp`;
+  try {
+    mkdirSync(NATIONAL_INDEX_DIR, { recursive: true });
+    writeFileSync(tmp, JSON.stringify({ at: Date.now(), brand, cars }));
+    renameSync(tmp, path);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`[stock] could not persist ${brand} national index:`, err?.message);
+  }
 }
 
 /* ---------------------------- fixtures source ------------------------- *
@@ -736,12 +884,14 @@ async function motorradLiveStock(origin) {
  *
  * @param {string} [brand] brand key (defaults to bmw)
  * @param {string} [retailerSite] retailer_site ID; defaults to the brand's default
+ * @param {string} [scope] 'dealer' (default) or 'national' — see normalizeScope
  * @returns {Promise<Array>} mapped car objects (mapping.js shape)
  */
-export async function fetchRetailerStock(brand = 'bmw', retailerSite) {
+export async function fetchRetailerStock(brand = 'bmw', retailerSite, scope) {
   const b = normalizeBrand(brand);
   const { origin, defaultRetailer, source } = brandConfig(b);
   const site = retailerSite || defaultRetailer;
+  const sc = normalizeScope(scope);
 
   // Fixtures-backed brands never touch the network or the TTL cache — the
   // snapshot is static for the run and the cars are already mapped.
@@ -783,30 +933,167 @@ export async function fetchRetailerStock(brand = 'bmw', retailerSite) {
     return cachedFetch(cacheByRetailer, key, () => ferrariLiveStock());
   }
 
+  /*
+   * BMW/MINI are the only brands with two genuinely different pools, so they're
+   * the only ones `scope` changes:
+   *
+   *   dealer   → `site`'s own forecourt (~100 cars, one page). The original
+   *              behaviour, and the default: a tool authored onto one
+   *              retailer's page must not silently answer for the whole country.
+   *   national → every retailer of the brand (~12k BMW / ~3.5k MINI),
+   *              stale-while-revalidate because the walk costs ~60s.
+   *
+   * The two cache under different keys ("bmw:96" vs "bmw:national"), so both
+   * stay hot at once and neither clobbers the other. `site` matters to the
+   * nearby carousel either way (resolveRetailerPostcode anchors distances to it).
+   */
+  if (sc === 'national') return nationalStock(b, origin);
+
   const key = keyFor(b, site);
   seenRetailers.set(key, { brand: b, retailerSite: site });
-  return cachedFetch(cacheByRetailer, key, async () => {
-    const query = byRetailerQuery(site);
-    let vehicles;
-    try {
-      const first = await fetchPageWithRetry(origin, query, 1);
-      vehicles = [...(first.results || [])];
-      const totalPages = Math.min(first.pagination?.total || 1, PAGE_LIMIT);
-      for (let page = 2; page <= totalPages; page += 1) {
-        const next = await fetchPageWithRetry(origin, query, page);
-        vehicles.push(...(next.results || []));
-      }
-    } catch (err) {
-      if (err instanceof StockUnavailableError) throw err;
-      throw new StockUnavailableError('Live stock fetch failed', { cause: err });
-    }
+  seenDealerPools.set(key, { brand: b, retailerSite: site });
+  return cachedFetch(cacheByRetailer, key, () => walkRetailerFeed(origin, b, site));
+}
 
-    const cars = vehicles.map((v) => mapVehicle(v, b)).filter(Boolean);
-    if (cars.length === 0) {
-      throw new StockUnavailableError('Live feed returned no usable vehicles');
+/** One retailer's own forecourt → mapped cars. A single dealer is ~100 cars, so
+ * this is 1–2 pages and cheap enough to sit on the request path (unlike the
+ * national walk). Paginates for the rare large dealer; same politeness delay. */
+async function walkRetailerFeed(origin, brand, retailerSite) {
+  const query = byRetailerQuery(retailerSite);
+  let vehicles;
+  try {
+    const first = await fetchPageWithRetry(origin, query, 1);
+    vehicles = [...(first.results || [])];
+    const totalPages = Math.min(first.pagination?.total || 1, RETAILER_PAGE_LIMIT);
+    for (let page = 2; page <= totalPages; page += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(NATIONAL_PAGE_DELAY_MS);
+      // eslint-disable-next-line no-await-in-loop
+      const next = await fetchPageWithRetry(origin, query, page);
+      vehicles.push(...(next.results || []));
     }
-    return cars;
-  });
+  } catch (err) {
+    if (err instanceof StockUnavailableError) throw err;
+    throw new StockUnavailableError('Live stock fetch failed', { cause: err });
+  }
+
+  const cars = vehicles.map((v) => mapVehicle(v, brand)).filter(Boolean);
+  if (cars.length === 0) {
+    // Names the site, because by far the likeliest cause is a retailer_site ID
+    // that doesn't exist — a misconfigured embed, not an outage. The API turns
+    // this into a 502 whose message says which ID drew a blank.
+    throw new StockUnavailableError(`Live feed returned no usable vehicles for retailer_site=${retailerSite}`);
+  }
+  return cars;
+}
+
+/** One full walk of a brand's national feed → mapped cars. ~60s, throttle-bound
+ * (see NATIONAL_PAGE_DELAY_MS); callers should keep it off the request path. */
+async function walkNationalFeed(origin, brand) {
+  const query = byNationalQuery();
+  let vehicles;
+  try {
+    const first = await fetchPageWithRetry(origin, query, 1);
+    vehicles = [...(first.results || [])];
+    const totalPages = Math.min(first.pagination?.total || 1, NATIONAL_PAGE_LIMIT);
+    for (let page = 2; page <= totalPages; page += 1) {
+      // Be polite — the feed throttles a fast burst, and a ~120-page walk is
+      // exactly that burst without this (see NATIONAL_PAGE_DELAY_MS).
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(NATIONAL_PAGE_DELAY_MS);
+      // eslint-disable-next-line no-await-in-loop
+      const next = await fetchPageWithRetry(origin, query, page);
+      vehicles.push(...(next.results || []));
+    }
+  } catch (err) {
+    if (err instanceof StockUnavailableError) throw err;
+    throw new StockUnavailableError('Live stock fetch failed', { cause: err });
+  }
+
+  const cars = vehicles.map((v) => mapVehicle(v, brand)).filter(Boolean);
+  if (cars.length === 0) {
+    throw new StockUnavailableError('Live feed returned no usable vehicles');
+  }
+  return cars;
+}
+
+// How long to leave a brand's national feed alone after a failed walk. Without
+// this, a persistently broken feed gets re-walked by every request that lands
+// while the pool is stale — 120 requests at an upstream we now know throttles.
+const NATIONAL_FAIL_COOLDOWN_MS = Number(process.env.NATIONAL_FAIL_COOLDOWN_MS) || 60 * 1000;
+
+/** Start (or join) a national refresh, persisting the result. Single-flight, so
+ * a warmer tick that overlaps a request shares the one walk. */
+function refreshNational(brand, origin, key) {
+  const entry = cacheByRetailer.get(key);
+  if (entry?.inflight) return entry.inflight;
+
+  const inflight = walkNationalFeed(origin, brand).then(
+    (cars) => {
+      cacheByRetailer.set(key, { at: Date.now(), cars });
+      writeNationalIndex(brand, cars);
+      return cars;
+    },
+    (err) => {
+      // Drop only the in-flight marker; any stale cars keep serving.
+      const prev = cacheByRetailer.get(key);
+      if (prev) {
+        delete prev.inflight;
+        prev.failedAt = Date.now();
+      }
+      throw err;
+    },
+  );
+  cacheByRetailer.set(key, { ...(entry || {}), inflight });
+  return inflight;
+}
+
+/**
+ * A feed brand's national pool, stale-while-revalidate.
+ *
+ * The walk costs ~60s and the upstream throttle makes that irreducible, so the
+ * only way national stock is viable is to never make a user wait for it:
+ *
+ *   fresh in memory      → serve it
+ *   stale in memory/disk → serve it NOW, refresh behind the response
+ *   nothing at all       → no choice but to walk (first run on a clean machine)
+ *
+ * Deliberately serves stale stock rather than blocking or erroring: a pool
+ * that's an hour old still ranks essentially the same cars, and a sold car is
+ * a far smaller problem than a 60-second wait or a 502. Freshness is the
+ * warmer's job, not the request's.
+ */
+function nationalStock(brand, origin) {
+  const key = keyFor(brand, 'national');
+  seenNationalBrands.add(brand);
+
+  const cached = cacheByRetailer.get(key);
+  if (fresh(cached)) return Promise.resolve(cached.cars);
+
+  // Nothing in memory: try the previous process's index before the network, so
+  // a restart doesn't re-pay the walk.
+  if (!cached?.cars) {
+    const snap = readNationalIndex(brand);
+    if (snap) cacheByRetailer.set(key, { ...(cached || {}), at: snap.at, cars: snap.cars });
+  }
+
+  const have = cacheByRetailer.get(key);
+  if (have?.cars) {
+    // Back off after a failure rather than re-walking a throttled feed on every
+    // request — we have cars to serve, so there's no urgency.
+    const cooling = have.failedAt && Date.now() - have.failedAt < NATIONAL_FAIL_COOLDOWN_MS;
+    if (!cooling) {
+      // Detach: a failed background refresh must not reject the response we've
+      // already served, nor surface as an unhandled rejection. The warmer retries.
+      refreshNational(brand, origin, key).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.warn(`[stock] ${brand} national refresh failed (serving stale):`, err?.message);
+      });
+    }
+    return Promise.resolve(have.cars);
+  }
+  // Nothing to serve — the caller has to wait for the walk (first run only).
+  return refreshNational(brand, origin, key);
 }
 
 /* ------------------------- nearby-retailer stock ---------------------- */
@@ -969,8 +1256,23 @@ export function startStockWarmer() {
 
   const tick = () => {
     for (const [key, { brand, retailerSite }] of seenRetailers) {
-      warmOne(cacheByRetailer, key, brand, retailerSite, fetchRetailerStock);
+      // A feed brand's main pool is scope-dependent, so it's warmed from the two
+      // loops below (whichever scopes have actually been asked for) rather than
+      // from here — warming it under this per-retailer key would otherwise
+      // re-fetch the wrong pool, once per distinct retailer ever seen. The
+      // nearby carousel is per-retailer for every brand, so that half always
+      // applies.
+      if (brandConfig(brand).source !== 'feed') {
+        warmOne(cacheByRetailer, key, brand, retailerSite, fetchRetailerStock);
+      }
       warmOne(cacheNearby, key, brand, retailerSite, fetchNearbyStock);
+    }
+    for (const [key, { brand, retailerSite }] of seenDealerPools) {
+      warmOne(cacheByRetailer, key, brand, retailerSite, (b, s) => fetchRetailerStock(b, s, 'dealer'));
+    }
+    for (const brand of seenNationalBrands) {
+      warmOne(cacheByRetailer, keyFor(brand, 'national'), brand, undefined,
+        (b) => fetchRetailerStock(b, undefined, 'national'));
     }
   };
 
@@ -1011,6 +1313,23 @@ export function stopStockWarmer() {
 // couldn't tell, so we don't ask again). No TTL: paint is immutable per advert.
 const colourByAdvert = new Map();
 const colourInflight = new Map(); // advert_id -> Promise, single-flight
+
+/*
+ * A third state, between "known" and "never asked": the fetch itself failed —
+ * a timeout, a reset, a 502 — so we learned nothing about this car's paint.
+ *
+ * It matters because the two failures need opposite treatment. A 200 whose blob
+ * carries no colour is a fact: that advert has no paint on record and asking
+ * again is waste, so it caches as `null` forever. A transport error is not a
+ * fact about the car, and caching it as `null` would let one dropped connection
+ * exclude a car from the colour filter permanently — the silent-exclusion rule
+ * turns a blip into an invisible, undiagnosable gap in the pool.
+ *
+ * So a failure caches this sentinel instead. The request path treats it exactly
+ * like `null` (don't re-fetch while a user waits), but the warm pass clears it
+ * and tries again on its next sweep, where a second attempt costs nothing.
+ */
+const COLOUR_SOFT_MISS = Symbol('colour-soft-miss');
 
 // How many PDPs to fetch at once. Deliberately small — this runs while a user
 // waits, against a site we're a guest on.
@@ -1064,19 +1383,26 @@ function colourFromPdp(html) {
   return null;
 }
 
-/** One advert's colour, cached forever, single-flighted, never throwing. */
+/** One advert's colour, cached forever, single-flighted, never throwing.
+ *  A fetch that failed rather than answered caches COLOUR_SOFT_MISS, which
+ *  reads as "no colour" here but stays retryable for the warm pass. */
 function fetchColour(origin, advertId) {
   const id = String(advertId);
-  if (colourByAdvert.has(id)) return Promise.resolve(colourByAdvert.get(id));
+  if (colourByAdvert.has(id)) {
+    const hit = colourByAdvert.get(id);
+    return Promise.resolve(hit === COLOUR_SOFT_MISS ? null : hit);
+  }
   if (colourInflight.has(id)) return colourInflight.get(id);
 
   const p = httpsGet(`${origin}/vehicle/${encodeURIComponent(id)}`, { Accept: 'text/html' })
-    .then((res) => (res.status === 200 ? colourFromPdp(res.body) : null))
-    .catch(() => null)
+    // A 200 that parses to nothing is a real answer (no paint on record); any
+    // other status is a failure to ask, not an answer — see COLOUR_SOFT_MISS.
+    .then((res) => (res.status === 200 ? colourFromPdp(res.body) : COLOUR_SOFT_MISS))
+    .catch(() => COLOUR_SOFT_MISS)
     .then((colour) => {
       colourByAdvert.set(id, colour);
       colourInflight.delete(id);
-      return colour;
+      return colour === COLOUR_SOFT_MISS ? null : colour;
     });
   colourInflight.set(id, p);
   return p;
@@ -1120,4 +1446,242 @@ export async function enrichColours(brand, cars, budgetMs = COLOUR_BUDGET_MS) {
     });
   }
   return cars;
+}
+
+/* --------------------- persisted colour, and the warm pass ------------- *
+ * enrichColours above is the request-path story: colour the handful of cars
+ * about to be shown, inside a 4.5s budget. That is right for a ranked page
+ * showing five cars and useless for the Guess Who mode, which offers colour as
+ * a HARD FILTER over the whole national pool — a filter that only knows the
+ * paint of cars someone happened to look at is a filter that hides stock.
+ *
+ * So colour gets acquired up front instead, for every car in the pool, by a
+ * background pass slow enough to be a good guest. Two properties make that
+ * affordable where it would otherwise be absurd:
+ *
+ *   - Paint is immutable per advert. A car coloured once is coloured forever,
+ *     so the expensive pass runs ONCE and every later sweep is a small delta of
+ *     adverts that appeared since — minutes, not hours.
+ *   - The cost is per advert, not per pool. Keying the store by advert id means
+ *     a car that moves between dealers, or drops out of the feed and returns,
+ *     is already known.
+ *
+ * Deliberately slow: COLOUR_WARM_DELAY_MS is one request per second, serial,
+ * no concurrency. That is ~4h20m for the first full BMW+MINI pass (12,012 +
+ * 3,537 adverts) and roughly 40× under the burst rate that first drew a 429
+ * from this platform. The slowness is the feature — the alternative is looking
+ * like a scraper to someone else's infrastructure. Do not "optimise" it.
+ *
+ * Cars whose colour is still unknown are simply excluded from the colour filter
+ * while it is in use, and nothing in the UI says "still cataloguing": a caveat
+ * would cost more user confidence than the missing cars cost.
+ * ---------------------------------------------------------------------- */
+
+const colourSidecarPath = (brand) => join(NATIONAL_INDEX_DIR, `colours-${brand}.json`);
+
+/*
+ * Colour lives in its own file rather than inside the national index, because
+ * the two have completely different lifetimes. The index is rewritten wholesale
+ * by every feed walk (see refreshNational); colour takes hours to gather. Baked
+ * into the index it would be destroyed by the next refresh, so the warm pass
+ * could never get ahead of the walker. Keyed separately by advert id, it simply
+ * survives.
+ */
+
+/** Load a brand's persisted colours into the in-memory map. Never throws — a
+ *  missing or corrupt sidecar just means the warm pass has more to do. Returns
+ *  how many entries were adopted. */
+function readColourSidecar(brand) {
+  try {
+    const snap = JSON.parse(readFileSync(colourSidecarPath(brand), 'utf8'));
+    const entries = Object.entries(snap?.byAdvert || {});
+    let n = 0;
+    for (const [id, colour] of entries) {
+      // Don't clobber anything already learned this process, and don't re-adopt
+      // soft misses — they serialise as `false` precisely so a restart retries
+      // them rather than inheriting a stale failure.
+      if (colourByAdvert.has(id)) continue;
+      if (colour === false) continue;
+      colourByAdvert.set(id, colour);
+      n += 1;
+    }
+    return n;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Persist what we know about one brand's colours.
+ *
+ * Written from the brand's CURRENT pool rather than from the whole in-memory
+ * map, which both scopes the file to one brand (the map is shared, keyed by
+ * advert id alone) and prunes it: adverts that have left the feed stop being
+ * written, so the sidecar stays proportional to the stock instead of growing
+ * forever. Temp-file-and-rename, like the index, so a crash can't leave a
+ * half-written file for the next boot to adopt.
+ */
+function writeColourSidecar(brand, cars) {
+  const byAdvert = {};
+  for (const car of cars) {
+    if (!car?.id) continue;
+    const id = String(car.id);
+    if (!colourByAdvert.has(id)) continue;
+    const hit = colourByAdvert.get(id);
+    // `false` marks a soft miss: recorded so the file is a complete picture of
+    // what was attempted, but read back as "ask again" (see readColourSidecar).
+    byAdvert[id] = hit === COLOUR_SOFT_MISS ? false : hit;
+  }
+  const path = colourSidecarPath(brand);
+  const tmp = `${path}.tmp`;
+  try {
+    mkdirSync(NATIONAL_INDEX_DIR, { recursive: true });
+    writeFileSync(tmp, JSON.stringify({ at: Date.now(), brand, byAdvert }));
+    renameSync(tmp, path);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`[colour] could not persist ${brand} colours:`, err?.message);
+  }
+}
+
+// One request per second, serial. See the block comment above before changing.
+const COLOUR_WARM_DELAY_MS = Number(process.env.COLOUR_WARM_DELAY_MS) || 1000;
+
+// Flush the sidecar every N fetches. Small enough that a restart loses seconds
+// of work rather than hours; large enough not to rewrite a 12k-entry file every
+// second. At 1 req/s this is a write every ~3 minutes.
+const COLOUR_FLUSH_EVERY = Number(process.env.COLOUR_FLUSH_EVERY) || 200;
+
+// How long to wait before sweeping a brand again once it's fully coloured.
+// Nothing to do but pick up adverts new since the last pass, so this is a
+// delta-sized job — cheap, and hourly is ample for used-car stock.
+const COLOUR_SWEEP_IDLE_MS = Number(process.env.COLOUR_SWEEP_IDLE_MS) || 60 * 60 * 1000;
+
+let colourWarmRunning = false;
+let colourWarmStop = false;
+
+/** Adverts in this pool we still have no definitive answer for, soft misses
+ *  included (a soft miss is a failure to ask, so the warmer re-asks). */
+function uncolouredIn(cars) {
+  return cars.filter((c) => {
+    if (!c?.id) return false;
+    const id = String(c.id);
+    return !colourByAdvert.has(id) || colourByAdvert.get(id) === COLOUR_SOFT_MISS;
+  });
+}
+
+/** Progress for one brand: how much of its pool has a known colour. */
+export function colourCoverage(brand) {
+  const b = normalizeBrand(brand);
+  const cars = cacheByRetailer.get(keyFor(b, 'national'))?.cars || [];
+  let known = 0;
+  for (const car of cars) {
+    const hit = car?.id != null ? colourByAdvert.get(String(car.id)) : undefined;
+    if (hit && hit !== COLOUR_SOFT_MISS) known += 1;
+  }
+  return { total: cars.length, known, pending: uncolouredIn(cars).length };
+}
+
+/**
+ * One pass over a brand's pool, colouring what isn't known yet.
+ *
+ * Returns when the pool is exhausted or the warmer is stopped. Every failure is
+ * swallowed: this is a background nicety and must never take the process down.
+ */
+async function colourSweep(brand) {
+  const { origin, source } = brandConfig(brand);
+  // Same exclusions enrichColours makes: these brands have no PDP on this
+  // origin to read paint from (fixtures point at the real brand site; Motorrad
+  // and Honda already carry colour by the time they're mapped).
+  if (source === 'fixtures' || source === 'live-motorrad' || source === 'live-honda') return;
+
+  const cars = cacheByRetailer.get(keyFor(brand, 'national'))?.cars;
+  if (!cars?.length) return; // pool not walked yet — try again next tick
+
+  const todo = uncolouredIn(cars);
+  if (!todo.length) return;
+
+  // eslint-disable-next-line no-console
+  console.log(`[colour] ${brand}: ${todo.length} of ${cars.length} adverts need colour`
+    + ` (~${Math.round((todo.length * COLOUR_WARM_DELAY_MS) / 60000)} min at ${COLOUR_WARM_DELAY_MS}ms each)`);
+
+  let done = 0;
+  for (const car of todo) {
+    if (colourWarmStop) break;
+    const id = String(car.id);
+    // Clear a previous soft miss so fetchColour actually re-asks rather than
+    // returning the cached failure.
+    if (colourByAdvert.get(id) === COLOUR_SOFT_MISS) colourByAdvert.delete(id);
+    // eslint-disable-next-line no-await-in-loop
+    const colour = await fetchColour(origin, id);
+    // Paint the in-memory car too, so the pool being served gains colour as the
+    // pass proceeds rather than only after the next feed walk.
+    if (colour) car.colour = colour;
+    done += 1;
+    if (done % COLOUR_FLUSH_EVERY === 0) {
+      writeColourSidecar(brand, cars);
+      // eslint-disable-next-line no-console
+      console.log(`[colour] ${brand}: ${done}/${todo.length} fetched`);
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await sleep(COLOUR_WARM_DELAY_MS);
+  }
+  writeColourSidecar(brand, cars);
+  const { known, total } = colourCoverage(brand);
+  // eslint-disable-next-line no-console
+  console.log(`[colour] ${brand}: pass complete — ${known}/${total} coloured`);
+}
+
+/**
+ * Start the background colour warm pass.
+ *
+ * Loads whatever previous runs persisted, then sweeps each feed brand in turn,
+ * forever, sleeping COLOUR_SWEEP_IDLE_MS between complete rounds. Serial across
+ * brands as well as within them, so the one-request-per-second budget is the
+ * whole process's, not per brand.
+ *
+ * Idempotent. Call once from server boot — NOT on import, so tests and tooling
+ * never fire thousands of requests at someone else's site.
+ *
+ * @returns {() => void} a stop function
+ */
+export function startColourWarmer() {
+  if (colourWarmRunning) return () => stopColourWarmer();
+  colourWarmRunning = true;
+  colourWarmStop = false;
+
+  const brands = ['bmw', 'mini'];
+  for (const brand of brands) {
+    const n = readColourSidecar(brand);
+    if (n) {
+      // eslint-disable-next-line no-console
+      console.log(`[colour] ${brand}: adopted ${n} known colours from disk`);
+    }
+  }
+
+  (async () => {
+    while (!colourWarmStop) {
+      for (const brand of brands) {
+        if (colourWarmStop) break;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await colourSweep(brand);
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn(`[colour] ${brand} sweep failed:`, err?.message);
+        }
+      }
+      if (colourWarmStop) break;
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(COLOUR_SWEEP_IDLE_MS);
+    }
+    colourWarmRunning = false;
+  })();
+
+  return () => stopColourWarmer();
+}
+
+/** Stop the colour warmer after the in-flight fetch settles. */
+export function stopColourWarmer() {
+  colourWarmStop = true;
 }

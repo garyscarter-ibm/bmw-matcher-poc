@@ -103,20 +103,41 @@ export function resetDom() {
 
 /**
  * Spin up a server whose stock is a caller-supplied per-brand pool (mapped car
- * objects — i.e. exactly what fetchRetailerStock returns). Returns { base, close }.
- * Nearby + colour are inert (empty / pass-through) so a mode's optional sections
- * simply don't appear, which is the honest fixtures-brand behaviour.
+ * objects — i.e. exactly what fetchRetailerStock returns). Returns
+ * { base, stockCalls, close }. Nearby + colour are inert (empty / pass-through)
+ * so a mode's optional sections simply don't appear, which is the honest
+ * fixtures-brand behaviour.
+ *
+ * `stockCalls` logs the (brand, retailer, scope) of every pool read the mounted
+ * modes caused, AS RESOLVED BY THE SERVER. It is how a test asserts something a
+ * painted screen cannot show: that the mode asked about the right stock. The log
+ * is per-server and cumulative, so a test that reads it should start its own
+ * server rather than share the suite's.
  */
 export async function startModeServer(poolsByBrand) {
-  const fetchRetailerStock = async (brand) => poolsByBrand[brand] || poolsByBrand.bmw || [];
+  const stockCalls = [];
+  const fetchRetailerStock = async (brand, retailer, scope) => {
+    stockCalls.push({ brand, retailer, scope });
+    return poolsByBrand[brand] || poolsByBrand.bmw || [];
+  };
   const fetchNearbyStock = async () => [];
   const enrichColours = async (_brand, cars = []) => cars;
-  const server = buildServer({ fetchRetailerStock, fetchNearbyStock, enrichColours });
+  // Location is inert for the same reason: both real implementations call someone
+  // else's server (a ~2MB dealer directory, and postcodes.io), and /api/pool asks
+  // for the directory on every request. An empty directory means the pool ships
+  // null site coordinates and Guess Who's distance filter self-suppresses, which
+  // is a state the mode is built to handle.
+  const fetchDealerDirectory = async () => new Map();
+  const geocodePostcode = async () => null;
+  const server = buildServer({
+    fetchRetailerStock, fetchNearbyStock, enrichColours, fetchDealerDirectory, geocodePostcode,
+  });
   server.listen(0);
   await once(server, 'listening');
   const { port } = server.address();
   return {
     base: `http://127.0.0.1:${port}`,
+    stockCalls,
     async close() {
       server.close();
       await once(server, 'close');
@@ -134,8 +155,12 @@ export async function loadMode(key) {
  * Mount a mode into a fresh stage against `base`, for `brand`. Returns the stage
  * element (already appended to the body) so the caller can assert on it after
  * settle().
+ *
+ * `scope` is left undefined unless a test asks for one, which is the shape of a
+ * page with no ?scope= — so the default path every other render test exercises is
+ * the one a real embed takes, right down to the server resolving the default.
  */
-export function mountMode(mode, { base, brand, retailer } = {}) {
+export function mountMode(mode, { base, brand, retailer, scope } = {}) {
   const stage = document.createElement('div');
   stage.className = `vm vm-${brand}`;
   document.body.append(stage);
@@ -144,6 +169,7 @@ export function mountMode(mode, { base, brand, retailer } = {}) {
     retailer: retailer || null,
     retailerLabel: 'Test Retailer',
     brand,
+    scope,
     overrides: {},
   };
   mode.mount(stage, ctx);

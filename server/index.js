@@ -35,11 +35,15 @@ import {
 } from './engine.js';
 import {
   fetchRetailerStock, fetchNearbyStock, startStockWarmer, StockUnavailableError, enrichColours,
+  normalizeScope,
+  startColourWarmer,
 } from './stock.js';
 import {
   QUESTIONS, BUDGET_BANDS, questionsForBrand, applyBespokeAnswers,
 } from './questions.js';
 import { normalizeBrand, brandTuning } from './brands.js';
+import { fetchDealerDirectory } from './dealers.js';
+import { geocodePostcode } from './geocode.js';
 
 const PORT = Number(process.env.PORT) || 8787;
 const MAX_BODY_BYTES = 16 * 1024; // quiz answers are tiny; reject anything bigger
@@ -79,6 +83,18 @@ function clampFieldSize(raw) {
   const n = Math.floor(Number(raw));
   if (!Number.isFinite(n) || n < 2) return FIELD_MAX;
   return Math.min(n, FIELD_MAX);
+}
+
+/** Flatten lists breadth-first: one item from each, then the next from each.
+ * For work queues that get cut off by a budget, this shares the spend across
+ * every list instead of finishing the first and starving the rest. */
+function interleave(lists) {
+  const out = [];
+  const longest = Math.max(0, ...lists.map((l) => l.length));
+  for (let i = 0; i < longest; i += 1) {
+    for (const list of lists) if (i < list.length) out.push(list[i]);
+  }
+  return out;
 }
 
 const CORS_HEADERS = {
@@ -216,6 +232,170 @@ function publicCar(car) {
   };
 }
 
+/* ------------------------- the whole-pool wire format ------------------ *
+ * Every other endpoint here sends a handful of cars, richly described. This one
+ * sends the ENTIRE national pool, because the Guess Who mode is a hard filter
+ * over all of it: the user watches twelve thousand cars become nine, so the
+ * client has to hold twelve thousand cars.
+ *
+ * Sent as columns with dictionaries rather than an array of objects, which is
+ * not premature cleverness — it is the difference between viable and not.
+ * Measured on the real BMW pool (12,084 cars):
+ *
+ *   full mapped pool, as-is        865 KB gzip
+ *   object per car, filter fields  452 KB gzip
+ *   these columns, card-complete   377 KB gzip
+ *
+ * The saving comes from how little actual variety there is: 553 distinct model
+ * names across 12,084 cars, 22 distinct features, one link prefix. Dictionaries
+ * turn each of those into an index, and `link` stops being sent at all.
+ *
+ * Two consequences worth stating, because they are the whole point:
+ *  1. ONE request serves the entire mode. There is no hydrate-on-demand tier and
+ *     no pagination, so no filter interaction can ever wait on the network.
+ *  2. Filtering is then a pass over parallel arrays — measured at 0.035 ms for
+ *     eight predicates over 12,012 cars. That is why the mode can re-filter on
+ *     every pointer move instead of debouncing.
+ *
+ * `features` is a BITMASK, not a list: both brands have fewer than 31 distinct
+ * feature concepts, so a car's whole equipment set fits in one integer and a
+ * must-have test is `(car & wanted) === wanted`.
+ * --------------------------------------------------------------------- */
+
+/** Dictionary-encode a column: returns [distinctValues, indexPerCar]. */
+function dictionary(values) {
+  const distinct = [];
+  const index = new Map();
+  const out = new Array(values.length);
+  for (let i = 0; i < values.length; i += 1) {
+    const v = values[i] ?? null;
+    let at = index.get(v);
+    if (at === undefined) {
+      at = distinct.length;
+      distinct.push(v);
+      index.set(v, at);
+    }
+    out[i] = at;
+  }
+  return [distinct, out];
+}
+
+/**
+ * The national pool as columns, for the hard-filter mode.
+ *
+ * Thumbnails, not full photos. Both CDNs the feed uses expose a small variant,
+ * and at ~5 KB against ~165 KB it is a 31× saving — which matters when a first
+ * paint is hundreds of cards rather than five. Neither CDN is the throttled
+ * used-car origin, so thumbnails cost nothing against that rate limit. The
+ * client swaps up to the full image once cards are big enough to show one.
+ */
+function thumbnail(url) {
+  if (!url) return null;
+  // eu.cdn.autosonshow.tv/…/e01_md.jpg → _sm.jpg (160×90)
+  if (url.includes('autosonshow')) return url.replace('_md.jpg', '_sm.jpg');
+  // m.atcdn.co.uk/a/media/{resize}/<hash>.jpg — the feed leaves {resize}
+  // unsubstituted, and the CDN then redirects it to the full-size original, so
+  // filling it in is both smaller AND one redirect cheaper.
+  return url.replace('{resize}', 'w160');
+}
+
+/**
+ * Where each retailer in the `retailers` dictionary is, as two arrays aligned
+ * with THAT dictionary rather than with the cars: `lat[retailer[i]]` is car i's
+ * site. One entry per retailer (130 for BMW, 121 for MINI) instead of one per
+ * car is the whole reason it is shaped this way — a per-car coordinate pair
+ * would be 12,000 of each for 130 distinct values.
+ *
+ * Hung off `retailers` and not `retailerId` deliberately. For BMW and MINI the
+ * two are interchangeable (measured: 130 ids to 130 names, and 121 to 121), but
+ * every other brand carries a single brand-wide id string against real
+ * per-listing names — Ferrari has 1 id and 15 names — so keying on the id would
+ * collapse fifteen dealers into one place and make the filter lie.
+ *
+ * `directory` is the dealer directory (dealers.js), or null when it could not be
+ * fetched. Null coordinates are an ordinary outcome, not a failure: they mean
+ * this retailer's site could not be located, and the client drops those cars
+ * from the proximity filter exactly as it drops colourless cars from the colour
+ * filter. Notably every car is in that state until a national walk has run since
+ * `dealerNumber` was added to mapVehicle, because the cached and committed pools
+ * predate the field.
+ *
+ * Rounded to 4 decimal places — about 11 metres, against a filter whose
+ * narrowest band is ten miles. It halves the bytes for precision no-one could
+ * act on.
+ */
+function siteCoords(cars, retailers, retailer, directory) {
+  const lat = new Array(retailers.length).fill(null);
+  const lon = new Array(retailers.length).fill(null);
+  if (!directory) return { lat, lon };
+
+  const round = (n) => Math.round(n * 1e4) / 1e4;
+  for (let i = 0; i < cars.length; i += 1) {
+    const at = retailer[i];
+    // First car that locates this retailer wins. Not simply the first car of the
+    // retailer: the feed omits dealer_number on some rows (see mapVehicle), so
+    // an unlocated slot has to stay open to the next car that might fill it.
+    if (lat[at] !== null) continue;
+    const site = directory.get(String(cars[i].dealerNumber ?? ''));
+    if (!Number.isFinite(site?.latitude) || !Number.isFinite(site?.longitude)) continue;
+    lat[at] = round(site.latitude);
+    lon[at] = round(site.longitude);
+  }
+  return { lat, lon };
+}
+
+function publicPool(brand, cars, directory = null) {
+  // Only the concepts this pool actually contains, so the bitmask stays as
+  // narrow as possible and the client's filter list has no dead options.
+  const featureKeys = [...new Set(cars.flatMap((c) => c.features || []))].sort();
+  const featureBit = new Map(featureKeys.map((k, i) => [k, i]));
+
+  const [names, name] = dictionary(cars.map((c) => c.name));
+  const [lines, line] = dictionary(cars.map((c) => c.line));
+  const [bodies, body] = dictionary(cars.map((c) => c.body));
+  const [fuels, fuel] = dictionary(cars.map((c) => c.fuel));
+  const [transmissions, transmission] = dictionary(cars.map((c) => c.transmission));
+  const [retailers, retailer] = dictionary(cars.map((c) => c.retailerName));
+  // Paint, in both forms the UI needs: the normalised basic name the filter
+  // groups by ("Grey") and the marketing name a card prints ("Brooklyn Grey").
+  // Absent for any car the colour warm pass hasn't reached yet — those are
+  // silently excluded from the colour filter rather than shown with a caveat.
+  const [shades, shade] = dictionary(cars.map((c) => c.colour?.colour ?? null));
+  const [paints, paint] = dictionary(cars.map((c) => (
+    c.colour?.manufacturerColour ?? c.colour?.colour ?? null)));
+
+  // `link` is always the same prefix plus the advert id, for every car of a
+  // brand, so send the prefix once instead of 12,000 near-identical URLs.
+  const linkPrefix = cars.find((c) => c.link)?.link?.replace(/[^/]+$/, '') || null;
+
+  return {
+    brand,
+    n: cars.length,
+    linkPrefix,
+    // Dictionaries. Each pairs with the same-named column below.
+    names, lines, bodies, fuels, transmissions, retailers, shades, paints,
+    featureKeys,
+    // The one table that is not per-car: it pairs with `retailers` above, not
+    // with a column. See siteCoords.
+    sites: siteCoords(cars, retailers, retailer, directory),
+    // Columns — every one exactly `n` long and index-aligned.
+    id: cars.map((c) => c.id),
+    name, line, body, fuel, transmission, retailer, shade, paint,
+    retailerId: cars.map((c) => c.retailerId ?? null),
+    price: cars.map((c) => c.priceMin ?? null),
+    mileage: cars.map((c) => c.mileage ?? null),
+    year: cars.map((c) => c.year ?? null),
+    plate: cars.map((c) => c.plate ?? null),
+    seats: cars.map((c) => c.seats ?? null),
+    boot: cars.map((c) => c.boot ?? null),
+    zeroTo62: cars.map((c) => c.zeroTo62 ?? null),
+    mpg: cars.map((c) => c.mpg ?? null),
+    features: cars.map((c) => (c.features || [])
+      .reduce((mask, k) => mask | (1 << featureBit.get(k)), 0)),
+    photo: cars.map((c) => thumbnail(c.photo)),
+  };
+}
+
 function publicMatch({
   car, score, stretch, reasons, tradeOffs, listings,
 }) {
@@ -286,8 +466,8 @@ function readJsonBody(req) {
 
 /**
  * Parse + validate the { answers, retailer } POST body shared by /api/match,
- * /api/nearby and /api/field. Returns { answers, retailer, brand, size, enrich,
- * group } on success, or { error, status } for the caller to send. Kept in one
+ * /api/nearby and /api/field. Returns { answers, retailer, brand, scope, size,
+ * enrich, group } on success, or { error, status } for the caller to send. One
  * place so every endpoint validates identically. `size`/`enrich` are only
  * meaningful to /api/field (the game-mode roster) and `group` only to
  * /api/preview; the match/nearby handlers ignore them.
@@ -310,6 +490,10 @@ async function readMatchRequest(req) {
     return { error: 'Invalid or missing budget', status: 400 };
   }
   const retailer = typeof body.retailer === 'string' && body.retailer ? body.retailer : undefined;
+  // Which pool to score against: this retailer's own forecourt (default) or the
+  // brand's whole national feed. normalizeScope defaults absent/garbage to
+  // 'dealer', so an old client that sends no scope keeps the original behaviour.
+  const scope = normalizeScope(body.scope);
   // Brand selects the feed (BMW vs MINI). normalizeBrand defaults unknown/absent
   // to BMW, so old clients that don't send a brand keep working.
   const brand = normalizeBrand(body.brand);
@@ -325,7 +509,7 @@ async function readMatchRequest(req) {
   // it: an absent or garbage flag has to leave that response untouched.
   const group = body.group === true;
   return {
-    answers, retailer, brand, size, enrich, group,
+    answers, retailer, brand, scope, size, enrich, group,
   };
 }
 
@@ -337,7 +521,7 @@ async function readMatchRequest(req) {
  */
 async function handleMatch(req, res, deps) {
   const {
-    answers, retailer, brand, error, status,
+    answers, retailer, brand, scope, error, status,
   } = await readMatchRequest(req);
   if (error) return sendJson(res, status, { error });
 
@@ -346,7 +530,7 @@ async function handleMatch(req, res, deps) {
   // retry UI handles it. No static fallback (this tool is honestly live-only).
   let cars;
   try {
-    cars = await deps.fetchRetailerStock(brand, retailer);
+    cars = await deps.fetchRetailerStock(brand, retailer, scope);
   } catch (err) {
     if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
@@ -371,20 +555,31 @@ async function handleMatch(req, res, deps) {
   // Shown cards get their listings enriched too (the picker needs every
   // colour); the held-back alternatives only need their own paint, since they
   // aren't on screen yet.
-  // Order matters: paint is fetched one page at a time against a wall-clock
-  // budget, so whatever is queued last may not get done. Cards on screen come
-  // first, then the listings behind them (the picker names cars by colour),
-  // then the held-back alternatives, which nobody can see yet.
   // Grouping copies the representative into a fresh `car` object and keeps the
   // originals in `listings`, so enriching one does NOT enrich the other. Both
-  // have to be in this list, or a grouped card gets paint on its headline and
-  // none on the listings behind it.
-  await deps.enrichColours(brand, [
-    ...matches.map((m) => m.car),
-    ...matches.flatMap((m) => m.listings || []),
+  // have to be enriched, or a grouped card gets paint on its headline and none
+  // on the listings behind it.
+  //
+  // Only the headline cars are waited on. Against a national pool the full
+  // queue (cards + every sampled listing + alternatives) runs to a few hundred
+  // PDPs, which cannot drain inside any budget a user should sit through — so
+  // the request blocks on just the paint that is actually on screen, and the
+  // rest is warmed behind the response. The colour cache is permanent, so the
+  // picker is populated by the time anyone opens it, and a repeat visit is
+  // complete and instant.
+  await deps.enrichColours(brand, matches.map((m) => m.car));
+  const warmRest = deps.enrichColours(brand, [
+    // Round-robin, not card-by-card: the budget runs out long before this queue
+    // does, and taken depth-first the first card's 24 listings consume all of it
+    // — leaving five pickers able to name a single colour. One listing from each
+    // card, then a second from each, spreads the same spend so every picker has
+    // something real to offer.
+    ...interleave(matches.map((m) => m.listings || [])),
     ...alternatives.map((m) => m.car),
-    ...alternatives.flatMap((m) => m.listings || []),
+    ...interleave(alternatives.map((m) => m.listings || [])),
   ]);
+  // Detached: a slow or failing PDP must not hold up (or reject) this response.
+  if (warmRest?.catch) warmRest.catch(() => {});
   // Paint is only known after that call, so the group's colour list is filled
   // in here rather than at grouping time. Alternatives get the same treatment:
   // a rejection promotes one into view, and it should arrive able to say what
@@ -439,13 +634,13 @@ async function handleMatch(req, res, deps) {
  */
 async function handlePreview(req, res, deps) {
   const {
-    answers, retailer, brand, group, error, status,
+    answers, retailer, brand, scope, group, error, status,
   } = await readMatchRequest(req);
   if (error) return sendJson(res, status, { error });
 
   let cars;
   try {
-    cars = await deps.fetchRetailerStock(brand, retailer);
+    cars = await deps.fetchRetailerStock(brand, retailer, scope);
   } catch (err) {
     if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
@@ -520,13 +715,13 @@ async function handlePreview(req, res, deps) {
  */
 async function handleField(req, res, deps) {
   const {
-    answers, retailer, brand, size, enrich, error, status,
+    answers, retailer, brand, scope, size, enrich, error, status,
   } = await readMatchRequest(req);
   if (error) return sendJson(res, status, { error });
 
   let cars;
   try {
-    cars = await deps.fetchRetailerStock(brand, retailer);
+    cars = await deps.fetchRetailerStock(brand, retailer, scope);
   } catch (err) {
     if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
@@ -634,6 +829,12 @@ export function buildServer(deps = {}) {
     fetchRetailerStock,
     fetchNearbyStock,
     enrichColours,
+    // The two location dependencies are on the same seam for the same reason as
+    // the stock ones: both call a third-party host that is not ours (a 2MB
+    // dealer directory, and postcodes.io), so a test that reached either would
+    // be neither hermetic nor fast.
+    fetchDealerDirectory,
+    geocodePostcode,
     ...deps,
   };
 
@@ -669,6 +870,68 @@ export function buildServer(deps = {}) {
       });
     }
 
+    /*
+     * The whole pool, for the hard-filter mode (see publicPool).
+     *
+     * A GET, unlike the other stock endpoints, because it takes no answers —
+     * there is nothing to score, only stock to hand over. That also makes it
+     * cacheable, which matters for a payload this size.
+     *
+     * Serves whatever the pool currently is, including a stale one, exactly as
+     * fetchRetailerStock does: a mode whose entire premise is "here is every
+     * car" must not 502 because a refresh is mid-flight.
+     */
+    if (req.method === 'GET' && pathname === '/api/pool') {
+      const brand = normalizeBrand(searchParams.get('brand'));
+      // Resolved, not raw: a typo'd scope silently becomes 'dealer', and the
+      // payload echoes what was actually used so a misconfigured embed shows up
+      // as a wrong `scope` in the response rather than a mysteriously small pool.
+      const scope = normalizeScope(searchParams.get('scope'));
+      try {
+        const cars = await resolved.fetchRetailerStock(
+          brand, searchParams.get('retailer') || undefined, scope,
+        );
+        // Retailer coordinates, for the proximity filter. Memoised for the
+        // process lifetime and primed at boot, so this awaits nothing in
+        // practice; a directory that is down costs the pool nothing but its
+        // `sites` table, which is a state the client already handles. Never
+        // allowed to fail the request — the mode's premise is every car.
+        const directory = await resolved.fetchDealerDirectory().catch((err) => {
+          console.warn('[pool] dealer directory unavailable:', err?.message);
+          return null;
+        });
+        return sendJson(res, 200, { ...publicPool(brand, cars, directory), scope });
+      } catch (err) {
+        console.warn('[pool] stock unavailable:', err?.message);
+        return sendJson(res, 502, { error: 'Stock temporarily unavailable' });
+      }
+    }
+
+    /*
+     * One postcode to one coordinate pair, for the proximity filter.
+     *
+     * A GET with the postcode in the query string, because it is neither a
+     * secret nor an answer to score — and because it is then as cacheable as the
+     * pool it pairs with. Deliberately NOT folded into /api/pool: the pool is
+     * one shared payload for every visitor, and a per-buyer postcode in it would
+     * make it uncacheable for the sake of two numbers.
+     *
+     * 404, not 502, for a postcode that does not exist: the buyer typed
+     * something wrong and the honest answer is "no such postcode", not "we are
+     * broken". 502 is reserved for the geocoder itself being unreachable, and
+     * the client keeps the filter usable either way.
+     */
+    if (req.method === 'GET' && pathname === '/api/geocode') {
+      try {
+        const place = await resolved.geocodePostcode(searchParams.get('postcode'));
+        if (!place) return sendJson(res, 404, { error: 'No such postcode' });
+        return sendJson(res, 200, place);
+      } catch (err) {
+        console.warn('[geocode] lookup failed:', err?.message);
+        return sendJson(res, 502, { error: 'Postcode lookup temporarily unavailable' });
+      }
+    }
+
     if (req.method === 'POST' && pathname === '/api/match') {
       return handleMatch(req, res, resolved);
     }
@@ -701,10 +964,11 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     console.log(`Matcher API listening on http://localhost:${PORT}`);
 
     // Keep live stock hot off the request path so the slow cold fetch (chiefly
-    // the nearby distance search) isn't paid by a user. Prime each brand's
-    // default retailer now so even the first visitor hits a warm cache; the
-    // warmer then keeps every served brand+retailer fresh. Failures are
-    // non-fatal — the request path still fetches on demand.
+    // BMW/MINI's national pagination and the nearby distance search) isn't
+    // paid by a user. Prime each brand's main pool now so even the first
+    // visitor hits a warm cache; the warmer then keeps every served brand
+    // (and, for BMW/MINI, the national pool) fresh. Failures are non-fatal —
+    // the request path still fetches on demand.
     startStockWarmer();
     // Prime every brand's main pool, and the nearby carousel for the two feed
     // brands that have one (BMW/MINI). Priming a brand also enrols it in the
@@ -715,9 +979,25 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     // Ferrari runs live too (its cold ~15-page walk is ~50s), so it's primed at
     // boot for the same reason as Motorrad: the first Ferrari visitor must not
     // pay that walk on the request path.
+    // The dealer directory, for the same reason and more sharply: it is a ~2MB
+    // response from someone else's server that its own module forbids on a
+    // request path, and /api/pool needs it to say where each retailer is.
+    // Memoised for the process lifetime, so this is the only fetch of it. Kept
+    // out of the pool prime below so a directory failure doesn't get counted as
+    // a cold pool — it isn't one, and what it costs is the proximity filter.
+    fetchDealerDirectory().then(
+      (sites) => console.log(`[dealers] directory primed (${sites.size} sites)`),
+      (err) => console.warn(`[dealers] directory unavailable (${err?.message}) — proximity filter off`),
+    );
+    // Feed brands prime BOTH pools: the dealer one because it is now the default
+    // an embed gets, and the national one because its on-disk index is what makes
+    // ?scope=national answer instantly instead of paying the ~60s walk. Priming
+    // only the default would leave the first national visitor on a cold pool.
     Promise.allSettled([
-      fetchRetailerStock('bmw'), fetchNearbyStock('bmw'),
-      fetchRetailerStock('mini'), fetchNearbyStock('mini'),
+      fetchRetailerStock('bmw', undefined, 'dealer'),
+      fetchRetailerStock('bmw', undefined, 'national'), fetchNearbyStock('bmw'),
+      fetchRetailerStock('mini', undefined, 'dealer'),
+      fetchRetailerStock('mini', undefined, 'national'), fetchNearbyStock('mini'),
       fetchRetailerStock('honda'),
       fetchRetailerStock('ford'),
       fetchRetailerStock('motorrad'),
@@ -728,6 +1008,20 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
         console.warn(`[warmer] initial prime: ${failed.length}/${r.length} pools cold (will retry on demand)`);
       } else {
         console.log('[warmer] initial stock primed (BMW + MINI + Honda + Ford + Motorrad + Ferrari)');
+      }
+      /*
+       * Colour last, and only once stock exists, because it needs the pool to
+       * know which adverts to ask about (see startColourWarmer).
+       *
+       * Off by default. It is thousands of requests at someone else's site —
+       * a ~4h20m first pass for BMW + MINI at one request per second — so it
+       * is opted into with COLOUR_WARM=1 rather than fired by anyone who
+       * happens to run the server. Subsequent passes are small deltas, since
+       * paint is cached per advert forever and persisted to .cache/.
+       */
+      if (process.env.COLOUR_WARM === '1') {
+        console.log('[colour] warm pass enabled (COLOUR_WARM=1) — see .cache/colours-*.json');
+        startColourWarmer();
       }
     });
   });

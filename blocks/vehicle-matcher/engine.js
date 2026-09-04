@@ -62,11 +62,13 @@ export async function apiGetQuestions(base, retailer, brandKey) {
 
 /** The configured retailer's ranked matches for a set of answers. Throws on
  * failure — this is the primary result, not an enhancement. */
-export async function apiMatch(base, answers, retailer, brandKey) {
+export async function apiMatch(base, answers, retailer, brandKey, scope) {
   const res = await fetch(`${base}/api/match`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ answers, retailer, brand: brandKey }),
+    body: JSON.stringify({
+      answers, retailer, brand: brandKey, scope,
+    }),
   });
   if (!res.ok) throw new Error(`Match request failed (${res.status})`);
   return res.json();
@@ -118,13 +120,13 @@ export async function apiNearby(base, answers, retailer, brandKey) {
  * awarding all three to one model in three colours says nothing, so a podium
  * passes true.
  */
-export async function apiPreview(base, answers, retailer, brandKey, group = false) {
+export async function apiPreview(base, answers, retailer, brandKey, scope, group = false) {
   try {
     const res = await fetch(`${base}/api/preview`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
-        answers, retailer, brand: brandKey, group,
+        answers, retailer, brand: brandKey, scope, group,
       }),
     });
     if (!res.ok) return [];
@@ -133,6 +135,60 @@ export async function apiPreview(base, answers, retailer, brandKey, group = fals
   } catch {
     return [];
   }
+}
+
+/**
+ * The WHOLE pool for a brand, columnar, in one request — the hard-filter mode's
+ * only data call.
+ *
+ * Every other function here asks the engine to choose; this one asks for the
+ * unranked lot, because Guess Who eliminates rather than recommends and the user
+ * watches twelve thousand cars become nine. That has two consequences worth
+ * stating: the payload is columns with dictionaries rather than objects (377 KB
+ * gzip for BMW's 12,084 cars — see publicPool in server/index.js), and there is
+ * no second tier, so no filter interaction ever waits on the network.
+ *
+ * The mode's premise is "every car we have", so what `scope` narrows is what
+ * "we" means — this retailer's forecourt, or the brand's whole network. It is
+ * the block's scope either way, never a pre-applied filter of the mode's own:
+ * at national scope the board's Distance filter is doing that job, and at dealer
+ * scope there is only one place to be near.
+ *
+ * THROWS on failure, like apiGetQuestions and for the same reason — there is no
+ * degraded version of this mode. No pool, no board.
+ */
+export async function apiPool(base, brandKey, retailer, scope) {
+  const url = new URL(`${base}/api/pool`);
+  if (brandKey) url.searchParams.set('brand', brandKey);
+  if (retailer) url.searchParams.set('retailer', retailer);
+  if (scope) url.searchParams.set('scope', scope);
+  const res = await fetch(url, { headers: authHeaders() });
+  if (res.status === 401) onUnauthorized();
+  if (!res.ok) throw new Error(`Pool request failed (${res.status})`);
+  return res.json();
+}
+
+/**
+ * One postcode to one point on the map, for the hard-filter mode's proximity
+ * axis. Takes a full postcode or just the outward code ("NG1"), and echoes back
+ * the canonical spelling so the UI can show it understood.
+ *
+ * The two failure modes are deliberately different values rather than one, because
+ * the buyer needs to be told different things: `null` is "no such postcode", which
+ * is about what they typed, and a THROW is "we couldn't ask", which is not their
+ * fault and shouldn't be phrased as though it were. The pool is already loaded by
+ * the time anyone types here, so neither ends the mode.
+ *
+ * @returns {Promise<{postcode, latitude, longitude} | null>}
+ */
+export async function apiGeocode(base, postcode) {
+  const url = new URL(`${base}/api/geocode`);
+  url.searchParams.set('postcode', postcode);
+  const res = await fetch(url, { headers: authHeaders() });
+  if (res.status === 401) onUnauthorized();
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Postcode lookup failed (${res.status})`);
+  return res.json();
 }
 
 /**
@@ -149,13 +205,13 @@ export async function apiPreview(base, answers, retailer, brandKey, group = fals
  * fetch a PDP for every round-one loser. Like apiPreview it NEVER throws — a
  * failed field must not break the game around it, so any error resolves to [].
  */
-export async function apiField(base, answers, retailer, brandKey, size, enrich = false) {
+export async function apiField(base, answers, retailer, brandKey, scope, size, enrich = false) {
   try {
     const res = await fetch(`${base}/api/field`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
-        answers, retailer, brand: brandKey, size, enrich,
+        answers, retailer, brand: brandKey, scope, size, enrich,
       }),
     });
     if (!res.ok) return [];

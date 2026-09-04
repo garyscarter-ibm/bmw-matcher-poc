@@ -101,8 +101,6 @@ const PODIUM_COPY = {
   mini: {
     wordmark: 'MINI Podium',
     title: 'YOUR TOP THREE, LIVE.',
-    lede: 'Tell us what you’re after on the left. The podium on the right shuffles '
-      + 'as you go.',
     bannerStart: 'Nothing decided yet. We’ve made a start from your budget anyway.',
     bannerProgress: ({ done, total }) => `${done} of ${total} down. The order moves with every answer.`,
     bannerComplete: 'That’s the lot answered. Go on then, make it official.',
@@ -152,8 +150,6 @@ const PODIUM_COPY = {
   bmw: {
     wordmark: 'Your Shortlist',
     title: 'Your top three, live.',
-    lede: 'Answer what matters on the left. The three cars on the right re-order '
-      + 'as you go, and the button confirms it.',
     bannerStart: 'Nothing committed yet. The podium is already working from your budget.',
     bannerProgress: ({ done, total }) => `${done} of ${total} answered. The order updates with each one.`,
     bannerComplete: 'That’s everything answered. Confirm when you’re ready.',
@@ -201,8 +197,6 @@ const PODIUM_COPY = {
   honda: {
     wordmark: 'Your Shortlist',
     title: 'Your top three, live.',
-    lede: 'Answer what you can on the left. The three cars on the right re-order '
-      + 'as you go, and the button confirms it.',
     bannerStart: 'Nothing committed yet. The shortlist is already working from your budget.',
     bannerProgress: ({ done, total }) => `${done} of ${total} answered. The order updates with each one.`,
     bannerComplete: 'That’s everything answered. Confirm when you’re ready.',
@@ -250,8 +244,6 @@ const PODIUM_COPY = {
   ford: {
     wordmark: 'Your Shortlist',
     title: 'Your top three, live.',
-    lede: 'Answer what matters on the left. The three cars on the right re-order '
-      + 'as you go, and the button makes it official.',
     bannerStart: 'Nothing committed yet. We’ve made a start from your budget.',
     bannerProgress: ({ done, total }) => `${done} of ${total} answered. The order shifts with each one.`,
     bannerComplete: 'That’s everything answered. Confirm whenever you’re ready.',
@@ -299,8 +291,6 @@ const PODIUM_COPY = {
   motorrad: {
     wordmark: 'Your Shortlist',
     title: 'Your top three bikes, live.',
-    lede: 'Answer what matters on the left. The three bikes on the right re-order '
-      + 'as you go, and the button confirms it.',
     bannerStart: 'Nothing committed yet. The shortlist is already working from your budget.',
     bannerProgress: ({ done, total }) => `${done} of ${total} answered. The order updates with each one.`,
     bannerComplete: 'That’s everything answered. Confirm when you’re ready.',
@@ -350,8 +340,6 @@ const PODIUM_COPY = {
   ferrari: {
     wordmark: 'The Podium',
     title: 'Your top three, live.',
-    lede: 'Tell us how you drive on the left. The order on the right forms as you '
-      + 'go, and the button settles it.',
     bannerStart: 'Nothing settled yet. The order has started from your budget.',
     bannerProgress: ({ done, total }) => `${done} of ${total} answered. The order changes with each one.`,
     bannerComplete: 'That’s everything answered. Settle it when you’re ready.',
@@ -537,7 +525,7 @@ function mount(root, ctx) {
   // and bronze must not be the same model in three colours (§3.4). One feed for
   // the whole run, so its debounce and its in-flight requests are its own.
   const feed = createPreviewFeed({
-    api: ctx.api, retailer: ctx.retailer, brand: ctx.brand, group: true,
+    api: ctx.api, retailer: ctx.retailer, brand: ctx.brand, scope: ctx.scope, group: true,
   });
 
   // Live DOM the paint functions write into, assigned by buildStage().
@@ -586,11 +574,13 @@ function mount(root, ctx) {
     const shell = el('div', 'vm-podium vm-podium-skeleton');
     shell.setAttribute('aria-busy', 'true');
     shell.setAttribute('aria-label', 'Loading');
+    const grid = el('div', 'vm-podium-grid');
     const ask = el('section', 'vm-podium-ask');
     for (let i = 0; i < 5; i += 1) ask.append(el('div', 'vm-skel vm-skel-line'));
     const results = el('section', 'vm-podium-results');
     for (let i = 0; i < 3; i += 1) results.append(el('div', 'vm-skel vm-skel-line'));
-    shell.append(ask, results);
+    grid.append(ask, results);
+    shell.append(grid);
     root.append(shell);
   };
 
@@ -599,21 +589,26 @@ function mount(root, ctx) {
     root.replaceChildren();
     stage = el('div', 'vm-podium');
 
-    // Left: the brief.
-    const ask = el('section', 'vm-podium-ask');
-    ask.append(
+    // A full-width head, above the two-pane grid: the campaign wordmark, the
+    // headline and the live progress, sized to lead the whole view now that
+    // the mode switcher no longer reserves that space as a tab row.
+    const head = el('div', 'vm-podium-head');
+    head.append(
       el('p', 'vm-podium-wordmark', copy.wordmark),
       el('h2', 'vm-podium-title', copy.title),
-      el('p', 'vm-podium-lede', copy.lede),
     );
-
     const progress = el('div', 'vm-podium-progress');
     progressBar = el('div', 'vm-podium-progress-bar');
     progress.append(progressBar);
     bannerEl = el('p', 'vm-podium-banner', copy.bannerStart);
     bannerEl.setAttribute('role', 'status');
-    ask.append(progress, bannerEl);
+    head.append(progress, bannerEl);
+    stage.append(head);
 
+    const grid = el('div', 'vm-podium-grid');
+
+    // Left: the brief.
+    const ask = el('section', 'vm-podium-ask');
     questionsWrap = el('div', 'vm-podium-questions');
     ask.append(questionsWrap);
 
@@ -638,7 +633,8 @@ function mount(root, ctx) {
     noteEl.hidden = true;
     results.append(liveEl, stepsEl, tailEl, noteEl);
 
-    stage.append(ask, results);
+    grid.append(ask, results);
+    stage.append(grid);
     stage.append(buildPopover());
     root.append(stage);
 
@@ -690,15 +686,44 @@ function mount(root, ctx) {
     updateProgress(visible);
   };
 
+  /*
+   * A twisty, not a flat block: every question starts open (so the pane reads
+   * the same as before on first paint) but a user filling in the easy ones can
+   * collapse them out of the way. The badge is the "you already did this one"
+   * signal a collapsed question can no longer show via a filled-in control.
+   */
   const buildQuestion = (q, index) => {
     const block = el('div', 'vm-podium-q');
     block.dataset.qid = q.id;
-    block.append(
-      el('p', 'vm-podium-q-label', `${String(index + 1).padStart(2, '0')} / ${shortLabel(q, ctx.brand)}`),
-      el('h3', 'vm-podium-q-title', q.title),
+
+    const panelId = `vm-podium-q-panel-${q.id}`;
+    const heading = el('h3', 'vm-podium-q-heading');
+    const toggle = el('button', 'vm-podium-q-toggle');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.setAttribute('aria-controls', panelId);
+    const text = el('span', 'vm-podium-q-text');
+    text.append(
+      el('span', 'vm-podium-q-label', `${String(index + 1).padStart(2, '0')} / ${shortLabel(q, ctx.brand)}`),
+      el('span', 'vm-podium-q-title', q.title),
     );
-    if (q.help) block.append(el('p', 'vm-podium-q-help', q.help));
-    block.append(buildControl(q, state.answers, answerChanged));
+    const chevron = el('span', 'vm-podium-q-chevron');
+    chevron.setAttribute('aria-hidden', 'true');
+    toggle.append(text, el('span', 'vm-podium-q-badge', 'Answered'), chevron);
+    heading.append(toggle);
+
+    const panel = el('div', 'vm-podium-q-panel');
+    panel.id = panelId;
+    if (q.help) panel.append(el('p', 'vm-podium-q-help', q.help));
+    panel.append(buildControl(q, state.answers, answerChanged));
+
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      panel.hidden = expanded;
+    });
+
+    block.append(heading, panel);
     return block;
   };
 
@@ -735,6 +760,11 @@ function mount(root, ctx) {
     if (done === 0) bannerEl.textContent = copy.bannerStart;
     else if (done >= visible.length) bannerEl.textContent = copy.bannerComplete;
     else bannerEl.textContent = copy.bannerProgress({ done, total: visible.length });
+
+    visible.forEach((q) => {
+      const badge = blocks.get(q.id)?.querySelector('.vm-podium-q-badge');
+      if (badge) badge.hidden = !isAnswered(q);
+    });
   };
 
   /*
@@ -771,7 +801,7 @@ function mount(root, ctx) {
     let result;
     try {
       // The identical call the questionnaire mode makes. THROWS on failure.
-      result = await apiMatch(ctx.api, state.answers, ctx.retailer, ctx.brand);
+      result = await apiMatch(ctx.api, state.answers, ctx.retailer, ctx.brand, ctx.scope);
     } catch {
       // Not a dead end and not a whole error screen: the podium on screen is
       // still true, so say what happened and re-arm the button.
