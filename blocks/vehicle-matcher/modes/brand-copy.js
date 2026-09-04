@@ -463,8 +463,8 @@ BRAND_COPY.ferrari = {
   // Ferrari Approved programme rather than "approved-used". See DECISIONS.md and
   // docs/tone-style-guide.md (Ferrari).
   lede: ({ questions, retailer }) => `${questions} quick questions about how you drive, `
-    + 'the roads you love and your budget. We’ll match you with the Ferrari Approved '
-    + `cars at ${retailer} that were made for you, and tell you why.`,
+    + 'the roads you love and your budget. We’ll match you with the '
+    + `vehicles at ${retailer} that were made for you, and tell you why.`,
   unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby just now. `
     + 'These are the closest to everything else you told us.',
   tasteTitle: ({ model }) => `The one for you is the ${model}.`,
