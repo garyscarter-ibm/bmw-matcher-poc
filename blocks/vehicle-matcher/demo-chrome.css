@@ -1,42 +1,26 @@
 /*
- * demo-chrome.css — fake brand-homepage furniture around the vehicle-matcher.
- *
- * This is DEMO-ONLY chrome, kept out of the portable block CSS on purpose. It
- * lets a stakeholder see the tool sitting inside convincing (not pixel-perfect)
- * brand-homepage furniture: a top nav, a photographic hero band, and a footer,
- * all wrapping the real block. Loaded only by homepage.html; index.html and any
- * real EDS page never see it.
- *
- * How the theming works — the trick that makes ONE shell serve five brands:
- * the shell wrapper carries `class="vm vm-<brand> demo-shell"`. The brand design
- * tokens (--vm-accent, --vm-font-heading, …) are declared on the compound
- * selector `.vm.vm-<brand>` in vehicle-matcher.css, so putting both classes on
- * the wrapper makes every token cascade down to the chrome as ordinary inherited
- * custom properties. The chrome below reads only `var(--vm-*)` — zero duplicated
- * colour or font values, one source of truth, and auto-reskin is a single class
- * swap on the wrapper.
- *
- * The catch the `.vm` class brings with it, and the fix:
- * `.vm` (vehicle-matcher.css) is not only the token block — it also lays the
- * TOOL out: transparent background, a 1280px max-width, centred, with padding.
- * On the wrapper that would clamp the full-bleed nav/hero to 1280px and break
- * the homepage look. So `.demo-shell.vm` below RESETS exactly those four layout
- * properties on the wrapper only. The inner `.vehicle-matcher.block` is a
- * separate element decorated on its own, so it re-applies `.vm`'s 1280px column
- * to itself and keeps the standalone width — same as index.html. With the 48px
- * gutter that column puts content at 1184px, which is why the hero and footer
- * inners below are 1180px: the tool lines up with the furniture around it.
- *
- * Guardrail (see vehicle-matcher.css:344): no element here is named
- * `.vehicle-matcher-wrapper` — that selector strips the block's own column
- * (correct inside EDS, where the host section supplies one; wrong here, where
- * the demo shell's sections are full-bleed and nothing would cap the block).
+ * demo-chrome.css — fake brand-homepage furniture (nav, hero, footer, picker)
+ * around the vehicle-matcher. Loaded only by index.html; block.html/EDS never see it.
+ */
+
+/*
+ * Theming: the wrapper's `vm vm-<brand>` classes cascade every brand token (tokens.css) down
+ * as inherited custom properties, so the chrome reads only var(--vm-*) — a reskin is one class swap.
+ */
+
+/*
+ * `.vm` also lays the tool out (1280px centred column), which would clamp the full-bleed nav/hero
+ * — so `.demo-shell.vm` resets those layout props; the hero/footer inners match at 1180px.
+ */
+
+/*
+ * Guardrail (see vehicle-matcher.css:344): no element here is `.vehicle-matcher-wrapper` —
+ * that selector strips the block's column (right in EDS, wrong here where sections are full-bleed).
  */
 
 /* --- wrapper: neutralise the block's own layout, keep its tokens/ink/font --- */
 .demo-shell.vm {
-  /* Undo the four layout properties `.vm` sets on itself, so the wrapper is a
-     plain full-bleed container. Tokens, colour and font-family still inherit. */
+  /* Undo the four layout props `.vm` sets on itself; tokens/colour/font still inherit. */
   max-width: none;
   margin: 0;
   padding: 0;
@@ -71,8 +55,8 @@
   width: auto;
   display: block;
 }
-/* Text-wordmark fallback when no clean SVG mark is committed for a brand. Reads
-   in the brand's own packaged heading face, so it's on-brand without a binary. */
+/* Text-wordmark fallback when no clean SVG mark is committed, in the brand's own
+   packaged heading face — on-brand without a binary. */
 .demo-logo-text {
   font-family: var(--vm-font-heading);
   font-weight: 700;
@@ -118,12 +102,8 @@
 /* ================= hero band ================= */
 
 /*
- * The hero carries a real brand photograph (set inline per brand as
- * background-image on this element) with the headline overlaid, the way the
- * real homepages are built. A dark left-weighted gradient scrim keeps the
- * overlaid type legible over any photo. When a brand has no committed photo the
- * shell adds `.is-plain` and the band falls back to the token accent colour, so
- * the demo never breaks.
+ * A real brand photo (set inline per brand) with the headline overlaid; a dark scrim
+ * keeps type legible. No photo → `.is-plain` falls back to the token accent colour.
  */
 .demo-hero {
   position: relative;
@@ -176,14 +156,8 @@
   opacity: 0.95;
 }
 /*
- * Per-brand hero headline treatment. Each mirrors the brand's own in-tool
- * .vm-title identity (case, weight, tracking) from vehicle-matcher.css, so the
- * hero band and the matcher below it read as the same brand rather than a
- * generic light headline sitting above branded chrome. The heading FACE is
- * already per-brand (the title inherits --vm-font-heading from .demo-hero), so
- * these rules only set the case/weight/tracking each brand headline needs, plus
- * the two size beats that genuinely differ: Motorrad shouts bigger, Ferrari is
- * quieter and more editorial.
+ * Per-brand hero headline treatment, mirroring each brand's in-tool .vm-title identity.
+ * The face is already per-brand (inherited); these set case/weight/tracking (+ two sizes).
  */
 /* BMW: light grotesque, uppercase, airy (the base .vm-title beat). */
 .vm-bmw .demo-hero-title {
@@ -198,8 +172,7 @@
   letter-spacing: 0.01em;
   line-height: 1.02;
 }
-/* Motorrad: the loudest hero of the set. Heavy uppercase, bigger than the rest,
-   matching bmw-motorrad.co.uk's "MAKE LIFE A RIDE" register. */
+/* Motorrad: the loudest hero — heavy uppercase, bigger, matching "MAKE LIFE A RIDE". */
 .vm-motorrad .demo-hero-title {
   text-transform: uppercase;
   font-weight: 700;
@@ -221,9 +194,7 @@
   letter-spacing: 0;
   line-height: 1.1;
 }
-/* Ferrari: restrained, editorial sentence case with air. Never shouted, so it
-   sits a touch smaller and lighter than the uppercase brands, with a hair of
-   tracking for the luxury register. */
+/* Ferrari: restrained editorial sentence case — a touch smaller/lighter, hair of tracking. */
 .vm-ferrari .demo-hero-title {
   text-transform: none;
   font-weight: 500;
@@ -232,8 +203,7 @@
   font-size: clamp(30px, 5.2vw, 58px);
 }
 
-/* An optional hero CTA — reads the same brand button tokens the tool's own
-   buttons do, so its size/shape/colour match the tool automatically. */
+/* Optional hero CTA — reads the brand button tokens, so size/shape/colour match the tool. */
 .demo-cta {
   display: inline-block;
   margin-top: var(--vm-space-6);
@@ -253,11 +223,8 @@
   cursor: pointer;
 }
 .demo-cta:hover { filter: brightness(1.08); }
-/* On the no-photo accent band the accent-filled CTA would vanish (accent on
-   accent). Invert it to a solid white button with accent text, so it reads
-   clearly as a button on the colour block — the way real brand heroes place a
-   light CTA on a flat colour panel. The photo-hero CTA keeps the accent fill,
-   which sits fine over the dark scrim. */
+/* On the no-photo accent band an accent-filled CTA would vanish, so invert to solid white
+   with accent text. The photo-hero CTA keeps the accent fill over the dark scrim. */
 .demo-hero.is-plain .demo-cta {
   background: #fff;
   color: var(--vm-accent);
@@ -267,13 +234,8 @@
 /* ================= tool section ================= */
 
 /*
- * The band the real block sits in. Painted in the brand's plain page surface
- * (white for every brand today) so the tool reads on a clean white ground
- * rather than the grey section band the earlier draft used. The block paints
- * its own transparent background and keeps its 1280px column, centred here.
- * The band's own side padding is small on purpose: the block's column is what
- * sets the content's distance from the edge, and doubling the two gutters would
- * pull the tool in from the hero and footer it is meant to align with.
+ * The band the real block sits in — painted in the brand's page surface (white today).
+ * Small side padding on purpose: the block's own 1280px column sets the edge distance.
  */
 .demo-tool {
   flex: 1 1 auto;
@@ -284,18 +246,8 @@
 /* ================= footer ================= */
 
 /*
- * Each brand's real footer is its dark ground (--vm-surface-dark, already set
- * per brand: BMW charcoal, Ford navy, Ferrari's global black, …) topped by a
- * thin keyline in the brand's spot colour, so the footer reads unmistakably as
- * that marque rather than a generic dark slab shared across all six.
- *
- * The keyline uses --vm-accent-spot, NOT --vm-accent: the spot token is the one
- * built to carry a small highlight, so it is legible on the dark ground for
- * every brand (BMW blue, Honda/Ferrari red, MINI racing green, Motorrad
- * motorsport red). --vm-accent would be near-black on MINI (invisible) and the
- * footer's own navy on Ford (no contrast). Ford is the single override below:
- * its spot is that same navy, so the keyline switches to the brand's brighter
- * digital blue (--vm-accent-secondary) to actually show.
+ * Dark ground topped by a keyline in the brand's spot colour (legible on dark, unlike raw accent).
+ * Ford overrides below: its spot is the footer navy, so it uses the brighter blue instead.
  */
 .demo-footer {
   padding: var(--vm-space-10) var(--vm-space-6) var(--vm-space-8);
@@ -305,8 +257,7 @@
   font-family: var(--vm-font-body);
   font-size: 14px;
 }
-/* Ford's spot colour is the same navy as its footer ground, so the shared
-   keyline would vanish. Use the brand's brighter digital blue instead. */
+/* Ford's spot colour is its footer navy, so the keyline would vanish — use the brighter blue. */
 .vm-ford .demo-footer { border-top-color: var(--vm-accent-secondary); }
 .demo-footer-inner {
   max-width: 1180px;
@@ -338,9 +289,13 @@
 /* ================= brand picker (no ?brand=) ================= */
 
 /*
- * The neutral landing splash shown when no brand is chosen. It carries NO
- * vm-<brand> class, so it uses the base BMW-default tokens — deliberately
- * marque-neutral. Five tiles, each a plain link into the themed shell.
+ * The neutral landing splash shown with no brand chosen. It carries NO `.vm` class, so
+ * brand-SPECIFIC tokens don't cascade — its dark palette below stays hardcoded and literal.
+ */
+
+/*
+ * Brand-INVARIANT tokens (--vm-space-*, type scale) live on `:root` in tokens.css, so they resolve
+ * here; the one brand signal is per-tile --tile-accent, set by renderPicker() for the hover below.
  */
 .demo-picker {
   min-height: 100vh;
@@ -355,22 +310,10 @@
   color: #f2f4f7;
   font-family: 'Helvetica Neue', helvetica, arial, sans-serif;
 }
-.demo-picker-head { text-align: center; max-width: 40ch; }
-.demo-picker-title {
-  margin: 0 0 var(--vm-space-3);
-  font-size: clamp(24px, 4vw, 34px);
-  font-weight: 600;
-}
-.demo-picker-lede {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.5;
-  color: #aeb4bd;
-}
 .demo-picker-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--vm-space-4);
+  gap: var(--vm-space-2);
   width: 100%;
   max-width: 860px;
 }
@@ -380,8 +323,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--vm-space-3);
-  min-height: 132px;
-  padding: var(--vm-space-6);
+  padding: var(--vm-space-3);
   border: 1px solid #2a2f37;
   border-radius: 12px;
   background: #16191e;
@@ -389,15 +331,15 @@
   text-decoration: none;
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
 }
+/* Hover in the tile's own brand colour: renderPicker() sets --tile-accent per tile from
+   --vm-accent-spot (spot stays legible here; MINI's raw accent is near-black). */
 .demo-picker-tile:hover {
-  border-color: #4c8bf5;
+  border-color: var(--tile-accent, #4c8bf5);
   background: #1c2027;
   transform: translateY(-2px);
 }
-/* A white plate behind the mark so every brand logo reads on the dark tile —
-   several marks are near-black (MINI wing, Honda H, the Motorrad lockup) and
-   would vanish directly on #16191e. The plate is how these marks sit on real
-   brand chips, so it also looks right. The mark scales to fit inside it. */
+/* A white plate so every mark reads on the dark tile (several marks are near-black);
+   this is also how these marks sit on real brand chips. The mark scales to fit. */
 .demo-picker-logo {
   display: flex;
   align-items: center;
@@ -412,12 +354,4 @@
 .demo-picker-logo img { max-height: 40px; max-width: 100%; width: auto; }
 /* Text-wordmark fallback sits on the same white plate, so it needs dark ink. */
 .demo-picker-logo .demo-picker-tile-label { color: #16191e; }
-.demo-picker-tile-label { font-size: 15px; font-weight: 600; }
-.demo-picker-note {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  text-align: center;
-  max-width: 52ch;
-  color: #7c828b;
-}
+.demo-picker-tile-label { font-size: 13px; font-weight: 400; }

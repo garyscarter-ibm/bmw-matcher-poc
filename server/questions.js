@@ -87,7 +87,6 @@ export const QUESTIONS = [
   {
     id: 'charging',
     title: 'Could you charge a car at home or work?',
-    help: 'A driveway socket or workplace charger changes the electric maths.',
     // fuel is now multi-select (an array), so test membership. Show the charging
     // question if the picks include electric-adjacent fuels or "help me decide",
     // or if fuel is still unanswered. Mirror of SHOW_IF.charging in quiz-meta.js.
@@ -321,8 +320,7 @@ const BRAND_COPY = {
   },
   mini: {
     budget: {
-      title: 'WHAT’S THE BUDGET?',
-      help: 'A rough on-the-road figure. We’ll flag anything that’s a slight stretch.',
+      title: 'WHAT’S YOUR BUDGET?',
     },
     bodyStyles: {
       title: 'WHICH SHAPE SPEAKS TO YOU?',
@@ -336,23 +334,22 @@ const BRAND_COPY = {
       },
     },
     fuel: {
-      title: 'HOW DO YOU WANT TO BE POWERED?',
+      title: 'HOW DO YOU WANT IT TO BE POWERED?',
       help: 'Pick as many as you like, or let us point you the right way.',
-      options: {
-        petrol: { label: 'Classic petrol' },
-        phev: { label: 'Plug-in hybrid', sub: 'Electric zip plus petrol range' },
-        ev: { label: 'Fully electric', sub: 'Silent, instant go-kart torque' },
-        open: { label: 'Help me decide', sub: 'Open to anything' },
-      },
+      optionsOverride: [
+        { value: 'ev', label: 'Fully electric', sub: 'Silent, instant go-kart torque' },
+        { value: 'phev', label: 'Plug-in hybrid', sub: 'Electric zip plus petrol range' },
+        { value: 'petrol', label: 'Petrol' },
+        { value: 'open', label: 'Help me decide', sub: 'Open to anything' },
+      ],
     },
     charging: {
-      title: 'COULD YOU PLUG IN AT HOME OR WORK?',
-      help: 'A driveway socket or a charger at work changes the electric maths.',
+      title: 'WHERE WOULD YOU PLUG YOUR CAR IN?',
       options: {
-        either: { label: 'Yep, home or work' },
-        home: { label: 'Yep, at home' },
-        work: { label: 'Yep, at work' },
-        none: { label: 'Nope, public chargers only' },
+        either: { label: 'Home or work' },
+        home: { label: 'Mostly at home' },
+        work: { label: 'Mostly at work' },
+        none: { label: 'Public chargers only' },
       },
     },
     primaryUse: {
@@ -431,14 +428,19 @@ export function questionsForBrand(brand = 'bmw') {
       // Budget slider bounds from the registry (only the fields it specifies).
       if (q.id === 'budget' && budget) Object.assign(out, budget);
       // Options: drop brand-excluded ones, strip the `brands` marker, and apply
-      // any per-option label/sub overrides.
+      // any per-option label/sub overrides. If the brand copy supplies
+      // `optionsOverride` (an array), it replaces the base set wholesale.
       if (q.options) {
-        out.options = q.options
-          .filter((o) => !o.brands || o.brands.includes(brand))
-          .map(({ brands, ...rest }) => {
-            const oc = c.options?.[rest.value];
-            return oc ? { ...rest, ...oc } : rest;
-          });
+        if (Array.isArray(c.optionsOverride)) {
+          out.options = c.optionsOverride;
+        } else {
+          out.options = q.options
+            .filter((o) => !o.brands || o.brands.includes(brand))
+            .map(({ brands, ...rest }) => {
+              const oc = c.options?.[rest.value];
+              return oc ? { ...rest, ...oc } : rest;
+            });
+        }
       }
       return out;
     });

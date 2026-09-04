@@ -130,7 +130,7 @@ blocks/vehicle-matcher/
 
 ```js
 function mount(root, ctx) { /* render into root */ }
-export default { key: 'mingle', label: 'Swipe', mount }; // neutral tab; wordmark is in-stage
+export default { key: 'swipe', label: 'Swipe', mount }; // key mirrors the neutral tab; wordmark is in-stage
 ```
 
 - `root` — a dedicated **stage** element the mode fully owns; it may
@@ -761,7 +761,7 @@ Ordered roughly by priority for a campaign — the top items are the product; th
 tail is polish that can be cut under time pressure (§6.3).
 
 **The brief + the game (must-have):**
-1. `modes/mingle.js` exporting `{ key: 'mingle', label, mount }`; register it in
+1. `modes/mingle.js` exporting `{ key: 'swipe', label, mount }`; register it in
    `modes/index.js` (import + array entry) — the switcher then shows two tabs.
 2. **Seed step** (§4.1): fetch `apiGetQuestions` first; build the budget bands
    and "what's it for" tiles from the engine's per-brand `budget`/`primaryUse`
@@ -805,6 +805,6 @@ tail is polish that can be cut under time pressure (§6.3).
 (`?brand=mini&retailer=92`) runs the seed step, then swipes a *shuffled, real*
 budget-scoped deck that reorders on reload; the result is a real `apiMatch` pick
 the buyer could afford (cross-check against `questions` for the same brief); a
-`Mode: mingle` row (or `?mode=mingle`) locks the page with no switcher; a
+`Mode: swipe` row (or `?mode=swipe`) locks the page with no switcher; a
 weak/unmet brief shows the honest note without killing the celebration;
 `cd server && npm test` stays green (engine untouched).

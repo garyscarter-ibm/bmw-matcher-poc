@@ -15,7 +15,7 @@
 
 /**
  * sessionStorage key holding the shared demo password the login overlay
- * captured (see index.html). It's the whole client side of the auth: the real
+ * captured (see index.html / block.html). It's the whole client side of the auth: the real
  * gate is the server's X-Access-Key check, and this is just where we stash the
  * value so every call can carry it.
  */
@@ -33,7 +33,7 @@ function authHeaders() {
 
 /**
  * A 401 means the shared password was wrong or has been rotated. Drop the stale
- * value and tell the harness (index.html) to re-show its login overlay, then let
+ * value and tell the host page (index.html / block.html) to re-show its login overlay, then let
  * the caller's own error handling run. Only apiGetQuestions acts on this — it's
  * the load-bearing call that throws; the others degrade to empty, so a bad key
  * simply yields an empty shell, which is the intended "useless without the API".

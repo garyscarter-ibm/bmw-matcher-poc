@@ -944,12 +944,22 @@ function mount(root, ctx) {
     // The committed hero upgrades to the big card, which is what surfaces the
     // engine's real "why it suits you" reasons. That upgrade is the visible
     // payoff for pressing the button, and the reason the button is honest.
-    step.append(matchCard(safeMatch(m), {
-      big: Boolean(state.committed) && gold,
-      compact: !gold,
-      brand: ctx.brand,
-    }));
-    step.append(rejectTrigger(m, step));
+    //
+    // Card and reject chip share a positioned wrapper *below* the rank eyebrow,
+    // so the absolutely-positioned chip anchors to the card's top-right corner
+    // (like the tail tiles) rather than the whole step — whose first child is
+    // the eyebrow, tallest on the gold tile, which is where the chip used to
+    // float. The dismissal target stays the step so the whole tile still fades.
+    const cardWrap = el('div', 'vm-podium-card');
+    cardWrap.append(
+      matchCard(safeMatch(m), {
+        big: Boolean(state.committed) && gold,
+        compact: !gold,
+        brand: ctx.brand,
+      }),
+      rejectTrigger(m, step),
+    );
+    step.append(cardWrap);
     return step;
   };
 

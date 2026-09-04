@@ -15,7 +15,7 @@
  * BMW and MINI use proprietary typefaces (BMW Type Next, MINI Serif, MINI
  * Sans). Earlier revisions of this block were *host-first only*: the tokens
  * named the host page's font variables and fell through to Helvetica in the
- * standalone harness (index.html / GitHub Pages), where there is no host to
+ * standalone harness (block.html / GitHub Pages), where there is no host to
  * inherit from. That is why the fonts didn't render outside an EDS site.
  *
  * We now SHIP the fonts with the block (see ./fonts/), so it renders in the
@@ -30,6 +30,14 @@
  * font-display: swap so text paints immediately in the fallback and swaps to
  * the brand face when it arrives.
  * ------------------------------------------------------------------------- */
+
+/* Design tokens (every --vm-* custom property) live in a sibling file so they
+   can be shared with the demo chrome and the neutral brand picker. Imported
+   here, at the very top, because a real EDS page auto-loads ONLY this file —
+   nothing pulls in a sibling — so the @import is what keeps the block
+   self-contained. @import must precede all other rules (the @font-face run
+   below included), so it stays first. See tokens.css for the :root vs .vm split. */
+@import url('./tokens.css');
 
 /* BMW Type Next — shared by BMW cars and BMW Motorrad. woff2 only. */
 @font-face {
@@ -209,89 +217,10 @@
 }
 
 .vm {
-  /* --- font ---
-     Packaged-first. 'BMW Type Next' is declared via @font-face at the top of
-     this file and shipped with the block (./fonts/), so it renders in the BMW
-     typeface everywhere — inside an EDS host AND in the standalone harness,
-     which has no host typography to inherit. One family, real weights: 300
-     Light for headings, 400 Regular for body, 700 Bold for emphasis; weight is
-     carried by font-weight, never by a per-weight family name (naming families
-     like 'BMWTypeNextLatin-Light' is what silently fell through to Helvetica
-     before). The host var is kept as a bridge and the system stack as the last
-     resort if the woff2 fails to load. */
-  --vm-font-heading: 'BMW Type Next', var(--heading-font-family, 'Helvetica Neue'), arial, sans-serif;
-  --vm-font-body: 'BMW Type Next', var(--body-font-family, 'Helvetica Neue'), arial, sans-serif;
-  --vm-font-bold: 'BMW Type Next', var(--body-font-family, 'Helvetica Neue'), arial, sans-serif;
-
-  /* --- colour (light theme) --- */
-  --vm-ink: #262626;          /* primary text */
-  --vm-ink-strong: #000000;   /* pure-black text/CTAs */
-  --vm-ink-muted: #666666;    /* secondary/caption text */
-  --vm-surface: #ffffff;      /* page background */
-  --vm-surface-alt: #f5f5f5;  /* section band background */
-  --vm-surface-alt-2: #f9f9f9;/* secondary section band */
-  --vm-surface-dark: #262626; /* dark section band */
-  --vm-accent: #1c69d4;       /* BMW Blue — primary CTA, links, highlights */
-  --vm-accent-ink: #ffffff;   /* text/icon colour on the accent */
-  --vm-accent-secondary: #0085ac; /* BMW i teal */
-  /* Spot accent for small highlights (progress bar, score badge, slider fill).
-     BMW = the same blue; MINI overrides this to British Racing Green so its
-     buttons can be black while the green still appears, sparingly. */
-  --vm-accent-spot: var(--vm-accent);
-  /* A soft wash of the accent, for the selected answer's fill. Kept as a
-     token so each brand tints with its own colour. */
-  --vm-accent-soft: rgba(28, 105, 212, 0.06);
-  --vm-line: #d6d6d6;         /* hairline dividers/borders on the light theme */
-
-  /* Semantic aliases so the shared selectors below read cleanly. */
-  --vm-bg: var(--vm-surface);
-  --vm-surface-2: var(--vm-surface-alt);
-  --vm-text: var(--vm-ink);
-  --vm-muted: var(--vm-ink-muted);
-
-  /* --- spacing scale (4px based) --- */
-  --vm-space-1: 4px;
-  --vm-space-2: 8px;
-  --vm-space-3: 12px;
-  --vm-space-4: 16px;
-  --vm-space-5: 20px;
-  --vm-space-6: 24px;
-  --vm-space-8: 32px;
-  --vm-space-10: 40px;
-  --vm-space-12: 48px;
-  --vm-space-16: 64px;
-
-  /* --- geometry --- */
-  --vm-radius: 0px;           /* cards, media, options — BMW is sharp */
-  --vm-radius-control: 0px;   /* buttons/pills — MINI overrides to a pill */
-  --vm-radius-soft: 4px;      /* rare exception, e.g. inline links */
-  --vm-btn-height: 46px;
-
-  /* --- motion character (the game modes lean on these) ---
-     One easing + one "pop" duration, referenced by the swipe/knockout
-     animations so the SAME keyframes read differently per brand. BMW is
-     precise and decisive: a tight ease-out, no overshoot. MINI overrides
-     --vm-ease to a springy curve (go-kart energy) further down. */
-  --vm-ease: cubic-bezier(0.2, 0.6, 0.2, 1);   /* BMW: crisp, no bounce */
-  --vm-pop: 0.42s;                             /* reveal/entrance duration */
-  --vm-btn-padding: 12px 20px 15px;
-  --vm-btn-min-width: 232px;
-  /* Button label casing/tracking. Default is the natural label (BMW/MINI/etc.
-     don't uppercase their CTAs here); Ferrari overrides to uppercase to match
-     its own button component. */
-  --vm-btn-transform: none;
-  --vm-btn-letter-spacing: normal;
-  --vm-border-width: 1px;
-
-  /* --- type scale (line-height 1.2× unless noted) --- */
-  --vm-text-h1: 40px;
-  --vm-text-h2-lg: 36px;
-  --vm-text-h2: 26px;
-  --vm-text-h3: 24px;
-  --vm-text-body-lg: 18px;
-  --vm-text-body: 16px;
-  --vm-text-label: 13px;
-  --vm-text-eyebrow: 10px;
+  /* Design tokens (fonts, colour, spacing, geometry, type scale, motion) live
+     in tokens.css, @imported at the top of this file; the base .vm block there
+     is the BMW default and each .vm.vm-<brand> block overrides it. They cascade
+     in here — what remains on .vm below is the block's own LAYOUT. */
 
   /* Transparent, not white: the host section owns the background. Painting
      our own white is invisible on a white page but becomes a white slab the
@@ -404,57 +333,8 @@
  * harness alike — it no longer depends on the host declaring them.
  * -------------------------------------------------------------------- */
 
-.vm.vm-mini {
-  /* fonts: serif headings, sans body. Both are PACKAGED with the block
-     (@font-face at the top of this file: 'MINI Serif' and 'MINI Sans', the
-     exact woff files the live MINI retailer site loads), so they render on a
-     host page and in the standalone harness alike. One family per typeface,
-     weight carried by font-weight (MINI titles set 700 below) — never a
-     per-weight family name, which is what silently fell through to Helvetica
-     before and left MINI's buttons and eyebrow labels un-branded. */
-  --vm-font-heading: 'MINI Serif', Georgia, 'Times New Roman', serif;
-  --vm-font-body: 'MINI Sans', 'Helvetica Neue', arial, sans-serif;
-  --vm-font-bold: var(--vm-font-body);
-
-  /* colour: black-on-white. The "accent" (primary button fill, selected-state
-     border) is near-black — that's MINI's primary. British Racing Green + teal
-     are SPOT colours applied only to small highlights (see --vm-accent-spot
-     rules below), not the button colour. */
-  --vm-ink: #000000;
-  --vm-ink-strong: #000000;
-  --vm-ink-muted: #555555;
-  --vm-accent: #111111;          /* near-black = MINI primary */
-  --vm-accent-ink: #ffffff;
-  --vm-accent-spot: #01693e;     /* British Racing Green — used sparingly */
-  --vm-accent-secondary: #0085ac; /* MINI teal — secondary spot */
-  /* Tinted with the green spot rather than the near-black accent, which
-     would just read as grey. */
-  --vm-accent-soft: rgba(1, 105, 62, 0.07);
-  /* Card/tile hairlines stay a soft grey (MINI reserves solid black for
-     buttons + selected states, applied explicitly below), so the quiz doesn't
-     read as a grid of heavy black boxes. */
-  --vm-line: #cfcfcf;
-  /* dark band (footer): MINI reserves solid near-black for its heavy surfaces,
-     so the footer is black rather than the base's #262626 grey. */
-  --vm-surface-dark: #111111;
-
-  /* geometry: fully-round pill controls, softly-rounded cards */
-  --vm-radius: 6px;
-  --vm-radius-control: 999px;
-
-  /* buttons: MINI's pills read taller and rounder than BMW's flat slab, with
-     more horizontal breathing room and a slightly narrower min-width (a pill
-     doesn't want BMW's wide rectangular measure). */
-  --vm-btn-height: 48px;
-  --vm-btn-padding: 13px 26px 14px;
-  --vm-btn-min-width: 208px;
-
-  /* motion: MINI is playful — the same game animations get a springy
-     overshoot (a little go-kart bounce as cards settle and stamps land),
-     and a slightly longer pop so the bounce has room to read. */
-  --vm-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --vm-pop: 0.52s;
-}
+/* MINI theme tokens (fonts, colour, geometry, buttons, motion) live in the
+   .vm.vm-mini block in tokens.css. The MINI-scoped COMPONENT rules stay here. */
 
 /* MINI headlines: serif, UPPERCASE, tight leading (MINI sets ~0.95). */
 .vm.vm-mini .vm-title,
@@ -536,44 +416,8 @@
  * Licence note: Proxima Nova is a commercial licensed face, self-hosted by
  * owner decision (weaker footing than BMW/MINI) — see DECISIONS.md.
  * -------------------------------------------------------------------- */
-.vm.vm-honda {
-  /* Headings use the condensed display cut; body the regular width. Packaged
-     first, then host bridge, then a neutral system sans for safety. */
-  --vm-font-heading: 'Proxima Nova ExCn', var(--heading-font-family, 'Helvetica Neue'), arial, sans-serif;
-  --vm-font-body: 'Proxima Nova', var(--body-font-family, 'Helvetica Neue'), arial, sans-serif;
-  --vm-font-bold: var(--vm-font-body);
-
-  /* colour: dark-ink-on-white with Honda Red as the primary accent. Red is the
-     CTA/link/highlight colour (Honda leads with it far more than BMW leads with
-     blue), so unlike MINI the accent IS the button colour here. */
-  --vm-ink: #1a1a1a;
-  --vm-ink-strong: #000000;
-  --vm-ink-muted: #5a5a5a;
-  --vm-accent: #cc0000;          /* Honda Red — primary CTA, links, highlights */
-  --vm-accent-ink: #ffffff;
-  --vm-accent-spot: var(--vm-accent);
-  --vm-accent-secondary: #333333; /* graphite — secondary spot */
-  --vm-accent-soft: rgba(204, 0, 0, 0.06);
-  --vm-line: #d9d9d9;
-  /* dark band (footer): a plain near-black, matching Honda's own dark footers
-     rather than the base's #262626 grey. */
-  --vm-surface-dark: #1a1a1a;
-
-  /* geometry: softly rounded, between BMW's sharp 0 and MINI's full pill. */
-  --vm-radius: 8px;
-  --vm-radius-control: 8px;
-
-  /* buttons: Honda's denser mainstream retail UI runs a touch shorter than
-     BMW's 46px, tighter padding, and a narrower min-width. */
-  --vm-btn-height: 44px;
-  --vm-btn-padding: 11px 18px 13px;
-  --vm-btn-min-width: 200px;
-
-  /* motion: calm and honest — a clean ease-out with no overshoot (Honda isn't
-     playful like MINI; it's steady). Slightly quicker than BMW's pop. */
-  --vm-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --vm-pop: 0.4s;
-}
+/* Honda theme tokens (fonts, colour, geometry, buttons, motion) live in the
+   .vm.vm-honda block in tokens.css. The Honda-scoped COMPONENT rules stay here. */
 
 /* Honda headlines: sans, sentence-case (NOT uppercased like BMW/MINI), medium
    weight. Overriding text-transform is the key move — the base .vm-title
@@ -646,43 +490,8 @@
  * one. Packaged FordF1 first, then Antenna, then the host bridge, then a system
  * sans for the standalone harness.
  * -------------------------------------------------------------------- */
-.vm.vm-ford {
-  /* Sans for both headings and body (Ford has no display serif). Packaged first
-     (FordF1 -> Ford Antenna), then host bridge, then a neutral system sans. */
-  --vm-font-heading: 'FordF1', 'Ford Antenna', var(--heading-font-family, 'Helvetica Neue'), arial, sans-serif;
-  --vm-font-body: 'FordF1', 'Ford Antenna', var(--body-font-family, 'Helvetica Neue'), arial, sans-serif;
-  --vm-font-bold: var(--vm-font-body);
-
-  /* colour: dark-ink-on-white with Ford Blue as the primary accent. Blue is the
-     CTA/link/highlight colour and, like Honda's red, IS the button colour here. */
-  --vm-ink: #1a1a1a;
-  --vm-ink-strong: #00142e;      /* near-black Ford navy for strongest ink */
-  --vm-ink-muted: #57606a;
-  --vm-accent: #003478;          /* Ford Blue — primary CTA, links, highlights */
-  --vm-accent-ink: #ffffff;
-  --vm-accent-spot: var(--vm-accent);
-  --vm-accent-secondary: #1700f4; /* Ford's brighter digital blue — secondary spot */
-  --vm-accent-soft: rgba(0, 52, 120, 0.06);
-  --vm-line: #d5dae0;
-  /* dark band (footer): Ford's dark surfaces are a deep navy, not neutral grey
-     (its ink-strong is #00142e); the footer takes that navy. */
-  --vm-surface-dark: #00142e;
-
-  /* geometry: lightly rounded, crisper than Honda's 8px (Ford's UI runs ~4px). */
-  --vm-radius: 4px;
-  --vm-radius-control: 4px;
-
-  /* buttons: Ford's FordF1 CTAs run at mainstream web scale, a shade chunkier
-     than Honda but still shorter than BMW's slab, with a moderate min-width. */
-  --vm-btn-height: 44px;
-  --vm-btn-padding: 12px 20px 13px;
-  --vm-btn-min-width: 210px;
-
-  /* motion: confident and clean, a touch more energetic than Honda's calm
-     ease-out (Ford sells a Mustang), but no MINI-style overshoot. */
-  --vm-ease: cubic-bezier(0.2, 0.75, 0.2, 1);
-  --vm-pop: 0.38s;
-}
+/* Ford theme tokens (fonts, colour, geometry, buttons, motion) live in the
+   .vm.vm-ford block in tokens.css. The Ford-scoped COMPONENT rules stay here. */
 
 /* Ford headlines: sans, sentence-case (NOT uppercased like BMW/MINI), in the
    navy strong-ink. As with Honda, overriding text-transform is the key move —
@@ -748,46 +557,8 @@
  * base .vm-title, unlike Ford/Honda which un-uppercase) because Motorrad's own
  * marketing sets model names and headlines in caps. Accent is Motorrad blue;
  * the motorsport red is the secondary spot that appears on small highlights. */
-.vm.vm-motorrad {
-  /* Motorrad uses the SAME BMW Type Next family as BMW cars, packaged with the
-     block (@font-face at the top of this file), so it inherits the base .vm
-     stack. Redeclared here for clarity: packaged family first, then a neutral
-     system sans if the woff2 fails to load. */
-  --vm-font-heading: 'BMW Type Next', 'Helvetica Neue', arial, sans-serif;
-  --vm-font-body: 'BMW Type Next', 'Helvetica Neue', arial, sans-serif;
-  --vm-font-bold: var(--vm-font-body);
-
-  /* colour: darker and more assertive than BMW cars. Strong near-black ink, a
-     Motorrad blue accent for CTAs/links, and the motorsport red as the spot. */
-  --vm-ink: #1c1c1c;
-  --vm-ink-strong: #0a0a0a;
-  --vm-ink-muted: #5c5c5c;
-  --vm-accent: #0066b1;          /* BMW Motorrad blue — primary CTA, links */
-  --vm-accent-ink: #ffffff;
-  --vm-accent-secondary: #e2001a; /* Motorsport red — energy on small chrome */
-  --vm-accent-spot: var(--vm-accent-secondary); /* red spot: progress, score, slider */
-  --vm-accent-soft: rgba(0, 102, 177, 0.07);
-  --vm-line: #d2d2d2;
-  /* dark band (footer): near-black, matching Motorrad's hard, machined dark
-     surfaces rather than the base's #262626 grey. */
-  --vm-surface-dark: #0a0a0a;
-
-  /* geometry: sharp. A bike's design language is hard edges and machined metal,
-     so square corners like BMW (not Ford/Honda's rounding). */
-  --vm-radius: 0px;
-  --vm-radius-control: 0px;
-
-  /* buttons: closest to BMW (the shared parent design language), nudged a touch
-     tighter — the sportier sub-brand runs slightly more compact CTAs. */
-  --vm-btn-height: 44px;
-  --vm-btn-padding: 11px 20px 14px;
-  --vm-btn-min-width: 220px;
-
-  /* motion: crisp and quick, a touch faster than BMW cars — the sportier
-     sub-brand — but no bounce. */
-  --vm-ease: cubic-bezier(0.2, 0.65, 0.15, 1);
-  --vm-pop: 0.36s;
-}
+/* Motorrad theme tokens (fonts, colour, geometry, buttons, motion) live in the
+   .vm.vm-motorrad block in tokens.css. The Motorrad-scoped COMPONENT rules stay here. */
 
 /* Motorrad buttons: BLACK primary fill with UPPERCASE labels — the marque's
    signature CTA treatment (bmw-motorrad.com). Blue is a LINK/accent colour here,
@@ -878,59 +649,8 @@
  * PACKAGED from ./fonts (Ferrari Sans, see the @font-face block up top) — a
  * brand-owned face, self-hosted on the BMW footing. See DECISIONS.md.
  * -------------------------------------------------------------------- */
-.vm.vm-ferrari {
-  /* Ferrari Sans for both headings and body (there is no display serif).
-     Packaged family first so the standalone harness renders, then the host
-     bridge, then Noto/​system sans — the same fallback family the site pairs
-     it with. Bold requests resolve to the Medium woff (see @font-face note). */
-  --vm-font-heading: 'Ferrari Sans', var(--heading-font-family, 'Noto Sans'), 'Helvetica Neue', arial, sans-serif;
-  --vm-font-body: 'Ferrari Sans', var(--body-font-family, 'Noto Sans'), 'Helvetica Neue', arial, sans-serif;
-  --vm-font-bold: var(--vm-font-body);
-
-  /* colour: near-black ink on white with Ferrari red as the sole accent. Red
-     IS the button colour here (like Honda red / Ford blue), used sparingly. */
-  --vm-ink: #181818;
-  --vm-ink-strong: #000000;
-  --vm-ink-muted: #8f8f8f;
-  --vm-surface: #ffffff;
-  --vm-surface-alt: #f6f7f8;      /* the site's own section band */
-  --vm-accent: #da291c;           /* Ferrari red — primary CTA, links, highlights */
-  --vm-accent-ink: #ffffff;
-  --vm-accent-spot: var(--vm-accent);
-  --vm-accent-secondary: #ffde00; /* Ferrari shield yellow — rare secondary spot */
-  --vm-accent-soft: rgba(218, 41, 28, 0.06);
-  --vm-line: #d0dddd;
-  /* dark band (footer): Ferrari's own global black (#181818, their
-     --f-color-global-black), the ground their dark UI uses, not #262626 grey. */
-  --vm-surface-dark: #181818;
-
-  /* geometry: crisp, lightly softened (2px) on cards/panels. The BUTTON is a
-     hard-edged rectangle, matching ferrari.com's own .f-button (border: 0 and
-     no border-radius in any of its 24 variants). */
-  --vm-radius: 2px;
-  --vm-radius-control: 0;
-
-  /* buttons: taken from ferrari.com's own .f-button component — UPPERCASE
-     12px/16px FerrariSans, 0.6px tracking (.f-button__text), padding 24px/32px
-     off their 8px space scale (--f-space-s / --f-space-m), and min-width 200px
-     (.f-button--width-min). Two deliberate adaptations: their 24px vertical
-     padding wraps 12px chrome type where ours wraps larger 14px label type, so
-     vertical is scaled to 16/18px (a literal 24px would stand ~64px tall beside
-     the other brands' 44-48px); horizontal 32px is kept exactly, since the
-     generous side padding is the signature of the mark. The fill is a red
-     gradient (a00c01 -> da291c), not flat red — applied in the
-     .vm-ferrari .vm-btn-primary rule below. */
-  --vm-btn-height: 52px;
-  --vm-btn-padding: 16px 32px 18px;
-  --vm-btn-min-width: 200px;
-  --vm-btn-transform: uppercase;
-  --vm-btn-letter-spacing: 0.05em;   /* 0.6px on their 12px; em-scaled for ours */
-
-  /* motion: composed and unhurried. A clean ease-out, a fraction slower than
-     Ford, no overshoot — luxury moves calmly, it doesn't bounce. */
-  --vm-ease: cubic-bezier(0.22, 0.61, 0.24, 1);
-  --vm-pop: 0.46s;
-}
+/* Ferrari theme tokens (fonts, colour, geometry, buttons, motion) live in the
+   .vm.vm-ferrari block in tokens.css. The Ferrari-scoped COMPONENT rules stay here. */
 
 /* Ferrari headlines: sans, SENTENCE CASE (not uppercased like BMW/MINI/
    Motorrad), in the strong ink. Overriding text-transform is the key move; the
@@ -3724,12 +3444,18 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-podium-steps.is-updating { opacity: 0.45; }
 
 /* A step is a frame around a shared card, not a card itself, so it paints no
-   background or border of its own (that would double every card edge). It is
-   the positioning context for the reject trigger, and it carries the dismissal
-   transition for the whole tile. */
+   background or border of its own (that would double every card edge). It holds
+   the rank eyebrow plus .vm-podium-card, and carries the dismissal transition
+   for the whole tile. The chip anchors to that inner wrapper, not to this. */
 .vm-podium-step {
   position: relative;
   transition: opacity 0.35s var(--vm-ease), transform 0.35s var(--vm-ease);
+}
+/* Wraps the card + reject chip below the rank eyebrow. It, not the step, is the
+   chip's positioning context, so the absolutely-positioned chip hugs the card's
+   top-right corner instead of floating in the eyebrow band (tallest on gold). */
+.vm-podium-card {
+  position: relative;
 }
 .vm-podium-step .vm-card {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
@@ -3824,11 +3550,11 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 
      Only the spanning winner. A tied gold card is one column wide, so it is a
      portrait card and keeps the stacked anatomy. */
-  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-media {
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-podium-card > .vm-card > .vm-card-media {
     flex: none;
     max-height: 280px;
   }
-  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body {
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-podium-card > .vm-card > .vm-card-body {
     display: block;
     columns: 2;
     column-gap: var(--vm-space-8);
@@ -3836,7 +3562,7 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   /* Multi-column will break a paragraph across the gap by default, which turns
      a two-line spec list into one line at the bottom of one column and one at
      the top of the other. Every block in this body is a unit. */
-  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body > * {
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-podium-card > .vm-card > .vm-card-body > * {
     break-inside: avoid;
   }
   /* Put the seam where the register changes instead of wherever the balancer
@@ -3844,14 +3570,14 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
      it is present on every non-compact card, so it is the reliable hinge.
      Skipped when the blurb is the last child — a payload with no kit, reasons or
      link would otherwise force an empty second column. */
-  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-podium-card > .vm-card > .vm-card-body
     > .vm-blurb:not(:last-child) {
     break-after: column;
   }
   /* Belt and braces for the browsers that ignore a forced column break: a
      balanced split put "What's fitted" at the foot of one column and the kit it
      labels at the head of the next. A label is part of the thing it labels. */
-  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-card > .vm-card-body
+  .vm-podium-steps:not(.is-tied) .vm-podium-step.is-gold > .vm-podium-card > .vm-card > .vm-card-body
     > .vm-why-label {
     break-after: avoid;
   }

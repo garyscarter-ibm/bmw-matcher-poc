@@ -1306,6 +1306,8 @@ export const _stat = {
 // The switcher tab is brand-agnostic shell UI, so its label is neutral —
 // "Head to head", not "MINI Knockout". The campaign name lives as the wordmark
 // INSIDE the stage (KNOCKOUT_COPY[brand].wordmark), where it can vary by brand;
-// the mode's static `label` can't. key stays 'knockout' — the ?mode= and authored
-// "Mode" value.
-export default { key: 'knockout', label: 'Head to head', mount };
+// the mode's static `label` can't. The key mirrors that label, slugified
+// ('head-to-head'), so ?mode=head-to-head and the authored "Mode" value read the
+// same as the tab — the file is still knockout.js, but the mode a visitor
+// addresses is "head-to-head".
+export default { key: 'head-to-head', label: 'Head to head', mount };
