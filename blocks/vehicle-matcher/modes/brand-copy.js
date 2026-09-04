@@ -530,8 +530,8 @@ export const UNMET_PHRASES = {
     // Kuga PHEV, and the Mach-E / Explorer / Capri / Puma Gen-E EVs) and every
     // body from a supermini to a pickup.
     fuel: {
-      petrol: 'petrol Fords', diesel: 'diesel Fords', phev: 'plug-in hybrid Fords',
-      ev: 'fully electric Fords',
+      petrol: 'petrol cars', diesel: 'diesels', phev: 'plug-in hybrids',
+      ev: 'fully electric cars',
     },
     bodyStyles: {
       hatchback: 'hatchbacks', estate: 'estates', suv: 'SUVs', coupe: 'coupés',
