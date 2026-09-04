@@ -520,7 +520,7 @@ async function readMatchRequest(req) {
  */
 async function handleMatch(req, res, deps) {
   const {
-    answers, retailer, brand, error, status,
+    answers, retailer, brand, scope, error, status,
   } = await readMatchRequest(req);
   if (error) return sendJson(res, status, { error });
 
