@@ -801,7 +801,7 @@ function mount(root, ctx) {
     let result;
     try {
       // The identical call the questionnaire mode makes. THROWS on failure.
-      result = await apiMatch(ctx.api, state.answers, ctx.retailer, ctx.brand);
+      result = await apiMatch(ctx.api, state.answers, ctx.retailer, ctx.brand, ctx.scope);
     } catch {
       // Not a dead end and not a whole error screen: the podium on screen is
       // still true, so say what happened and re-arm the button.
