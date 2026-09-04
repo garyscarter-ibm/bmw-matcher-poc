@@ -57,7 +57,7 @@ export function createPreviewFeed({
         // Snapshot: the request is about the answers as they were when it left,
         // and the caller's object goes on mutating underneath it.
         const snapshot = { ...answers };
-        apiPreview(api, snapshot, retailer, brand, group).then((matches) => {
+        apiPreview(api, snapshot, retailer, brand, scope, group).then((matches) => {
           // A newer answer already superseded this request — drop the stale result.
           if (mine !== seq) return;
           onResult(matches);
