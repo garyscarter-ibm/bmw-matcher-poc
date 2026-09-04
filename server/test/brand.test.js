@@ -330,17 +330,24 @@ test('annual mileage changes the ranking (efficient cars rise at high mileage)',
 
 /* ---- bespoke per-brand question ---- */
 
-test('MINI question surgery: drops mileage/style, adds doors + miniVibe; BMW keeps its full set', () => {
+test('MINI question surgery: drops five, adds doors + miniVibe; BMW keeps its full set', () => {
   const mini = questionsForBrand('mini');
   const ids = mini.map((q) => q.id);
-  // Dropped for MINI (dead against its range), kept for BMW.
-  assert.ok(!ids.includes('mileage'), 'MINI drops mileage');
-  assert.ok(!ids.includes('style'), 'MINI drops style (folded into miniVibe)');
   const bmwIds = questionsForBrand('bmw').map((q) => q.id);
-  assert.ok(bmwIds.includes('mileage') && bmwIds.includes('style'), 'BMW keeps both');
-  // Added for MINI: doors right after bodyStyles, miniVibe after people.
-  assert.equal(ids.indexOf('doors'), ids.indexOf('bodyStyles') + 1, 'doors follows bodyStyles');
-  assert.equal(ids.indexOf('miniVibe'), ids.indexOf('people') + 1, 'miniVibe follows people');
+  // Dropped for MINI (dead or near-dead against its range), kept for BMW.
+  const dropped = ['mileage', 'style', 'primaryUse', 'people', 'priorities'];
+  for (const id of dropped) {
+    assert.ok(!ids.includes(id), `MINI drops ${id}`);
+    assert.ok(bmwIds.includes(id), `BMW keeps ${id}`);
+  }
+  // Added for MINI. Both declare insertAfter: 'charging' — the last shared
+  // question — so the bespoke pair closes the flow. Note the rendered order is
+  // the REVERSE of the declaration order in brands.js: each insert lands
+  // immediately after its anchor and pushes the previous one down, so `doors`
+  // (declared first) ends up last. Assert the order the client actually gets.
+  assert.equal(ids.indexOf('miniVibe'), ids.indexOf('charging') + 1, 'miniVibe follows charging');
+  assert.equal(ids.indexOf('doors'), ids.indexOf('miniVibe') + 1, 'doors follows miniVibe');
+  assert.equal(ids.at(-1), 'doors', 'doors is the last question MINI asks');
   assert.ok(!bmwIds.includes('doors') && !bmwIds.includes('miniVibe'), 'BMW has neither');
   // scoresAs is engine-internal and must never cross to the client.
   for (const o of mini.find((q) => q.id === 'miniVibe').options) {
