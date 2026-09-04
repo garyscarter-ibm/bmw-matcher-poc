@@ -145,20 +145,28 @@
     const retailerOverride = params.get('retailer');
     if (retailerOverride) setRow('retailer id', retailerOverride);
 
+    // ?scope=dealer|national needs no row (the block reads the query string
+    // itself — see resolveScope), but the Retailer Name below depends on it, so
+    // resolve it the same way and with the same default.
+    const scope = params.get('scope')?.trim().toLowerCase() === 'national'
+      ? 'national'
+      : 'dealer';
+
     // Retailer *Name* is a third authored row: the label the copy uses for the
     // pool it searched ("AT BMW APPROVED USED", "Nothing at … is close to what
-    // you asked for"). It is NOT the brand row, so switching brand with ?brand=
-    // alone would leave the name as whatever the markup hardcoded — every other
-    // brand then read "...at Grassicks BMW". Fix: each brand carries its own
-    // default label, applied whenever ?brand= is set.
+    // you asked for"). Its one job is to name the pool that was ACTUALLY
+    // searched, and since ?scope= that is two different things:
     //
-    // Every label is the brand's national programme, not a single dealer,
-    // because that is what the block now searches: BMW and MINI walk the whole
-    // national feed (see nationalStock in server/stock.js), so the cards come
-    // from ~130 retailers apiece. Naming one branch would claim a pool that was
-    // never searched — "Nothing at Sytner Luton MINI is close to what you asked
-    // for" over a card reading "At Group 1 Lincoln". Honda/Ford/Motorrad/Ferrari
-    // were already national programmes; BMW and MINI have simply joined them.
+    //   dealer (default) — one branch's own forecourt, so name the branch.
+    //   national         — BMW and MINI walk the whole feed (nationalStock in
+    //                      server/stock.js), so the cards come from ~130
+    //                      retailers apiece and no branch is a true answer. Name
+    //                      the programme; each card names the dealer holding it.
+    //
+    // Both ways of getting it wrong show up on screen: a national pool labelled
+    // "Nothing at Sytner Luton MINI is close to what you asked for" over a card
+    // reading "At Group 1 Lincoln", or a dealer pool labelled "BMW Approved
+    // Used", implying twelve thousand cars when it searched forty-one.
     const BRAND_RETAILER_NAMES = {
       bmw: 'BMW Approved Used',
       mini: 'MINI Approved Used',
@@ -167,13 +175,25 @@
       motorrad: 'BMW Motorrad Approved Used',
       ferrari: 'Ferrari Approved',
     };
-    // ?retailerName= still overrides it, for demoing a genuinely single-dealer
-    // page. Deliberately NOT derived from ?retailer=<id> any more: that row only
-    // anchors the "other retailers nearby" postcode lookup (fetchNearbyStock),
-    // and no longer narrows the main pool, so an ID can't name it.
-    const nameOverride = params.get('retailerName')
-      || (brandOverride && BRAND_RETAILER_NAMES[brandOverride.toLowerCase()]);
-    if (nameOverride) setRow('retailer name', nameOverride);
+    // Dealer scope: the branches this harness ships in its Retailer ID row. A
+    // real retailer's page authors its own name; a demo offering a switch has to
+    // know the names on both sides of it. Read off the feed (the `retailers`
+    // dictionary /api/pool returns at ?scope=dealer), not invented.
+    const DEALER_NAMES = { 96: 'Grassicks Garage', 92: 'Sytner Luton' };
+
+    // Set unconditionally, not just on an override: the markup can only hardcode
+    // one label, so any change of brand or scope leaves it stale. ?retailerName=
+    // still wins, for demoing a page whose dealer this harness doesn't ship.
+    const brandKey = getRow('brand').toLowerCase();
+    const poolName = scope === 'national'
+      // An unknown ?brand= falls back to bmw in the block, so mirror that here
+      // rather than labelling a BMW pool with a generic phrase.
+      ? BRAND_RETAILER_NAMES[brandKey] || BRAND_RETAILER_NAMES.bmw
+      // An ID with no name here gets an honest generic. "this retailer" reads
+      // correctly in every copy shape that takes the label, and a vague label is
+      // much the lesser evil next to confidently naming the wrong branch.
+      : DEALER_NAMES[getRow('retailer id')] || 'this retailer';
+    setRow('retailer name', params.get('retailerName') || poolName);
 
     // ---- Shared-password gate ---------------------------------------------
     // This overlay is UX only, not a security boundary: it captures the shared
