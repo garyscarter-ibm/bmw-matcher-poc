@@ -188,7 +188,16 @@ test('every endpoint the client calls exists (contract guard for the /api/field-
   // backend served it. A valid request to each must NOT come back 404.
   const enrich = fakeEnrich();
   await withServer(
-    { fetchRetailerStock: fakeStock(), fetchNearbyStock: fakeStock(), enrichColours: enrich },
+    {
+      fetchRetailerStock: fakeStock(),
+      fetchNearbyStock: fakeStock(),
+      enrichColours: enrich,
+      // The harness's default geocoder answers "no such postcode", which is a
+      // 404 from the HANDLER — indistinguishable from the 404 this test is
+      // looking for, so the route would look missing when it isn't. One that
+      // resolves keeps the guard about routing.
+      geocodePostcode: async () => ({ postcode: 'NG1', latitude: 52.95, longitude: -1.15 }),
+    },
     async (base) => {
       const calls = [
         () => get(base, '/api/questions'),
