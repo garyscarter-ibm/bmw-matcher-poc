@@ -273,7 +273,8 @@ BRAND_COPY.honda = {
   title: 'Find the right Honda for you.',
   cta: 'Find my Honda',
   // Honda's plain, practical register: no superlative ("best"), lead on the
-  // sensible fit (life, running, budget) and the reassurance of approved-used.
+  // sensible fit (life, running, budget). The approved-used reassurance comes
+  // from the retailer label itself, so the lede doesn't restate it.
   // See docs/tone-style-guide.md (Honda).
   lede: ({ questions, retailer }) => `${questions} quick questions about your days, `
     + 'your mileage and what you want to spend. We’ll find the '
