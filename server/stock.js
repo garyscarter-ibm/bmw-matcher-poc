@@ -1255,19 +1255,23 @@ export function startStockWarmer() {
 
   const tick = () => {
     for (const [key, { brand, retailerSite }] of seenRetailers) {
-      // BMW/MINI's main pool is national (see seenNationalBrands below), not
-      // retailer-scoped — warming cacheByRetailer under this per-retailer key
-      // would just re-fetch the whole national pool once per distinct
-      // retailer ever seen, redundant with (and undercounted by) the national
-      // warm below. Their nearby carousel is still per-retailer, so that half
-      // still applies to every brand.
-      if (!seenNationalBrands.has(brand)) {
+      // A feed brand's main pool is scope-dependent, so it's warmed from the two
+      // loops below (whichever scopes have actually been asked for) rather than
+      // from here — warming it under this per-retailer key would otherwise
+      // re-fetch the wrong pool, once per distinct retailer ever seen. The
+      // nearby carousel is per-retailer for every brand, so that half always
+      // applies.
+      if (brandConfig(brand).source !== 'feed') {
         warmOne(cacheByRetailer, key, brand, retailerSite, fetchRetailerStock);
       }
       warmOne(cacheNearby, key, brand, retailerSite, fetchNearbyStock);
     }
+    for (const [key, { brand, retailerSite }] of seenDealerPools) {
+      warmOne(cacheByRetailer, key, brand, retailerSite, (b, s) => fetchRetailerStock(b, s, 'dealer'));
+    }
     for (const brand of seenNationalBrands) {
-      warmOne(cacheByRetailer, keyFor(brand, 'national'), brand, undefined, fetchRetailerStock);
+      warmOne(cacheByRetailer, keyFor(brand, 'national'), brand, undefined,
+        (b) => fetchRetailerStock(b, undefined, 'national'));
     }
   };
 
