@@ -276,8 +276,8 @@ BRAND_COPY.honda = {
   // sensible fit (life, running, budget) and the reassurance of approved-used.
   // See docs/tone-style-guide.md (Honda).
   lede: ({ questions, retailer }) => `${questions} quick questions about your days, `
-    + 'your mileage and what you want to spend. We’ll find the approved-used '
-    + `Hondas at ${retailer} that genuinely suit how you live, and show our working.`,
+    + 'your mileage and what you want to spend. We’ll find the '
+    + `vehicles at ${retailer} that genuinely suit how you live, and show our working.`,
   unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
     + 'These are the closest to everything else you told us.',
   tiedTitle: ({ count }) => `${cardinal(count)} of these fit you just as well.`,
