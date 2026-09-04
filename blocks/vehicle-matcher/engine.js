@@ -62,11 +62,13 @@ export async function apiGetQuestions(base, retailer, brandKey) {
 
 /** The configured retailer's ranked matches for a set of answers. Throws on
  * failure — this is the primary result, not an enhancement. */
-export async function apiMatch(base, answers, retailer, brandKey) {
+export async function apiMatch(base, answers, retailer, brandKey, scope) {
   const res = await fetch(`${base}/api/match`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ answers, retailer, brand: brandKey }),
+    body: JSON.stringify({
+      answers, retailer, brand: brandKey, scope,
+    }),
   });
   if (!res.ok) throw new Error(`Match request failed (${res.status})`);
   return res.json();
