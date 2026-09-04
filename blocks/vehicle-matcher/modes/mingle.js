@@ -563,7 +563,9 @@ function mount(root, ctx) {
     // card paint and the "Colour" bar read car.colour as a taste signal, and the
     // pool is small enough to pay the per-card PDP fetch. (The knockout omits
     // enrich; see knockout.js.)
-    const matches = await apiField(ctx.api, state.seed, ctx.retailer, ctx.brand, DECK_POOL, true);
+    const matches = await apiField(
+      ctx.api, state.seed, ctx.retailer, ctx.brand, ctx.scope, DECK_POOL, true,
+    );
     if (!matches.length) {
       renderEmptyPool();
       return;
