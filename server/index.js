@@ -714,7 +714,7 @@ async function handlePreview(req, res, deps) {
  */
 async function handleField(req, res, deps) {
   const {
-    answers, retailer, brand, size, enrich, error, status,
+    answers, retailer, brand, scope, size, enrich, error, status,
   } = await readMatchRequest(req);
   if (error) return sendJson(res, status, { error });
 
