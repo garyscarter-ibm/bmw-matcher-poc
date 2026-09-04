@@ -35,6 +35,7 @@ import {
 } from './engine.js';
 import {
   fetchRetailerStock, fetchNearbyStock, startStockWarmer, StockUnavailableError, enrichColours,
+  normalizeScope,
   startColourWarmer,
 } from './stock.js';
 import {
