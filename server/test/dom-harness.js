@@ -155,8 +155,12 @@ export async function loadMode(key) {
  * Mount a mode into a fresh stage against `base`, for `brand`. Returns the stage
  * element (already appended to the body) so the caller can assert on it after
  * settle().
+ *
+ * `scope` is left undefined unless a test asks for one, which is the shape of a
+ * page with no ?scope= — so the default path every other render test exercises is
+ * the one a real embed takes, right down to the server resolving the default.
  */
-export function mountMode(mode, { base, brand, retailer } = {}) {
+export function mountMode(mode, { base, brand, retailer, scope } = {}) {
   const stage = document.createElement('div');
   stage.className = `vm vm-${brand}`;
   document.body.append(stage);
@@ -165,6 +169,7 @@ export function mountMode(mode, { base, brand, retailer } = {}) {
     retailer: retailer || null,
     retailerLabel: 'Test Retailer',
     brand,
+    scope,
     overrides: {},
   };
   mode.mount(stage, ctx);
