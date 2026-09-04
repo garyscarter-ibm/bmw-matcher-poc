@@ -489,6 +489,10 @@ async function readMatchRequest(req) {
     return { error: 'Invalid or missing budget', status: 400 };
   }
   const retailer = typeof body.retailer === 'string' && body.retailer ? body.retailer : undefined;
+  // Which pool to score against: this retailer's own forecourt (default) or the
+  // brand's whole national feed. normalizeScope defaults absent/garbage to
+  // 'dealer', so an old client that sends no scope keeps the original behaviour.
+  const scope = normalizeScope(body.scope);
   // Brand selects the feed (BMW vs MINI). normalizeBrand defaults unknown/absent
   // to BMW, so old clients that don't send a brand keep working.
   const brand = normalizeBrand(body.brand);
