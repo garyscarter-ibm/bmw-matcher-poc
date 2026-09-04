@@ -136,6 +136,31 @@ function brand(block) {
 }
 
 /**
+ * Which stock pool this block searches:
+ *   - 'dealer'   — the Retailer ID's own forecourt;
+ *   - 'national' — every retailer of the brand.
+ * An authored "Scope" config row, overridable with ?scope= (like ?mode=) so one
+ * deployed page can demo both. Anything absent, blank or unrecognised is
+ * 'dealer', because a block authored onto one retailer's page must never
+ * silently answer for the whole country — of the two ways to get this wrong,
+ * offering a user only the cars they can actually go and see is the safe one.
+ *
+ * Only BMW and MINI have two pools to choose between; the fixtures-backed brands
+ * serve their one file whatever this says. Mirrors SCOPES/normalizeScope in
+ * server/stock.js, which validates the value again on arrival — the client copy
+ * exists so the Retailer Name row can be authored to match (see retailerName).
+ */
+const SCOPES = ['dealer', 'national'];
+const DEFAULT_SCOPE = 'dealer';
+
+function resolveScope(block) {
+  const params = new URLSearchParams(window.location.search);
+  const requested = (params.get('scope') || readBlockConfig(block).scope || '')
+    .trim().toLowerCase();
+  return SCOPES.includes(requested) ? requested : DEFAULT_SCOPE;
+}
+
+/**
  * Which interface mode to run, and whether the switcher is shown:
  *   - an authored "Mode" config row, or a ?mode= query override, LOCKS the
  *     block to that mode (switcher hidden) — the production case;
