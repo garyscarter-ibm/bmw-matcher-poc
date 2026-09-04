@@ -1022,7 +1022,7 @@ function mount(root, ctx) {
     let result;
     try {
       // The identical call the questionnaire mode makes. THROWS on failure — guard.
-      result = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand);
+      result = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand, ctx.scope);
     } catch {
       showError(showResult);
       return;
