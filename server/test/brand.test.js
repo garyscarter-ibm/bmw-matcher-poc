@@ -87,6 +87,34 @@ test('mapVehicle(mini) resolves a MINI spec, body and MINI PDP link', () => {
   assert.match(car.link, /approvedusedminis\.co\.uk\/vehicle\/202500002/);
 });
 
+/*
+ * dealerNumber is the join key the distance filter hangs off, and it is the kind
+ * of field that breaks silently: `retailer_site` carries no postcode and no
+ * coordinates, so this number is the only route from "which site sells this car"
+ * to "where that site is" (see dealers.js, indexed on exactly this). Drop it and
+ * nothing throws — every retailer simply becomes unlocated, the pool ships null
+ * coordinates, and Guess Who quietly hides its Distance chip. A test is the only
+ * thing that would notice.
+ */
+test('mapVehicle carries the dealer_number through, and tolerates a feed row without one', () => {
+  assert.equal(mapVehicle(bmwVehicle, 'bmw').dealerNumber, '11107');
+  assert.equal(mapVehicle(miniVehicle, 'mini').dealerNumber, '15127');
+
+  // Some live rows omit it (resolveRetailerPostcode in stock.js scans for the
+  // first that has one), so absent must be undefined rather than a crash or a
+  // string like "undefined" that would then miss in the directory.
+  const noDealer = mapVehicle(
+    { ...bmwVehicle, retailer_site: { id: 96, name: 'Grassicks BMW' } },
+    'bmw',
+  );
+  assert.equal(noDealer.dealerNumber, undefined);
+  assert.equal(noDealer.retailerName, 'Grassicks BMW', 'the rest of the car still maps');
+
+  // And a row with no retailer_site at all.
+  const noSite = mapVehicle({ ...bmwVehicle, retailer_site: undefined }, 'bmw');
+  assert.equal(noSite.dealerNumber, undefined);
+});
+
 test('mapVehicle(mini) maps ELECTRIC fuel and an electric line', () => {
   const car = mapVehicle(miniElectric, 'mini');
   assert.equal(car.fuel, 'ev');
