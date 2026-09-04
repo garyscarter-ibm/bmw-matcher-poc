@@ -197,7 +197,8 @@ Example authored table:
 
 (The blank **Title** row above suppresses the block's own headline, for when it
 sits under the page's own "FIND YOUR MINI." section heading. The **Mode** row
-locks the page to the questions interface with no switcher.)
+locks the page to the questions interface with no switcher. **Scope** and
+**Retailer Name** agree, so the copy names the forecourt it actually searched.)
 
 The block ships **no font files**: it names the host site's licensed families
 first (`--heading-font-family` / `--body-font-family` on BMW, MINI's own faces
