@@ -899,7 +899,7 @@ export function buildServer(deps = {}) {
           console.warn('[pool] dealer directory unavailable:', err?.message);
           return null;
         });
-        return sendJson(res, 200, publicPool(brand, cars, directory));
+        return sendJson(res, 200, { ...publicPool(brand, cars, directory), scope });
       } catch (err) {
         console.warn('[pool] stock unavailable:', err?.message);
         return sendJson(res, 502, { error: 'Stock temporarily unavailable' });
