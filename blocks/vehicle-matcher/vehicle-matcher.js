@@ -99,10 +99,13 @@ const DEFAULT_RETAILER_NAME = 'our retailer network';
 
 /** Display name for the pool this block searched: authored "Retailer Name"
  * config row. Required alongside Retailer ID so the copy can name where the
- * stock actually came from — for BMW and MINI that's the national programme
- * ("BMW Approved Used"), not a branch, because stock.js walks the whole feed;
- * the dealer holding a given car is named on its own card. Falls back to a
- * generic phrase (and warns) if the page author forgot to set it. */
+ * stock actually came from — which is a question of Scope, and the reason the
+ * two rows have to be authored together. At dealer scope the pool IS the branch,
+ * so this is its name ("Grassicks Garage"). At national scope stock.js walks the
+ * whole feed, so no branch is the truthful answer: name the programme instead
+ * ("BMW Approved Used") and let each car's own card name the dealer holding it.
+ * Falls back to a generic phrase (and warns) if the page author forgot to set
+ * it. */
 function retailerName(block) {
   const config = readBlockConfig(block);
   const name = config['retailer-name'];
