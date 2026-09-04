@@ -989,9 +989,15 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       (sites) => console.log(`[dealers] directory primed (${sites.size} sites)`),
       (err) => console.warn(`[dealers] directory unavailable (${err?.message}) — proximity filter off`),
     );
+    // Feed brands prime BOTH pools: the dealer one because it is now the default
+    // an embed gets, and the national one because its on-disk index is what makes
+    // ?scope=national answer instantly instead of paying the ~60s walk. Priming
+    // only the default would leave the first national visitor on a cold pool.
     Promise.allSettled([
-      fetchRetailerStock('bmw'), fetchNearbyStock('bmw'),
-      fetchRetailerStock('mini'), fetchNearbyStock('mini'),
+      fetchRetailerStock('bmw', undefined, 'dealer'),
+      fetchRetailerStock('bmw', undefined, 'national'), fetchNearbyStock('bmw'),
+      fetchRetailerStock('mini', undefined, 'dealer'),
+      fetchRetailerStock('mini', undefined, 'national'), fetchNearbyStock('mini'),
       fetchRetailerStock('honda'),
       fetchRetailerStock('ford'),
       fetchRetailerStock('motorrad'),
