@@ -44,7 +44,7 @@ export const PREVIEW_DEBOUNCE_MS = 250;
  * @returns {{ schedule: (answers, onResult) => void, cancel: () => void }}
  */
 export function createPreviewFeed({
-  api, retailer, brand, group = false,
+  api, retailer, brand, scope, group = false,
 }) {
   let timer = null;
   let seq = 0;
