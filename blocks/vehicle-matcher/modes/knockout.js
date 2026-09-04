@@ -1100,7 +1100,7 @@ function mount(root, ctx) {
     const answers = bracketToAnswers(state.rounds, state.seed);
     let result;
     try {
-      result = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand);
+      result = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand, ctx.scope);
     } catch {
       showError(() => showResult(champion));
       return;
