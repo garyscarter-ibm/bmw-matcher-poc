@@ -236,9 +236,14 @@ The backend exposes two endpoints (plus `GET /health` → `{ ok: true }`):
   can state the number without hardcoding it. Both counts are server-owned: a
   brand gaining a question, or `TOP_MATCHES` changing, updates the intro copy on
   the next page load with no block rebuild.
-- **`POST /api/match`** with body `{ answers, retailer? }` → `{ matches, unmet }`.
-  `retailer` is the retailer_site ID to match against; omit it to use the
-  backend's default (`RETAILER_SITE` env var, or `96` if unset).
+- **`POST /api/match`** with body `{ answers, retailer?, brand?, scope? }` →
+  `{ matches, unmet }`. `retailer` is the retailer_site ID to match against; omit
+  it for the brand's `defaultRetailer` (`server/brands.js` — `96` for BMW, `92`
+  for MINI). `scope` is `dealer` (the default) or `national`: that retailer's own
+  stock, or every retailer of the brand. Anything unrecognised resolves to
+  `dealer`, deliberately — a mistyped scope must never widen a pool the page has
+  already named. `/api/preview`, `/api/field` and `/api/pool` take the same two
+  (`/api/pool` on the query string, and it echoes back the `scope` it used).
   Each match is `{ car, score, stretch, reasons }`, where `car` carries **only
   display fields** (name, line, body, fuel, price range, 0–62, mpg/range, blurb).
   Internal scoring fields (tags, size class, seats, boot…) are omitted, so the
