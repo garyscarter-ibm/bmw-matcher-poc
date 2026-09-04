@@ -93,5 +93,14 @@ real EDS page gets it transitively. `demo-chrome.css` styles the demo homepage/p
   (predicates can't cross JSON, so `/api/questions` strips them and the client re-applies).
 - **Counts are server-owned:** `TOP_MATCHES` and the question set ship via `/api/questions` so
   intro copy states numbers without a block rebuild — don't hardcode them client-side.
-</content>
-</invoke>
+- **`?scope=` and the Retailer Name row must agree.** `?scope=dealer|national` (default
+  **dealer**) chooses the pool: one branch's forecourt, or every retailer of the brand.
+  Only BMW and MINI have two pools (`source: 'feed'` in `brands.js`); the other four run a
+  single national programme feed each, so both scopes search the same cars for them and the
+  programme name is the true label either way. The authored **Retailer Name** row is only a
+  label, so nothing stops it naming a pool that wasn't searched — and both ways of getting it
+  wrong are visible on screen ("Nothing at Sytner Luton is close…" above a card reading "At
+  Group 1 Lincoln", or a 41-car forecourt labelled "BMW Approved Used"). Both harnesses
+  re-derive it from brand + scope rather than trusting the authored value; a real retailer page
+  authors one scope and one matching name. `resolveScope` narrows anything unrecognised *down*
+  to dealer, so a typo'd embed can never widen a pool the page has already named.
