@@ -196,6 +196,11 @@ test('every endpoint the client calls exists (contract guard for the /api/field-
         () => post(base, '/api/preview', { answers: OPEN_BRIEF }),
         () => post(base, '/api/field', { answers: OPEN_BRIEF, size: 8 }),
         () => post(base, '/api/nearby', { answers: FULL_BRIEF }),
+        // Guess Who's two. The pool is its only data call; the geocode is the
+        // distance filter's, and 'NG1' is a real outward code so a valid request
+        // here means a 200 rather than the 404 an unknown postcode earns.
+        () => get(base, '/api/pool'),
+        () => get(base, '/api/geocode?postcode=NG1'),
       ];
       for (const call of calls) {
         const { status } = await call();
