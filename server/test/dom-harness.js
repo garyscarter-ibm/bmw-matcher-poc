@@ -111,7 +111,16 @@ export async function startModeServer(poolsByBrand) {
   const fetchRetailerStock = async (brand) => poolsByBrand[brand] || poolsByBrand.bmw || [];
   const fetchNearbyStock = async () => [];
   const enrichColours = async (_brand, cars = []) => cars;
-  const server = buildServer({ fetchRetailerStock, fetchNearbyStock, enrichColours });
+  // Location is inert for the same reason: both real implementations call someone
+  // else's server (a ~2MB dealer directory, and postcodes.io), and /api/pool asks
+  // for the directory on every request. An empty directory means the pool ships
+  // null site coordinates and Guess Who's distance filter self-suppresses, which
+  // is a state the mode is built to handle.
+  const fetchDealerDirectory = async () => new Map();
+  const geocodePostcode = async () => null;
+  const server = buildServer({
+    fetchRetailerStock, fetchNearbyStock, enrichColours, fetchDealerDirectory, geocodePostcode,
+  });
   server.listen(0);
   await once(server, 'listening');
   const { port } = server.address();
