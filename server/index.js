@@ -465,8 +465,8 @@ function readJsonBody(req) {
 
 /**
  * Parse + validate the { answers, retailer } POST body shared by /api/match,
- * /api/nearby and /api/field. Returns { answers, retailer, brand, size, enrich,
- * group } on success, or { error, status } for the caller to send. Kept in one
+ * /api/nearby and /api/field. Returns { answers, retailer, brand, scope, size,
+ * enrich, group } on success, or { error, status } for the caller to send. One
  * place so every endpoint validates identically. `size`/`enrich` are only
  * meaningful to /api/field (the game-mode roster) and `group` only to
  * /api/preview; the match/nearby handlers ignore them.
