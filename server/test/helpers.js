@@ -35,7 +35,7 @@ import { mapVehicle } from '../mapping.js';
  * does.
  */
 export async function startTestServer(deps = {}) {
-  const server = buildServer(deps);
+  const server = buildServer({ ...INERT_LOCATION, ...deps });
   server.listen(0);
   await once(server, 'listening');
   const { port } = server.address();
