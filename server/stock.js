@@ -307,9 +307,10 @@ const keyFor = (brand, retailerSite) => `${brand}:${retailerSite}`;
  */
 export const SCOPES = ['dealer', 'national'];
 export const DEFAULT_SCOPE = 'dealer';
-export const normalizeScope = (value) => (
-  SCOPES.includes(String(value || '')) ? String(value) : DEFAULT_SCOPE
-);
+export const normalizeScope = (value) => {
+  const v = String(value ?? '').trim().toLowerCase();
+  return SCOPES.includes(v) ? v : DEFAULT_SCOPE;
+};
 
 /** node:https has no argless Date.now ban — this is server runtime, fine to use. */
 function fresh(entry) {
