@@ -148,15 +148,20 @@ export async function apiPreview(base, answers, retailer, brandKey, scope, group
  * gzip for BMW's 12,084 cars — see publicPool in server/index.js), and there is
  * no second tier, so no filter interaction ever waits on the network.
  *
- * Deliberately NOT retailer-scoped: the mode's premise is "every car we have",
- * and location is one of its own filters rather than a pre-applied narrowing.
+ * The mode's premise is "every car we have", so what `scope` narrows is what
+ * "we" means — this retailer's forecourt, or the brand's whole network. It is
+ * the block's scope either way, never a pre-applied filter of the mode's own:
+ * at national scope the board's Distance filter is doing that job, and at dealer
+ * scope there is only one place to be near.
  *
  * THROWS on failure, like apiGetQuestions and for the same reason — there is no
  * degraded version of this mode. No pool, no board.
  */
-export async function apiPool(base, brandKey) {
+export async function apiPool(base, brandKey, retailer, scope) {
   const url = new URL(`${base}/api/pool`);
   if (brandKey) url.searchParams.set('brand', brandKey);
+  if (retailer) url.searchParams.set('retailer', retailer);
+  if (scope) url.searchParams.set('scope', scope);
   const res = await fetch(url, { headers: authHeaders() });
   if (res.status === 401) onUnauthorized();
   if (!res.ok) throw new Error(`Pool request failed (${res.status})`);
