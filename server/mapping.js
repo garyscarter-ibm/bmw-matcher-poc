@@ -1437,7 +1437,10 @@ export function mapMotorradRaw(raw) {
     // card layer keys the unit off the brand.
     power: num(raw?.powerKw) || undefined,
     tags: motorradTags(spec.category, spec.sizeClass, fuel),
-    blurb: motorradBlurb(line, spec.category, fuel, MOTORRAD_RETAILER_NAME),
+    // No retailer name: the feed gives every bike the one synthetic identity, so
+    // the only name available is the pool label, and "Approved-used BMW … from
+    // BMW Motorrad Approved Used" is a tautology.
+    blurb: motorradBlurb(line, spec.category, fuel),
 
     // ---- display-only ----
     mileage: num(raw?.mileage),
