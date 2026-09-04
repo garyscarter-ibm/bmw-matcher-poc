@@ -549,6 +549,198 @@ test('POST /api/nearby degrades a failure to { nearby: [], unmet: null } 200', a
 });
 
 /* ------------------------------------------------------------------ *
+ * /api/pool — the whole stock, columnar (Guess Who's only data call)
+ * ------------------------------------------------------------------ */
+
+/*
+ * The pool's contract is INDEX ALIGNMENT, and nothing else can check it.
+ *
+ * Every other endpoint ships objects, where a missing field is a missing field.
+ * This one ships parallel arrays plus dictionaries of the strings they index
+ * into, so a column that is one element short doesn't fail — it silently shifts
+ * every car after it onto the wrong price, and the client filters a board of
+ * plausible nonsense. That is a bug no assertion about "a 200 with some JSON"
+ * would ever catch, so it gets one of its own.
+ */
+test('GET /api/pool ships every column index-aligned to n', async () => {
+  await withServer({ fetchRetailerStock: fakeStock(bmwPool(7)) }, async (base) => {
+    const { status, json } = await get(base, '/api/pool');
+    assert.equal(status, 200);
+    assert.equal(json.n, 7, 'n must be the car count');
+
+    const COLUMNS = [
+      'id', 'name', 'line', 'body', 'fuel', 'transmission', 'retailer', 'shade', 'paint',
+      'retailerId', 'price', 'mileage', 'year', 'plate', 'seats', 'boot', 'zeroTo62',
+      'mpg', 'features', 'photo',
+    ];
+    for (const col of COLUMNS) {
+      assert.ok(Array.isArray(json[col]), `${col} is not an array`);
+      assert.equal(json[col].length, json.n, `${col} is not n long — the columns are misaligned`);
+    }
+
+    // Each dictionary column indexes a real slot in its dictionary. An index
+    // past the end reads undefined on the client, which paints as a blank spec
+    // rather than an error.
+    const PAIRS = [
+      ['name', 'names'], ['line', 'lines'], ['body', 'bodies'], ['fuel', 'fuels'],
+      ['transmission', 'transmissions'], ['retailer', 'retailers'],
+      ['shade', 'shades'], ['paint', 'paints'],
+    ];
+    for (const [col, dict] of PAIRS) {
+      assert.ok(Array.isArray(json[dict]), `${dict} dictionary missing`);
+      for (const at of json[col]) {
+        assert.ok(
+          Number.isInteger(at) && at >= 0 && at < json[dict].length,
+          `${col} holds ${at}, which is not a slot in ${dict}`,
+        );
+      }
+    }
+
+    // The bitmask is a number per car, and every set bit names a real concept.
+    assert.ok(Array.isArray(json.featureKeys));
+    for (const mask of json.features) {
+      assert.equal(typeof mask, 'number');
+      assert.ok(mask < 2 ** json.featureKeys.length, 'a feature bit is set past featureKeys');
+    }
+  });
+});
+
+test('GET /api/pool ships a sites table aligned with retailers, not with the cars', async () => {
+  // The one table that is per-RETAILER. Two sites so the alignment claim is
+  // falsifiable: if it were car-aligned or dictionary order were ignored, the
+  // coordinates would land on the wrong name.
+  const cars = [
+    ...bmwPool(2),
+    ...Array.from({ length: 2 }, (_, i) => mapVehicle(bmwFeedVehicle({
+      cash_price: { value: 50000 + i * 500 },
+      retailer_site: { id: 97, name: 'Barons BMW', dealer_number: '22208' },
+    }), 'bmw')),
+  ];
+  const directory = new Map([
+    ['11107', { name: 'Grassicks BMW', postcode: 'PH1 3GA', latitude: 56.4, longitude: -3.47 }],
+    ['22208', { name: 'Barons BMW', postcode: 'GU14 7PA', latitude: 51.28, longitude: -0.77 }],
+  ]);
+  await withServer(
+    { fetchRetailerStock: fakeStock(cars), fetchDealerDirectory: async () => directory },
+    async (base) => {
+      const { json } = await get(base, '/api/pool');
+      assert.equal(json.sites.lat.length, json.retailers.length, 'sites.lat is not retailer-aligned');
+      assert.equal(json.sites.lon.length, json.retailers.length, 'sites.lon is not retailer-aligned');
+      const grassicks = json.retailers.indexOf('Grassicks BMW');
+      const barons = json.retailers.indexOf('Barons BMW');
+      assert.ok(grassicks >= 0 && barons >= 0, 'both retailers are in the dictionary');
+      // 4 dp, which is ~11m — see siteCoords. The point is which slot, not the
+      // precision, so compare on the rounded value the wire actually carries.
+      assert.equal(json.sites.lat[grassicks], 56.4);
+      assert.equal(json.sites.lat[barons], 51.28);
+      assert.notEqual(json.sites.lat[grassicks], json.sites.lat[barons]);
+    },
+  );
+});
+
+test('GET /api/pool still serves the stock when the dealer directory is down', async () => {
+  /*
+   * The mode's premise is EVERY car, so a third-party directory must never be
+   * able to take the board away. What a failure costs is the distance filter, and
+   * nothing else: null coordinates, which the client already treats as "this axis
+   * has no data" and hides. Same shape as an unmapped dealer_number, which is
+   * why one test covers both.
+   */
+  await withServer(
+    {
+      fetchRetailerStock: fakeStock(bmwPool(4)),
+      fetchDealerDirectory: async () => { throw new Error('directory unavailable'); },
+    },
+    async (base) => {
+      const { status, json } = await get(base, '/api/pool');
+      assert.equal(status, 200, 'a directory failure must not fail the pool');
+      assert.equal(json.n, 4);
+      assert.ok(json.sites, 'the sites table must still be present, just empty');
+      assert.equal(json.sites.lat.length, json.retailers.length);
+      assert.ok(json.sites.lat.every((v) => v === null), 'no directory means no coordinates');
+    },
+  );
+});
+
+test('GET /api/pool leaves a dealer the directory does not know unlocated', async () => {
+  // A directory that answers, but not about this dealer. The slot stays null
+  // rather than borrowing another site's position, which would put a car in the
+  // wrong county and make the distance filter lie.
+  await withServer(
+    {
+      fetchRetailerStock: fakeStock(bmwPool(3)),
+      fetchDealerDirectory: async () => new Map([
+        ['99999', { name: 'Somewhere Else BMW', postcode: 'M1 1AA', latitude: 53.48, longitude: -2.24 }],
+      ]),
+    },
+    async (base) => {
+      const { status, json } = await get(base, '/api/pool');
+      assert.equal(status, 200);
+      assert.ok(json.sites.lat.every((v) => v === null), 'an unknown dealer must not be located');
+    },
+  );
+});
+
+test('GET /api/pool 502s when the stock itself is unavailable', async () => {
+  // Unlike the directory, the stock IS the pool — there is no degraded version.
+  await withServer({ fetchRetailerStock: throwingStock() }, async (base) => {
+    const { status, json } = await get(base, '/api/pool');
+    assert.equal(status, 502);
+    assert.ok(json.error, 'a 502 must say something');
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * /api/geocode — the buyer's end of the distance filter
+ * ------------------------------------------------------------------ */
+
+test('GET /api/geocode returns the coordinates for a postcode', async () => {
+  await withServer(
+    { geocodePostcode: async () => ({ postcode: 'NG1 2AB', latitude: 52.9548, longitude: -1.1581 }) },
+    async (base) => {
+      const { status, json } = await get(base, '/api/geocode?postcode=ng12ab');
+      assert.equal(status, 200);
+      // The canonical spelling comes back, because the client writes it into the
+      // box as its confirmation that we understood what was typed.
+      assert.equal(json.postcode, 'NG1 2AB');
+      assert.equal(typeof json.latitude, 'number');
+      assert.equal(typeof json.longitude, 'number');
+    },
+  );
+});
+
+test('GET /api/geocode 404s for a postcode that does not exist', async () => {
+  // 404, not 502: the two are different messages to a buyer. "We don't know that
+  // postcode" is about what they typed; "we couldn't check" is not their fault,
+  // and phrasing one as the other either blames them or excuses a typo.
+  await withServer({ geocodePostcode: async () => null }, async (base) => {
+    const { status, json } = await get(base, '/api/geocode?postcode=zz99zz');
+    assert.equal(status, 404);
+    assert.ok(json.error);
+  });
+});
+
+test('GET /api/geocode 502s when the geocoder cannot be reached', async () => {
+  await withServer(
+    { geocodePostcode: async () => { throw new Error('postcodes.io timed out'); } },
+    async (base) => {
+      const { status, json } = await get(base, '/api/geocode?postcode=NG1');
+      assert.equal(status, 502);
+      assert.ok(json.error);
+    },
+  );
+});
+
+test('GET /api/geocode with no postcode at all is a 404, not a crash', async () => {
+  // The real geocodePostcode resolves null for anything that isn't postcode-
+  // shaped, and an absent param is the degenerate case of that.
+  await withServer({ geocodePostcode: async () => null }, async (base) => {
+    const { status } = await get(base, '/api/geocode');
+    assert.equal(status, 404);
+  });
+});
+
+/* ------------------------------------------------------------------ *
  * clampFieldSize — direct unit tests (it's exported; boundaries are cheap)
  * ------------------------------------------------------------------ */
 
