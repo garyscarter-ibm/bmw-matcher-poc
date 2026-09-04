@@ -287,8 +287,29 @@ const seenRetailers = new Map(); // "brand:retailer" -> { brand, retailerSite }
 // with, so every request for a feed brand collapses onto one warm entry.
 const seenNationalBrands = new Set(); // brand
 
+// Feed brands whose DEALER-scoped pool has been requested, so the warmer keeps
+// that forecourt hot too. Deliberately separate from seenRetailers, which also
+// tracks the nearby-carousel anchor for every brand: a national visitor's
+// nearby request must not cause their dealer pool to be warmed as well.
+const seenDealerPools = new Map(); // "brand:retailerSite" -> { brand, retailerSite }
+
 /** Cache/seen key for a brand+retailer pair. */
 const keyFor = (brand, retailerSite) => `${brand}:${retailerSite}`;
+
+/*
+ * Which pool a feed brand should serve. Only BMW/MINI have two (see
+ * fetchRetailerStock); every other source type has one and ignores this.
+ *
+ * Unrecognised or absent values resolve to 'dealer'. That's the safe direction
+ * for a typo: `?scope=nationl` shows one forecourt rather than silently
+ * answering for the whole country on a retailer's own page. /api/pool echoes
+ * the resolved scope so a misconfigured embed is visible rather than guessed at.
+ */
+export const SCOPES = ['dealer', 'national'];
+export const DEFAULT_SCOPE = 'dealer';
+export const normalizeScope = (value) => (
+  SCOPES.includes(String(value || '')) ? String(value) : DEFAULT_SCOPE
+);
 
 /** node:https has no argless Date.now ban — this is server runtime, fine to use. */
 function fresh(entry) {
