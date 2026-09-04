@@ -2011,7 +2011,7 @@ function mount(root, ctx) {
   const boot = async () => {
     let raw;
     try {
-      raw = await apiPool(ctx.api, ctx.brand);
+      raw = await apiPool(ctx.api, ctx.brand, ctx.retailer, ctx.scope);
     } catch {
       showError(boot);
       return;
