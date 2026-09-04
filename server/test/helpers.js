@@ -23,6 +23,25 @@ import { fileURLToPath } from 'node:url';
 import { buildServer } from '../index.js';
 import { mapVehicle } from '../mapping.js';
 
+/*
+ * The two location deps, stubbed out by default rather than left to buildServer's
+ * real ones.
+ *
+ * Both call a third party: fetchDealerDirectory pulls a ~2MB directory and
+ * geocodePostcode hits postcodes.io. /api/pool asks for the directory on every
+ * request, so a suite that didn't stub this would quietly make a live 2MB fetch
+ * per pool test — hermetic in its assertions, but not in its behaviour, and
+ * failing on a plane. An empty Map is a real answer, not an error: the pool ships
+ * null site coordinates and the client's distance filter self-suppresses, which
+ * is exactly the state of a brand whose stock cache predates dealer_number.
+ *
+ * A test that wants to exercise either one passes its own, as with any other dep.
+ */
+const INERT_LOCATION = {
+  fetchDealerDirectory: async () => new Map(),
+  geocodePostcode: async () => null,
+};
+
 /**
  * Spin up a server with injected stock on an ephemeral port. Returns the base
  * URL and a close() that resolves when the socket is fully shut. Every fake
