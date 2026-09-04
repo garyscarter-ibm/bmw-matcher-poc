@@ -906,7 +906,10 @@ export function mapFordRaw(raw) {
     mpg: fuel === 'ev' ? num(raw?.mpg) : (num(raw?.mpg) || spec.mpg),
     ...(evRange ? { evRange } : {}),
     tags: fordTags(line, body, fuel, derivative),
-    blurb: fordBlurb(line, body, fuel, FORD_RETAILER_NAME, derivative),
+    // The real dealer when the feed names one (as BMW/MINI do), never the pool
+    // label — "from Ford Approved Used" after "Approved-used Ford" is a
+    // tautology, and the falsy guard in fordBlurb drops the clause entirely.
+    blurb: fordBlurb(line, body, fuel, raw?.dealer || '', derivative),
 
     // ---- display-only (surfaced by index.js publicCar) ----
     mileage: num(raw?.mileage),
