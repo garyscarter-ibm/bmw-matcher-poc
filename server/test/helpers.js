@@ -241,13 +241,17 @@ export function ferrariPool(n = 20) {
 
 /**
  * A fake fetchRetailerStock that serves a per-brand pool and records every
- * call's (brand, retailer) so a test can assert the handler threaded them
+ * call's (brand, retailer, scope) so a test can assert the handler threaded them
  * through. Unknown brands fall back to the bmw pool (matching normalizeBrand's
  * default). `.calls` is the audit log.
+ *
+ * The pool served is the same whatever the scope: what the scope tests assert is
+ * that the handler PASSED it on, which is the only part of the decision that
+ * lives in the request path. Which cars a scope yields is stock.js's business.
  */
 export function fakeStock({ bmw = bmwPool(), mini = miniPool() } = {}) {
-  const fn = async (brand, retailer) => {
-    fn.calls.push({ brand, retailer });
+  const fn = async (brand, retailer, scope) => {
+    fn.calls.push({ brand, retailer, scope });
     return brand === 'mini' ? mini : bmw;
   };
   fn.calls = [];
