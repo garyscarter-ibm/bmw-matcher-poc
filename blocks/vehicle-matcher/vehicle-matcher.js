@@ -234,6 +234,10 @@ export default async function decorate(block) {
     retailer,
     retailerLabel,
     brand: brandKey,
+    // 'dealer' | 'national' — which pool every stock request asks for. Sent on
+    // each call rather than read once, so a mode swap can't leave two modes
+    // disagreeing about it.
+    scope,
     // Authored copy overrides (title / kicker / disclaimer) — see copyRow.
     overrides,
   };
