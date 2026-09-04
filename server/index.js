@@ -529,7 +529,7 @@ async function handleMatch(req, res, deps) {
   // retry UI handles it. No static fallback (this tool is honestly live-only).
   let cars;
   try {
-    cars = await deps.fetchRetailerStock(brand, retailer);
+    cars = await deps.fetchRetailerStock(brand, retailer, scope);
   } catch (err) {
     if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
@@ -639,7 +639,7 @@ async function handlePreview(req, res, deps) {
 
   let cars;
   try {
-    cars = await deps.fetchRetailerStock(brand, retailer);
+    cars = await deps.fetchRetailerStock(brand, retailer, scope);
   } catch (err) {
     if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
@@ -720,7 +720,7 @@ async function handleField(req, res, deps) {
 
   let cars;
   try {
-    cars = await deps.fetchRetailerStock(brand, retailer);
+    cars = await deps.fetchRetailerStock(brand, retailer, scope);
   } catch (err) {
     if (err instanceof StockUnavailableError) {
       return sendJson(res, 502, { error: 'Live stock is temporarily unavailable' });
