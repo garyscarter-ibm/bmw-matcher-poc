@@ -22,8 +22,9 @@ import questionnaire from './questionnaire.js';
 import mingle from './mingle.js';
 import knockout from './knockout.js';
 import podium from './podium.js';
+import guessWho from './guess-who.js';
 
-export const MODES = [questionnaire, mingle, knockout, podium];
+export const MODES = [questionnaire, mingle, knockout, podium, guessWho];
 
 export const DEFAULT_MODE = MODES[0];
 
