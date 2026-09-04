@@ -1681,7 +1681,7 @@ async function renderResults(root, ctx, answers) {
     ({
       matches, decisive = true, clusterSize = 1, tasteLead = false,
       alternatives = [], unmet: retailerUnmet = {}, searched = null,
-    } = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand));
+    } = await apiMatch(ctx.api, answers, ctx.retailer, ctx.brand, ctx.scope));
   } catch {
     renderStatus(root, {
       kicker: 'Sorry',
