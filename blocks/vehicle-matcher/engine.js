@@ -200,13 +200,13 @@ export async function apiGeocode(base, postcode) {
  * fetch a PDP for every round-one loser. Like apiPreview it NEVER throws — a
  * failed field must not break the game around it, so any error resolves to [].
  */
-export async function apiField(base, answers, retailer, brandKey, size, enrich = false) {
+export async function apiField(base, answers, retailer, brandKey, scope, size, enrich = false) {
   try {
     const res = await fetch(`${base}/api/field`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
-        answers, retailer, brand: brandKey, size, enrich,
+        answers, retailer, brand: brandKey, scope, size, enrich,
       }),
     });
     if (!res.ok) return [];
