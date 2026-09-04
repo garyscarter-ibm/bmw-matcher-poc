@@ -80,11 +80,18 @@
          defaults for local dev, overridable via the query string:
            ?brand=bmw|mini   — which brand to theme + source
            ?retailer=<id>    — which retailer's stock
+           ?scope=dealer|national — that retailer's forecourt, or the whole
+                               network (BMW/MINI only; default dealer)
            ?mode=<key>       — lock to one interface (else the switcher shows)
            ?api=<url>        — point at a deployed backend
 
-         No "Mode" row is authored here on purpose: unlocked, the block shows
-         its mode switcher — this page IS the multi-interface showcase. -->
+         No "Mode" or "Scope" row is authored here on purpose: both are read
+         from the query string by the block itself, and unlocked the block shows
+         its mode switcher — this page IS the multi-interface showcase.
+
+         Retailer Name is authored to match the DEFAULT scope, but the script
+         below re-derives it whenever brand or scope changes, because one
+         hardcoded label cannot be true for both scopes. -->
     <div class="vehicle-matcher block" data-block-name="vehicle-matcher" data-api="http://localhost:8787">
       <div>
         <div>Brand</div>
