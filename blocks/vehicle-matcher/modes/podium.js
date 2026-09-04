@@ -525,7 +525,7 @@ function mount(root, ctx) {
   // and bronze must not be the same model in three colours (§3.4). One feed for
   // the whole run, so its debounce and its in-flight requests are its own.
   const feed = createPreviewFeed({
-    api: ctx.api, retailer: ctx.retailer, brand: ctx.brand, group: true,
+    api: ctx.api, retailer: ctx.retailer, brand: ctx.brand, scope: ctx.scope, group: true,
   });
 
   // Live DOM the paint functions write into, assigned by buildStage().
