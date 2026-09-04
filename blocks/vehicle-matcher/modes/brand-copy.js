@@ -556,7 +556,7 @@ export const UNMET_PHRASES = {
     // diesel or fully electric. Its three bodies are named the way the quiz
     // names them: the Spider for a convertible, the Purosangue for the SUV.
     fuel: {
-      petrol: 'petrol Ferraris', phev: 'plug-in hybrid Ferraris',
+      petrol: 'petrol cars', phev: 'plug-in hybrids',
     },
     bodyStyles: {
       coupe: 'coupés', convertible: 'Spiders', suv: 'the Purosangue',
