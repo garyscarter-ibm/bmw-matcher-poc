@@ -519,6 +519,86 @@ test('an absent/garbage brand defaults to bmw at the stock layer', async () => {
 });
 
 /* ------------------------------------------------------------------ *
+ * Scope — WHOSE stock the request is about
+ * ------------------------------------------------------------------ *
+ *
+ * One embed asks about a single forecourt, another about the whole network, and
+ * the answers differ by two orders of magnitude (41 cars at Grassicks against
+ * 12,143 nationally). Every consequence of getting it wrong is silent: no error,
+ * no empty screen, just a pool that isn't the one the page claims. So the scope
+ * gets its own section, and the asymmetry below is deliberate — an unrecognised
+ * scope must always resolve DOWN to the dealer, never up to the network. Showing
+ * a user fewer cars than exist is a disappointment; showing them cars 300 miles
+ * away under a branch's own name is a lie.
+ */
+
+test('normalizeScope takes the two scopes case-insensitively and defaults everything else to dealer', () => {
+  for (const good of ['dealer', 'national', 'NATIONAL', ' Dealer ', 'National']) {
+    assert.equal(
+      normalizeScope(good),
+      good.trim().toLowerCase(),
+      `${JSON.stringify(good)} is a scope, however it was typed`,
+    );
+  }
+  for (const bad of ['nationl', 'all', 'everywhere', '', ' ', null, undefined, 0, 42, {}, []]) {
+    assert.equal(normalizeScope(bad), 'dealer', `${JSON.stringify(bad)} must fall back to dealer`);
+  }
+  assert.equal(DEFAULT_SCOPE, 'dealer', 'the default is the narrow pool, by design');
+});
+
+test('scope is threaded to the stock fetch by every endpoint that reads the pool', async () => {
+  const stock = fakeStock();
+  await withServer({ fetchRetailerStock: stock, enrichColours: fakeEnrich() }, async (base) => {
+    await post(base, '/api/match', { answers: FULL_BRIEF, scope: 'national' });
+    await post(base, '/api/preview', { answers: OPEN_BRIEF, scope: 'national' });
+    await post(base, '/api/field', { answers: OPEN_BRIEF, size: 8, scope: 'national' });
+    await get(base, '/api/pool?scope=national');
+    assert.equal(stock.calls.length, 4, 'all four endpoints read the pool');
+    for (const call of stock.calls) {
+      assert.equal(call.scope, 'national', 'each endpoint passes the scope it was given');
+    }
+  });
+});
+
+test('a request that names no scope reads the dealer pool, on all four endpoints', async () => {
+  const stock = fakeStock();
+  await withServer({ fetchRetailerStock: stock, enrichColours: fakeEnrich() }, async (base) => {
+    await post(base, '/api/match', { answers: FULL_BRIEF });
+    await post(base, '/api/preview', { answers: OPEN_BRIEF });
+    await post(base, '/api/field', { answers: OPEN_BRIEF, size: 8 });
+    await get(base, '/api/pool');
+    assert.equal(stock.calls.length, 4);
+    for (const call of stock.calls) {
+      assert.equal(call.scope, 'dealer', 'silence means this dealer, never the network');
+    }
+  });
+});
+
+test('GET /api/pool echoes the scope it actually used, so a typo is visible', async () => {
+  const stock = fakeStock({ bmw: bmwPool(5) });
+  await withServer({ fetchRetailerStock: stock }, async (base) => {
+    const wide = await get(base, '/api/pool?scope=national');
+    assert.equal(wide.json.scope, 'national', 'a valid scope is echoed back');
+
+    const typo = await get(base, '/api/pool?scope=nationl');
+    assert.equal(typo.json.scope, 'dealer', 'a typo is reported as what it became');
+    assert.equal(
+      stock.calls.at(-1).scope,
+      'dealer',
+      'and the echo is the scope actually read, not the string sent',
+    );
+  });
+});
+
+test('GET /api/pool threads the retailer too, so a dealer scope has a dealer to scope to', async () => {
+  const stock = fakeStock();
+  await withServer({ fetchRetailerStock: stock }, async (base) => {
+    await get(base, '/api/pool?retailer=96&scope=dealer');
+    assert.equal(stock.calls[0].retailer, '96', 'the hard-filter mode names its dealer like every other');
+  });
+});
+
+/* ------------------------------------------------------------------ *
  * /api/nearby — the honesty distinction
  * ------------------------------------------------------------------ */
 
