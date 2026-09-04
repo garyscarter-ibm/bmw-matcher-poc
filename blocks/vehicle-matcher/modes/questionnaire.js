@@ -2014,7 +2014,7 @@ function mount(root, ctx) {
   // No `group`: the questions drawer shows individual cars, so its requests are
   // exactly what they always were.
   ctx.previewFeed = createPreviewFeed({
-    api: ctx.api, retailer: ctx.retailer, brand: ctx.brand,
+    api: ctx.api, retailer: ctx.retailer, brand: ctx.brand, scope: ctx.scope,
   });
   // Set when a summary pill is tapped to edit an earlier answer: the index to
   // return to once that answer is re-submitted (see renderAnswerPills /
