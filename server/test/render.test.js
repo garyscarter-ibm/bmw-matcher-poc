@@ -267,7 +267,7 @@ test('no em dashes in painted copy', async () => {
 test('no em dashes in any string literal across the client copy surface', () => {
   const CLIENT_FILES = [
     'modes/questionnaire.js', 'modes/mingle.js', 'modes/knockout.js',
-    'modes/podium.js', 'modes/match-signal.js',
+    'modes/podium.js', 'modes/guess-who.js', 'modes/match-signal.js',
     // The shared render modules lifted out of questionnaire.js. Their string
     // literals are on-screen copy for every mode that renders a card or a
     // question, so they belong in the same guard.
