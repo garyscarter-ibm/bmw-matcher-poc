@@ -508,7 +508,7 @@ async function readMatchRequest(req) {
   // it: an absent or garbage flag has to leave that response untouched.
   const group = body.group === true;
   return {
-    answers, retailer, brand, size, enrich, group,
+    answers, retailer, brand, scope, size, enrich, group,
   };
 }
 
