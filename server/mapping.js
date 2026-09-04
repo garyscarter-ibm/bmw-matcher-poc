@@ -630,7 +630,11 @@ export function mapHondaRaw(raw) {
     mpg: fuel === 'ev' ? num(raw.mpg) : (num(raw.mpg) || spec.mpg),
     ...(evRange ? { evRange } : {}),
     tags: hondaTags(line, body, raw.fuel),
-    blurb: hondaBlurb(line, body, raw.fuel, HONDA_RETAILER_NAME),
+    // No retailer name: Honda's scrape carries no per-dealer identity, so the
+    // only name available is the pool label — "from Honda Approved Used" after
+    // "Approved-used Honda" is a tautology. BMW/MINI still name the real dealer
+    // holding the car (docs/tone-style-guide.md).
+    blurb: hondaBlurb(line, body, raw.fuel),
 
     // ---- display-only (surfaced by index.js publicCar) ----
     mileage: num(raw.mileage),
