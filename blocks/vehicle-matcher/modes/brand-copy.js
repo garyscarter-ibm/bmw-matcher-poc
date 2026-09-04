@@ -507,7 +507,7 @@ export const UNMET_PHRASES = {
   },
   mini: {
     fuel: {
-      petrol: 'petrol MINIs', phev: 'plug-in hybrid MINIs', ev: 'all-electric MINIs',
+      petrol: 'petrol cars', phev: 'plug-in hybrids', ev: 'all-electric cars',
     },
     bodyStyles: {
       hatchback: 'hatchbacks', estate: 'Clubman estates', suv: 'Countryman crossovers',
