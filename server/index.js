@@ -882,8 +882,14 @@ export function buildServer(deps = {}) {
      */
     if (req.method === 'GET' && pathname === '/api/pool') {
       const brand = normalizeBrand(searchParams.get('brand'));
+      // Resolved, not raw: a typo'd scope silently becomes 'dealer', and the
+      // payload echoes what was actually used so a misconfigured embed shows up
+      // as a wrong `scope` in the response rather than a mysteriously small pool.
+      const scope = normalizeScope(searchParams.get('scope'));
       try {
-        const cars = await resolved.fetchRetailerStock(brand, searchParams.get('retailer') || undefined);
+        const cars = await resolved.fetchRetailerStock(
+          brand, searchParams.get('retailer') || undefined, scope,
+        );
         // Retailer coordinates, for the proximity filter. Memoised for the
         // process lifetime and primed at boot, so this awaits nothing in
         // practice; a directory that is down costs the pool nothing but its
