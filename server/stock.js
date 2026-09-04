@@ -858,12 +858,14 @@ async function motorradLiveStock(origin) {
  *
  * @param {string} [brand] brand key (defaults to bmw)
  * @param {string} [retailerSite] retailer_site ID; defaults to the brand's default
+ * @param {string} [scope] 'dealer' (default) or 'national' — see normalizeScope
  * @returns {Promise<Array>} mapped car objects (mapping.js shape)
  */
-export async function fetchRetailerStock(brand = 'bmw', retailerSite) {
+export async function fetchRetailerStock(brand = 'bmw', retailerSite, scope) {
   const b = normalizeBrand(brand);
   const { origin, defaultRetailer, source } = brandConfig(b);
   const site = retailerSite || defaultRetailer;
+  const sc = normalizeScope(scope);
 
   // Fixtures-backed brands never touch the network or the TTL cache — the
   // snapshot is static for the run and the cars are already mapped.
