@@ -65,6 +65,10 @@ const STOCK_TTL_MS = Number(process.env.STOCK_TTL_MS) || 5 * 60 * 1000; // 5 min
 // and served stale-while-revalidate rather than fetched on the request path.
 const NATIONAL_PAGE_SIZE = 100; // the platform's max page size (size=500 still yields 100)
 const NATIONAL_PAGE_LIMIT = Number(process.env.NATIONAL_PAGE_LIMIT) || 200;
+// A dealer-scoped walk. The biggest UK BMW retailer is a few hundred cars, so 8
+// pages is generous headroom; the cap only exists so a feed bug can't turn one
+// forecourt into an unbounded walk.
+const RETAILER_PAGE_LIMIT = Number(process.env.RETAILER_PAGE_LIMIT) || 8;
 const NATIONAL_PAGE_DELAY_MS = Number(process.env.NATIONAL_PAGE_DELAY_MS) || 400;
 const RATE_LIMIT_MAX_RETRIES = 5; // per page, when 429'd (honours Retry-After)
 
