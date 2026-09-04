@@ -103,12 +103,23 @@ export function resetDom() {
 
 /**
  * Spin up a server whose stock is a caller-supplied per-brand pool (mapped car
- * objects — i.e. exactly what fetchRetailerStock returns). Returns { base, close }.
- * Nearby + colour are inert (empty / pass-through) so a mode's optional sections
- * simply don't appear, which is the honest fixtures-brand behaviour.
+ * objects — i.e. exactly what fetchRetailerStock returns). Returns
+ * { base, stockCalls, close }. Nearby + colour are inert (empty / pass-through)
+ * so a mode's optional sections simply don't appear, which is the honest
+ * fixtures-brand behaviour.
+ *
+ * `stockCalls` logs the (brand, retailer, scope) of every pool read the mounted
+ * modes caused, AS RESOLVED BY THE SERVER. It is how a test asserts something a
+ * painted screen cannot show: that the mode asked about the right stock. The log
+ * is per-server and cumulative, so a test that reads it should start its own
+ * server rather than share the suite's.
  */
 export async function startModeServer(poolsByBrand) {
-  const fetchRetailerStock = async (brand) => poolsByBrand[brand] || poolsByBrand.bmw || [];
+  const stockCalls = [];
+  const fetchRetailerStock = async (brand, retailer, scope) => {
+    stockCalls.push({ brand, retailer, scope });
+    return poolsByBrand[brand] || poolsByBrand.bmw || [];
+  };
   const fetchNearbyStock = async () => [];
   const enrichColours = async (_brand, cars = []) => cars;
   // Location is inert for the same reason: both real implementations call someone
