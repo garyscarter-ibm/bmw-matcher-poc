@@ -1150,7 +1150,9 @@ export function mapFerrariRaw(raw) {
     mpg: spec.mpg,
     ...(evRange ? { evRange } : {}),
     tags: ferrariTags(line, body, fuel, spec.seats),
-    blurb: ferrariBlurb(displayName, body, fuel, raw?.engine, FERRARI_RETAILER_NAME),
+    // The real dealer when the feed names one, never the pool label — the blurb
+    // already opens "Ferrari Approved", so "from Ferrari Approved" said it twice.
+    blurb: ferrariBlurb(displayName, body, fuel, raw?.engine, raw?.dealerName || ''),
 
     // ---- display-only (surfaced by index.js publicCar) ----
     mileage: num(raw?.mileage),
