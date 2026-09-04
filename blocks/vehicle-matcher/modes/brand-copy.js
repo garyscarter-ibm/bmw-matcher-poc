@@ -37,8 +37,8 @@ export const BRAND_COPY = {
     // No promised count: results now show one clear winner or the whole tie
     // (up to MAX_SHOWN), so naming a number here would be wrong half the time.
     lede: ({ questions, retailer }) => `${questions} quick questions about your life, `
-      + `your miles and your budget. We’ll match you with the approved-used `
-      + `cars at ${retailer} that suit you best, and tell you why.`,
+      + `your miles and your budget. We’ll match you with the `
+      + `vehicles at ${retailer} that suit you best, and tell you why.`,
     // Approved Used's no-surprises register: state the fact, name the
     // retailer, don't dress it up (docs/tone-style-guide.md). No label —
     // BMW's copy states things rather than announcing them.
