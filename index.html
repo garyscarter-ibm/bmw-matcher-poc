@@ -123,14 +123,19 @@
 
     // Rewrite an authored config row's value in place, found by its label so
     // the right row is hit regardless of order. Used by the ?brand / ?retailer
-    // overrides below. (?mode is read by the block itself from the query string,
-    // so it needs no row here.)
+    // overrides below. (?mode and ?scope are read by the block itself from the
+    // query string, so they need no row here.)
+    const findRow = (label) => [...block.children].find(
+      (r) => r.firstElementChild?.textContent.trim().toLowerCase() === label,
+    );
     const setRow = (label, value) => {
-      const row = [...block.children].find(
-        (r) => r.firstElementChild?.textContent.trim().toLowerCase() === label,
-      );
+      const row = findRow(label);
       if (row) row.lastElementChild.textContent = value;
     };
+    // Read a row back, so the label logic below works from the block's EFFECTIVE
+    // config — the authored value, or whatever ?brand / ?retailer just replaced
+    // it with — instead of re-deriving that precedence a second time.
+    const getRow = (label) => findRow(label)?.lastElementChild.textContent.trim() || '';
 
     // ?brand=bmw|mini|honda|ford|motorrad overrides the authored Brand row.
     const brandOverride = params.get('brand');
