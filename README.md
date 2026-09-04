@@ -151,14 +151,23 @@ after the block, self-contained folder), so porting is a copy-paste:
      every registered mode with a switcher (the showcase). Mode keys live in
      `blocks/vehicle-matcher/modes/index.js`.
    - **Retailer ID** — the retailer's `retailer_site` ID (e.g. `96`); omit to
-     fall back to the backend's default retailer. On BMW and MINI the main pool
-     is national, so this no longer narrows it — it's the address the "other
-     retailers nearby" carousel measures distance from.
+     fall back to the brand's default (`defaultRetailer` in `server/brands.js`).
+     It does two jobs: at dealer **Scope** it is the pool, and at either scope it
+     is the address the "other retailers nearby" carousel measures distance from.
+   - **Scope** — `dealer` (default) or `national`: whether the block searches this
+     retailer's own forecourt or every retailer of the brand. Only BMW and MINI
+     have both — the other brands' feeds are a single national programme, so the
+     row does nothing there. Dealer scope is the default because a block authored
+     onto one retailer's page should answer for that retailer; national scope is
+     the group/programme case, and turns on Guess Who's Distance filter (with one
+     forecourt there is nothing to sort by distance, so it hides itself).
    - **Retailer Name** — the display name shown in copy, for the pool that was
-     searched. Since BMW and MINI search the whole national feed, that's the
-     programme (`BMW Approved Used`), not a branch: naming one dealer would
-     claim a pool that was never searched. The dealer actually holding each car
-     is named on the card itself.
+     searched. Author it to match **Scope**: at dealer scope that is the branch
+     (`Grassicks Garage`), at national scope the programme (`BMW Approved Used`).
+     Getting it the wrong way round makes the copy lie about what it searched —
+     either claiming a pool of 12,000 when it looked at 41, or naming one branch
+     over cards from 130 of them. The dealer actually holding each car is always
+     named on the card itself.
    - **API** — your deployed backend's base URL. **This is how you point an
      EDS-authored block at its backend**: authored content can set config rows
      but not HTML attributes, so the block reads the API base from this row
