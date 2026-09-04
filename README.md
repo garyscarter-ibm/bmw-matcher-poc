@@ -190,7 +190,8 @@ Example authored table:
 | Brand | MINI |
 | Mode | questions |
 | Retailer ID | 92 |
-| Retailer Name | MINI Approved Used |
+| Scope | dealer |
+| Retailer Name | Sytner Luton |
 | API | https://your-backend.onrender.com |
 | Title |  |
 
