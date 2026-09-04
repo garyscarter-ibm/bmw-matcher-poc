@@ -21,11 +21,12 @@ import {
   buildServer, FIELD_MAX, PREVIEW_COUNT, clampFieldSize,
 } from '../index.js';
 import { TOP_MATCHES, MAX_SHOWN } from '../engine.js';
-import { StockUnavailableError } from '../stock.js';
+import { StockUnavailableError, normalizeScope, DEFAULT_SCOPE } from '../stock.js';
 import {
   startTestServer, post, get, request,
-  fakeStock, fakeEnrich, throwingStock, bmwPool, miniPool,
+  fakeStock, fakeEnrich, throwingStock, bmwPool, miniPool, bmwFeedVehicle,
 } from './helpers.js';
+import { mapVehicle } from '../mapping.js';
 
 /* A budget that keeps every fixture car eligible (fixtures sit 24k–40k). */
 const OPEN_BRIEF = { budget: [10000, 60000] };
@@ -563,7 +564,7 @@ test('POST /api/nearby degrades a failure to { nearby: [], unmet: null } 200', a
  * would ever catch, so it gets one of its own.
  */
 test('GET /api/pool ships every column index-aligned to n', async () => {
-  await withServer({ fetchRetailerStock: fakeStock(bmwPool(7)) }, async (base) => {
+  await withServer({ fetchRetailerStock: fakeStock({ bmw: bmwPool(7) }) }, async (base) => {
     const { status, json } = await get(base, '/api/pool');
     assert.equal(status, 200);
     assert.equal(json.n, 7, 'n must be the car count');
@@ -621,7 +622,7 @@ test('GET /api/pool ships a sites table aligned with retailers, not with the car
     ['22208', { name: 'Barons BMW', postcode: 'GU14 7PA', latitude: 51.28, longitude: -0.77 }],
   ]);
   await withServer(
-    { fetchRetailerStock: fakeStock(cars), fetchDealerDirectory: async () => directory },
+    { fetchRetailerStock: fakeStock({ bmw: cars }), fetchDealerDirectory: async () => directory },
     async (base) => {
       const { json } = await get(base, '/api/pool');
       assert.equal(json.sites.lat.length, json.retailers.length, 'sites.lat is not retailer-aligned');
@@ -648,7 +649,7 @@ test('GET /api/pool still serves the stock when the dealer directory is down', a
    */
   await withServer(
     {
-      fetchRetailerStock: fakeStock(bmwPool(4)),
+      fetchRetailerStock: fakeStock({ bmw: bmwPool(4) }),
       fetchDealerDirectory: async () => { throw new Error('directory unavailable'); },
     },
     async (base) => {
@@ -668,7 +669,7 @@ test('GET /api/pool leaves a dealer the directory does not know unlocated', asyn
   // wrong county and make the distance filter lie.
   await withServer(
     {
-      fetchRetailerStock: fakeStock(bmwPool(3)),
+      fetchRetailerStock: fakeStock({ bmw: bmwPool(3) }),
       fetchDealerDirectory: async () => new Map([
         ['99999', { name: 'Somewhere Else BMW', postcode: 'M1 1AA', latitude: 53.48, longitude: -2.24 }],
       ]),
@@ -683,7 +684,7 @@ test('GET /api/pool leaves a dealer the directory does not know unlocated', asyn
 
 test('GET /api/pool 502s when the stock itself is unavailable', async () => {
   // Unlike the directory, the stock IS the pool — there is no degraded version.
-  await withServer({ fetchRetailerStock: throwingStock() }, async (base) => {
+  await withServer({ fetchRetailerStock: throwingStock(new StockUnavailableError('feed down')) }, async (base) => {
     const { status, json } = await get(base, '/api/pool');
     assert.equal(status, 502);
     assert.ok(json.error, 'a 502 must say something');
