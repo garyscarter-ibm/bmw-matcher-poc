@@ -143,9 +143,25 @@
     const brandOverride = params.get('brand');
     if (brandOverride) setRow('brand', brandOverride);
 
+    // The branch each dealer-pool brand calls home. Only BMW and MINI have
+    // per-dealer pools (source: 'feed'); the rest run one national programme
+    // feed and ignore the Retailer ID row entirely, so they need no entry.
+    const BRAND_RETAILER_IDS = { bmw: '96', mini: '92' };
+
     // ?retailer=<id> overrides the authored Retailer ID row.
     const retailerOverride = params.get('retailer');
-    if (retailerOverride) setRow('retailer id', retailerOverride);
+    if (retailerOverride) {
+      setRow('retailer id', retailerOverride);
+    } else if (brandOverride) {
+      // Changing brand without naming a retailer has to move the Retailer ID
+      // too. The authored 96 is a BMW branch, so ?brand=mini alone asked the
+      // MINI feed for a dealer it has never heard of ("Retailer 96 reports no
+      // dealer_number"), which came back as an empty pool — a 502 from
+      // /api/preview — under a heading naming a BMW dealer. Mirrors
+      // BRAND_RETAILER_IDS in index.html, so both harnesses agree.
+      const homeBranch = BRAND_RETAILER_IDS[brandOverride.trim().toLowerCase()];
+      if (homeBranch) setRow('retailer id', homeBranch);
+    }
 
     // ?scope=dealer|national needs no row (the block reads the query string
     // itself — see resolveScope), but the Retailer Name below depends on it, so
