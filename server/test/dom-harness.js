@@ -137,6 +137,7 @@ export async function startModeServer(poolsByBrand) {
   const { port } = server.address();
   return {
     base: `http://127.0.0.1:${port}`,
+    stockCalls,
     async close() {
       server.close();
       await once(server, 'close');
