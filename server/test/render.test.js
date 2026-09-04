@@ -49,7 +49,7 @@ const BRANDS = [
   { key: 'ferrari', pool: () => ferrariPool(20), name: /Ferrari/i },
 ];
 
-const MODES = ['questionnaire', 'mingle', 'knockout', 'podium'];
+const MODES = ['questionnaire', 'mingle', 'knockout', 'podium', 'guess-who'];
 
 let server;
 let modes;
