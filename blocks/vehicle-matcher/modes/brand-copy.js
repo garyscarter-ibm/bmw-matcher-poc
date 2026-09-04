@@ -425,8 +425,8 @@ BRAND_COPY.motorrad = {
   // a Ride"): lead on the riding, not "your life", and on the machine under you
   // rather than a soft "suit you best". See docs/tone-style-guide.md (Motorrad).
   lede: ({ questions, retailer }) => `${questions} quick questions about your riding, `
-    + 'your licence and your budget. We’ll match you to the approved-used '
-    + `BMW Motorrad bikes at ${retailer} built for the road you ride, and tell you why.`,
+    + 'your licence and your budget. We’ll match you to the '
+    + `bikes at ${retailer} built for the road you ride, and tell you why.`,
   unmet: ({ list, retailer }) => `No ${list} at ${retailer} or nearby right now. `
     + 'These are the closest matches to everything else you asked for.',
   refineStatus: ({ shown, wants }) => (shown === 1
