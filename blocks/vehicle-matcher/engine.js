@@ -120,13 +120,13 @@ export async function apiNearby(base, answers, retailer, brandKey) {
  * awarding all three to one model in three colours says nothing, so a podium
  * passes true.
  */
-export async function apiPreview(base, answers, retailer, brandKey, group = false) {
+export async function apiPreview(base, answers, retailer, brandKey, scope, group = false) {
   try {
     const res = await fetch(`${base}/api/preview`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
-        answers, retailer, brand: brandKey, group,
+        answers, retailer, brand: brandKey, scope, group,
       }),
     });
     if (!res.ok) return [];
