@@ -218,6 +218,7 @@ export default async function decorate(block) {
   const api = apiBase(block);
   const brandKey = brand(block);
   const overrides = copyOverrides(block);
+  const scope = resolveScope(block);
   const { mode, locked } = resolveMode(block);
 
   block.replaceChildren();
