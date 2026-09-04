@@ -519,7 +519,7 @@ export const UNMET_PHRASES = {
     // (see hondaFuel in mapping.js), so the fuel warnings only ever name petrol,
     // diesel or fully electric — the values the quiz collects.
     fuel: {
-      petrol: 'petrol Hondas', diesel: 'diesel Hondas', ev: 'fully electric Hondas',
+      petrol: 'petrol cars', diesel: 'diesels', ev: 'fully electric cars',
     },
     bodyStyles: {
       hatchback: 'hatchbacks', suv: 'SUVs',
