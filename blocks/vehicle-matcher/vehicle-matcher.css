@@ -2365,6 +2365,16 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    trap the user's scroll. */
 .vm-mingle-card-0 { cursor: grab; }
 .vm-mingle-card-0.is-draggable { touch-action: none; }
+/* The UA's a:any-link rule puts `pointer` on the photo band, and a declaration
+   matching the element beats the `grab` inherited from the card. Restate it. */
+.vm-mingle-card-0 a.vm-mingle-card-media {
+  cursor: grab;
+  /* A slow swipe is a long press on a link, which iOS answers with the action
+     sheet. The advert is a tap away; here the gesture wins. */
+  -webkit-touch-callout: none;
+}
+.vm-mingle-card-0.is-dragging-keep a.vm-mingle-card-media,
+.vm-mingle-card-0.is-dragging-pass a.vm-mingle-card-media { cursor: grabbing; }
 
 /* Spring back to centre when a drag is released short of the threshold. The
    inline transform is cleared by JS; this transition carries it home (with the
