@@ -1196,7 +1196,7 @@ function mount(root, ctx) {
         if (f.origin) commit(null);
         return;
       }
-      // Already resolved and unchanged: pressing Find again is not a new question.
+      // Already resolved and unchanged: pressing Go again is not a new question.
       if (f.origin && typed.toUpperCase() === f.origin.postcode.toUpperCase()) return;
       find.disabled = true;
       try {
