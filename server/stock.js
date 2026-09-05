@@ -27,7 +27,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { lookupDealer } from './dealers.js';
-import { mapVehicle, mapMotorradRaw, mapHondaRaw, mapFerrariRaw } from './mapping.js';
+import {
+  mapVehicle, mapMotorradRaw, mapHondaRaw, mapFerrariRaw, normaliseColour,
+} from './mapping.js';
 import { brandConfig, normalizeBrand } from './brands.js';
 import { parseListingHtml, listingUrl } from './honda-listing.js';
 import { parseResTable } from './motorrad-listing.js';
