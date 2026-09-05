@@ -27,7 +27,7 @@ import {
   installDom, resetDom, startModeServer, loadMode, mountMode, settle,
 } from './dom-harness.js';
 import {
-  bmwPool, miniPool, hondaPool, fordPool, motorradPool, ferrariPool,
+  bmwPool, miniPool, hondaPool, fordPool, motorradPool, ferrariPool, post,
 } from './helpers.js';
 
 // Brands under render test, each with a stock pool and the marque name. The
