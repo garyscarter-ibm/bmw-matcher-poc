@@ -634,9 +634,15 @@ function matchAt(pool, i, big) {
       // server/index.js). A card-sized card deserves the bigger variant, so it
       // is reconstructed here rather than sent for all 12,000.
       photo: big ? fullPhoto(photo) : photo,
-      link: pool.linkPrefix && pool.id[i] ? `${pool.linkPrefix}${pool.id[i]}` : null,
+      link: linkOf(pool, i),
     },
   };
+}
+
+/** The advert URL for car `i`, or null when the feed gave no id to build one from
+ *  (the pool ships one prefix rather than 12,000 near-identical URLs). */
+function linkOf(pool, i) {
+  return pool.linkPrefix && pool.id[i] ? `${pool.linkPrefix}${pool.id[i]}` : null;
 }
 
 /** The larger variant of a thumbnail URL, for cards big enough to need one.
