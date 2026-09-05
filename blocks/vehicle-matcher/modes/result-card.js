@@ -204,7 +204,7 @@ export function matchCard(match, {
   const copy = BRAND_COPY[brandKey] || BRAND_COPY.bmw;
   const card = el('article', `vm-card${big ? ' vm-card-big' : ''}${compact ? ' vm-card-compact' : ''}`);
 
-  const { media, showPhoto } = mediaWell(car);
+  const { media, showPhoto } = mediaWell(car, '', car.link);
   card.append(media);
 
   const body = el('div', 'vm-card-body');
