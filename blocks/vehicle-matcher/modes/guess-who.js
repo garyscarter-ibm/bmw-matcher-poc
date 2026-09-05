@@ -1366,23 +1366,15 @@ function mount(root, ctx) {
     const open = el('button', 'vm-reject-open', copy.rejectLabel);
     open.type = 'button';
     open.setAttribute('aria-expanded', 'false');
-    const menu = el('div', 'vm-reject-menu');
-    menu.hidden = true;
     open.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (menu.hidden) {
-        menu.replaceChildren(el('p', 'vm-reject-prompt', copy.rejectPrompt));
-        rejectOptionsFor(i).forEach((o) => {
-          const b = el('button', 'vm-reject-option', o.label);
-          b.type = 'button';
-          b.addEventListener('click', o.apply);
-          menu.append(b);
-        });
-      }
-      menu.hidden = !menu.hidden;
-      open.setAttribute('aria-expanded', String(!menu.hidden));
+      if (state.reject?.trigger === open) closeReject();
+      else openReject(open, i);
     });
-    wrap.append(open, menu);
+    // The menu itself is NOT in here: a tile cell has both overflow: hidden and
+    // paint containment from content-visibility, which clips a child at any
+    // z-index. It lives in one shared layer instead (see openReject).
+    wrap.append(open);
     return wrap;
   };
 
