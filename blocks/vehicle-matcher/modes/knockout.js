@@ -1075,11 +1075,21 @@ function mount(root, ctx) {
   const buildCrest = (car) => {
     const crest = el('div', 'vm-knockout-crest');
     crest.style.setProperty('--vm-mingle-swatch', swatchFor(car));
-    const disc = el('div', 'vm-knockout-crest-disc');
+    const disc = el(car.photo && car.link ? 'a' : 'div', 'vm-knockout-crest-disc');
     if (car.photo) {
+      if (car.link) {
+        disc.href = car.link;
+        disc.target = '_blank';
+        disc.rel = 'noopener noreferrer';
+        disc.setAttribute('aria-label', `View the ${car.name} at the retailer`);
+      }
       const img = el('img', 'vm-knockout-crest-photo');
       img.src = car.photo; img.alt = car.name || ''; img.loading = 'lazy';
-      img.addEventListener('error', () => { img.remove(); disc.classList.add('no-photo'); });
+      img.addEventListener('error', () => {
+        img.remove();
+        disc.classList.add('no-photo');
+        disc.removeAttribute('href');
+      });
       disc.append(img);
     } else {
       disc.classList.add('no-photo');
