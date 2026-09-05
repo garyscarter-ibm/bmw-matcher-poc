@@ -1207,11 +1207,21 @@ function mount(root, ctx) {
     if (!reducedMotion) card.classList.add('is-revealing');
     card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
     card.append(el('div', 'vm-mingle-card-colour'));
-    const media = el('div', 'vm-mingle-card-media');
+    const media = el(car.photo && car.link ? 'a' : 'div', 'vm-mingle-card-media');
     if (car.photo) {
+      if (car.link) {
+        media.href = car.link;
+        media.target = '_blank';
+        media.rel = 'noopener noreferrer';
+        media.setAttribute('aria-label', `View the ${car.name} at the retailer`);
+      }
       const img = el('img', 'vm-mingle-card-photo');
       img.src = car.photo; img.alt = car.name || ''; img.loading = 'lazy';
-      img.addEventListener('error', () => { img.remove(); media.classList.add('no-photo'); });
+      img.addEventListener('error', () => {
+        img.remove();
+        media.classList.add('no-photo');
+        media.removeAttribute('href');
+      });
       media.append(img);
     } else {
       media.classList.add('no-photo');
