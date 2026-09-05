@@ -3737,6 +3737,8 @@ a.vm-knockout-crest-disc:focus-visible {
 .vm-podium-tail-grid > .is-dismissed {
   opacity: 0;
   transform: scale(0.93);
+  /* Faded to nothing but live for another 350ms, and its photo now links out. */
+  pointer-events: none;
 }
 
 /* ---------------------------- "not this one" ------------------------- */
