@@ -801,13 +801,27 @@ function mount(root, ctx) {
     // Colour bar across the top + tinted media (§11.4).
     card.append(el('div', 'vm-mingle-card-colour'));
 
-    const media = el('div', 'vm-mingle-card-media');
+    const media = el(car.photo && car.link ? 'a' : 'div', 'vm-mingle-card-media');
     if (car.photo) {
+      if (car.link) {
+        media.href = car.link;
+        media.target = '_blank';
+        media.rel = 'noopener noreferrer';
+        media.setAttribute('aria-label', `View the ${car.name} at the retailer`);
+        // A mouse drag on a link or an image starts a native link/image drag,
+        // which kills the swipe mid-gesture. Opt both out.
+        media.draggable = false;
+      }
       const img = el('img', 'vm-mingle-card-photo');
       img.src = car.photo;
       img.alt = car.name;
       img.loading = 'lazy';
-      img.addEventListener('error', () => { img.remove(); media.classList.add('no-photo'); });
+      img.draggable = false;
+      img.addEventListener('error', () => {
+        img.remove();
+        media.classList.add('no-photo');
+        media.removeAttribute('href');
+      });
       media.append(img);
     } else {
       media.classList.add('no-photo');
