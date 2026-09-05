@@ -947,6 +947,9 @@ function mount(root, ctx) {
     let startT = 0;
     let dx = 0;
     let dragging = false;
+    // A drag ends in a click, and the photo band is now a link to the advert — so
+    // a swipe would navigate. Set on any real movement, consumed by the guard below.
+    let suppressClick = false;
     // Mark the card as an active swipe surface. The CSS `touch-action: none`
     // that stops the page scrolling mid-swipe is scoped to THIS class, so it
     // only applies when a drag handler is actually attached — under reduced
