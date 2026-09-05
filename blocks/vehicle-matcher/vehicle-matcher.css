@@ -4200,6 +4200,13 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   background: var(--vm-surface-alt);
   overflow: hidden;
 }
+/* The band is an <a> whenever the car has an advert (see photoFor), so it has to
+   carry no link decoration and still show a keyboard focus ring. */
+a.vm-gw-photo { color: inherit; text-decoration: none; }
+a.vm-gw-photo:focus-visible {
+  outline: var(--vm-focus-width) solid var(--vm-focus);
+  outline-offset: calc(-1 * var(--vm-focus-width));
+}
 .vm-gw-photo img {
   width: 100%;
   height: 100%;
