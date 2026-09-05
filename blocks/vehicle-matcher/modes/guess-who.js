@@ -1144,7 +1144,7 @@ function mount(root, ctx) {
    * question has. Putting it in the shared file would mean giving every mode a
    * network dependency for the sake of one filter in one of them.
    *
-   * "Postcode" and "Find" are hardcoded rather than per-brand, on the same
+   * "Postcode" and "Go" are hardcoded rather than per-brand, on the same
    * grounds as the popover's own "Done" button and the filter names above: they
    * name a control, they don't speak in a voice.
    */
