@@ -981,6 +981,8 @@ function mount(root, ctx) {
     const onUp = (e) => {
       if (!dragging) return;
       cleanup();
+      // Same 8px as the stamp threshold: below it the gesture was a tap, not a drag.
+      suppressClick = Math.abs(dx) > 8;
       const elapsed = (e.timeStamp || 0) - startT;
       const flick = Math.abs(dx) > 48 && elapsed < 250;
       const past = Math.abs(dx) >= threshold() || flick;
