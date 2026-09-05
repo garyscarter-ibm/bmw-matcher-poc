@@ -3159,9 +3159,10 @@ a.vm-knockout-crest-disc:focus-visible {
    The Final interstitial still SHOWS (it's content — the round change must stay
    legible) but doesn't animate in; the sweep is skipped in JS entirely. --- */
 @media (prefers-reduced-motion: reduce) {
-  .vm-knockout-card { transition: none; }
-  .vm-knockout-card.is-out-left,
-  .vm-knockout-card.is-out-right { transform: none; opacity: 0; }
+  .vm-knockout-card,
+  .vm-knockout-slot { transition: none; }
+  .vm-knockout-slot.is-out-left,
+  .vm-knockout-slot.is-out-right { transform: none; opacity: 0; }
   .vm-knockout-card.is-crowned { box-shadow: none; }
   .vm-knockout-verdict { animation: none; }
   .vm-knockout-sweep { animation: none; }
