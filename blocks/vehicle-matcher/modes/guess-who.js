@@ -797,6 +797,7 @@ function mount(root, ctx) {
   let pop = null;
   let popTitle = null;
   let popBody = null;
+  let rejectPop = null;
 
   /* ---- error screen (the shared renderStatus pattern, as in podium.js) ---- */
   const showError = (onRetry) => {
