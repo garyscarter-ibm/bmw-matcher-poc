@@ -39,7 +39,7 @@ import {
   startColourWarmer,
 } from './stock.js';
 import {
-  QUESTIONS, BUDGET_BANDS, questionsForBrand, applyBespokeAnswers,
+  QUESTIONS, BUDGET_BANDS, questionsForBrand, applyBespokeAnswers, seedQuestionIds,
 } from './questions.js';
 import { normalizeBrand, brandTuning } from './brands.js';
 import { fetchDealerDirectory } from './dealers.js';
@@ -865,6 +865,10 @@ export function buildServer(deps = {}) {
       const brand = normalizeBrand(searchParams.get('brand'));
       return sendJson(res, 200, {
         questions: publicQuestions(brand),
+        // Which of them the game modes' seed screen asks. Server-owned like
+        // topMatches: a client that names one can only be a stale copy of this
+        // brand's set, and MINI's set has no primaryUse to name.
+        seedQuestions: seedQuestionIds(brand),
         budgetBands: BUDGET_BANDS,
         topMatches: TOP_MATCHES,
       });

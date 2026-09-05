@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
   mapVehicle, mapHondaRaw, mapFordRaw, mapMotorradRaw, mapFerrariRaw,
 } from '../mapping.js';
-import { questionsForBrand, applyBespokeAnswers } from '../questions.js';
+import { questionsForBrand, applyBespokeAnswers, seedQuestionIds } from '../questions.js';
 import { normalizeBrand, brandConfig, brandTuning } from '../brands.js';
 import { rankCars } from '../engine.js';
 import { motorradRowsFromEnvelope, motorradRowToRaw, parseMotorradSid } from '../stock.js';
@@ -374,6 +374,60 @@ test('miniVibe folds trim + style into the standard answer set without overridin
   assert.equal(applyBespokeAnswers('mini', { doors: '3' }).doors, '3');
   // BMW has no bespoke questions → answers pass through untouched.
   assert.deepEqual(applyBespokeAnswers('bmw', { style: '3' }), { style: '3' });
+});
+
+/* ---- the game modes' seed questions ----
+ *
+ * The swipe and knockout seeds ask two questions and disable their start button
+ * until both are answered, so a seed naming a question the brand doesn't ask is
+ * not a cosmetic gap — it is an unplayable mode. MINI proved it: it drops
+ * primaryUse for miniVibe, and the client hardcoded primaryUse.
+ *
+ * Two things are asserted, because the fix has two halves. The server's pick
+ * must be renderable as a tile row for every brand, and the client's fallback
+ * derivation (match-signal.js, used only against an older API) must agree with
+ * it — a mirror that drifts is the same bug again.
+ */
+test('every brand has two seed questions the game modes can actually render', () => {
+  for (const brand of ['bmw', 'mini', 'ford', 'honda', 'motorrad', 'ferrari']) {
+    const set = questionsForBrand(brand);
+    const ids = seedQuestionIds(brand);
+    assert.equal(ids.length, 2, `${brand}: seed needs a budget and a taste question, got ${ids}`);
+    assert.equal(ids[0], 'budget', `${brand}: the first seed row is the budget`);
+    const taste = set.find((q) => q.id === ids[1]);
+    assert.ok(taste, `${brand}: seed names ${ids[1]}, which this brand does not ask`);
+    // A one-tap row needs options, one choice, and no condition to wait on.
+    assert.ok(taste.options?.length >= 2, `${brand}: ${taste.id} has too few options to tile`);
+    assert.ok(!taste.multi, `${brand}: ${taste.id} is multi-choice, the seed picks one`);
+    assert.ok(!taste.showIf, `${brand}: ${taste.id} is conditional and may not be shown`);
+  }
+});
+
+test('the client re-derives the same seed questions the server would', async () => {
+  const client = await import(
+    new URL('../../blocks/vehicle-matcher/modes/match-signal.js', import.meta.url)
+  );
+  for (const brand of ['bmw', 'mini', 'ford', 'honda', 'motorrad', 'ferrari']) {
+    // What the wire carries: showIf can't cross JSON, so /api/questions sends
+    // `conditional` instead (publicQuestions in index.js).
+    const wire = questionsForBrand(brand).map(({ showIf, ...q }) => (
+      showIf ? { ...q, conditional: true } : q
+    ));
+    const server = seedQuestionIds(brand);
+    const override = brandConfig(brand).questions?.seed;
+    if (override) {
+      // An explicit registry pick is server-only by design: an older API can't
+      // send it, so the client falls back to the shared default instead.
+      assert.equal(server[1], override, `${brand}: registry seed override ignored`);
+    } else {
+      assert.deepEqual(
+        client.seedQuestionIds(wire), server,
+        `${brand}: the client's fallback derivation has drifted from the server's`,
+      );
+    }
+    // With the field present the client must just use it, override or not.
+    assert.deepEqual(client.seedQuestionIds(wire, server), server, `${brand}: server list ignored`);
+  }
 });
 
 /* ---- BMW spec-gap fill + fuel/crew binding (from the used-stock eval) ---- */

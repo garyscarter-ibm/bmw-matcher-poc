@@ -32,7 +32,7 @@ import { apiGetQuestions, apiField, apiMatch } from '../engine.js';
 import { el } from '../ui.js';
 import {
   WEAK_SCORE, SHADE_HEX, NEUTRAL_SWATCH,
-  budgetBandsFromQuestion, useTilesFromQuestion,
+  budgetBandsFromQuestion, tilesFromQuestion, seedQuestionIds,
   shuffle, photosFirst, shadeOf, swatchFor, priceLabel, cap, gbpShort,
   modal, rankByFrequency, swipesToAnswers, celebrate, ageInYears,
 } from './match-signal.js';
@@ -78,10 +78,9 @@ const MINGLE_COPY = {
     budgetLabel: 'How much are you looking to spend?',
     useLabel: 'And what’s it for?',
     seedCta: 'Start swiping',
-    // NB: the budget bands and the "what's it for" options are NOT copy — they
-    // come from the engine per brand (apiGetQuestions → the `budget` and
-    // `primaryUse` questions), so MINI's own labels and MINI-scale budget show
-    // without duplicating the source of truth. Only the seed's framing lives here.
+    // NB: the tiles are NOT copy. Both rows come from the engine per brand, and
+    // WHICH two questions they are is the server's call too (seedQuestionIds) —
+    // MINI has no primaryUse to ask. Only the framing lives here.
     // Deck
     deckInstruction: 'Drag right for yes, left for no, or tap. Keep the ones that catch your eye.',
     passLabel: 'Pass',
@@ -433,7 +432,8 @@ function mount(root, ctx) {
   // ctx.answers or the questionnaire mode's #m= link).
   const state = {
     questions: [], // the engine's per-brand questions (seeds the budget/use tiles)
-    seed: null, // { budget, primaryUse }
+    seedQuestions: null, // which two of them the seed asks (server's call)
+    seed: null, // { budget, <the brand's taste question id> }
     deck: [], // shuffled, sampled preview matches
     index: 0, // next card to show
     kept: [], // cars the player kept (the taste signal)
@@ -486,10 +486,9 @@ function mount(root, ctx) {
 
   /* ---------------------------- seed step ----------------------------
    * The two answers a swipe can't read: budget (the engine's hard filter) and
-   * what the car's for. Both the budget bands and the "what's it for" tiles are
-   * built from the engine's own per-brand questions (state.questions) — NOT from
-   * local copy — so MINI shows MINI's labels and MINI-scale money, exactly like
-   * the questionnaire mode. Only the seed's framing (kicker/title/lede) is copy. */
+   * what the car's for. Both rows are built from the engine's own per-brand
+   * questions (state.questions) — NOT from local copy — so MINI shows MINI's
+   * labels and MINI-scale money. Only the framing (kicker/title/lede) is copy. */
   const renderSeed = (preset) => {
     root.replaceChildren();
     const screen = el('div', 'vm-screen vm-mingle-seed');
@@ -498,14 +497,22 @@ function mount(root, ctx) {
     screen.append(el('p', 'vm-lede', copy.seedLede));
 
     const budgetQ = state.questions.find((q) => q.id === 'budget');
-    const useQ = state.questions.find((q) => q.id === 'primaryUse');
+    // WHICH taste question this brand asks is the server's call: MINI drops
+    // primaryUse for miniVibe, so a hardcoded id painted an empty row here.
+    const tasteId = seedQuestionIds(state.questions, state.seedQuestions)
+      .find((id) => id !== 'budget');
+    const tasteQ = tasteId ? state.questions.find((q) => q.id === tasteId) : null;
     const budgetBands = budgetBandsFromQuestion(budgetQ);
-    const useTiles = useTilesFromQuestion(useQ);
 
-    const chosen = { budget: preset?.budget || null, primaryUse: preset?.primaryUse || null };
+    const chosen = {
+      budget: preset?.budget || null,
+      taste: (tasteQ && preset?.[tasteQ.id]) || null,
+    };
     const cta = el('button', 'vm-btn vm-btn-primary vm-mingle-seed-cta', copy.seedCta);
     cta.type = 'button';
-    const refreshCta = () => { cta.disabled = !(chosen.budget && chosen.primaryUse); };
+    // Gate on the rows that exist. A brand with no taste question gets one row
+    // and a live button, never a dead one.
+    const refreshCta = () => { cta.disabled = !chosen.budget || (!!tasteQ && !chosen.taste); };
 
     // Budget bands — ceilings and open-top scale to the brand's slider max.
     screen.append(el('p', 'vm-mingle-seed-label', budgetQ?.title || copy.budgetLabel));
@@ -525,28 +532,30 @@ function mount(root, ctx) {
     });
     screen.append(budgetRow);
 
-    // What's it for — the engine's primaryUse options, brand labels + subs.
-    screen.append(el('p', 'vm-mingle-seed-label', useQ?.title || copy.useLabel));
-    const useRow = el('div', 'vm-mingle-tiles vm-mingle-tiles-use');
-    useTiles.forEach(({ value, label, sub }) => {
-      const tile = el('button', 'vm-mingle-tile vm-mingle-tile-use');
-      tile.type = 'button';
-      tile.append(el('span', 'vm-mingle-tile-label', label));
-      if (sub) tile.append(el('span', 'vm-mingle-tile-hint', sub));
-      if (chosen.primaryUse === value) tile.classList.add('is-selected');
-      tile.addEventListener('click', () => {
-        chosen.primaryUse = value;
-        useRow.querySelectorAll('.vm-mingle-tile').forEach((t) => t.classList.remove('is-selected'));
-        tile.classList.add('is-selected');
-        refreshCta();
+    // What's it for — the brand's own taste question, its labels + subs.
+    if (tasteQ) {
+      screen.append(el('p', 'vm-mingle-seed-label', tasteQ.title || copy.useLabel));
+      const useRow = el('div', 'vm-mingle-tiles vm-mingle-tiles-use');
+      tilesFromQuestion(tasteQ).forEach(({ value, label, sub }) => {
+        const tile = el('button', 'vm-mingle-tile vm-mingle-tile-use');
+        tile.type = 'button';
+        tile.append(el('span', 'vm-mingle-tile-label', label));
+        if (sub) tile.append(el('span', 'vm-mingle-tile-hint', sub));
+        if (chosen.taste === value) tile.classList.add('is-selected');
+        tile.addEventListener('click', () => {
+          chosen.taste = value;
+          useRow.querySelectorAll('.vm-mingle-tile').forEach((t) => t.classList.remove('is-selected'));
+          tile.classList.add('is-selected');
+          refreshCta();
+        });
+        useRow.append(tile);
       });
-      useRow.append(tile);
-    });
-    screen.append(useRow);
+      screen.append(useRow);
+    }
 
     refreshCta();
     cta.addEventListener('click', () => {
-      state.seed = { budget: chosen.budget, primaryUse: chosen.primaryUse };
+      state.seed = { budget: chosen.budget, ...(tasteQ && { [tasteQ.id]: chosen.taste }) };
       loadDeck();
     });
     screen.append(cta);
@@ -1210,8 +1219,9 @@ function mount(root, ctx) {
    * retry that re-boots. */
   const boot = async () => {
     try {
-      const { questions } = await apiGetQuestions(ctx.api, ctx.retailer, ctx.brand);
+      const { questions, seedQuestions } = await apiGetQuestions(ctx.api, ctx.retailer, ctx.brand);
       state.questions = Array.isArray(questions) ? questions : [];
+      state.seedQuestions = Array.isArray(seedQuestions) ? seedQuestions : null;
     } catch {
       showError(boot);
       return;

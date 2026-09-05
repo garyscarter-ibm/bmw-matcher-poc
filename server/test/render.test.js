@@ -323,6 +323,81 @@ test('every mode stock call passes a scope', () => {
   );
 });
 
+/*
+ * A gated first screen has to be openable.
+ *
+ * The two game modes' seed screens disable their start button until both rows
+ * are answered, and WHICH questions those rows come from is per-brand. So a
+ * brand whose questions the client assumes wrongly paints an empty row and a
+ * button nothing on screen can enable: the mode is unplayable, and every check
+ * above still passes (it paints, it's themed, it has no em dashes). MINI shipped
+ * exactly that — it drops primaryUse for miniVibe, and the seed named primaryUse.
+ *
+ * Written as reachability rather than a MINI assertion, so it holds for a mode
+ * with no gate at all and needs no list of which modes have seeds: find the
+ * disabled controls, answer everything on the screen, require the gate to open.
+ */
+test('no mode leaves a first screen that no answer on it can get past', async () => {
+  const stuck = [];
+  for (const mode of MODES) {
+    for (const brand of BRANDS) {
+      resetDom();
+      // eslint-disable-next-line no-await-in-loop
+      const stage = mountMode(modes[mode], { base: server.base, brand: brand.key });
+      // eslint-disable-next-line no-await-in-loop
+      await settle(stage, (s) => s.textContent.replace(/\s/g, '').length > 20);
+
+      const gated = () => [...stage.querySelectorAll('button[disabled]')];
+      if (!gated().length) continue;
+      // Answer everything answerable — seed tiles and question options, never the
+      // gated button itself, so we test the gate rather than walk past it.
+      const answers = [...stage.querySelectorAll('.vm-mingle-tile, .vm-option')];
+      answers.forEach((a) => a.click());
+      for (const btn of gated()) {
+        stuck.push(
+          `${mode}/${brand.key}: "${btn.textContent}" still disabled after answering`
+          + ` all ${answers.length} controls on screen`,
+        );
+      }
+    }
+  }
+  assert.deepEqual(
+    stuck, [],
+    `a control the user can never enable (the mode is unplayable for that brand):\n${stuck.join('\n')}`,
+  );
+});
+
+/*
+ * The cause behind the test above, guarded directly: a seed row is only there if
+ * the client asked for a question the brand actually asks. The gate fix means a
+ * missing taste question no longer deadlocks the button, so without this the
+ * failure mode becomes silent instead — MINI would be seeded on budget alone and
+ * lose the one taste signal the game feeds the engine.
+ */
+test('both game modes seed on a taste question the brand actually asks', async () => {
+  for (const mode of ['mingle', 'knockout']) {
+    for (const brand of BRANDS) {
+      resetDom();
+      // eslint-disable-next-line no-await-in-loop
+      const stage = mountMode(modes[mode], { base: server.base, brand: brand.key });
+      // eslint-disable-next-line no-await-in-loop
+      await settle(stage, (s) => s.querySelector('.vm-mingle-tiles-budget'));
+
+      const row = stage.querySelector('.vm-mingle-tiles-use');
+      assert.ok(row, `${mode}/${brand.key}: the seed painted no taste row at all`);
+      const tiles = row.querySelectorAll('.vm-mingle-tile');
+      assert.ok(
+        tiles.length >= 2,
+        `${mode}/${brand.key}: taste row has ${tiles.length} tiles, so it asks nothing`,
+      );
+      // Real labels, not empty buttons from a question shaped wrong for a tile row.
+      for (const t of tiles) {
+        assert.ok(t.textContent.trim(), `${mode}/${brand.key}: an unlabelled taste tile`);
+      }
+    }
+  }
+});
+
 // No user-facing em dashes on the first painted screen of any mode/brand. The
 // house rule (no em dashes in on-screen copy) gets a machine guard here.
 test('no em dashes in painted copy', async () => {

@@ -499,3 +499,30 @@ export function applyBespokeAnswers(brand, answers) {
   }
   return merged;
 }
+
+/**
+ * The two questions a game mode's seed screen asks (renderSeed in the block's
+ * mingle.js / knockout.js): the budget, and ONE "what's it for" question.
+ *
+ * Server-owned for the same reason the question set is: which questions a brand
+ * asks is this file's and brands.js's decision, and a client that names one can
+ * only ever be a stale copy of it. MINI proved that the hard way — it drops
+ * `primaryUse` for `miniVibe`, so a seed hardcoded to `primaryUse` painted an
+ * empty tile row and a start button nothing could enable.
+ *
+ * The taste pick, in order: an explicit `questions.seed` in the brand's registry
+ * block, else `primaryUse` (what the shared pool asks), else the brand's first
+ * unconditional single-choice question. Every candidate must be in the brand's
+ * own set, so this can never name a question the brand dropped.
+ */
+export function seedQuestionIds(brand = 'bmw') {
+  const set = questionsForBrand(brand);
+  const named = brandConfig(brand).questions?.seed;
+  // Options, single-choice and always shown: the only shape a one-tap tile row
+  // can render (a slider has no options, a conditional may not apply yet).
+  const seedable = (q) => q.options && !q.multi && !q.showIf;
+  const taste = set.find((q) => q.id === named && seedable(q))
+    || set.find((q) => q.id === 'primaryUse' && seedable(q))
+    || set.find((q) => q.id !== 'budget' && seedable(q));
+  return [set.some((q) => q.id === 'budget') && 'budget', taste?.id].filter(Boolean);
+}
