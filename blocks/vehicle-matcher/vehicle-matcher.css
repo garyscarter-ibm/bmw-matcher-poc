@@ -2417,6 +2417,13 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   background: var(--vm-surface-dark);
   overflow: hidden;
 }
+/* An <a> to the advert on the deck card and the result hero (photo-bearing cars
+   only). No link decoration; inset focus ring because the card clips. */
+a.vm-mingle-card-media { color: inherit; text-decoration: none; }
+a.vm-mingle-card-media:focus-visible {
+  outline: 2px solid var(--vm-accent);
+  outline-offset: -2px;
+}
 /* A soft wash of the paint colour over the photo, so the deck reads by colour. */
 .vm-mingle-card-media::after {
   content: '';
