@@ -475,6 +475,7 @@ test('a photo-less card carries no live link', async () => {
 });
 
 test('no painted mode nests a link inside another link or a button', async () => {
+  let linked = 0;
   for (const mode of MODES) {
     for (const brand of BRANDS) {
       resetDom();
@@ -486,6 +487,10 @@ test('no painted mode nests a link inside another link or a button', async () =>
         badNesting(stage), [],
         `${mode}/${brand.key} painted invalid interactive nesting`,
       );
+      linked += stage.querySelectorAll('a[href]').length;
     }
   }
+  // Only the first screen of each mode is painted here, and Guess Who is the one
+  // that shows cars straight away. If it stops, this scan is checking nothing.
+  assert.ok(linked > 0, 'no painted screen had a link at all, so this proved nothing');
 });
