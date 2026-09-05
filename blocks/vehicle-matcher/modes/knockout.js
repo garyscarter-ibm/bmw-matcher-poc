@@ -408,6 +408,10 @@ const KNOCKOUT_COPY = {
 /** Copy for the active brand, BMW as the fallback (matches ctx.brand shape). */
 const copyFor = (brand) => KNOCKOUT_COPY[brand] || KNOCKOUT_COPY.bmw;
 
+/** The matchup card IS the pick <button>, so its photo can't be a link (invalid
+ * nesting, and it would steal the tap). This chip is the advert route instead. */
+const ADVERT_CHIP = 'Details ›';
+
 /** Largest power of two ≤ n (0 for n < 1). Used to snap the shuffled pool to a
  * clean bracket size so every round is a full set of pairings, no byes. */
 function largestPowerOfTwo(n) {
