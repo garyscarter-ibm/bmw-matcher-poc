@@ -106,6 +106,40 @@ const DEFAULT_SPEC = { boot: 460, seats: 5, zeroTo62: 8.0, sizeClass: 2 };
 const DEFAULT_SPEC_MINI = { boot: 210, seats: 4, zeroTo62: 7.7, sizeClass: 1 };
 const warnedLines = new Set(); // log each unknown line once, not per-car
 
+/* The basic shades the client's SHADE_HEX table knows, keyed by every word the
+   feeds actually spell them with (measured over live Honda/Ford/Ferrari stock). */
+const SHADE_WORDS = {
+  red: 'red', orange: 'orange', yellow: 'yellow', green: 'green', blue: 'blue',
+  purple: 'purple', pink: 'pink', brown: 'brown', beige: 'beige', white: 'white',
+  silver: 'silver', grey: 'grey', gray: 'grey', black: 'black',
+  // Ferrari names its paint in Italian, so the English table alone finds nothing.
+  rosso: 'red', nero: 'black', bianco: 'white', blu: 'blue', grigio: 'grey',
+  argento: 'silver', alluminio: 'silver', giallo: 'yellow', viola: 'purple',
+  celeste: 'blue', verde: 'green', marrone: 'brown', arancio: 'orange',
+  // Greys sold under a name containing no colour word at all: Ferrari's
+  // gunmetal "Canna di Fucile", Honda's "Modern Steel", Ford's "Magnetic".
+  canna: 'grey', gunmetal: 'grey', steel: 'grey', metal: 'grey', magnetic: 'grey',
+};
+
+/**
+ * A feed's colour STRING to the { colour, manufacturerColour } shape the pool and
+ * the cards read (see fetchColour in stock.js, where BMW/MINI get it from a PDP).
+ * Without this a string reaches publicPool's `c.colour?.colour` as undefined, and
+ * 96% of Ferrari's known paint is dropped before it can be filtered on.
+ *
+ * `colour` is the basic shade a filter groups by, taken from the first recognised
+ * word; `manufacturerColour` keeps the name verbatim for display. An unrecognised
+ * name ("Extra Sample") keeps its display name but gets no shade, so it stays out
+ * of the colour filter rather than being guessed into the wrong bucket.
+ */
+export function normaliseColour(value) {
+  if (value == null || typeof value === 'object') return value || undefined;
+  const name = String(value).trim();
+  if (!name) return undefined;
+  const shade = name.toLowerCase().split(/[^a-z]+/).map((w) => SHADE_WORDS[w]).find(Boolean);
+  return { colour: shade, manufacturerColour: name };
+}
+
 /* ------------------------------ derivations ---------------------------- */
 
 /**
@@ -644,7 +678,7 @@ export function mapHondaRaw(raw) {
     // power in bhp, and engine capacity in cc. Surfaced verbatim from the feed
     // (odd casing/typos in the source colour strings are left as-is here; the
     // card layer handles display), so a card can state them as the car's own.
-    colour: raw.colour || undefined,
+    colour: normaliseColour(raw.colour),
     power: num(raw.bhp) || undefined,
     cc: num(raw.cc) || undefined,
     // Registration year/date power the swipe card's "N years old" frame; where
@@ -926,7 +960,7 @@ export function mapFordRaw(raw) {
     // the car's own exterior colour, its full-service-history flag ("Yes"/"No"
     // string), and previous-owner count. Each describes THIS car, not the model,
     // and is only set when the source carried it — no invented defaults.
-    colour: raw?.colour || undefined,
+    colour: normaliseColour(raw?.colour),
     fullServiceHistory: raw?.fullServiceHistory || undefined,
     previousOwners: raw?.previousOwners || undefined,
     // Prefer the REAL per-listing dealer (VendorName, e.g. "Lawtons of Tadcaster")
@@ -1166,7 +1200,7 @@ export function mapFerrariRaw(raw) {
     cc: cc || undefined,
     power: power || undefined,
     topSpeed: num(raw?.topSpeed),
-    colour: raw?.exteriorColor || undefined,
+    colour: normaliseColour(raw?.exteriorColor),
     // The real dealer holding this car (Meridien Modena, Graypaul Nottingham …),
     // not the Ferrari-wide constant; falls back to it when absent.
     retailerName: raw?.dealerName || FERRARI_RETAILER_NAME,

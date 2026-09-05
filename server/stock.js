@@ -27,7 +27,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { lookupDealer } from './dealers.js';
-import { mapVehicle, mapMotorradRaw, mapHondaRaw, mapFerrariRaw } from './mapping.js';
+import {
+  mapVehicle, mapMotorradRaw, mapHondaRaw, mapFerrariRaw, normaliseColour,
+} from './mapping.js';
 import { brandConfig, normalizeBrand } from './brands.js';
 import { parseListingHtml, listingUrl } from './honda-listing.js';
 import { parseResTable } from './motorrad-listing.js';
@@ -449,6 +451,9 @@ function loadFixtures(brand) {
   if (!Array.isArray(cars) || cars.length === 0) {
     throw new StockUnavailableError(`Fixtures for "${brand}" are empty or malformed`);
   }
+  // Snapshots pre-date the { colour, manufacturerColour } shape and store paint as
+  // a bare string, which the pool's shade dictionary cannot read. Idempotent.
+  for (const car of cars) if (car.colour) car.colour = normaliseColour(car.colour);
   fixturesByBrand.set(brand, cars);
   return cars;
 }

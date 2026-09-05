@@ -122,6 +122,8 @@ const CONFETTI_MS = 2400;
 /** Popover width (for the viewport clamp only — the real width is the CSS's). */
 const POP_WIDTH = 300;
 const POP_MARGIN = 8;
+/** Same, for the portalled reject menu (.vm-gw-reject-pop). */
+const REJECT_WIDTH = 220;
 
 /* ------------------------------- the axes ------------------------------- */
 
@@ -634,9 +636,15 @@ function matchAt(pool, i, big) {
       // server/index.js). A card-sized card deserves the bigger variant, so it
       // is reconstructed here rather than sent for all 12,000.
       photo: big ? fullPhoto(photo) : photo,
-      link: pool.linkPrefix && pool.id[i] ? `${pool.linkPrefix}${pool.id[i]}` : null,
+      link: linkOf(pool, i),
     },
   };
+}
+
+/** The advert URL for car `i`, or null when the feed gave no id to build one from
+ *  (the pool ships one prefix rather than 12,000 near-identical URLs). */
+function linkOf(pool, i) {
+  return pool.linkPrefix && pool.id[i] ? `${pool.linkPrefix}${pool.id[i]}` : null;
 }
 
 /** The larger variant of a thumbnail URL, for cards big enough to need one.
@@ -766,6 +774,7 @@ function mount(root, ctx) {
     keep: [], // survivor indices, newest first paint
     layout: null, // { stage, track, gap, cellH }
     pop: null, // { trigger, axis }
+    reject: null, // { trigger, i } — the open tile reject menu, if any
     won: false, // the "one left" celebration has fired
     exitTimer: 0,
     countGen: 0,
@@ -791,6 +800,7 @@ function mount(root, ctx) {
   let pop = null;
   let popTitle = null;
   let popBody = null;
+  let rejectPop = null;
 
   /* ---- error screen (the shared renderStatus pattern, as in podium.js) ---- */
   const showError = (onRetry) => {
@@ -1144,7 +1154,7 @@ function mount(root, ctx) {
    * question has. Putting it in the shared file would mean giving every mode a
    * network dependency for the sake of one filter in one of them.
    *
-   * "Postcode" and "Find" are hardcoded rather than per-brand, on the same
+   * "Postcode" and "Go" are hardcoded rather than per-brand, on the same
    * grounds as the popover's own "Done" button and the filter names above: they
    * name a control, they don't speak in a voice.
    */
@@ -1165,8 +1175,9 @@ function mount(root, ctx) {
     input.placeholder = 'NG1 2AB';
     input.setAttribute('aria-label', 'Postcode');
     input.value = f.origin ? f.origin.postcode : '';
-    const find = el('button', 'vm-gw-place-go', 'Find');
+    const find = el('button', 'vm-gw-place-go', 'Go');
     find.type = 'button';
+    find.setAttribute('aria-label', 'Find postcode');
     row.append(input, find);
 
     const status = el('p', 'vm-gw-place-status');
@@ -1195,7 +1206,7 @@ function mount(root, ctx) {
         if (f.origin) commit(null);
         return;
       }
-      // Already resolved and unchanged: pressing Find again is not a new question.
+      // Already resolved and unchanged: pressing Go again is not a new question.
       if (f.origin && typed.toUpperCase() === f.origin.postcode.toUpperCase()) return;
       find.disabled = true;
       try {
@@ -1265,6 +1276,8 @@ function mount(root, ctx) {
    */
   const paintCell = (node, i, stageKey) => {
     const pool = state.pool;
+    // A repaint discards the button the open menu is anchored to.
+    if (state.reject && node.contains(state.reject.trigger)) closeReject({ refocus: false });
     node.replaceChildren();
     node.className = `vm-gw-cell is-${stageKey}`;
     nodeStage[i] = stageKey;
@@ -1310,13 +1323,24 @@ function mount(root, ctx) {
   };
 
   /** The photo band for a chip or tile — deliberately not mediaWell(), which
-   *  builds a card's full media well with its line label and caption. */
+   *  builds a card's full media well with its line label and caption.
+   *
+   *  A recognisable photo is an invitation to click it, so once one is showing the
+   *  band IS the link to the advert (card stage has matchCard's own CTA instead).
+   *  A blank well stays a div: there is nothing there to have been clicked. */
   const photoFor = (i, big, alt) => {
     const src = state.pool.photo[i];
-    const well = el('div', 'vm-gw-photo');
+    const href = linkOf(state.pool, i);
+    const well = el(src && href ? 'a' : 'div', 'vm-gw-photo');
     if (!src) {
       well.classList.add('is-blank');
       return well;
+    }
+    if (href) {
+      well.href = href;
+      well.target = '_blank';
+      well.rel = 'noopener noreferrer';
+      well.setAttribute('aria-label', `View ${alt} at the retailer`);
     }
     const img = el('img');
     img.src = big ? fullPhoto(src) : src;
@@ -1326,6 +1350,9 @@ function mount(root, ctx) {
     img.addEventListener('error', () => {
       well.classList.add('is-blank');
       img.remove();
+      // Nothing left to have been clicked, so the band stops being a tap target.
+      well.removeAttribute('href');
+      well.removeAttribute('aria-label');
     });
     well.append(img);
     return well;
@@ -1344,23 +1371,15 @@ function mount(root, ctx) {
     const open = el('button', 'vm-reject-open', copy.rejectLabel);
     open.type = 'button';
     open.setAttribute('aria-expanded', 'false');
-    const menu = el('div', 'vm-reject-menu');
-    menu.hidden = true;
     open.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (menu.hidden) {
-        menu.replaceChildren(el('p', 'vm-reject-prompt', copy.rejectPrompt));
-        rejectOptionsFor(i).forEach((o) => {
-          const b = el('button', 'vm-reject-option', o.label);
-          b.type = 'button';
-          b.addEventListener('click', o.apply);
-          menu.append(b);
-        });
-      }
-      menu.hidden = !menu.hidden;
-      open.setAttribute('aria-expanded', String(!menu.hidden));
+      if (state.reject?.trigger === open) closeReject();
+      else openReject(open, i);
     });
-    wrap.append(open, menu);
+    // The menu itself is NOT in here: a tile cell has both overflow: hidden and
+    // paint containment from content-visibility, which clips a child at any
+    // z-index. It lives in one shared layer instead (see openReject).
+    wrap.append(open);
     return wrap;
   };
 
@@ -1901,6 +1920,115 @@ function mount(root, ctx) {
     return out;
   };
 
+  /*
+   * The tile stage's reject menu, in a layer of its own.
+   *
+   * A tile cell clips absolutely everything inside it — overflow: hidden plus the
+   * paint containment that comes with content-visibility: auto, which no z-index
+   * escapes — so a 220px menu hanging off a 128px tile was cut to the tile. One
+   * shared menu is portalled to the shell instead and positioned from the
+   * button's rect, exactly as the filter popover is: same fixed-to-viewport
+   * clamp, same outside-pointerdown and Escape closers, and it overlaps the
+   * neighbouring cars rather than being trimmed by its own.
+   */
+  const buildRejectPop = () => {
+    rejectPop = el('div', 'vm-reject-menu vm-gw-reject-pop');
+    rejectPop.hidden = true;
+    return rejectPop;
+  };
+
+  const openReject = (trigger, i) => {
+    if (state.reject) closeReject({ refocus: false });
+    rejectPop.replaceChildren(el('p', 'vm-reject-prompt', copy.rejectPrompt));
+    rejectOptionsFor(i).forEach((o) => {
+      const b = el('button', 'vm-reject-option', o.label);
+      b.type = 'button';
+      // Close first: applying re-filters the board, which repaints this cell and
+      // throws away the button that is mid-click.
+      b.addEventListener('click', () => { closeReject({ refocus: false }); o.apply(); });
+      rejectPop.append(b);
+    });
+    state.reject = { trigger, i };
+    rejectPop.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    placeReject(trigger);
+    document.addEventListener('keydown', onRejectKey);
+    document.addEventListener('pointerdown', onRejectOutside, true);
+    window.addEventListener('scroll', onRejectShift, true);
+    window.addEventListener('resize', onRejectShift);
+    focusablesIn(rejectPop)[0]?.focus();
+  };
+
+  /** Under the button and right-aligned with it (the button sits in the tile's top
+   *  right), clamped into the viewport, flipped above if it would fall off. */
+  const placeReject = (trigger) => {
+    const r = trigger.getBoundingClientRect?.();
+    if (!r) return;
+    const width = rejectPop.offsetWidth || REJECT_WIDTH;
+    const vw = window.innerWidth || width + POP_MARGIN * 2;
+    const vh = window.innerHeight || 0;
+    let left = r.right - width;
+    left = Math.max(POP_MARGIN, Math.min(left, vw - width - POP_MARGIN));
+    let top = r.bottom + 2;
+    const height = rejectPop.offsetHeight || 0;
+    if (height && vh && top + height > vh - POP_MARGIN) {
+      top = Math.max(POP_MARGIN, r.top - height - 2);
+    }
+    rejectPop.style.left = `${Math.round(left)}px`;
+    rejectPop.style.top = `${Math.round(top)}px`;
+  };
+
+  /* Scrolling keeps the menu with its tile rather than closing it, because the
+     board scrolls under a sticky bar and a menu that vanishes on a stray
+     trackpad nudge reads as a broken control. */
+  const onRejectShift = () => {
+    if (!state.reject) return;
+    if (!state.reject.trigger.isConnected) { closeReject({ refocus: false }); return; }
+    placeReject(state.reject.trigger);
+  };
+
+  const onRejectKey = (e) => {
+    if (!state.reject) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeReject();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    // Trapped: the menu is a sibling of the board now, so untrapped tabbing would
+    // walk out of it into whatever follows the shell.
+    const items = focusablesIn(rejectPop);
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+
+  const onRejectOutside = (e) => {
+    if (!state.reject) return;
+    if (rejectPop.contains(e.target) || state.reject.trigger.contains(e.target)) return;
+    closeReject({ refocus: false });
+  };
+
+  function closeReject({ refocus = true } = {}) {
+    if (!state.reject) return;
+    const { trigger } = state.reject;
+    document.removeEventListener('keydown', onRejectKey);
+    document.removeEventListener('pointerdown', onRejectOutside, true);
+    window.removeEventListener('scroll', onRejectShift, true);
+    window.removeEventListener('resize', onRejectShift);
+    rejectPop.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    state.reject = null;
+    if (refocus) trigger.focus?.();
+  }
+
   /* ---------------------------- the stage ---------------------------- */
 
   const buildStage = () => {
@@ -1947,7 +2075,7 @@ function mount(root, ctx) {
       emptyReset,
     );
 
-    shell.append(barEl, board, emptyEl, buildPopover());
+    shell.append(barEl, board, emptyEl, buildPopover(), buildRejectPop());
     root.append(shell);
   };
 

@@ -132,17 +132,35 @@ export function distanceLabel(distance) {
  * itself. Tiles never call it a second time, but they get it from here anyway
  * — this was two near-identical copies, and the copy the picker didn't use was
  * the copy that quietly stopped matching.
+ *
+ * `link` is opt-in because previewTile's whole tile is already an <a>: baking the
+ * anchor in here would nest one link inside another on every preview tile.
  */
-export function mediaWell(car, extraClass = '') {
-  const media = el('div', `vm-card-media${extraClass ? ` ${extraClass}` : ''}`);
+export function mediaWell(car, extraClass = '', link = null) {
+  const media = el(link ? 'a' : 'div', `vm-card-media${extraClass ? ` ${extraClass}` : ''}`);
+  if (link) { media.target = '_blank'; media.rel = 'noopener noreferrer'; }
   media.append(
     el('span', 'vm-card-soon', 'Images coming soon'),
     el('span', 'vm-card-line', car.line),
   );
 
-  function showPhoto(src) {
+  // Only a live link while a photo is actually showing: an <a> with no href is
+  // inert, so the "coming soon" placeholder never becomes a mystery tap target.
+  const setLink = (href) => {
+    if (!link) return;
+    if (href) {
+      media.href = href;
+      media.setAttribute('aria-label', `View the ${car.name} at the retailer`);
+    } else {
+      media.removeAttribute('href');
+      media.removeAttribute('aria-label');
+    }
+  };
+
+  function showPhoto(src, href = link) {
     media.querySelector('.vm-card-photo')?.remove();
     media.classList.toggle('has-photo', Boolean(src));
+    setLink(src ? href : null);
     if (!src) return;
     const img = el('img', 'vm-card-photo');
     img.src = src;
@@ -153,6 +171,7 @@ export function mediaWell(car, extraClass = '') {
     img.addEventListener('error', () => {
       media.classList.remove('has-photo');
       img.remove();
+      setLink(null);
     });
     // Ahead of the caption and the line label, both of which sit over it.
     media.prepend(img);
@@ -185,7 +204,7 @@ export function matchCard(match, {
   const copy = BRAND_COPY[brandKey] || BRAND_COPY.bmw;
   const card = el('article', `vm-card${big ? ' vm-card-big' : ''}${compact ? ' vm-card-compact' : ''}`);
 
-  const { media, showPhoto } = mediaWell(car);
+  const { media, showPhoto } = mediaWell(car, '', car.link);
   card.append(media);
 
   const body = el('div', 'vm-card-body');
@@ -507,7 +526,7 @@ export function matchCard(match, {
         // Re-describe the card as the chosen car: paint, swatch, price,
         // gearbox, mileage and where the link goes. Anything left showing the
         // previous listing's values is a card describing two cars at once.
-        showPhoto(listing.photo);
+        showPhoto(listing.photo, listing.link || car.link);
         renderSpecs(
           listing.colour, listing.shade, gbp(listing.priceMin),
           listing.transmission ?? car.transmission,

@@ -408,6 +408,10 @@ const KNOCKOUT_COPY = {
 /** Copy for the active brand, BMW as the fallback (matches ctx.brand shape). */
 const copyFor = (brand) => KNOCKOUT_COPY[brand] || KNOCKOUT_COPY.bmw;
 
+/** The matchup card IS the pick <button>, so its photo can't be a link (invalid
+ * nesting, and it would steal the tap). This chip is the advert route instead. */
+const ADVERT_CHIP = 'Details ›';
+
 /** Largest power of two ≤ n (0 for n < 1). Used to snap the shuffled pool to a
  * clean bracket size so every round is a full set of pairings, no byes. */
 function largestPowerOfTwo(n) {
@@ -856,8 +860,10 @@ function mount(root, ctx) {
   };
 
   // One contender card — a lean face-off card (not the swipe stack). `side` is
-  // 'a'|'b' for the fly-out direction of the loser.
+  // 'a'|'b' for the fly-out direction of the loser. Returns a positioning SLOT,
+  // not the card: the advert chip has to live outside the pick <button>.
   const buildContender = (car, side) => {
+    const slot = el('div', `vm-knockout-slot vm-knockout-slot-${side}`);
     const card = el('button', `vm-knockout-card vm-knockout-card-${side}`);
     card.type = 'button';
     card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
@@ -896,7 +902,19 @@ function mount(root, ctx) {
     const [pa, pb] = state.pairings[state.matchIndex];
     const other = car === pa ? pb : pa;
     card.addEventListener('click', () => pick(car, other, side));
-    return card;
+    slot.append(card);
+
+    // The advert chip, pinned to the photo's free top corner (the A/B badge has
+    // the other one). A sibling of the button, so it never swallows a pick.
+    if (car.link) {
+      const chip = el('a', 'vm-knockout-details', ADVERT_CHIP);
+      chip.href = car.link;
+      chip.target = '_blank';
+      chip.rel = 'noopener noreferrer';
+      chip.setAttribute('aria-label', `View the ${car.name} at the retailer`);
+      slot.append(chip);
+    }
+    return slot;
   };
 
   // The "tale of the tape" panel for the current pair, from the per-brand
@@ -1004,8 +1022,10 @@ function mount(root, ctx) {
     if (reducedMotion) { advance(); return; }
     // Fly the loser's card out; the winner's card lifts. Loser side is the
     // opposite of the winner's side (the winner is `side`).
+    // The fly-out moves the SLOT, so the advert chip travels with its card; the
+    // crown is card decoration and stays on the button.
     const cards = root.querySelectorAll('.vm-knockout-card');
-    const loserSel = side === 'a' ? '.vm-knockout-card-b' : '.vm-knockout-card-a';
+    const loserSel = side === 'a' ? '.vm-knockout-slot-b' : '.vm-knockout-slot-a';
     const winnerSel = side === 'a' ? '.vm-knockout-card-a' : '.vm-knockout-card-b';
     root.querySelector(loserSel)?.classList.add(side === 'a' ? 'is-out-right' : 'is-out-left');
     root.querySelector(winnerSel)?.classList.add('is-crowned');
@@ -1075,11 +1095,21 @@ function mount(root, ctx) {
   const buildCrest = (car) => {
     const crest = el('div', 'vm-knockout-crest');
     crest.style.setProperty('--vm-mingle-swatch', swatchFor(car));
-    const disc = el('div', 'vm-knockout-crest-disc');
+    const disc = el(car.photo && car.link ? 'a' : 'div', 'vm-knockout-crest-disc');
     if (car.photo) {
+      if (car.link) {
+        disc.href = car.link;
+        disc.target = '_blank';
+        disc.rel = 'noopener noreferrer';
+        disc.setAttribute('aria-label', `View the ${car.name} at the retailer`);
+      }
       const img = el('img', 'vm-knockout-crest-photo');
       img.src = car.photo; img.alt = car.name || ''; img.loading = 'lazy';
-      img.addEventListener('error', () => { img.remove(); disc.classList.add('no-photo'); });
+      img.addEventListener('error', () => {
+        img.remove();
+        disc.classList.add('no-photo');
+        disc.removeAttribute('href');
+      });
       disc.append(img);
     } else {
       disc.classList.add('no-photo');
@@ -1197,11 +1227,21 @@ function mount(root, ctx) {
     if (!reducedMotion) card.classList.add('is-revealing');
     card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
     card.append(el('div', 'vm-mingle-card-colour'));
-    const media = el('div', 'vm-mingle-card-media');
+    const media = el(car.photo && car.link ? 'a' : 'div', 'vm-mingle-card-media');
     if (car.photo) {
+      if (car.link) {
+        media.href = car.link;
+        media.target = '_blank';
+        media.rel = 'noopener noreferrer';
+        media.setAttribute('aria-label', `View the ${car.name} at the retailer`);
+      }
       const img = el('img', 'vm-mingle-card-photo');
       img.src = car.photo; img.alt = car.name || ''; img.loading = 'lazy';
-      img.addEventListener('error', () => { img.remove(); media.classList.add('no-photo'); });
+      img.addEventListener('error', () => {
+        img.remove();
+        media.classList.add('no-photo');
+        media.removeAttribute('href');
+      });
       media.append(img);
     } else {
       media.classList.add('no-photo');

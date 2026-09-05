@@ -1442,6 +1442,14 @@
   padding: var(--vm-space-4) var(--vm-space-5);
   overflow: hidden;
 }
+/* The band is an <a> to the advert whenever the card has one (see mediaWell), so
+   it must carry no link decoration and still show a keyboard focus ring. */
+a.vm-card-media { color: inherit; text-decoration: none; }
+a.vm-card-media:focus-visible {
+  outline: 2px solid var(--vm-accent);
+  /* Inset, not the house +2px: the card clips, so an outset ring would vanish. */
+  outline-offset: -2px;
+}
 
 /* A 16:9 band is a photo at 880px and a wall at 1184: held to its aspect ratio
    the results hero's media alone was 665px tall, more than a laptop fold, and
@@ -2337,6 +2345,10 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    The easing is the brand token, so MINI's exit carries a touch of spring. */
 .vm-mingle-card-0.is-flying-right { transform: translateX(120%) rotate(20deg); opacity: 0; }
 .vm-mingle-card-0.is-flying-left { transform: translateX(-120%) rotate(-20deg); opacity: 0; }
+/* Invisible but still hit-testable for 280ms, and the photo band is now a link to
+   the car just passed on. Same guard as .vm-gw-cell.is-out. */
+.vm-mingle-card-0.is-flying-right,
+.vm-mingle-card-0.is-flying-left { pointer-events: none; }
 
 /* While a finger is dragging the front card, its transform is set inline (JS),
    so kill the transition — it should track the finger 1:1, not lag behind it. */
@@ -2353,6 +2365,16 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    trap the user's scroll. */
 .vm-mingle-card-0 { cursor: grab; }
 .vm-mingle-card-0.is-draggable { touch-action: none; }
+/* The UA's a:any-link rule puts `pointer` on the photo band, and a declaration
+   matching the element beats the `grab` inherited from the card. Restate it. */
+.vm-mingle-card-0 a.vm-mingle-card-media {
+  cursor: grab;
+  /* A slow swipe is a long press on a link, which iOS answers with the action
+     sheet. The advert is a tap away; here the gesture wins. */
+  -webkit-touch-callout: none;
+}
+.vm-mingle-card-0.is-dragging-keep a.vm-mingle-card-media,
+.vm-mingle-card-0.is-dragging-pass a.vm-mingle-card-media { cursor: grabbing; }
 
 /* Spring back to centre when a drag is released short of the threshold. The
    inline transform is cleared by JS; this transition carries it home (with the
@@ -2408,6 +2430,15 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   flex: 1;
   background: var(--vm-surface-dark);
   overflow: hidden;
+}
+/* An <a> to the advert on the deck card and the result hero (photo-bearing cars
+   only). No link decoration; inset focus ring because the card clips. */
+a.vm-mingle-card-media { color: inherit; text-decoration: none; }
+a.vm-mingle-card-media:focus-visible {
+  /* --vm-accent-spot, like every other ring in these two modes: on MINI plain
+     --vm-accent is near-black, invisible inset over a dark photo. */
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: -2px;
 }
 /* A soft wash of the paint colour over the photo, so the deck reads by colour. */
 .vm-mingle-card-media::after {
@@ -2907,6 +2938,15 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   z-index: 2;
 }
 
+/* Each contender sits in a slot: the grid cell that holds the pick <button> plus
+   the advert chip, which can't live inside a button. The slot is the thing that
+   flies out, so the chip travels with its card. */
+.vm-knockout-slot {
+  position: relative;
+  display: grid;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
 /* A contender is a <button> wrapping the shared .vm-mingle-card-* interior, so
    the whole card is one big tap target. Reset the button, then frame it like a
    deck card. */
@@ -2959,11 +2999,40 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-knockout-card-a .vm-knockout-corner { left: var(--vm-space-2); }
 .vm-knockout-card-b .vm-knockout-corner { right: var(--vm-space-2); }
 
+/* The advert route on the one screen where the photo can't be a link. A themed
+   chip in the photo's free top corner, opposite the A/B badge. */
+.vm-knockout-details {
+  position: absolute;
+  top: var(--vm-space-2);
+  z-index: 2;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  line-height: 1.3;
+  color: var(--vm-accent-spot);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.vm-knockout-details:hover {
+  border-color: var(--vm-accent-spot);
+  background: var(--vm-accent-spot);
+  color: var(--vm-surface);
+}
+.vm-knockout-details:focus-visible { outline: 2px solid var(--vm-accent-spot); outline-offset: 2px; }
+.vm-knockout-slot-a .vm-knockout-details { right: var(--vm-space-2); }
+.vm-knockout-slot-b .vm-knockout-details { left: var(--vm-space-2); }
+/* Picks are locked by disabling the buttons; the chip has to go inert with them. */
+.vm-knockout-card:disabled ~ .vm-knockout-details { pointer-events: none; }
+
 /* Pick fly-out: the loser leaves in its side's direction, the winner lifts and
    fades as the round advances. ~0.3s, matched to the 300ms JS timer. Gated on
    reduced-motion below. */
-.vm-knockout-card.is-out-left { transform: translateX(-60%) rotate(-8deg); opacity: 0; }
-.vm-knockout-card.is-out-right { transform: translateX(60%) rotate(8deg); opacity: 0; }
+.vm-knockout-slot.is-out-left { transform: translateX(-60%) rotate(-8deg); opacity: 0; }
+.vm-knockout-slot.is-out-right { transform: translateX(60%) rotate(8deg); opacity: 0; }
 .vm-knockout-card.is-crowned {
   border-color: var(--vm-accent-spot);
   box-shadow: 0 0 0 2px var(--vm-accent-spot);
@@ -3054,6 +3123,14 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   justify-content: center;
   position: relative;
 }
+/* The disc is an <a> to the advert when the finalist has one. */
+a.vm-knockout-crest-disc { color: inherit; text-decoration: none; }
+/* Outset, unlike the card wells: an element's own overflow never clips its own
+   outline, and no ancestor of the crest clips either. */
+a.vm-knockout-crest-disc:focus-visible {
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: 2px;
+}
 .vm-knockout-crest-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .vm-knockout-crest-name {
   font-family: var(--vm-font-bold);
@@ -3099,9 +3176,10 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    The Final interstitial still SHOWS (it's content — the round change must stay
    legible) but doesn't animate in; the sweep is skipped in JS entirely. --- */
 @media (prefers-reduced-motion: reduce) {
-  .vm-knockout-card { transition: none; }
-  .vm-knockout-card.is-out-left,
-  .vm-knockout-card.is-out-right { transform: none; opacity: 0; }
+  .vm-knockout-card,
+  .vm-knockout-slot { transition: none; }
+  .vm-knockout-slot.is-out-left,
+  .vm-knockout-slot.is-out-right { transform: none; opacity: 0; }
   .vm-knockout-card.is-crowned { box-shadow: none; }
   .vm-knockout-verdict { animation: none; }
   .vm-knockout-sweep { animation: none; }
@@ -3662,6 +3740,8 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
 .vm-podium-tail-grid > .is-dismissed {
   opacity: 0;
   transform: scale(0.93);
+  /* Faded to nothing but live for another 350ms, and its photo now links out. */
+  pointer-events: none;
 }
 
 /* ---------------------------- "not this one" ------------------------- */
@@ -4200,6 +4280,14 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   background: var(--vm-surface-alt);
   overflow: hidden;
 }
+/* The band is an <a> whenever the car has an advert (see photoFor), so it has to
+   carry no link decoration and still show a keyboard focus ring. */
+a.vm-gw-photo { color: inherit; text-decoration: none; }
+a.vm-gw-photo:focus-visible {
+  outline: 2px solid var(--vm-accent);
+  /* Inset, not the house +2px: the cell clips, so an outset ring would vanish. */
+  outline-offset: -2px;
+}
 .vm-gw-photo img {
   width: 100%;
   height: 100%;
@@ -4265,17 +4353,24 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    buttons is a page that looks like it wants you to leave. Focus-within keeps
    it fully reachable by keyboard, where there is no hover to depend on. */
 .vm-gw-cell:hover .vm-gw-reject .vm-reject-open,
-.vm-gw-cell:focus-within .vm-gw-reject .vm-reject-open { opacity: 1; }
-.vm-gw-reject .vm-reject-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 3;
+.vm-gw-cell:focus-within .vm-gw-reject .vm-reject-open,
+/* Its menu is open and the pointer has left the tile: the button has to stay,
+   or the menu is anchored to nothing. */
+.vm-gw-reject .vm-reject-open[aria-expanded='true'] { opacity: 1; }
+/* The menu is not a child of the tile: it is portalled to the shell and placed
+   from the button's rect (see openReject), because a tile cell's overflow and
+   paint containment clip a descendant at any z-index. Fixed, like .vm-gw-pop,
+   and in the same z-index band under it. */
+.vm-gw-reject-pop {
+  position: fixed;
+  z-index: 49;
   width: 220px;
-  margin-top: 2px;
+  max-width: calc(100vw - 16px);
+  margin-top: 0;
   border: var(--vm-border-width) solid var(--vm-line);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
 }
+.vm-gw-reject-pop[hidden] { display: none; }
 
 /* --- card stage: the shared card, shorter than the podium's --- */
 
@@ -4400,14 +4495,16 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   font-family: var(--vm-font-bold);
   font-weight: 700;
   font-size: var(--vm-text-label);
-  color: var(--vm-ink);
-  background: var(--vm-surface-dark);
-  border: var(--vm-border-width) solid var(--vm-line);
+  /* On the accent, not on --vm-surface-dark: that token equals --vm-ink on most
+     brands, so the label was drawn in its own background colour. */
+  color: var(--vm-accent-ink);
+  background: var(--vm-accent);
+  border: var(--vm-border-width) solid var(--vm-accent);
   /* -control, not -radius: this is a button, and MINI's buttons are pills. */
   border-radius: var(--vm-radius-control);
   cursor: pointer;
 }
-.vm-gw-place-go:hover { border-color: var(--vm-ink); }
+.vm-gw-place-go:hover { filter: brightness(1.08); }
 /* Disabled only for the moment a lookup is in flight, so this is a "working on
    it" state rather than a permanent one: dimmed, but the label stays readable. */
 .vm-gw-place-go:disabled {

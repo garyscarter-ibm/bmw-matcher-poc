@@ -27,7 +27,7 @@ import {
   installDom, resetDom, startModeServer, loadMode, mountMode, settle,
 } from './dom-harness.js';
 import {
-  bmwPool, miniPool, hondaPool, fordPool, motorradPool, ferrariPool,
+  bmwPool, miniPool, hondaPool, fordPool, motorradPool, ferrariPool, post,
 } from './helpers.js';
 
 // Brands under render test, each with a stock pool and the marque name. The
@@ -390,4 +390,107 @@ test('no em dashes in any string literal across the client copy surface', () => 
     offenders.length, 0,
     `em dash in user-facing copy (house rule):\n${offenders.join('\n')}`,
   );
+});
+
+/*
+ * The photo band is a link to the advert, in every mode, and exactly one hop deep.
+ *
+ * mediaWell takes its link as an opt-in argument because previewTile's whole tile
+ * is already an <a>. The reason that needs a test: createElement + appendChild does
+ * NOT unnest an <a> inside an <a> the way the HTML parser does, so a nested link
+ * sits happily in the DOM and only shows up in a browser, as a tap target that
+ * navigates to the wrong car. Same for a link inside the knockout's pick <button>,
+ * which is why the advert chip there is a sibling of the button, not a child.
+ */
+const LINK_BRIEF = {
+  budget: [10000, 60000], bodyStyles: ['suv'], fuel: ['open'], charging: 'none',
+  primaryUse: 'family', people: 'family', priorities: ['comfort'],
+};
+
+const loadResultCard = () => import(
+  new URL('../../blocks/vehicle-matcher/modes/result-card.js', import.meta.url)
+);
+
+// Every flavour of invalid interactive nesting. The browser resolves all three by
+// breaking the inner control, so each is a silently dead or misdirected tap.
+function badNesting(root) {
+  const hits = [];
+  const name = (n) => `${n.tagName.toLowerCase()}.${n.className || '(no class)'}`;
+  for (const a of root.querySelectorAll('a')) {
+    if (a.parentElement?.closest('a')) hits.push(`a inside a: ${name(a)}`);
+    if (a.parentElement?.closest('button')) hits.push(`a inside button: ${name(a)}`);
+  }
+  for (const b of root.querySelectorAll('button')) {
+    if (b.parentElement?.closest('a')) hits.push(`button inside a: ${name(b)}`);
+  }
+  return hits;
+}
+
+test('a card photo band links to the advert, and the preview tile does not double up', async () => {
+  const { json } = await post(server.base, '/api/match', { answers: LINK_BRIEF, brand: 'bmw' });
+  const match = json.matches[0];
+  assert.ok(match.car.link, 'the fixture car has no link, so this test would prove nothing');
+  assert.ok(match.car.photo, 'the fixture car has no photo, so the band would be inert');
+
+  const { matchCard, previewTile } = await loadResultCard();
+
+  const card = matchCard(match, { brand: 'bmw' });
+  const well = card.querySelector('.vm-card-media');
+  assert.equal(well.tagName, 'A', 'a card with a photo and a link must have a linked photo band');
+  assert.match(well.getAttribute('href'), /^https?:\/\//, 'the band linked somewhere unusable');
+  assert.equal(well.getAttribute('target'), '_blank');
+  assert.match(well.getAttribute('rel') || '', /noopener/, 'a _blank link needs noopener');
+  assert.match(well.getAttribute('rel') || '', /noreferrer/, 'a _blank link needs noreferrer');
+  assert.ok(well.getAttribute('aria-label'), 'an image-only link needs its own accessible name');
+  assert.deepEqual(badNesting(card), [], 'matchCard nested an interactive element');
+
+  // The tile is the link; its well must stay a plain div or the two fight.
+  const tile = previewTile(match);
+  assert.equal(tile.tagName, 'A', 'a preview tile with a link must be the tap target');
+  assert.equal(
+    tile.querySelector('.vm-card-media').tagName, 'DIV',
+    'previewTile opted into mediaWell\'s link: the tile now holds a link inside a link',
+  );
+  assert.deepEqual(badNesting(tile), [], 'previewTile nested an interactive element');
+});
+
+// A card with no photo still builds the anchor (the photo can arrive later, from
+// the listing picker), so the guard is the href: an <a> with none is inert, and
+// the "Images coming soon" placeholder never becomes a mystery tap target.
+test('a photo-less card carries no live link', async () => {
+  const { json } = await post(server.base, '/api/match', { answers: LINK_BRIEF, brand: 'bmw' });
+  const match = json.matches[0];
+  const { matchCard } = await loadResultCard();
+
+  const card = matchCard({
+    ...match,
+    car: { ...match.car, photo: null },
+    listings: (match.listings || []).map((l) => ({ ...l, photo: null })),
+  }, { brand: 'bmw' });
+
+  const well = card.querySelector('.vm-card-media');
+  assert.equal(well.hasAttribute('href'), false, 'an empty photo band linked out');
+  assert.equal(well.hasAttribute('aria-label'), false, 'an inert band claimed an accessible name');
+  assert.equal(well.classList.contains('has-photo'), false);
+});
+
+test('no painted mode nests a link inside another link or a button', async () => {
+  let linked = 0;
+  for (const mode of MODES) {
+    for (const brand of BRANDS) {
+      resetDom();
+      // eslint-disable-next-line no-await-in-loop
+      const stage = mountMode(modes[mode], { base: server.base, brand: brand.key });
+      // eslint-disable-next-line no-await-in-loop
+      await settle(stage, (s) => s.textContent.replace(/\s/g, '').length > 20);
+      assert.deepEqual(
+        badNesting(stage), [],
+        `${mode}/${brand.key} painted invalid interactive nesting`,
+      );
+      linked += stage.querySelectorAll('a[href]').length;
+    }
+  }
+  // Only the first screen of each mode is painted here, and Guess Who is the one
+  // that shows cars straight away. If it stops, this scan is checking nothing.
+  assert.ok(linked > 0, 'no painted screen had a link at all, so this proved nothing');
 });

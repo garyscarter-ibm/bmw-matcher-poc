@@ -719,6 +719,9 @@ function mount(root, ctx) {
         card.style.transform = '';
         card.style.removeProperty('--vm-drag-stamp');
       }
+      // The peeking cards are all but hidden behind the front one, so their photo
+      // links must leave the tab order. Reset on promotion, hence every render.
+      card.inert = depth > 0;
       stack.append(card);
     });
     // Forget cards that have left the visible window so the map stays bounded.
@@ -801,13 +804,27 @@ function mount(root, ctx) {
     // Colour bar across the top + tinted media (§11.4).
     card.append(el('div', 'vm-mingle-card-colour'));
 
-    const media = el('div', 'vm-mingle-card-media');
+    const media = el(car.photo && car.link ? 'a' : 'div', 'vm-mingle-card-media');
     if (car.photo) {
+      if (car.link) {
+        media.href = car.link;
+        media.target = '_blank';
+        media.rel = 'noopener noreferrer';
+        media.setAttribute('aria-label', `View the ${car.name} at the retailer`);
+        // A mouse drag on a link or an image starts a native link/image drag,
+        // which kills the swipe mid-gesture. Opt both out.
+        media.draggable = false;
+      }
       const img = el('img', 'vm-mingle-card-photo');
       img.src = car.photo;
       img.alt = car.name;
       img.loading = 'lazy';
-      img.addEventListener('error', () => { img.remove(); media.classList.add('no-photo'); });
+      img.draggable = false;
+      img.addEventListener('error', () => {
+        img.remove();
+        media.classList.add('no-photo');
+        media.removeAttribute('href');
+      });
       media.append(img);
     } else {
       media.classList.add('no-photo');
@@ -933,6 +950,9 @@ function mount(root, ctx) {
     let startT = 0;
     let dx = 0;
     let dragging = false;
+    // A drag ends in a click, and the photo band is now a link to the advert — so
+    // a swipe would navigate. Set on any real movement, consumed by the guard below.
+    let suppressClick = false;
     // Mark the card as an active swipe surface. The CSS `touch-action: none`
     // that stops the page scrolling mid-swipe is scoped to THIS class, so it
     // only applies when a drag handler is actually attached — under reduced
@@ -964,6 +984,8 @@ function mount(root, ctx) {
     const onUp = (e) => {
       if (!dragging) return;
       cleanup();
+      // Same 8px as the stamp threshold: below it the gesture was a tap, not a drag.
+      suppressClick = Math.abs(dx) > 8;
       const elapsed = (e.timeStamp || 0) - startT;
       const flick = Math.abs(dx) > 48 && elapsed < 250;
       const past = Math.abs(dx) >= threshold() || flick;
@@ -985,10 +1007,19 @@ function mount(root, ctx) {
       }
     };
 
+    // Capture phase, so a drag is swallowed before the photo link sees the click.
+    card.addEventListener('click', (e) => {
+      if (!suppressClick) return;
+      suppressClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
+
     card.addEventListener('pointerdown', (e) => {
       // Ignore secondary buttons and any pull once a swipe is mid-flight.
       if (state.busy || (e.button && e.button !== 0)) return;
       dragging = true;
+      suppressClick = false;
       startX = e.clientX;
       startT = e.timeStamp || 0;
       dx = 0;
@@ -1121,11 +1152,21 @@ function mount(root, ctx) {
     if (!reducedMotion) card.classList.add('is-revealing');
     card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
     card.append(el('div', 'vm-mingle-card-colour'));
-    const media = el('div', 'vm-mingle-card-media');
+    const media = el(car.photo && car.link ? 'a' : 'div', 'vm-mingle-card-media');
     if (car.photo) {
+      if (car.link) {
+        media.href = car.link;
+        media.target = '_blank';
+        media.rel = 'noopener noreferrer';
+        media.setAttribute('aria-label', `View the ${car.name} at the retailer`);
+      }
       const img = el('img', 'vm-mingle-card-photo');
       img.src = car.photo; img.alt = car.name; img.loading = 'lazy';
-      img.addEventListener('error', () => { img.remove(); media.classList.add('no-photo'); });
+      img.addEventListener('error', () => {
+        img.remove();
+        media.classList.add('no-photo');
+        media.removeAttribute('href');
+      });
       media.append(img);
     } else {
       media.classList.add('no-photo');
