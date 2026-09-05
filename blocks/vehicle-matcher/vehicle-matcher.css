@@ -4274,16 +4274,20 @@ a.vm-gw-photo:focus-visible {
    it fully reachable by keyboard, where there is no hover to depend on. */
 .vm-gw-cell:hover .vm-gw-reject .vm-reject-open,
 .vm-gw-cell:focus-within .vm-gw-reject .vm-reject-open { opacity: 1; }
-.vm-gw-reject .vm-reject-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 3;
+/* The menu is not a child of the tile: it is portalled to the shell and placed
+   from the button's rect (see openReject), because a tile cell's overflow and
+   paint containment clip a descendant at any z-index. Fixed, like .vm-gw-pop,
+   and in the same z-index band under it. */
+.vm-gw-reject-pop {
+  position: fixed;
+  z-index: 49;
   width: 220px;
-  margin-top: 2px;
+  max-width: calc(100vw - 16px);
+  margin-top: 0;
   border: var(--vm-border-width) solid var(--vm-line);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
 }
+.vm-gw-reject-pop[hidden] { display: none; }
 
 /* --- card stage: the shared card, shorter than the podium's --- */
 
