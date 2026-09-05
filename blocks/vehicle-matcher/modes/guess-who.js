@@ -1276,6 +1276,8 @@ function mount(root, ctx) {
    */
   const paintCell = (node, i, stageKey) => {
     const pool = state.pool;
+    // A repaint discards the button the open menu is anchored to.
+    if (state.reject && node.contains(state.reject.trigger)) closeReject({ refocus: false });
     node.replaceChildren();
     node.className = `vm-gw-cell is-${stageKey}`;
     nodeStage[i] = stageKey;
