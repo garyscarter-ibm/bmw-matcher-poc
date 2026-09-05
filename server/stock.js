@@ -451,6 +451,9 @@ function loadFixtures(brand) {
   if (!Array.isArray(cars) || cars.length === 0) {
     throw new StockUnavailableError(`Fixtures for "${brand}" are empty or malformed`);
   }
+  // Snapshots pre-date the { colour, manufacturerColour } shape and store paint as
+  // a bare string, which the pool's shade dictionary cannot read. Idempotent.
+  for (const car of cars) if (car.colour) car.colour = normaliseColour(car.colour);
   fixturesByBrand.set(brand, cars);
   return cars;
 }
