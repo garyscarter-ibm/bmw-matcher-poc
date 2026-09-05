@@ -2073,7 +2073,7 @@ function mount(root, ctx) {
       emptyReset,
     );
 
-    shell.append(barEl, board, emptyEl, buildPopover());
+    shell.append(barEl, board, emptyEl, buildPopover(), buildRejectPop());
     root.append(shell);
   };
 
