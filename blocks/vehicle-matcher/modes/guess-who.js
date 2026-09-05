@@ -1341,9 +1341,6 @@ function mount(root, ctx) {
       well.target = '_blank';
       well.rel = 'noopener noreferrer';
       well.setAttribute('aria-label', `View ${alt} at the retailer`);
-      // The tile's own "not this one" sits over this band; a click there is a
-      // rejection, not a visit.
-      well.addEventListener('click', (e) => e.stopPropagation());
     }
     const img = el('img');
     img.src = big ? fullPhoto(src) : src;
