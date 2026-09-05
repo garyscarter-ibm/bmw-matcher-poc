@@ -93,6 +93,12 @@ real EDS page gets it transitively. `demo-chrome.css` styles the demo homepage/p
   (predicates can't cross JSON, so `/api/questions` strips them and the client re-applies).
 - **Counts are server-owned:** `TOP_MATCHES` and the question set ship via `/api/questions` so
   intro copy states numbers without a block rebuild — don't hardcode them client-side.
+- **No client may name a question id that a brand can drop.** `brands.js` diverges question sets
+  per brand (`questions: { drop, add }`), so any hardcoded id is a bug waiting for the brand that
+  drops it. The game modes' seed rows are the worked example: `seedQuestionIds` (`server/questions.js`)
+  decides and ships the pair on `/api/questions`, and the client mirror in `modes/match-signal.js`
+  only re-derives against an older API. MINI is why — it drops `primaryUse` for `miniVibe`, and the
+  seed's hardcoded `primaryUse` left a start button nothing on screen could enable.
 - **`?scope=` and the Retailer Name row must agree.** `?scope=dealer|national` (default
   **dealer**) chooses the pool: one branch's forecourt, or every retailer of the brand.
   Only BMW and MINI have two pools (`source: 'feed'` in `brands.js`); the other four run a

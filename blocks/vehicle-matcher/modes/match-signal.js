@@ -9,7 +9,7 @@
  *   - display: SHADE_HEX / swatchFor / priceLabel / gbpShort / cap
  *   - deck:    shuffle
  *   - reading: modal / rankByFrequency
- *   - seed:    budgetBandsFromQuestion / useTilesFromQuestion
+ *   - seed:    seedQuestionIds / budgetBandsFromQuestion / tilesFromQuestion
  *   - infer:   swipesToAnswers (swipe) / bracketToAnswers (knockout)
  *   - reveal:  celebrate (the shared confetti crescendo)
  *
@@ -79,14 +79,38 @@ export function budgetBandsFromQuestion(budgetQ) {
 export const gbpShort = (n) => (n % 1000 === 0 ? `£${n / 1000}k` : gbp(n));
 
 /**
- * The `primaryUse` options as the seed's "what's it for" tiles, taken straight
- * from the engine so the labels/subs are the brand's own (MINI's "Nipping round
- * town", BMW's "City driving") and any brand-excluded option is already gone.
- * Returns [{ value, label, sub }]. Falls back to an empty list if the question
- * is missing — the caller guards on that.
+ * A question's options as one-tap seed tiles, taken straight from the engine so
+ * the labels/subs are the brand's own (MINI's "Nipping round town", BMW's "City
+ * driving") and any brand-excluded option is already gone. Returns
+ * [{ value, label, sub }], empty when the question is missing.
  */
-export function useTilesFromQuestion(useQ) {
-  return (useQ?.options || []).map((o) => ({ value: o.value, label: o.label, sub: o.sub }));
+export function tilesFromQuestion(q) {
+  return (q?.options || []).map((o) => ({ value: o.value, label: o.label, sub: o.sub }));
+}
+
+/**
+ * Which two questions the seed screen asks: the budget, and ONE "what's it for".
+ *
+ * The server decides (seedQuestionIds in server/questions.js) and ships the
+ * answer on /api/questions, because which questions a brand asks is the
+ * registry's call. This picks that up and only re-derives when the field is
+ * absent, i.e. against an older API — the two halves deploy separately.
+ *
+ * MINI is why this isn't a hardcoded 'primaryUse': it drops that question for
+ * `miniVibe`, so a seed naming primaryUse painted an empty tile row and a start
+ * button nothing could enable. The fallback rule below mirrors the server's, and
+ * brand.test.js asserts the two agree for every brand.
+ */
+export function seedQuestionIds(questions, fromServer) {
+  const set = Array.isArray(questions) ? questions : [];
+  if (Array.isArray(fromServer) && fromServer.length) {
+    return fromServer.filter((id) => set.some((q) => q.id === id));
+  }
+  // Options, single-choice, unconditional: the only shape a tile row can render.
+  const seedable = (q) => q.options && !q.multi && !q.conditional;
+  const taste = set.find((q) => q.id === 'primaryUse' && seedable(q))
+    || set.find((q) => q.id !== 'budget' && seedable(q));
+  return [set.some((q) => q.id === 'budget') && 'budget', taste?.id].filter(Boolean);
 }
 
 /** In-place Fisher–Yates. Math.random is fine — this is the game surface, not

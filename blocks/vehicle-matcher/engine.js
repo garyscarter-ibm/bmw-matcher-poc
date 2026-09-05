@@ -57,7 +57,9 @@ export async function apiGetQuestions(base, retailer, brandKey) {
   if (res.status === 401) onUnauthorized();
   if (!res.ok) throw new Error(`Questions request failed (${res.status})`);
   const data = await res.json();
-  return { questions: data.questions };
+  // seedQuestions names the two the game modes' seed screen asks (see
+  // seedQuestionIds in server/questions.js); absent on an older API.
+  return { questions: data.questions, seedQuestions: data.seedQuestions };
 }
 
 /** The configured retailer's ranked matches for a set of answers. Throws on
