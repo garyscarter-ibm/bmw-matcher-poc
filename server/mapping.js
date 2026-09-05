@@ -678,7 +678,7 @@ export function mapHondaRaw(raw) {
     // power in bhp, and engine capacity in cc. Surfaced verbatim from the feed
     // (odd casing/typos in the source colour strings are left as-is here; the
     // card layer handles display), so a card can state them as the car's own.
-    colour: raw.colour || undefined,
+    colour: normaliseColour(raw.colour),
     power: num(raw.bhp) || undefined,
     cc: num(raw.cc) || undefined,
     // Registration year/date power the swipe card's "N years old" frame; where
