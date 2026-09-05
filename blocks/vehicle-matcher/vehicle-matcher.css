@@ -2345,6 +2345,10 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    The easing is the brand token, so MINI's exit carries a touch of spring. */
 .vm-mingle-card-0.is-flying-right { transform: translateX(120%) rotate(20deg); opacity: 0; }
 .vm-mingle-card-0.is-flying-left { transform: translateX(-120%) rotate(-20deg); opacity: 0; }
+/* Invisible but still hit-testable for 280ms, and the photo band is now a link to
+   the car just passed on. Same guard as .vm-gw-cell.is-out. */
+.vm-mingle-card-0.is-flying-right,
+.vm-mingle-card-0.is-flying-left { pointer-events: none; }
 
 /* While a finger is dragging the front card, its transform is set inline (JS),
    so kill the transition — it should track the finger 1:1, not lag behind it. */
