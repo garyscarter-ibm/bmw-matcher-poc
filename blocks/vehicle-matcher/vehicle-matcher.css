@@ -2983,11 +2983,40 @@ a.vm-mingle-card-media:focus-visible {
 .vm-knockout-card-a .vm-knockout-corner { left: var(--vm-space-2); }
 .vm-knockout-card-b .vm-knockout-corner { right: var(--vm-space-2); }
 
+/* The advert route on the one screen where the photo can't be a link. A themed
+   chip in the photo's free top corner, opposite the A/B badge. */
+.vm-knockout-details {
+  position: absolute;
+  top: var(--vm-space-2);
+  z-index: 2;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--vm-surface);
+  border: var(--vm-border-width) solid var(--vm-line);
+  font-family: var(--vm-font-bold);
+  font-weight: 700;
+  font-size: var(--vm-text-label);
+  line-height: 1.3;
+  color: var(--vm-accent-spot);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.vm-knockout-details:hover {
+  border-color: var(--vm-accent-spot);
+  background: var(--vm-accent-spot);
+  color: var(--vm-surface);
+}
+.vm-knockout-details:focus-visible { outline: 2px solid var(--vm-accent-spot); outline-offset: 2px; }
+.vm-knockout-slot-a .vm-knockout-details { right: var(--vm-space-2); }
+.vm-knockout-slot-b .vm-knockout-details { left: var(--vm-space-2); }
+/* Picks are locked by disabling the buttons; the chip has to go inert with them. */
+.vm-knockout-card:disabled ~ .vm-knockout-details { pointer-events: none; }
+
 /* Pick fly-out: the loser leaves in its side's direction, the winner lifts and
    fades as the round advances. ~0.3s, matched to the 300ms JS timer. Gated on
    reduced-motion below. */
-.vm-knockout-card.is-out-left { transform: translateX(-60%) rotate(-8deg); opacity: 0; }
-.vm-knockout-card.is-out-right { transform: translateX(60%) rotate(8deg); opacity: 0; }
+.vm-knockout-slot.is-out-left { transform: translateX(-60%) rotate(-8deg); opacity: 0; }
+.vm-knockout-slot.is-out-right { transform: translateX(60%) rotate(8deg); opacity: 0; }
 .vm-knockout-card.is-crowned {
   border-color: var(--vm-accent-spot);
   box-shadow: 0 0 0 2px var(--vm-accent-spot);
