@@ -902,7 +902,19 @@ function mount(root, ctx) {
     const [pa, pb] = state.pairings[state.matchIndex];
     const other = car === pa ? pb : pa;
     card.addEventListener('click', () => pick(car, other, side));
-    return card;
+    slot.append(card);
+
+    // The advert chip, pinned to the photo's free top corner (the A/B badge has
+    // the other one). A sibling of the button, so it never swallows a pick.
+    if (car.link) {
+      const chip = el('a', 'vm-knockout-details', ADVERT_CHIP);
+      chip.href = car.link;
+      chip.target = '_blank';
+      chip.rel = 'noopener noreferrer';
+      chip.setAttribute('aria-label', `View the ${car.name} at the retailer`);
+      slot.append(chip);
+    }
+    return slot;
   };
 
   // The "tale of the tape" panel for the current pair, from the per-brand
