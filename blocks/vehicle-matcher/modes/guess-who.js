@@ -774,6 +774,7 @@ function mount(root, ctx) {
     keep: [], // survivor indices, newest first paint
     layout: null, // { stage, track, gap, cellH }
     pop: null, // { trigger, axis }
+    reject: null, // { trigger, i } — the open tile reject menu, if any
     won: false, // the "one left" celebration has fired
     exitTimer: 0,
     countGen: 0,
