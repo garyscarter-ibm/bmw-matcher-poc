@@ -1350,6 +1350,9 @@ function mount(root, ctx) {
     img.addEventListener('error', () => {
       well.classList.add('is-blank');
       img.remove();
+      // Nothing left to have been clicked, so the band stops being a tap target.
+      well.removeAttribute('href');
+      well.removeAttribute('aria-label');
     });
     well.append(img);
     return well;
