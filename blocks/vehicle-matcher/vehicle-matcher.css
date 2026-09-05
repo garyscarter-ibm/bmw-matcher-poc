@@ -2435,7 +2435,9 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    only). No link decoration; inset focus ring because the card clips. */
 a.vm-mingle-card-media { color: inherit; text-decoration: none; }
 a.vm-mingle-card-media:focus-visible {
-  outline: 2px solid var(--vm-accent);
+  /* --vm-accent-spot, like every other ring in these two modes: on MINI plain
+     --vm-accent is near-black, invisible inset over a dark photo. */
+  outline: 2px solid var(--vm-accent-spot);
   outline-offset: -2px;
 }
 /* A soft wash of the paint colour over the photo, so the deck reads by colour. */
