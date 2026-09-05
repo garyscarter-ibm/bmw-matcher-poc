@@ -1442,6 +1442,14 @@
   padding: var(--vm-space-4) var(--vm-space-5);
   overflow: hidden;
 }
+/* The band is an <a> to the advert whenever the card has one (see mediaWell), so
+   it must carry no link decoration and still show a keyboard focus ring. */
+a.vm-card-media { color: inherit; text-decoration: none; }
+a.vm-card-media:focus-visible {
+  outline: 2px solid var(--vm-accent);
+  /* Inset, not the house +2px: the card clips, so an outset ring would vanish. */
+  outline-offset: -2px;
+}
 
 /* A 16:9 band is a photo at 880px and a wall at 1184: held to its aspect ratio
    the results hero's media alone was 665px tall, more than a laptop fold, and
