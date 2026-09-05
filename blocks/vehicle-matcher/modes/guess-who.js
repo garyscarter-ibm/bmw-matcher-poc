@@ -1165,8 +1165,9 @@ function mount(root, ctx) {
     input.placeholder = 'NG1 2AB';
     input.setAttribute('aria-label', 'Postcode');
     input.value = f.origin ? f.origin.postcode : '';
-    const find = el('button', 'vm-gw-place-go', 'Find');
+    const find = el('button', 'vm-gw-place-go', 'Go');
     find.type = 'button';
+    find.setAttribute('aria-label', 'Find postcode');
     row.append(input, find);
 
     const status = el('p', 'vm-gw-place-status');
