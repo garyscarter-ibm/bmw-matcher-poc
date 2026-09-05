@@ -1022,8 +1022,10 @@ function mount(root, ctx) {
     if (reducedMotion) { advance(); return; }
     // Fly the loser's card out; the winner's card lifts. Loser side is the
     // opposite of the winner's side (the winner is `side`).
+    // The fly-out moves the SLOT, so the advert chip travels with its card; the
+    // crown is card decoration and stays on the button.
     const cards = root.querySelectorAll('.vm-knockout-card');
-    const loserSel = side === 'a' ? '.vm-knockout-card-b' : '.vm-knockout-card-a';
+    const loserSel = side === 'a' ? '.vm-knockout-slot-b' : '.vm-knockout-slot-a';
     const winnerSel = side === 'a' ? '.vm-knockout-card-a' : '.vm-knockout-card-b';
     root.querySelector(loserSel)?.classList.add(side === 'a' ? 'is-out-right' : 'is-out-left');
     root.querySelector(winnerSel)?.classList.add('is-crowned');
