@@ -3125,10 +3125,11 @@ a.vm-mingle-card-media:focus-visible {
 }
 /* The disc is an <a> to the advert when the finalist has one. */
 a.vm-knockout-crest-disc { color: inherit; text-decoration: none; }
+/* Outset, unlike the card wells: an element's own overflow never clips its own
+   outline, and no ancestor of the crest clips either. */
 a.vm-knockout-crest-disc:focus-visible {
-  outline: 2px solid var(--vm-accent);
-  /* Inset: the disc is a clipped 999px circle, an outset ring would be cut. */
-  outline-offset: -2px;
+  outline: 2px solid var(--vm-accent-spot);
+  outline-offset: 2px;
 }
 .vm-knockout-crest-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .vm-knockout-crest-name {
