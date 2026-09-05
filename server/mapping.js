@@ -960,7 +960,7 @@ export function mapFordRaw(raw) {
     // the car's own exterior colour, its full-service-history flag ("Yes"/"No"
     // string), and previous-owner count. Each describes THIS car, not the model,
     // and is only set when the source carried it — no invented defaults.
-    colour: raw?.colour || undefined,
+    colour: normaliseColour(raw?.colour),
     fullServiceHistory: raw?.fullServiceHistory || undefined,
     previousOwners: raw?.previousOwners || undefined,
     // Prefer the REAL per-listing dealer (VendorName, e.g. "Lawtons of Tadcaster")
