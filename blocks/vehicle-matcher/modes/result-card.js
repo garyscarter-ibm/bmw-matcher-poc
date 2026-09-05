@@ -133,16 +133,31 @@ export function distanceLabel(distance) {
  * — this was two near-identical copies, and the copy the picker didn't use was
  * the copy that quietly stopped matching.
  */
-export function mediaWell(car, extraClass = '') {
-  const media = el('div', `vm-card-media${extraClass ? ` ${extraClass}` : ''}`);
+export function mediaWell(car, extraClass = '', link = null) {
+  const media = el(link ? 'a' : 'div', `vm-card-media${extraClass ? ` ${extraClass}` : ''}`);
+  if (link) { media.target = '_blank'; media.rel = 'noopener noreferrer'; }
   media.append(
     el('span', 'vm-card-soon', 'Images coming soon'),
     el('span', 'vm-card-line', car.line),
   );
 
-  function showPhoto(src) {
+  // Only a live link while a photo is actually showing: an <a> with no href is
+  // inert, so the "coming soon" placeholder never becomes a mystery tap target.
+  const setLink = (href) => {
+    if (!link) return;
+    if (href) {
+      media.href = href;
+      media.setAttribute('aria-label', `View the ${car.name} at the retailer`);
+    } else {
+      media.removeAttribute('href');
+      media.removeAttribute('aria-label');
+    }
+  };
+
+  function showPhoto(src, href = link) {
     media.querySelector('.vm-card-photo')?.remove();
     media.classList.toggle('has-photo', Boolean(src));
+    setLink(src ? href : null);
     if (!src) return;
     const img = el('img', 'vm-card-photo');
     img.src = src;
@@ -153,6 +168,7 @@ export function mediaWell(car, extraClass = '') {
     img.addEventListener('error', () => {
       media.classList.remove('has-photo');
       img.remove();
+      setLink(null);
     });
     // Ahead of the caption and the line label, both of which sit over it.
     media.prepend(img);
