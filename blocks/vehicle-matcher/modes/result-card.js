@@ -526,7 +526,7 @@ export function matchCard(match, {
         // Re-describe the card as the chosen car: paint, swatch, price,
         // gearbox, mileage and where the link goes. Anything left showing the
         // previous listing's values is a card describing two cars at once.
-        showPhoto(listing.photo);
+        showPhoto(listing.photo, listing.link || car.link);
         renderSpecs(
           listing.colour, listing.shade, gbp(listing.priceMin),
           listing.transmission ?? car.transmission,
