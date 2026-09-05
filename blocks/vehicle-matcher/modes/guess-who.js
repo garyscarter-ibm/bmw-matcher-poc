@@ -1915,6 +1915,115 @@ function mount(root, ctx) {
     return out;
   };
 
+  /*
+   * The tile stage's reject menu, in a layer of its own.
+   *
+   * A tile cell clips absolutely everything inside it — overflow: hidden plus the
+   * paint containment that comes with content-visibility: auto, which no z-index
+   * escapes — so a 220px menu hanging off a 128px tile was cut to the tile. One
+   * shared menu is portalled to the shell instead and positioned from the
+   * button's rect, exactly as the filter popover is: same fixed-to-viewport
+   * clamp, same outside-pointerdown and Escape closers, and it overlaps the
+   * neighbouring cars rather than being trimmed by its own.
+   */
+  const buildRejectPop = () => {
+    rejectPop = el('div', 'vm-reject-menu vm-gw-reject-pop');
+    rejectPop.hidden = true;
+    return rejectPop;
+  };
+
+  const openReject = (trigger, i) => {
+    if (state.reject) closeReject({ refocus: false });
+    rejectPop.replaceChildren(el('p', 'vm-reject-prompt', copy.rejectPrompt));
+    rejectOptionsFor(i).forEach((o) => {
+      const b = el('button', 'vm-reject-option', o.label);
+      b.type = 'button';
+      // Close first: applying re-filters the board, which repaints this cell and
+      // throws away the button that is mid-click.
+      b.addEventListener('click', () => { closeReject({ refocus: false }); o.apply(); });
+      rejectPop.append(b);
+    });
+    state.reject = { trigger, i };
+    rejectPop.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    placeReject(trigger);
+    document.addEventListener('keydown', onRejectKey);
+    document.addEventListener('pointerdown', onRejectOutside, true);
+    window.addEventListener('scroll', onRejectShift, true);
+    window.addEventListener('resize', onRejectShift);
+    focusablesIn(rejectPop)[0]?.focus();
+  };
+
+  /** Under the button and right-aligned with it (the button sits in the tile's top
+   *  right), clamped into the viewport, flipped above if it would fall off. */
+  const placeReject = (trigger) => {
+    const r = trigger.getBoundingClientRect?.();
+    if (!r) return;
+    const width = rejectPop.offsetWidth || REJECT_WIDTH;
+    const vw = window.innerWidth || width + POP_MARGIN * 2;
+    const vh = window.innerHeight || 0;
+    let left = r.right - width;
+    left = Math.max(POP_MARGIN, Math.min(left, vw - width - POP_MARGIN));
+    let top = r.bottom + 2;
+    const height = rejectPop.offsetHeight || 0;
+    if (height && vh && top + height > vh - POP_MARGIN) {
+      top = Math.max(POP_MARGIN, r.top - height - 2);
+    }
+    rejectPop.style.left = `${Math.round(left)}px`;
+    rejectPop.style.top = `${Math.round(top)}px`;
+  };
+
+  /* Scrolling keeps the menu with its tile rather than closing it, because the
+     board scrolls under a sticky bar and a menu that vanishes on a stray
+     trackpad nudge reads as a broken control. */
+  const onRejectShift = () => {
+    if (!state.reject) return;
+    if (!state.reject.trigger.isConnected) { closeReject({ refocus: false }); return; }
+    placeReject(state.reject.trigger);
+  };
+
+  const onRejectKey = (e) => {
+    if (!state.reject) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeReject();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    // Trapped: the menu is a sibling of the board now, so untrapped tabbing would
+    // walk out of it into whatever follows the shell.
+    const items = focusablesIn(rejectPop);
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+
+  const onRejectOutside = (e) => {
+    if (!state.reject) return;
+    if (rejectPop.contains(e.target) || state.reject.trigger.contains(e.target)) return;
+    closeReject({ refocus: false });
+  };
+
+  function closeReject({ refocus = true } = {}) {
+    if (!state.reject) return;
+    const { trigger } = state.reject;
+    document.removeEventListener('keydown', onRejectKey);
+    document.removeEventListener('pointerdown', onRejectOutside, true);
+    window.removeEventListener('scroll', onRejectShift, true);
+    window.removeEventListener('resize', onRejectShift);
+    rejectPop.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    state.reject = null;
+    if (refocus) trigger.focus?.();
+  }
+
   /* ---------------------------- the stage ---------------------------- */
 
   const buildStage = () => {
