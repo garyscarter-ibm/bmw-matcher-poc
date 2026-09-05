@@ -3069,6 +3069,13 @@ a.vm-mingle-card-media:focus-visible {
   justify-content: center;
   position: relative;
 }
+/* The disc is an <a> to the advert when the finalist has one. */
+a.vm-knockout-crest-disc { color: inherit; text-decoration: none; }
+a.vm-knockout-crest-disc:focus-visible {
+  outline: 2px solid var(--vm-accent);
+  /* Inset: the disc is a clipped 999px circle, an outset ring would be cut. */
+  outline-offset: -2px;
+}
 .vm-knockout-crest-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .vm-knockout-crest-name {
   font-family: var(--vm-font-bold);
