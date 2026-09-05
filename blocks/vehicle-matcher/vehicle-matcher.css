@@ -4400,14 +4400,16 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
   font-family: var(--vm-font-bold);
   font-weight: 700;
   font-size: var(--vm-text-label);
-  color: var(--vm-ink);
-  background: var(--vm-surface-dark);
-  border: var(--vm-border-width) solid var(--vm-line);
+  /* On the accent, not on --vm-surface-dark: that token equals --vm-ink on most
+     brands, so the label was drawn in its own background colour. */
+  color: var(--vm-accent-ink);
+  background: var(--vm-accent);
+  border: var(--vm-border-width) solid var(--vm-accent);
   /* -control, not -radius: this is a button, and MINI's buttons are pills. */
   border-radius: var(--vm-radius-control);
   cursor: pointer;
 }
-.vm-gw-place-go:hover { border-color: var(--vm-ink); }
+.vm-gw-place-go:hover { filter: brightness(1.08); }
 /* Disabled only for the moment a lookup is in flight, so this is a "working on
    it" state rather than a permanent one: dimmed, but the label stays readable. */
 .vm-gw-place-go:disabled {
