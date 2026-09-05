@@ -132,6 +132,9 @@ export function distanceLabel(distance) {
  * itself. Tiles never call it a second time, but they get it from here anyway
  * — this was two near-identical copies, and the copy the picker didn't use was
  * the copy that quietly stopped matching.
+ *
+ * `link` is opt-in because previewTile's whole tile is already an <a>: baking the
+ * anchor in here would nest one link inside another on every preview tile.
  */
 export function mediaWell(car, extraClass = '', link = null) {
   const media = el(link ? 'a' : 'div', `vm-card-media${extraClass ? ` ${extraClass}` : ''}`);
