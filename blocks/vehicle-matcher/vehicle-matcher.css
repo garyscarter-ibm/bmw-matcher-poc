@@ -4204,8 +4204,9 @@ a.vm-ptile:focus-visible { outline: 2px solid var(--vm-accent); outline-offset: 
    carry no link decoration and still show a keyboard focus ring. */
 a.vm-gw-photo { color: inherit; text-decoration: none; }
 a.vm-gw-photo:focus-visible {
-  outline: var(--vm-focus-width) solid var(--vm-focus);
-  outline-offset: calc(-1 * var(--vm-focus-width));
+  outline: 2px solid var(--vm-accent);
+  /* Inset, not the house +2px: the cell clips, so an outset ring would vanish. */
+  outline-offset: -2px;
 }
 .vm-gw-photo img {
   width: 100%;
