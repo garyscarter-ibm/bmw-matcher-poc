@@ -1311,13 +1311,27 @@ function mount(root, ctx) {
   };
 
   /** The photo band for a chip or tile — deliberately not mediaWell(), which
-   *  builds a card's full media well with its line label and caption. */
+   *  builds a card's full media well with its line label and caption.
+   *
+   *  A recognisable photo is an invitation to click it, so once one is showing the
+   *  band IS the link to the advert (card stage has matchCard's own CTA instead).
+   *  A blank well stays a div: there is nothing there to have been clicked. */
   const photoFor = (i, big, alt) => {
     const src = state.pool.photo[i];
-    const well = el('div', 'vm-gw-photo');
+    const href = linkOf(state.pool, i);
+    const well = el(src && href ? 'a' : 'div', 'vm-gw-photo');
     if (!src) {
       well.classList.add('is-blank');
       return well;
+    }
+    if (href) {
+      well.href = href;
+      well.target = '_blank';
+      well.rel = 'noopener noreferrer';
+      well.setAttribute('aria-label', `View ${alt} at the retailer`);
+      // The tile's own "not this one" sits over this band; a click there is a
+      // rejection, not a visit.
+      well.addEventListener('click', (e) => e.stopPropagation());
     }
     const img = el('img');
     img.src = big ? fullPhoto(src) : src;
