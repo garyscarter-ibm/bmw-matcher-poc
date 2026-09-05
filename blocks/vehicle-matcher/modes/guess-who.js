@@ -122,6 +122,8 @@ const CONFETTI_MS = 2400;
 /** Popover width (for the viewport clamp only — the real width is the CSS's). */
 const POP_WIDTH = 300;
 const POP_MARGIN = 8;
+/** Same, for the portalled reject menu (.vm-gw-reject-pop). */
+const REJECT_WIDTH = 220;
 
 /* ------------------------------- the axes ------------------------------- */
 
