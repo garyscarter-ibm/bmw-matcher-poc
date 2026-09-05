@@ -2922,6 +2922,15 @@ a.vm-mingle-card-media:focus-visible {
   z-index: 2;
 }
 
+/* Each contender sits in a slot: the grid cell that holds the pick <button> plus
+   the advert chip, which can't live inside a button. The slot is the thing that
+   flies out, so the chip travels with its card. */
+.vm-knockout-slot {
+  position: relative;
+  display: grid;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
 /* A contender is a <button> wrapping the shared .vm-mingle-card-* interior, so
    the whole card is one big tap target. Reset the button, then frame it like a
    deck card. */
