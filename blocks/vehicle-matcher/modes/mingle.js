@@ -1004,10 +1004,19 @@ function mount(root, ctx) {
       }
     };
 
+    // Capture phase, so a drag is swallowed before the photo link sees the click.
+    card.addEventListener('click', (e) => {
+      if (!suppressClick) return;
+      suppressClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
+
     card.addEventListener('pointerdown', (e) => {
       // Ignore secondary buttons and any pull once a swipe is mid-flight.
       if (state.busy || (e.button && e.button !== 0)) return;
       dragging = true;
+      suppressClick = false;
       startX = e.clientX;
       startT = e.timeStamp || 0;
       dx = 0;
