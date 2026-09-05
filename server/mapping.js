@@ -1200,7 +1200,7 @@ export function mapFerrariRaw(raw) {
     cc: cc || undefined,
     power: power || undefined,
     topSpeed: num(raw?.topSpeed),
-    colour: raw?.exteriorColor || undefined,
+    colour: normaliseColour(raw?.exteriorColor),
     // The real dealer holding this car (Meridien Modena, Graypaul Nottingham …),
     // not the Ferrari-wide constant; falls back to it when absent.
     retailerName: raw?.dealerName || FERRARI_RETAILER_NAME,
