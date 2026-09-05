@@ -719,6 +719,9 @@ function mount(root, ctx) {
         card.style.transform = '';
         card.style.removeProperty('--vm-drag-stamp');
       }
+      // The peeking cards are all but hidden behind the front one, so their photo
+      // links must leave the tab order. Reset on promotion, hence every render.
+      card.inert = depth > 0;
       stack.append(card);
     });
     // Forget cards that have left the visible window so the map stays bounded.
