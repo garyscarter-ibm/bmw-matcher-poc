@@ -860,8 +860,10 @@ function mount(root, ctx) {
   };
 
   // One contender card — a lean face-off card (not the swipe stack). `side` is
-  // 'a'|'b' for the fly-out direction of the loser.
+  // 'a'|'b' for the fly-out direction of the loser. Returns a positioning SLOT,
+  // not the card: the advert chip has to live outside the pick <button>.
   const buildContender = (car, side) => {
+    const slot = el('div', `vm-knockout-slot vm-knockout-slot-${side}`);
     const card = el('button', `vm-knockout-card vm-knockout-card-${side}`);
     card.type = 'button';
     card.style.setProperty('--vm-mingle-swatch', swatchFor(car));
